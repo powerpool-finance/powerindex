@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./SushiToken.sol";
 
 
 interface IMigratorChef {
@@ -59,7 +58,7 @@ contract MasterChef is Ownable {
     }
 
     // The SUSHI TOKEN!
-    SushiToken public sushi;
+    IERC20 public sushi;
     // Dev address.
     address public devaddr;
     // Reservoir address.
@@ -87,7 +86,7 @@ contract MasterChef is Ownable {
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
 
     constructor(
-        SushiToken _sushi,
+        IERC20 _sushi,
         address _reservoir,
         address _devaddr,
         uint256 _sushiPerBlock,
