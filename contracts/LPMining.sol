@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./IMigrator.sol";
+import "./Checkpoints.sol";
 
 
 // LPMining is the master of Cvp. He can make Cvp and he is a fair guy.
@@ -16,7 +17,7 @@ import "./IMigrator.sol";
 // distributed and the community can show to govern itself.
 //
 // Have fun reading it. Hopefully it's bug-free. God bless.
-contract LPMining is Ownable {
+contract LPMining is Ownable, Checkpoints {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -72,6 +73,7 @@ contract LPMining is Ownable {
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
+    event CheckpointVotes(address indexed user, uint256 votes, uint256 price);
 
     constructor(
         IERC20 _cvp,
@@ -206,6 +208,8 @@ contract LPMining is Ownable {
         }
         user.rewardDebt = user.amount.mul(pool.accCvpPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
+
+        checkpointVotes(_pid, msg.sender);
     }
 
     // Withdraw LP tokens from LPMining.
@@ -224,6 +228,8 @@ contract LPMining is Ownable {
         }
         user.rewardDebt = user.amount.mul(pool.accCvpPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount);
+
+        checkpointVotes(_pid, msg.sender);
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
@@ -234,6 +240,23 @@ contract LPMining is Ownable {
         emit EmergencyWithdraw(msg.sender, _pid, user.amount);
         user.amount = 0;
         user.rewardDebt = 0;
+
+        checkpointVotes(_pid, msg.sender);
+    }
+
+    function checkpointVotes(uint256 _pid, address _user) public {
+        PoolInfo storage pool = poolInfo[_pid];
+
+        uint256 userLpTokenBalance = userInfo[_pid][_user].amount;
+        uint256 lpTokenTotalSupply = pool.lpToken.totalSupply();
+
+        uint256 lpCvpBalance = cvp.balanceOf(address(pool.lpToken));
+        uint256 cvpPrice = lpCvpBalance.mul(1e12).div(lpTokenTotalSupply);
+        uint256 votesBalance = userLpTokenBalance.mul(cvpPrice).div(1e12);
+
+        _writeBalance(_user, safe96(votesBalance, "LPMining::checkpointVotes: Amount overflow"));
+
+        emit CheckpointVotes(_user, votesBalance, cvpPrice);
     }
 
     // Safe cvp transfer function, just in case if rounding error causes pool to not have enough CVPs.
