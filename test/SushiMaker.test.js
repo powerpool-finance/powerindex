@@ -1,4 +1,4 @@
-const SushiToken = artifacts.require('SushiToken');
+const SushiToken = artifacts.require('MockCvp');
 const SushiMaker = artifacts.require('SushiMaker');
 const MockERC20 = artifacts.require('MockERC20');
 const UniswapV2Pair = artifacts.require('UniswapV2Pair');
@@ -8,7 +8,7 @@ contract('SushiMaker', ([alice, bar, minter]) => {
     beforeEach(async () => {
         this.factory = await UniswapV2Factory.new(alice, { from: alice });
         this.sushi = await SushiToken.new({ from: alice });
-        await this.sushi.mint(minter, '100000000', { from: alice });
+        await this.sushi.transfer(minter, '100000000', { from: alice });
         this.weth = await MockERC20.new('WETH', 'WETH', '100000000', { from: minter });
         this.token1 = await MockERC20.new('TOKEN1', 'TOKEN', '100000000', { from: minter });
         this.token2 = await MockERC20.new('TOKEN2', 'TOKEN2', '100000000', { from: minter });

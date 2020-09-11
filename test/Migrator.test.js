@@ -1,10 +1,11 @@
 const { expectRevert, time } = require('@openzeppelin/test-helpers');
-const SushiToken = artifacts.require('SushiToken');
+const SushiToken = artifacts.require('MockCvp');
 const MasterChef = artifacts.require('MasterChef');
 const MockERC20 = artifacts.require('MockERC20');
 const UniswapV2Pair = artifacts.require('UniswapV2Pair');
 const UniswapV2Factory = artifacts.require('UniswapV2Factory');
 const Migrator = artifacts.require('Migrator');
+const Reservoir = artifacts.require('Reservoir');
 
 contract('Migrator', ([alice, bob, dev, minter]) => {
     beforeEach(async () => {
@@ -15,9 +16,15 @@ contract('Migrator', ([alice, bob, dev, minter]) => {
         this.token = await MockERC20.new('TOKEN', 'TOKEN', '100000000', { from: minter });
         this.lp1 = await UniswapV2Pair.at((await this.factory1.createPair(this.weth.address, this.token.address)).logs[0].args.pair);
         this.lp2 = await UniswapV2Pair.at((await this.factory2.createPair(this.weth.address, this.token.address)).logs[0].args.pair);
-        this.chef = await MasterChef.new(this.sushi.address, dev, '1000', '0', '100000', { from: alice });
+
+        this.reservoir = await Reservoir.new({ from: alice });
+        this.chef = await MasterChef.new(this.sushi.address, this.reservoir.address, dev, '1000', '0', '100000', { from: alice });
         this.migrator = await Migrator.new(this.chef.address, this.factory1.address, this.factory2.address, '0');
-        await this.sushi.transferOwnership(this.chef.address, { from: alice });
+
+        const supply = await this.sushi.totalSupply();
+        await this.sushi.transfer(this.reservoir.address, supply, { from: alice });
+        await this.reservoir.setApprove(this.sushi.address, this.chef.address, supply, { from: alice });
+
         await this.chef.add('100', this.lp1.address, true, { from: alice });
     });
 

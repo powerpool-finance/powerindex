@@ -62,6 +62,8 @@ contract MasterChef is Ownable {
     SushiToken public sushi;
     // Dev address.
     address public devaddr;
+    // Reservoir address.
+    address public reservoir;
     // Block number when bonus SUSHI period ends.
     uint256 public bonusEndBlock;
     // SUSHI tokens created per block.
@@ -86,12 +88,14 @@ contract MasterChef is Ownable {
 
     constructor(
         SushiToken _sushi,
+        address _reservoir,
         address _devaddr,
         uint256 _sushiPerBlock,
         uint256 _startBlock,
         uint256 _bonusEndBlock
     ) public {
         sushi = _sushi;
+        reservoir = _reservoir;
         devaddr = _devaddr;
         sushiPerBlock = _sushiPerBlock;
         bonusEndBlock = _bonusEndBlock;
@@ -192,8 +196,8 @@ contract MasterChef is Ownable {
         }
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
         uint256 sushiReward = multiplier.mul(sushiPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-        sushi.mint(devaddr, sushiReward.div(10));
-        sushi.mint(address(this), sushiReward);
+        sushi.transferFrom(reservoir, devaddr, sushiReward.div(10));
+        sushi.transferFrom(reservoir, address(this), sushiReward);
         pool.accSushiPerShare = pool.accSushiPerShare.add(sushiReward.mul(1e12).div(lpSupply));
         pool.lastRewardBlock = block.number;
     }
