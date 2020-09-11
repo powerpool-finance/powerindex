@@ -9,24 +9,26 @@ const {toBN} = web3.utils;
 
 contract('LPMining', ([alice, bob, carol, dev, minter]) => {
     let supply;
+    let reservoirInitialBalance;
     beforeEach(async () => {
-        this.cvp = await CvpToken.new({ from: alice });
-        this.reservoir = await Reservoir.new({ from: alice });
+        this.cvp = await CvpToken.new({ from: minter });
+        this.reservoir = await Reservoir.new({ from: minter });
 
         this.prepareReservoir = async function() {
             supply = await this.cvp.totalSupply();
-            await this.cvp.transfer(this.reservoir.address, toBN(supply).div(toBN('2')), { from: alice });
-            await this.reservoir.setApprove(this.cvp.address, this.lpMining.address, supply, { from: alice });
+            reservoirInitialBalance = toBN(supply).div(toBN('2'));
+            await this.cvp.transfer(this.reservoir.address, reservoirInitialBalance, { from: minter });
+            await this.reservoir.setApprove(this.cvp.address, this.lpMining.address, supply, { from: minter });
         };
 
         this.checkCvpSpent = async function(spentValue) {
             const reservoirBalance = await this.cvp.balanceOf(this.reservoir.address);
-            assert.equal(toBN(supply).sub(toBN(reservoirBalance)).toString(10), toBN(spentValue).toString(10))
+            assert.equal(toBN(reservoirInitialBalance).sub(toBN(reservoirBalance)).toString(10), toBN(spentValue).toString(10))
         };
     });
 
     it('should set correct state variables', async () => {
-        this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '1000', '0', '1000', { from: alice });
+        this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '1000', '0', '1000', { from: minter });
         await this.prepareReservoir();
         const cvp = await this.lpMining.cvp();
         const devaddr = await this.lpMining.devaddr();
@@ -35,7 +37,7 @@ contract('LPMining', ([alice, bob, carol, dev, minter]) => {
     });
 
     it('should allow dev and only dev to update dev', async () => {
-        this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '1000', '0', '1000', { from: alice });
+        this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '1000', '0', '1000', { from: minter });
         assert.equal((await this.lpMining.devaddr()).valueOf(), dev);
         await expectRevert(this.lpMining.dev(bob, { from: bob }), 'dev: wut?');
         await this.lpMining.dev(bob, { from: dev });
@@ -58,8 +60,8 @@ contract('LPMining', ([alice, bob, carol, dev, minter]) => {
 
         it('should allow emergency withdraw', async () => {
             // 100 per block farming rate starting at block 100 with bonus until block 1000
-            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '100', '1000', { from: alice });
-            await this.lpMining.add('100', this.lp.address, true);
+            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '100', '1000', { from: minter });
+            await this.lpMining.add('100', this.lp.address, true, { from: minter });
             await this.lp.approve(this.lpMining.address, '1000', { from: bob });
             await this.lpMining.deposit(0, '100', { from: bob });
             assert.equal((await this.lp.balanceOf(bob)).valueOf(), '900');
@@ -69,9 +71,9 @@ contract('LPMining', ([alice, bob, carol, dev, minter]) => {
 
         it('should give out CVPs only after farming time', async () => {
             // 100 per block farming rate starting at block 100 with bonus until block 1000
-            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '100', '1000', { from: alice });
+            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '100', '1000', { from: minter });
             await this.prepareReservoir();
-            await this.lpMining.add('100', this.lp.address, true);
+            await this.lpMining.add('100', this.lp.address, true, { from: minter });
             await this.lp.approve(this.lpMining.address, '1000', { from: bob });
             await this.lpMining.deposit(0, '100', { from: bob });
             await time.advanceBlockTo('89');
@@ -94,17 +96,17 @@ contract('LPMining', ([alice, bob, carol, dev, minter]) => {
 
         it('should not distribute CVPs if no one deposit', async () => {
             // 100 per block farming rate starting at block 200 with bonus until block 1000
-            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '200', '1000', { from: alice });
+            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '200', '1000', { from: minter });
             await this.prepareReservoir();
-            await this.lpMining.add('100', this.lp.address, true);
+            await this.lpMining.add('100', this.lp.address, true, { from: minter });
             await this.lp.approve(this.lpMining.address, '1000', { from: bob });
             await time.advanceBlockTo('199');
-            assert.equal((await this.cvp.balanceOf(this.reservoir.address)).toString(10), supply.toString(10));
+            assert.equal((await this.cvp.balanceOf(this.reservoir.address)).toString(10), reservoirInitialBalance.toString(10));
             await time.advanceBlockTo('204');
-            assert.equal((await this.cvp.balanceOf(this.reservoir.address)).toString(10), supply.toString(10));
+            assert.equal((await this.cvp.balanceOf(this.reservoir.address)).toString(10), reservoirInitialBalance.toString(10));
             await time.advanceBlockTo('209');
             await this.lpMining.deposit(0, '10', { from: bob }); // block 210
-            assert.equal((await this.cvp.balanceOf(this.reservoir.address)).toString(10), supply.toString(10));
+            assert.equal((await this.cvp.balanceOf(this.reservoir.address)).toString(10), reservoirInitialBalance.toString(10));
             assert.equal((await this.cvp.balanceOf(bob)).valueOf(), '0');
             assert.equal((await this.cvp.balanceOf(dev)).valueOf(), '0');
             assert.equal((await this.lp.balanceOf(bob)).valueOf(), '990');
@@ -118,9 +120,9 @@ contract('LPMining', ([alice, bob, carol, dev, minter]) => {
 
         it('should distribute CVPs properly for each staker', async () => {
             // 100 per block farming rate starting at block 300 with bonus until block 1000
-            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '300', '1000', { from: alice });
+            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '300', '1000', { from: minter });
             await this.prepareReservoir();
-            await this.lpMining.add('100', this.lp.address, true);
+            await this.lpMining.add('100', this.lp.address, true, { from: minter });
             await this.lp.approve(this.lpMining.address, '1000', { from: alice });
             await this.lp.approve(this.lpMining.address, '1000', { from: bob });
             await this.lp.approve(this.lpMining.address, '1000', { from: carol });
@@ -179,18 +181,18 @@ contract('LPMining', ([alice, bob, carol, dev, minter]) => {
 
         it('should give proper CVPs allocation to each pool', async () => {
             // 100 per block farming rate starting at block 400 with bonus until block 1000
-            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '400', '1000', { from: alice });
+            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '400', '1000', { from: minter });
             await this.prepareReservoir();
             await this.lp.approve(this.lpMining.address, '1000', { from: alice });
             await this.lp2.approve(this.lpMining.address, '1000', { from: bob });
             // Add first LP to the pool with allocation 1
-            await this.lpMining.add('10', this.lp.address, true);
+            await this.lpMining.add('10', this.lp.address, true, { from: minter });
             // Alice deposits 10 LPs at block 410
             await time.advanceBlockTo('409');
             await this.lpMining.deposit(0, '10', { from: alice });
             // Add LP2 to the pool with allocation 2 at block 420
             await time.advanceBlockTo('419');
-            await this.lpMining.add('20', this.lp2.address, true);
+            await this.lpMining.add('20', this.lp2.address, true, { from: minter });
             // Alice should have 10*1000 pending reward
             assert.equal((await this.lpMining.pendingCvp(0, alice)).valueOf(), '10000');
             // Bob deposits 10 LP2s at block 425
@@ -206,10 +208,10 @@ contract('LPMining', ([alice, bob, carol, dev, minter]) => {
 
         it('should stop giving bonus CVPs after the bonus period ends', async () => {
             // 100 per block farming rate starting at block 500 with bonus until block 600
-            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '500', '600', { from: alice });
+            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '500', '600', { from: minter });
             await this.prepareReservoir();
             await this.lp.approve(this.lpMining.address, '1000', { from: alice });
-            await this.lpMining.add('1', this.lp.address, true);
+            await this.lpMining.add('1', this.lp.address, true, { from: minter });
             // Alice deposits 10 LPs at block 590
             await time.advanceBlockTo('589');
             await this.lpMining.deposit(0, '10', { from: alice });
@@ -223,25 +225,28 @@ contract('LPMining', ([alice, bob, carol, dev, minter]) => {
         });
 
         it('should correctly checkpoint votes', async () => {
-            // 100 per block farming rate starting at block 500 with bonus until block 600
-            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '500', '600', { from: alice });
+            // 100 per block farming rate starting at block 700 with bonus until block 800
+            await time.advanceBlockTo('699');
+            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '100', '700', '800', { from: minter });
             await this.prepareReservoir();
+
+            await this.cvp.transfer(this.lp.address, '5000000000', { from: minter });
+            await this.lp.transfer(alice, '1000', { from: minter });
             await this.lp.approve(this.lpMining.address, '1000', { from: alice });
-            await this.lpMining.add('1', this.lp.address, true);
 
-            await this.cvp.transfer(this.lp.address, '5000000000', { from: alice });
+            await this.lpMining.add('1', this.lp.address, true, { from: minter });
 
-            // Alice deposits 10 LPs at block 590
-            await time.advanceBlockTo('589');
+            // Alice deposits 10 LPs at block 790
+            await time.advanceBlockTo('789');
             await this.lpMining.deposit(0, '10', { from: alice });
             // console.log('logs', logs.map(e => e.args));
             const firstBlockNumber = await web3.eth.getBlockNumber();
             await time.advanceBlock();
             assert.equal((await this.lpMining.getCurrentVotes(alice)).valueOf(), '5');
             assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).valueOf(), '5');
-            // At block 605, she should have 1000*10 + 100*5 = 10500 pending.
-            await time.advanceBlockTo('605');
-            assert.equal((await this.lpMining.pendingCvp(0, alice)).valueOf(), '10500');
+            // At block 805, she should have 1000*10 + 100*5 = 10500 pending.
+            await time.advanceBlockTo('805');
+            assert.equal((await this.lpMining.pendingCvp(0, alice)).valueOf().toString(10), '10500');
 
             await this.lpMining.deposit(0, '10', { from: alice });
             const secondBlockNumber = await web3.eth.getBlockNumber();
@@ -267,7 +272,7 @@ contract('LPMining', ([alice, bob, carol, dev, minter]) => {
             assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).valueOf(), '30');
             assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).valueOf(), '25');
 
-            await this.cvp.transfer(this.lp.address, '5000000000', { from: alice });
+            await this.cvp.transfer(this.lp.address, '5000000000', { from: minter });
             await this.lpMining.checkpointVotes('0', alice);
             const fifthBlockNumber = await web3.eth.getBlockNumber();
             await time.advanceBlock();
