@@ -3,9 +3,6 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 contract Checkpoints {
-    /// @notice EIP-20 token decimals for this token
-    uint8 public constant decimals = 18;
-
     /// @notice Official record of token balances for each account
     mapping (address => uint96) internal balances;
 
@@ -22,7 +19,7 @@ contract Checkpoints {
     mapping (address => uint32) public numCheckpoints;
 
     /// @notice An event thats emitted when a delegate account's vote balance changes
-    event VotesChanged(address indexed delegate, uint previousBalance, uint newBalance);
+    event CheckpointBalanceChanged(address indexed delegate, uint previousBalance, uint newBalance);
 
     constructor() public {
 
@@ -37,6 +34,7 @@ contract Checkpoints {
         return balances[account];
     }
 
+    /// @dev The exact copy from CVP token
     /**
      * @notice Gets the current votes balance for `account`
      * @param account The address to get votes balance
@@ -47,6 +45,7 @@ contract Checkpoints {
         return nCheckpoints > 0 ? checkpoints[account][nCheckpoints - 1].votes : 0;
     }
 
+    /// @dev The exact copy from CVP token
     /**
      * @notice Determine the prior number of votes for an account as of a block number
      * @dev Block number must be a finalized block or else this function will revert to prevent misinformation.
@@ -88,13 +87,19 @@ contract Checkpoints {
         return checkpoints[account][lower].votes;
     }
 
-    function _writeBalance(address delegatee, uint96 amount) internal {
-        uint32 srcRepNum = numCheckpoints[delegatee];
-        uint96 srcRepOld = srcRepNum > 0 ? checkpoints[delegatee][srcRepNum - 1].votes : 0;
-        uint96 srcRepNew = safe96(amount, "Checkpoints::_writeBalance: vote amount overflow");
-        _writeCheckpoint(delegatee, srcRepNum, srcRepOld, srcRepNew);
+    /**
+     * @notice Writes checkpoint number, old and new balance to checkpoint for account address
+     * @param account The address to write balance
+     * @param balance New account balance
+     */
+    function _writeBalance(address account, uint96 balance) internal {
+        uint32 srcRepNum = numCheckpoints[account];
+        uint96 srcRepOld = srcRepNum > 0 ? checkpoints[account][srcRepNum - 1].votes : 0;
+        uint96 srcRepNew = safe96(balance, "Checkpoints::_writeBalance: vote amount overflow");
+        _writeCheckpoint(account, srcRepNum, srcRepOld, srcRepNew);
     }
 
+    /// @dev A copy from CVP token, only the event name changed
     function _writeCheckpoint(address delegatee, uint32 nCheckpoints, uint96 oldVotes, uint96 newVotes) internal {
       uint32 blockNumber = safe32(block.number, "Checkpoints::_writeCheckpoint: block number exceeds 32 bits");
 
@@ -105,25 +110,29 @@ contract Checkpoints {
           numCheckpoints[delegatee] = nCheckpoints + 1;
       }
 
-      emit VotesChanged(delegatee, oldVotes, newVotes);
+      emit CheckpointBalanceChanged(delegatee, oldVotes, newVotes);
     }
 
+    /// @dev The exact copy from CVP token
     function safe32(uint n, string memory errorMessage) internal pure returns (uint32) {
         require(n < 2**32, errorMessage);
         return uint32(n);
     }
 
+    /// @dev The exact copy from CVP token
     function safe96(uint n, string memory errorMessage) internal pure returns (uint96) {
         require(n < 2**96, errorMessage);
         return uint96(n);
     }
 
+    /// @dev The exact copy from CVP token
     function add96(uint96 a, uint96 b, string memory errorMessage) internal pure returns (uint96) {
         uint96 c = a + b;
         require(c >= a, errorMessage);
         return c;
     }
 
+    /// @dev The exact copy from CVP token
     function sub96(uint96 a, uint96 b, string memory errorMessage) internal pure returns (uint96) {
         require(b <= a, errorMessage);
         return a - b;
