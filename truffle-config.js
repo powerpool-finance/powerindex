@@ -1,3 +1,9 @@
+const web3 = require('web3');
+const homedir = require('os').homedir();
+const fs = require('fs');
+const path = require('path');
+const HDWalletProvider = require('@truffle/hdwallet-provider');
+
 module.exports = {
   // Uncommenting the defaults below
   // provides for an easier quick-start with Ganache.
@@ -18,6 +24,25 @@ module.exports = {
   //  }
   //}
   //
+  networks: {
+    kovan: {
+      host: "https://kovan-eth.compound.finance",     // Localhost (default: none)
+      port: 8545,            // Standard Ethereum port (default: none)
+      provider: () => new HDWalletProvider(
+          fs.readFileSync(path.join(homedir, '.ethereum', 'kovan'), {encoding: 'utf8'}),
+          new web3.providers.HttpProvider('https://kovan-eth.compound.finance'),
+          0,
+          100
+      ),
+      network_id: 42,
+      gas: 5500000,
+      gasPrice: 1000000000,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      allowUnlimitedContractSize: true,
+      skipDryRun: true
+    },
+  },
   compilers: {
     solc: {
       version: "0.6.12"
