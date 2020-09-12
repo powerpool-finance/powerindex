@@ -276,5 +276,26 @@ contract('LPMining', ([alice, bob, carol, minter]) => {
             assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).valueOf(), '50');
             assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).valueOf(), '0');
         });
+
+        it('cvpPerBlock can be changed by owner', async () => {
+            await time.advanceBlockTo('899');
+            // 100 per block farming rate starting at block 900
+            this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, '100', '900', { from: minter });
+            await this.prepareReservoir();
+            await this.lp.approve(this.lpMining.address, '1000', { from: bob });
+            await time.advanceBlockTo('909');
+            await this.lpMining.add('100', this.lp.address, true, { from: minter });
+            await this.lpMining.deposit(0, '100', { from: bob });
+            await time.advanceBlockTo('919');
+            await this.lpMining.deposit(0, '0', { from: bob }); // block 920
+            assert.equal((await this.cvp.balanceOf(bob)).valueOf(), '900');
+
+            await expectRevert(this.lpMining.setCvpPerBlock('200', { from: alice }), 'Ownable: caller is not the owner');
+            await this.lpMining.setCvpPerBlock('200', { from: minter });
+
+            await time.advanceBlockTo('929');
+            await this.lpMining.deposit(0, '0', { from: bob }); // block 930
+            assert.equal((await this.cvp.balanceOf(bob)).valueOf(), '2900');
+        });
     });
 });

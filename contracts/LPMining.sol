@@ -50,7 +50,7 @@ contract LPMining is Ownable, Checkpoints {
     IERC20 public cvp;
     // Reservoir address.
     address public reservoir;
-    // CVP tokens created per block.
+    // CVP tokens reward per block.
     uint256 public cvpPerBlock;
     // The migrator contract. It has a lot of power. Can only be set through governance (owner).
     IMigrator public migrator;
@@ -113,6 +113,11 @@ contract LPMining is Ownable, Checkpoints {
     // Set the migrator contract. Can only be called by the owner.
     function setMigrator(IMigrator _migrator) public onlyOwner {
         migrator = _migrator;
+    }
+
+    // Set CVP reward per block. Can only be called by the owner.
+    function setCvpPerBlock(uint256 _cvpPerBlock) public onlyOwner {
+        cvpPerBlock = _cvpPerBlock;
     }
 
     // Migrate lp token to another lp contract. Can be called by anyone. We trust that migrator contract is good.
