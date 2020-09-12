@@ -48,8 +48,6 @@ contract LPMining is Ownable, Checkpoints {
 
     // The CVP TOKEN!
     IERC20 public cvp;
-    // Dev address.
-    address public devaddr;
     // Reservoir address.
     address public reservoir;
     // CVP tokens created per block.
@@ -74,13 +72,11 @@ contract LPMining is Ownable, Checkpoints {
     constructor(
         IERC20 _cvp,
         address _reservoir,
-        address _devaddr,
         uint256 _cvpPerBlock,
         uint256 _startBlock
     ) public {
         cvp = _cvp;
         reservoir = _reservoir;
-        devaddr = _devaddr;
         cvpPerBlock = _cvpPerBlock;
         startBlock = _startBlock;
     }
@@ -171,7 +167,6 @@ contract LPMining is Ownable, Checkpoints {
         }
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
         uint256 cvpReward = multiplier.mul(cvpPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-        cvp.transferFrom(reservoir, devaddr, cvpReward.div(10));
         cvp.transferFrom(reservoir, address(this), cvpReward);
         pool.accCvpPerShare = pool.accCvpPerShare.add(cvpReward.mul(1e12).div(lpSupply));
         pool.lastRewardBlock = block.number;
@@ -253,11 +248,5 @@ contract LPMining is Ownable, Checkpoints {
         } else {
             cvp.transfer(_to, _amount);
         }
-    }
-
-    // Update dev address by the previous dev.
-    function dev(address _devaddr) public {
-        require(msg.sender == devaddr, "dev: wut?");
-        devaddr = _devaddr;
     }
 }
