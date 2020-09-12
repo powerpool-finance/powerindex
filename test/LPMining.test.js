@@ -290,7 +290,7 @@ contract('LPMining', ([alice, bob, carol, minter]) => {
             assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).valueOf(), '25');
 
             await this.cvp.transfer(this.lp.address, '5000000000', { from: minter });
-            await this.lpMining.checkpointVotes('0', alice);
+            await this.lpMining.checkpointVotes(alice);
             const fifthBlockNumber = await web3.eth.getBlockNumber();
             await time.advanceBlock();
             assert.equal((await this.lpMining.getCurrentVotes(alice)).valueOf(), '50');
@@ -300,8 +300,41 @@ contract('LPMining', ([alice, bob, carol, minter]) => {
             assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).valueOf(), '25');
             assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).valueOf(), '50');
 
-            await this.lpMining.emergencyWithdraw(0, { from: alice });
+            await this.cvp.transfer(this.lp2.address, '5000000000', { from: minter });
+            await this.lp2.transfer(alice, '1000', { from: minter });
+            await this.lp2.approve(this.lpMining.address, '1000', { from: alice });
+
+            await this.lpMining.add('1', this.lp2.address, true, { from: minter });
+            await this.lpMining.deposit('1', '10', { from: alice });
             const sixthBlockNumber = await web3.eth.getBlockNumber();
+            await time.advanceBlock();
+            assert.equal((await this.lpMining.getCurrentVotes(alice)).valueOf(), '55');
+            assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).valueOf(), '5');
+            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).valueOf(), '10');
+            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).valueOf(), '30');
+            assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).valueOf(), '25');
+            assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).valueOf(), '50');
+            assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).valueOf(), '55');
+
+            await this.lpMining.checkpointVotes(alice);
+            assert.equal((await this.lpMining.getCurrentVotes(alice)).valueOf(), '55');
+
+            await this.lpMining.emergencyWithdraw(0, { from: alice });
+            const seventhBlockNumber = await web3.eth.getBlockNumber();
+            await time.advanceBlock();
+            assert.equal((await this.lpMining.getCurrentVotes(alice)).valueOf(), '5');
+            assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).valueOf(), '5');
+            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).valueOf(), '10');
+            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).valueOf(), '30');
+            assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).valueOf(), '25');
+            assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).valueOf(), '50');
+            assert.equal((await this.lpMining.getPriorVotes(alice, seventhBlockNumber)).valueOf(), '5');
+
+            await this.lpMining.checkpointVotes(alice);
+            assert.equal((await this.lpMining.getCurrentVotes(alice)).valueOf(), '5');
+
+            await this.lpMining.emergencyWithdraw(1, { from: alice });
+            const eighthBlockNumber = await web3.eth.getBlockNumber();
             await time.advanceBlock();
             assert.equal((await this.lpMining.getCurrentVotes(alice)).valueOf(), '0');
             assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).valueOf(), '5');
@@ -309,7 +342,8 @@ contract('LPMining', ([alice, bob, carol, minter]) => {
             assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).valueOf(), '30');
             assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).valueOf(), '25');
             assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).valueOf(), '50');
-            assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).valueOf(), '0');
+            assert.equal((await this.lpMining.getPriorVotes(alice, seventhBlockNumber)).valueOf(), '5');
+            assert.equal((await this.lpMining.getPriorVotes(alice, eighthBlockNumber)).valueOf(), '0');
         });
 
         it('cvpPerBlock can be changed by owner', async () => {

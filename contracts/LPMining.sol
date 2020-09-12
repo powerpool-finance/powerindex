@@ -75,7 +75,8 @@ contract LPMining is Ownable, Checkpoints {
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
-    event CheckpointVotes(address indexed user, uint256 votes, uint256 price);
+    event CheckpointPoolVotes(address indexed user, uint256 indexed pid, uint256 votes, uint256 price);
+    event CheckpointTotalVotes(address indexed user, uint256 votes);
 
     constructor(
         IERC20 _cvp,
@@ -228,7 +229,7 @@ contract LPMining is Ownable, Checkpoints {
         user.rewardDebt = user.amount.mul(pool.accCvpPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
 
-        checkpointVotes(_pid, msg.sender);
+        checkpointVotes(msg.sender);
     }
 
     // Withdraw LP tokens from LPMining.
@@ -248,7 +249,7 @@ contract LPMining is Ownable, Checkpoints {
         user.rewardDebt = user.amount.mul(pool.accCvpPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount);
 
-        checkpointVotes(_pid, msg.sender);
+        checkpointVotes(msg.sender);
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
@@ -260,22 +261,34 @@ contract LPMining is Ownable, Checkpoints {
         user.amount = 0;
         user.rewardDebt = 0;
 
-        checkpointVotes(_pid, msg.sender);
+        checkpointVotes(msg.sender);
     }
 
-    function checkpointVotes(uint256 _pid, address _user) public {
-        PoolInfo storage pool = poolInfo[_pid];
+    // Write votes at current block
+    function checkpointVotes(address _user) public {
+        uint256 length = poolInfo.length;
 
-        uint256 userLpTokenBalance = userInfo[_pid][_user].amount;
-        uint256 lpTokenTotalSupply = pool.lpToken.totalSupply();
+        uint256 totalVotesBalance = 0;
+        for (uint256 pid = 0; pid < length; ++pid) {
+            PoolInfo storage pool = poolInfo[pid];
 
-        uint256 lpCvpBalance = cvp.balanceOf(address(pool.lpToken));
-        uint256 cvpPrice = lpCvpBalance.mul(1e12).div(lpTokenTotalSupply);
-        uint256 votesBalance = userLpTokenBalance.mul(cvpPrice).div(1e12);
+            uint256 userLpTokenBalance = userInfo[pid][_user].amount;
+            if (userLpTokenBalance == 0) {
+                continue;
+            }
+            uint256 lpTokenTotalSupply = pool.lpToken.totalSupply();
 
-        _writeBalance(_user, safe96(votesBalance, "LPMining::checkpointVotes: Amount overflow"));
+            uint256 lpCvpBalance = cvp.balanceOf(address(pool.lpToken));
+            uint256 lpCvpPrice = lpCvpBalance.mul(1e12).div(lpTokenTotalSupply);
+            uint256 lpVotesBalance = userLpTokenBalance.mul(lpCvpPrice).div(1e12);
 
-        emit CheckpointVotes(_user, votesBalance, cvpPrice);
+            totalVotesBalance = totalVotesBalance.add(lpVotesBalance);
+            emit CheckpointPoolVotes(_user, pid, lpVotesBalance, lpCvpPrice);
+        }
+
+        emit CheckpointTotalVotes(_user, totalVotesBalance);
+
+        _writeBalance(_user, safe96(totalVotesBalance, "LPMining::checkpointVotes: Amount overflow"));
     }
 
     // Safe cvp transfer function, just in case if rounding error causes pool to not have enough CVPs.
