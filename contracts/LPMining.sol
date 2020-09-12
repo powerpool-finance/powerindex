@@ -57,12 +57,20 @@ contract LPMining is Ownable, Checkpoints {
 
     // Info of each pool.
     PoolInfo[] public poolInfo;
+    // Pid of each pool by its address
+    mapping(address => uint256) public poolPidByAddress;
     // Info of each user that stakes LP tokens.
     mapping (uint256 => mapping (address => UserInfo)) public userInfo;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
     // The block number when CVP mining starts.
     uint256 public startBlock;
+
+    event AddLpToken(address indexed lpToken, uint256 indexed pid, uint256 allocPoint);
+    event SetLpToken(address indexed lpToken, uint256 indexed pid, uint256 allocPoint);
+    event SetMigrator(address indexed migrator);
+    event SetCvpPerBlock(uint256 cvpPerBlock);
+    event MigrateLpToken(address indexed oldLpToken, address indexed newLpToken, uint256 indexed pid);
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
@@ -79,6 +87,8 @@ contract LPMining is Ownable, Checkpoints {
         reservoir = _reservoir;
         cvpPerBlock = _cvpPerBlock;
         startBlock = _startBlock;
+
+        emit SetCvpPerBlock(_cvpPerBlock);
     }
 
     function poolLength() external view returns (uint256) {
@@ -86,19 +96,25 @@ contract LPMining is Ownable, Checkpoints {
     }
 
     // Add a new lp to the pool. Can only be called by the owner.
-    // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
     function add(uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate) public onlyOwner {
+        require(!isLpTokenAdded(_lpToken), "add: Lp token already added");
+
         if (_withUpdate) {
             massUpdatePools();
         }
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
+
+        uint256 pid = poolInfo.length;
         poolInfo.push(PoolInfo({
             lpToken: _lpToken,
             allocPoint: _allocPoint,
             lastRewardBlock: lastRewardBlock,
             accCvpPerShare: 0
         }));
+        poolPidByAddress[address(_lpToken)] = pid;
+
+        emit AddLpToken(address(_lpToken), pid, _allocPoint);
     }
 
     // Update the given pool's CVP allocation point. Can only be called by the owner.
@@ -108,16 +124,22 @@ contract LPMining is Ownable, Checkpoints {
         }
         totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
         poolInfo[_pid].allocPoint = _allocPoint;
+
+        emit SetLpToken(address(poolInfo[_pid].lpToken), _pid, _allocPoint);
     }
 
     // Set the migrator contract. Can only be called by the owner.
     function setMigrator(IMigrator _migrator) public onlyOwner {
         migrator = _migrator;
+
+        emit SetMigrator(address(_migrator));
     }
 
     // Set CVP reward per block. Can only be called by the owner.
     function setCvpPerBlock(uint256 _cvpPerBlock) public onlyOwner {
         cvpPerBlock = _cvpPerBlock;
+
+        emit SetCvpPerBlock(_cvpPerBlock);
     }
 
     // Migrate lp token to another lp contract. Can be called by anyone. We trust that migrator contract is good.
@@ -130,6 +152,11 @@ contract LPMining is Ownable, Checkpoints {
         IERC20 newLpToken = migrator.migrate(lpToken);
         require(bal == newLpToken.balanceOf(address(this)), "migrate: bad");
         pool.lpToken = newLpToken;
+
+        delete poolPidByAddress[address(lpToken)];
+        poolPidByAddress[address(newLpToken)] = _pid;
+
+        emit MigrateLpToken(address(lpToken), address(newLpToken), _pid);
     }
 
     // Return reward multiplier over the given _from to _to block.
@@ -149,6 +176,12 @@ contract LPMining is Ownable, Checkpoints {
             accCvpPerShare = accCvpPerShare.add(cvpReward.mul(1e12).div(lpSupply));
         }
         return user.amount.mul(accCvpPerShare).div(1e12).sub(user.rewardDebt);
+    }
+
+    // Return bool - is Lp Token added or not
+    function isLpTokenAdded(IERC20 _lpToken) public view returns (bool) {
+        uint256 pid = poolPidByAddress[address(_lpToken)];
+        return poolInfo.length > pid && address(poolInfo[pid].lpToken) == address(_lpToken);
     }
 
     // Update reward variables for all pools. Be careful of gas spending!

@@ -167,14 +167,27 @@ contract('LPMining', ([alice, bob, carol, minter]) => {
             await this.prepareReservoir();
             await this.lp.approve(this.lpMining.address, '1000', { from: alice });
             await this.lp2.approve(this.lpMining.address, '1000', { from: bob });
+
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp.address), false);
             // Add first LP to the pool with allocation 1
             await this.lpMining.add('10', this.lp.address, true, { from: minter });
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp.address), true);
+            assert.equal(await this.lpMining.poolPidByAddress(this.lp.address), '0');
+
             // Alice deposits 10 LPs at block 410
             await time.advanceBlockTo('409');
             await this.lpMining.deposit(0, '10', { from: alice });
+
+            await expectRevert(this.lpMining.add('10', this.lp.address, true, { from: minter }), 'add: Lp token already added');
+
             // Add LP2 to the pool with allocation 2 at block 420
             await time.advanceBlockTo('419');
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp2.address), false);
             await this.lpMining.add('20', this.lp2.address, true, { from: minter });
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp.address), true);
+            assert.equal(await this.lpMining.poolPidByAddress(this.lp.address), '0');
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp2.address), true);
+            assert.equal(await this.lpMining.poolPidByAddress(this.lp2.address), '1');
             // Alice should have 10*1000 pending reward
             assert.equal((await this.lpMining.pendingCvp(0, alice)).valueOf(), '1000');
             // Bob deposits 10 LP2s at block 425
@@ -186,6 +199,28 @@ contract('LPMining', ([alice, bob, carol, minter]) => {
             // At block 430. Bob should get 5*2/3*1000 = 3333. Alice should get ~1666 more.
             assert.equal((await this.lpMining.pendingCvp(0, alice)).valueOf().toString(10), '1333');
             assert.equal((await this.lpMining.pendingCvp(1, bob)).valueOf().toString(10), '333');
+
+            this.lp3 = await MockERC20.new('LPToken3', 'LP3', '10000000000', { from: minter });
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp3.address), false);
+            await this.lpMining.add('20', this.lp3.address, true, { from: minter });
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp.address), true);
+            assert.equal(await this.lpMining.poolPidByAddress(this.lp.address), '0');
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp2.address), true);
+            assert.equal(await this.lpMining.poolPidByAddress(this.lp2.address), '1');
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp3.address), true);
+            assert.equal(await this.lpMining.poolPidByAddress(this.lp3.address), '2');
+
+            this.lp4 = await MockERC20.new('LPToken4', 'LP4', '10000000000', { from: minter });
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp4.address), false);
+            await this.lpMining.add('20', this.lp4.address, true, { from: minter });
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp.address), true);
+            assert.equal(await this.lpMining.poolPidByAddress(this.lp.address), '0');
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp2.address), true);
+            assert.equal(await this.lpMining.poolPidByAddress(this.lp2.address), '1');
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp3.address), true);
+            assert.equal(await this.lpMining.poolPidByAddress(this.lp3.address), '2');
+            assert.equal(await this.lpMining.isLpTokenAdded(this.lp4.address), true);
+            assert.equal(await this.lpMining.poolPidByAddress(this.lp4.address), '3');
         });
 
         it('should stop giving bonus CVPs after the bonus period ends', async () => {
