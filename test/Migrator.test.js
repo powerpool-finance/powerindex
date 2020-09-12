@@ -18,7 +18,7 @@ contract('Migrator', ([alice, bob, dev, minter]) => {
         this.lp2 = await UniswapV2Pair.at((await this.factory2.createPair(this.weth.address, this.token.address)).logs[0].args.pair);
 
         this.reservoir = await Reservoir.new({ from: alice });
-        this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '1000', '0', '100000', { from: alice });
+        this.lpMining = await LPMining.new(this.cvp.address, this.reservoir.address, dev, '1000', '0', { from: alice });
         this.migrator = await Migrator.new(this.lpMining.address, this.factory1.address, this.factory2.address, '0');
 
         const supply = await this.cvp.totalSupply();

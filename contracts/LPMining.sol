@@ -52,12 +52,8 @@ contract LPMining is Ownable, Checkpoints {
     address public devaddr;
     // Reservoir address.
     address public reservoir;
-    // Block number when bonus CVP period ends.
-    uint256 public bonusEndBlock;
     // CVP tokens created per block.
     uint256 public cvpPerBlock;
-    // Bonus muliplier for early cvp makers.
-    uint256 public constant BONUS_MULTIPLIER = 10;
     // The migrator contract. It has a lot of power. Can only be set through governance (owner).
     IMigrator public migrator;
 
@@ -80,14 +76,12 @@ contract LPMining is Ownable, Checkpoints {
         address _reservoir,
         address _devaddr,
         uint256 _cvpPerBlock,
-        uint256 _startBlock,
-        uint256 _bonusEndBlock
+        uint256 _startBlock
     ) public {
         cvp = _cvp;
         reservoir = _reservoir;
         devaddr = _devaddr;
         cvpPerBlock = _cvpPerBlock;
-        bonusEndBlock = _bonusEndBlock;
         startBlock = _startBlock;
     }
 
@@ -139,15 +133,7 @@ contract LPMining is Ownable, Checkpoints {
 
     // Return reward multiplier over the given _from to _to block.
     function getMultiplier(uint256 _from, uint256 _to) public view returns (uint256) {
-        if (_to <= bonusEndBlock) {
-            return _to.sub(_from).mul(BONUS_MULTIPLIER);
-        } else if (_from >= bonusEndBlock) {
-            return _to.sub(_from);
-        } else {
-            return bonusEndBlock.sub(_from).mul(BONUS_MULTIPLIER).add(
-                _to.sub(bonusEndBlock)
-            );
-        }
+        return _to.sub(_from);
     }
 
     // View function to see pending CVPs on frontend.
