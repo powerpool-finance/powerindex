@@ -44,7 +44,10 @@ contract('Migrator', ([alice, bob, minter]) => {
         await this.lpMining.setMigrator(this.migrator.address, { from: alice });
         await expectRevert(this.lpMining.migrate(0), 'migrate: bad');
         await this.factory2.setMigrator(this.migrator.address, { from: alice });
+        assert.equal(await this.lpMining.isLpTokenAdded(this.lp1.address), true);
         await this.lpMining.migrate(0);
+        assert.equal(await this.lpMining.isLpTokenAdded(this.lp1.address), false);
+        assert.equal(await this.lpMining.isLpTokenAdded(this.lp2.address), true);
         assert.equal((await this.lp1.balanceOf(this.lpMining.address)).valueOf(), '0');
         assert.equal((await this.lp2.balanceOf(this.lpMining.address)).valueOf(), '2000000');
         await this.lpMining.withdraw('0', '2000000', { from: minter });
