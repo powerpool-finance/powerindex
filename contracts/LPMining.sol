@@ -280,6 +280,9 @@ contract LPMining is Ownable, Checkpoints {
                 continue;
             }
             uint256 lpTokenTotalSupply = pool.lpToken.totalSupply();
+            if (lpTokenTotalSupply == 0) {
+                continue;
+            }
 
             uint256 lpCvpBalance = cvp.balanceOf(address(pool.lpToken));
             uint256 lpCvpPrice = lpCvpBalance.mul(1e12).div(lpTokenTotalSupply);
