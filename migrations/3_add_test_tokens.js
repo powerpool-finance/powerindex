@@ -4,7 +4,10 @@ const LPMining = artifacts.require("LPMining");
 const {web3} = MockERC20;
 const {toBN} = web3.utils;
 
-module.exports = function(deployer) {
+module.exports = function(deployer, network) {
+    if(network === 'test') {
+        return;
+    }
     deployer.then(async () => {
         const mockCvp = await MockCvp.deployed();
         const lpMining = await LPMining.deployed();
@@ -29,7 +32,7 @@ module.exports = function(deployer) {
             await testLpToken.transfer('0xE8bdC4438084da9Ad4e0a154C58062EAA969ab15', lpTokenPart);
             await testLpToken.transfer('0x0dEdd078d7a64a44B4a7A2BD0Dd6Ca968CF2C099', lpTokenPart);
 
-            await lpMining.add('50', testLpToken.address, true);
+            await lpMining.add('50', testLpToken.address, true, true);
         }
     })
 };

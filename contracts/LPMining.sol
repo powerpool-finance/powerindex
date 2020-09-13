@@ -43,7 +43,8 @@ contract LPMining is Ownable, Checkpoints {
         IERC20 lpToken;           // Address of LP token contract.
         uint256 allocPoint;       // How many allocation points assigned to this pool. CVPs to distribute per block.
         uint256 lastRewardBlock;  // Last block number that CVPs distribution occurs.
-        uint256 accCvpPerShare; // Accumulated CVPs per share, times 1e12. See below.
+        uint256 accCvpPerShare;   // Accumulated CVPs per share, times 1e12. See below.
+        bool votesEnabled;        // Pool enabled to write votes
     }
 
     // The CVP TOKEN!
@@ -97,7 +98,7 @@ contract LPMining is Ownable, Checkpoints {
     }
 
     // Add a new lp to the pool. Can only be called by the owner.
-    function add(uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate) public onlyOwner {
+    function add(uint256 _allocPoint, IERC20 _lpToken, bool _votesEnabled, bool _withUpdate) public onlyOwner {
         require(!isLpTokenAdded(_lpToken), "add: Lp token already added");
 
         if (_withUpdate) {
@@ -111,7 +112,8 @@ contract LPMining is Ownable, Checkpoints {
             lpToken: _lpToken,
             allocPoint: _allocPoint,
             lastRewardBlock: lastRewardBlock,
-            accCvpPerShare: 0
+            accCvpPerShare: 0,
+            votesEnabled: _votesEnabled
         }));
         poolPidByAddress[address(_lpToken)] = pid;
 
@@ -119,12 +121,13 @@ contract LPMining is Ownable, Checkpoints {
     }
 
     // Update the given pool's CVP allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate) public onlyOwner {
+    function set(uint256 _pid, uint256 _allocPoint, bool _votesEnabled, bool _withUpdate) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
         totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
         poolInfo[_pid].allocPoint = _allocPoint;
+        poolInfo[_pid].votesEnabled = _votesEnabled;
 
         emit SetLpToken(address(poolInfo[_pid].lpToken), _pid, _allocPoint);
     }
@@ -273,7 +276,7 @@ contract LPMining is Ownable, Checkpoints {
             PoolInfo storage pool = poolInfo[pid];
 
             uint256 userLpTokenBalance = userInfo[pid][_user].amount;
-            if (userLpTokenBalance == 0) {
+            if (userLpTokenBalance == 0 || !pool.votesEnabled) {
                 continue;
             }
             uint256 lpTokenTotalSupply = pool.lpToken.totalSupply();

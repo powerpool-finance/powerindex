@@ -25,7 +25,7 @@ contract('Migrator', ([alice, bob, minter]) => {
         await this.cvp.transfer(this.reservoir.address, supply, { from: alice });
         await this.reservoir.setApprove(this.cvp.address, this.lpMining.address, supply, { from: alice });
 
-        await this.lpMining.add('100', this.lp1.address, true, { from: alice });
+        await this.lpMining.add('100', this.lp1.address, true, true, { from: alice });
     });
 
     it('should do the migration successfully', async () => {

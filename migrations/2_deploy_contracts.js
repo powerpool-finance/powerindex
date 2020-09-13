@@ -5,6 +5,9 @@ const Reservoir = artifacts.require("Reservoir");
 const {web3} = Reservoir;
 
 module.exports = function(deployer, network) {
+    if(network === 'test') {
+        return;
+    }
     deployer.then(async () => {
         const cvpPerBlock = '2';
         const startBlock = await web3.eth.getBlockNumber();
