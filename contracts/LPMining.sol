@@ -10,13 +10,9 @@ import "./IMigrator.sol";
 import "./Checkpoints.sol";
 
 
-// LPMining is the master of Cvp. He can make Cvp and he is a fair guy.
-//
-// Note that it's ownable and the owner wields tremendous power. The ownership
-// will be transferred to a governance smart contract once CVP is sufficiently
-// distributed and the community can show to govern itself.
-//
-// Have fun reading it. Hopefully it's bug-free. God bless.
+// Note that LPMining is ownable and the owner wields tremendous power. The ownership
+// will be transferred to a governance smart contract
+// and the community can show to govern itself.
 contract LPMining is Ownable, Checkpoints {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
