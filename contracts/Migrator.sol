@@ -23,7 +23,8 @@ contract Migrator {
         notBeforeBlock = _notBeforeBlock;
     }
 
-    function migrate(IUniswapV2Pair orig) public returns (IUniswapV2Pair) {
+    function migrate(IUniswapV2Pair orig, uint8 poolType) public returns (IUniswapV2Pair) {
+        require(poolType == 1, "Only Uniswap poolType supported");
         require(msg.sender == lpMining, "not from lpMining");
         require(block.number >= notBeforeBlock, "too early to migrate");
         require(orig.factory() == oldFactory, "not from old factory");

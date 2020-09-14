@@ -13,5 +13,5 @@ interface IMigrator {
     // PowerSwap must mint EXACTLY the same amount of PowerSwap LP tokens or
     // else something bad will happen. Traditional UniswapV2 does not
     // do that so be careful!
-    function migrate(IERC20 token) external returns (IERC20);
+    function migrate(IERC20 token, uint8 poolType) external returns (IERC20);
 }

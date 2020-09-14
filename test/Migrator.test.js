@@ -25,7 +25,7 @@ contract('Migrator', ([alice, bob, minter]) => {
         await this.cvp.transfer(this.reservoir.address, supply, { from: alice });
         await this.reservoir.setApprove(this.cvp.address, this.lpMining.address, supply, { from: alice });
 
-        await this.lpMining.add('100', this.lp1.address, true, true, { from: alice });
+        await this.lpMining.add('100', this.lp1.address, '1', true, true, { from: alice });
     });
 
     it('should do the migration successfully', async () => {
@@ -66,5 +66,27 @@ contract('Migrator', ([alice, bob, minter]) => {
         await expectRevert(this.lpx.mint(minter), 'Must not have migrator');
         await this.factory2.setMigrator('0x0000000000000000000000000000000000000000', { from: alice });
         await this.lpx.mint(minter);
+    });
+
+    it('should reject migration for not the Uniswap poolType', async () => {
+        this.token2 = await MockERC20.new('TOKEN2', 'TOKEN2', '100000000', { from: minter });
+        this.lp3 = await UniswapV2Pair.at((await this.factory1.createPair(this.weth.address, this.token2.address)).logs[0].args.pair);
+        await this.lpMining.add('100', this.lp3.address, '2', true, true, { from: alice });
+
+        await this.token2.transfer(this.lp3.address, '10000000', { from: minter });
+        await this.weth.transfer(this.lp3.address, '500000', { from: minter });
+        await this.lp3.mint(minter);
+        assert.equal((await this.lp3.balanceOf(minter)).valueOf(), '2235067');
+        // Add some fake revenue
+        await this.token2.transfer(this.lp3.address, '100000', { from: minter });
+        await this.weth.transfer(this.lp3.address, '5000', { from: minter });
+        await this.lp3.sync();
+        await this.lp3.approve(this.lpMining.address, '100000000000', { from: minter });
+        await this.lpMining.deposit('1', '2000000', { from: minter });
+        assert.equal((await this.lp3.balanceOf(this.lpMining.address)).valueOf(), '2000000');
+        await this.lpMining.setMigrator(this.migrator.address, { from: alice });
+        await this.factory2.setMigrator(this.migrator.address, { from: alice });
+        assert.equal(await this.lpMining.isLpTokenAdded(this.lp3.address), true);
+        await expectRevert(this.lpMining.migrate('1'), "Only Uniswap poolType supported");
     });
 });

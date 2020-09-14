@@ -41,6 +41,7 @@ contract LPMining is Ownable, Checkpoints {
         uint256 lastRewardBlock;  // Last block number that CVPs distribution occurs.
         uint256 accCvpPerShare;   // Accumulated CVPs per share, times 1e12. See below.
         bool votesEnabled;        // Pool enabled to write votes
+        uint8 poolType;           // Pool type (1 For Uniswap, 2 for Balancer)
     }
 
     // The CVP TOKEN!
@@ -94,7 +95,7 @@ contract LPMining is Ownable, Checkpoints {
     }
 
     // Add a new lp to the pool. Can only be called by the owner.
-    function add(uint256 _allocPoint, IERC20 _lpToken, bool _votesEnabled, bool _withUpdate) public onlyOwner {
+    function add(uint256 _allocPoint, IERC20 _lpToken, uint8 _poolType, bool _votesEnabled, bool _withUpdate) public onlyOwner {
         require(!isLpTokenAdded(_lpToken), "add: Lp token already added");
 
         if (_withUpdate) {
@@ -109,7 +110,8 @@ contract LPMining is Ownable, Checkpoints {
             allocPoint: _allocPoint,
             lastRewardBlock: lastRewardBlock,
             accCvpPerShare: 0,
-            votesEnabled: _votesEnabled
+            votesEnabled: _votesEnabled,
+            poolType: _poolType
         }));
         poolPidByAddress[address(_lpToken)] = pid;
 
@@ -117,13 +119,14 @@ contract LPMining is Ownable, Checkpoints {
     }
 
     // Update the given pool's CVP allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, bool _votesEnabled, bool _withUpdate) public onlyOwner {
+    function set(uint256 _pid, uint256 _allocPoint, uint8 _poolType, bool _votesEnabled, bool _withUpdate) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
         totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
         poolInfo[_pid].allocPoint = _allocPoint;
         poolInfo[_pid].votesEnabled = _votesEnabled;
+        poolInfo[_pid].poolType = _poolType;
 
         emit SetLpToken(address(poolInfo[_pid].lpToken), _pid, _allocPoint);
     }
@@ -149,7 +152,7 @@ contract LPMining is Ownable, Checkpoints {
         IERC20 lpToken = pool.lpToken;
         uint256 bal = lpToken.balanceOf(address(this));
         lpToken.safeApprove(address(migrator), bal);
-        IERC20 newLpToken = migrator.migrate(lpToken);
+        IERC20 newLpToken = migrator.migrate(lpToken, pool.poolType);
         require(bal == newLpToken.balanceOf(address(this)), "migrate: bad");
         pool.lpToken = newLpToken;
 
