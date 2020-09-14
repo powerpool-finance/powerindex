@@ -11,7 +11,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity 0.5.12;
+pragma solidity 0.6.12;
 
 import "./BNum.sol";
 
@@ -88,19 +88,19 @@ contract BToken is BTokenBase, IERC20 {
         return _decimals;
     }
 
-    function allowance(address src, address dst) external view returns (uint) {
+    function allowance(address src, address dst) external override view returns (uint) {
         return _allowance[src][dst];
     }
 
-    function balanceOf(address whom) external view returns (uint) {
+    function balanceOf(address whom) external override view returns (uint) {
         return _balance[whom];
     }
 
-    function totalSupply() public view returns (uint) {
+    function totalSupply() public override view returns (uint) {
         return _totalSupply;
     }
 
-    function approve(address dst, uint amt) external returns (bool) {
+    function approve(address dst, uint amt) external override returns (bool) {
         _allowance[msg.sender][dst] = amt;
         emit Approval(msg.sender, dst, amt);
         return true;
@@ -123,12 +123,12 @@ contract BToken is BTokenBase, IERC20 {
         return true;
     }
 
-    function transfer(address dst, uint amt) external returns (bool) {
+    function transfer(address dst, uint amt) external override returns (bool) {
         _move(msg.sender, dst, amt);
         return true;
     }
 
-    function transferFrom(address src, address dst, uint amt) external returns (bool) {
+    function transferFrom(address src, address dst, uint amt) external override returns (bool) {
         require(msg.sender == src || amt <= _allowance[src][msg.sender], "ERR_BTOKEN_BAD_CALLER");
         _move(src, dst, amt);
         if (msg.sender != src && _allowance[src][msg.sender] != uint256(-1)) {
