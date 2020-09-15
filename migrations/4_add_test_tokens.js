@@ -5,7 +5,7 @@ const {web3} = MockERC20;
 const {toBN} = web3.utils;
 
 module.exports = function(deployer, network) {
-    if(network === 'test') {
+    if(network === 'test' || network === 'mainnet') {
         return;
     }
     deployer.then(async () => {
