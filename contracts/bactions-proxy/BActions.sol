@@ -11,35 +11,35 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity 0.5.12;
+pragma solidity 0.6.12;
 
-contract ERC20 {
-    function balanceOf(address whom) external view returns (uint);
-    function allowance(address, address) external view returns (uint);
-    function approve(address spender, uint amount) external returns (bool);
-    function transfer(address dst, uint amt) external returns (bool);
-    function transferFrom(address sender, address recipient, uint amount) external returns (bool);
+abstract contract ERC20 {
+    function balanceOf(address whom) external view virtual returns (uint);
+    function allowance(address, address) external view virtual returns (uint);
+    function approve(address spender, uint amount) external virtual returns (bool);
+    function transfer(address dst, uint amt) external virtual returns (bool);
+    function transferFrom(address sender, address recipient, uint amount) external virtual returns (bool);
 }
 
-contract BPool is ERC20 {
-    function isBound(address t) external view returns (bool);
-    function getFinalTokens() external view returns(address[] memory);
-    function getBalance(address token) external view returns (uint);
-    function setSwapFee(uint swapFee) external;
-    function setController(address controller) external;
-    function setPublicSwap(bool public_) external;
-    function finalize() external;
-    function bind(address token, uint balance, uint denorm) external;
-    function rebind(address token, uint balance, uint denorm) external;
-    function unbind(address token) external;
-    function joinPool(uint poolAmountOut, uint[] calldata maxAmountsIn) external;
+abstract contract BPool is ERC20 {
+    function isBound(address t) external view virtual returns (bool);
+    function getFinalTokens() external view virtual returns(address[] memory);
+    function getBalance(address token) external view virtual returns (uint);
+    function setSwapFee(uint swapFee) external virtual;
+    function setController(address controller) external virtual;
+    function setPublicSwap(bool public_) external virtual;
+    function finalize() external virtual;
+    function bind(address token, uint balance, uint denorm) external virtual;
+    function rebind(address token, uint balance, uint denorm) external virtual;
+    function unbind(address token) external virtual;
+    function joinPool(uint poolAmountOut, uint[] calldata maxAmountsIn) external virtual;
     function joinswapExternAmountIn(
         address tokenIn, uint tokenAmountIn, uint minPoolAmountOut
-    ) external returns (uint poolAmountOut);
+    ) external virtual returns (uint poolAmountOut);
 }
 
-contract BFactory {
-    function newBPool() external returns (BPool);
+abstract contract BFactory {
+    function newBPool() external virtual returns (BPool);
 }
 
 /********************************** WARNING **********************************/

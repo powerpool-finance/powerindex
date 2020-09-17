@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity 0.5.12;
+pragma solidity 0.6.12;
 
 interface DSAuthority {
     function canCall(
@@ -110,8 +110,7 @@ contract DSProxy is DSAuth, DSNote {
         setCache(_cacheAddr);
     }
 
-    function() external payable {
-    }
+    receive() external payable {}
 
     // use the proxy to execute calldata _data on contract _code
     function execute(bytes memory _code, bytes memory _data)
@@ -139,8 +138,8 @@ contract DSProxy is DSAuth, DSNote {
 
         // call contract in current context
         assembly {
-            let succeeded := delegatecall(sub(gas, 5000), _target, add(_data, 0x20), mload(_data), 0, 0)
-            let size := returndatasize
+            let succeeded := delegatecall(sub(gas(), 5000), _target, add(_data, 0x20), mload(_data), 0, 0)
+            let size := returndatasize()
 
             response := mload(0x40)
             mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
