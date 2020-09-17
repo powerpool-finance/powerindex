@@ -25,6 +25,23 @@ module.exports = {
   //}
   //
   networks: {
+    mainnet: {
+      host: "https://mainnet.infura.io/v3/0451559fb28d46b7b7489fbb87062222",     // Localhost (default: none)
+      port: 8545,            // Standard Ethereum port (default: none)
+      provider: () => new HDWalletProvider(
+          fs.readFileSync(path.join(homedir, '.ethereum', 'mainnet'), {encoding: 'utf8'}),
+          new web3.providers.WebsocketProvider('wss://mainnet.infura.io/ws/v3/0451559fb28d46b7b7489fbb87062222'),
+          0,
+          100
+      ),
+      network_id: 1,
+      gas: 1000000,
+      gasPrice: 112000000000,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      allowUnlimitedContractSize: true,
+      skipDryRun: true
+    },
     kovan: {
       host: "https://kovan-eth.compound.finance",     // Localhost (default: none)
       port: 8545,            // Standard Ethereum port (default: none)
@@ -35,7 +52,7 @@ module.exports = {
           100
       ),
       network_id: 42,
-      gas: 5500000,
+      gas: 10000000,
       gasPrice: 1000000000,
       confirmations: 2,
       timeoutBlocks: 200,

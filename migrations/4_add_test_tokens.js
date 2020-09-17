@@ -1,6 +1,7 @@
 const MockERC20 = artifacts.require("MockERC20");
 const MockCvp = artifacts.require("MockCvp");
 const LPMining = artifacts.require("LPMining");
+const Reservoir = artifacts.require("Reservoir");
 const {web3} = MockERC20;
 const {toBN} = web3.utils;
 
@@ -11,6 +12,7 @@ module.exports = function(deployer, network) {
     deployer.then(async () => {
         const mockCvp = await MockCvp.deployed();
         const lpMining = await LPMining.deployed();
+        const reservoir = await Reservoir.deployed();
 
         const testLpTokens = [{
             name: 'Test Uniswap LP',
@@ -34,5 +36,8 @@ module.exports = function(deployer, network) {
 
             await lpMining.add('50', testLpToken.address, true, true);
         }
+
+        await lpMining.transferOwnership(deployer);
+        await reservoir.transferOwnership(deployer);
     })
 };
