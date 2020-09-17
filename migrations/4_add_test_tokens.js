@@ -10,7 +10,7 @@ module.exports = function(deployer, network) {
         return;
     }
     deployer.then(async () => {
-        const mockCvp = await MockCvp.at('0x86D0FFCf65eE225217e0Fe85DDB2B79A8CE7eDE2');
+        const mockCvp = await MockCvp.deployed();
         const lpMining = await LPMining.deployed();
         const reservoir = await Reservoir.deployed();
 
