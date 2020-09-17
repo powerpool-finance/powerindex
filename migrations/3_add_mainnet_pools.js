@@ -1,19 +1,14 @@
 const MockERC20 = artifacts.require("MockERC20");
-const MockCvp = artifacts.require("MockCvp");
 const LPMining = artifacts.require("LPMining");
 const Reservoir = artifacts.require("Reservoir");
-const {web3} = MockERC20;
-const {toBN} = web3.utils;
 
 module.exports = function(deployer, network) {
     if(network === 'test' || network !== 'mainnet') {
         return;
     }
     deployer.then(async () => {
-        // const lpMining = await LPMining.deployed();
-        // const reservoir = await Reservoir.deployed();
-        const reservoir = await Reservoir.at('0x8EbC56A13Ae7e3cE27B960b16AA57efed3F4e79E');
-        const lpMining = await LPMining.at('0xC0B5c7f2F5b5c6CDcc75AeBB73Ac8B5d87C68DcC');
+        const lpMining = await LPMining.deployed();
+        const reservoir = await Reservoir.deployed();
 
         const testLpTokens = [{
             name: 'Uniswap',
