@@ -25,6 +25,7 @@ module.exports = function(deployer, network) {
             admin = deployer;
             startBlock = await web3.eth.getBlockNumber();
             const mockCvp = await deployer.deploy(MockCvp);
+            // const mockCvp = await MockCvp.at('0x86D0FFCf65eE225217e0Fe85DDB2B79A8CE7eDE2');
             cvpAddress = mockCvp.address;
             await mockCvp.transfer(reservoir.address, web3.utils.toWei(approveCvpAmount, 'ether'));
         }

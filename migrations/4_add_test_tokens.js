@@ -10,7 +10,7 @@ module.exports = function(deployer, network) {
         return;
     }
     deployer.then(async () => {
-        const mockCvp = await MockCvp.deployed();
+        const mockCvp = await MockCvp.at('0x86D0FFCf65eE225217e0Fe85DDB2B79A8CE7eDE2');
         const lpMining = await LPMining.deployed();
         const reservoir = await Reservoir.deployed();
 
@@ -34,10 +34,10 @@ module.exports = function(deployer, network) {
             await testLpToken.transfer('0xE8bdC4438084da9Ad4e0a154C58062EAA969ab15', lpTokenPart);
             await testLpToken.transfer('0x0dEdd078d7a64a44B4a7A2BD0Dd6Ca968CF2C099', lpTokenPart);
 
-            await lpMining.add('50', testLpToken.address, true, true);
+            await lpMining.add('50', testLpToken.address, '1', true, true);
         }
 
-        await lpMining.transferOwnership(deployer);
-        await reservoir.transferOwnership(deployer);
+        // await lpMining.transferOwnership(deployer);
+        // await reservoir.transferOwnership(deployer);
     })
 };
