@@ -11,23 +11,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity 0.5.12;
+pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 
-contract PoolInterface {
-    function swapExactAmountIn(address, uint, address, uint, uint) external returns (uint, uint);
-    function swapExactAmountOut(address, uint, address, uint, uint) external returns (uint, uint);
+abstract contract PoolInterface {
+    function swapExactAmountIn(address, uint, address, uint, uint) external virtual returns (uint, uint);
+    function swapExactAmountOut(address, uint, address, uint, uint) external virtual returns (uint, uint);
 }
 
-contract TokenInterface {
-    function balanceOf(address) public returns (uint);
-    function allowance(address, address) public returns (uint);
-    function approve(address, uint) public returns (bool);
-    function transfer(address, uint) public returns (bool);
-    function transferFrom(address, address, uint) public returns (bool);
-    function deposit() public payable;
-    function withdraw(uint) public;
+abstract contract TokenInterface {
+    function balanceOf(address) public virtual returns (uint);
+    function allowance(address, address) public virtual returns (uint);
+    function approve(address, uint) public virtual returns (bool);
+    function transfer(address, uint) public virtual returns (bool);
+    function transferFrom(address, address, uint) public virtual returns (bool);
+    function deposit() public virtual payable;
+    function withdraw(uint) public virtual;
 }
 
 contract ExchangeProxy {
@@ -292,5 +292,5 @@ contract ExchangeProxy {
         return totalAmountIn;
     }
 
-    function() external payable {}
+    receive() external payable {}
 }
