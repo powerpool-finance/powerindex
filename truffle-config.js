@@ -43,16 +43,16 @@ module.exports = {
       skipDryRun: true
     },
     kovan: {
-      host: "https://kovan-eth.compound.finance",     // Localhost (default: none)
+      host: "https://kovan.infura.io/v3/0451559fb28d46b7b7489fbb87062222",     // Localhost (default: none)
       port: 8545,            // Standard Ethereum port (default: none)
       provider: () => new HDWalletProvider(
           fs.readFileSync(path.join(homedir, '.ethereum', 'kovan'), {encoding: 'utf8'}),
-          new web3.providers.HttpProvider('https://kovan-eth.compound.finance'),
+          new web3.providers.WebsocketProvider('wss://kovan.infura.io/ws/v3/0451559fb28d46b7b7489fbb87062222'),
           0,
           100
       ),
       network_id: 42,
-      gas: 10000000,
+      gas: 12000000,
       gasPrice: 1000000000,
       confirmations: 2,
       timeoutBlocks: 200,
@@ -62,7 +62,13 @@ module.exports = {
   },
   compilers: {
     solc: {
-      version: "0.6.12"
+      version: "0.6.12",
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200
+        }
+      }
     }
   }
 };

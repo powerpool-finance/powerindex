@@ -18,14 +18,16 @@ module.exports = function(deployer, network) {
         //
         let cvpAddress;
         if(network === 'mainnet') {
-            admin = '0xB258302C3f209491d604165549079680708581Cc';
             startBlock = '10868783';
             cvpAddress = '0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1';
         } else {
-            admin = deployer;
             startBlock = await web3.eth.getBlockNumber();
-            const mockCvp = await deployer.deploy(MockCvp);
-            // const mockCvp = await MockCvp.at('0x86D0FFCf65eE225217e0Fe85DDB2B79A8CE7eDE2');
+            let mockCvp;
+            if(process.env.CVP) {
+                mockCvp = await MockCvp.at(process.env.CVP);
+            } else {
+                mockCvp = await deployer.deploy(MockCvp);
+            }
             cvpAddress = mockCvp.address;
             await mockCvp.transfer(reservoir.address, web3.utils.toWei(approveCvpAmount, 'ether'));
         }
