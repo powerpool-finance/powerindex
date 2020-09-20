@@ -125,7 +125,7 @@ contract TToken {
     }
 
     function transferFrom(address src, address dst, uint amt) external returns (bool) {
-        require(msg.sender == src || amt <= _allowance[src][msg.sender], "ERR_BTOKEN_BAD_CALLER");
+        require(msg.sender == src || amt <= _allowance[src][msg.sender], "ERR_TTOKEN_BAD_CALLER");
         _move(src, dst, amt);
         if (msg.sender != src && _allowance[src][msg.sender] != uint256(-1)) {
             _allowance[src][msg.sender] = sub(_allowance[src][msg.sender], amt);
