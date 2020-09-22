@@ -70,7 +70,6 @@ contract BPool is BBronze, BToken, BMath {
 
     bool private _mutex;
 
-    address private _factory;    // BFactory address to push token exitFee to
     address private _controller; // has CONTROL role
     bool private _publicSwap; // true if PUBLIC can call SWAP functions
 
@@ -89,7 +88,6 @@ contract BPool is BBronze, BToken, BMath {
         _name = name;
         _symbol = symbol;
         _controller = msg.sender;
-        _factory = msg.sender;
         _swapFee = MIN_FEE;
         _communitySwapFee = MIN_COMMUNITY_FEE;
         _publicSwap = false;

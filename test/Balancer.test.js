@@ -32,7 +32,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
     beforeEach(async () => {
         this.weth = await WETH.new();
 
-        this.bFactory = await BFactory.new(labsWallet, { from: minter });
+        this.bFactory = await BFactory.new({ from: minter });
         this.bActions = await BActions.new({ from: minter });
         this.bExchange = await ExchangeProxy.new(this.weth.address, { from: minter });
 
