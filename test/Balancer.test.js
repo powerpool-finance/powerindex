@@ -5,12 +5,16 @@ const BPool = artifacts.require('BPool');
 const MockERC20 = artifacts.require('MockERC20');
 const WETH = artifacts.require('WETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
+const PoolRestrictions = artifacts.require('PoolRestrictions');
 
 const {web3} = BFactory;
 const {toBN} = web3.utils;
 
 function mulScalarBN(bn1, bn2) {
     return toBN(bn1.toString(10)).mul(toBN(bn2.toString(10))).div(toBN(ether('1').toString(10))).toString(10);
+}
+function divScalarBN(bn1, bn2) {
+    return toBN(bn1.toString(10)).mul(toBN(ether('1').toString(10))).div(toBN(bn2.toString(10))).toString(10);
 }
 function subBN(bn1, bn2) {
     return toBN(bn1.toString(10)).sub(toBN(bn2.toString(10))).toString(10);
@@ -39,6 +43,16 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
         this.token1 = await MockERC20.new('My Token 1', 'MT1', ether('1000000'));
         this.token2 = await MockERC20.new('My Token 2', 'MT2', ether('1000000'));
         tokens = [this.token1.address, this.token2.address];
+
+        this.getTokensToJoinPoolAndApprove = async (pool, amountToMint) => {
+            const poolTotalSupply = (await pool.totalSupply()).toString(10);
+            const ratio = divScalarBN(amountToMint, poolTotalSupply);
+            const token1Amount = mulScalarBN(ratio, (await pool.getBalance(this.token1.address)).toString(10));
+            const token2Amount = mulScalarBN(ratio, (await pool.getBalance(this.token2.address)).toString(10));
+            await this.token1.approve(this.bActions.address, token1Amount);
+            await this.token2.approve(this.bActions.address, token2Amount);
+            return [token1Amount, token2Amount];
+        }
     });
 
     it('should set name and symbol for new pool', async () => {
@@ -136,5 +150,55 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
             addBN(token1PoolBalanceBefore, amountAfterCommunityFee)
         );
         assert.equal((await this.token2.balanceOf(alice)).toString(), tokensOut.toString());
+    });
+
+    it('pool restrictions should work properly', async () => {
+        await this.token1.approve(this.bActions.address, balances[0]);
+        await this.token2.approve(this.bActions.address, balances[1]);
+
+        const res = await this.bActions.create(
+            this.bFactory.address,
+            name,
+            symbol,
+            tokens,
+            balances,
+            weights,
+            [swapFee, communityFee],
+            communityWallet,
+            true,
+            { from: minter }
+        );
+
+        const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
+        const resultPool = await BPool.at(logNewPool.args.pool);
+
+        assert.equal((await resultPool.totalSupply()).toString(10), ether('100').toString(10));
+
+        const poolRestrictions = await PoolRestrictions.new();
+        await poolRestrictions.setTotalRestrictions([resultPool.address], [ether('200').toString(10)], { from: minter });
+
+        await resultPool.setRestrictions(poolRestrictions.address, { from: minter });
+
+        let amountToMint = ether('50').toString(10);
+
+        let [token1Amount, token2Amount] = await this.getTokensToJoinPoolAndApprove(resultPool, amountToMint)
+
+        await this.bActions.joinPool(
+            resultPool.address,
+            amountToMint,
+            [token1Amount, token2Amount]
+        );
+
+        assert.equal((await resultPool.totalSupply()).toString(10), ether('150').toString(10));
+
+        amountToMint = ether('60').toString(10);
+
+        [token1Amount, token2Amount] = await this.getTokensToJoinPoolAndApprove(resultPool, amountToMint)
+
+        await expectRevert(this.bActions.joinPool(
+            resultPool.address,
+            amountToMint,
+            [token1Amount, token2Amount]
+        ), 'ERR_MAX_TOTAL_SUPPLY');
     });
 });
