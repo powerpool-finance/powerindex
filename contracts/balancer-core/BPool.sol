@@ -15,6 +15,7 @@ pragma solidity 0.6.12;
 
 import "./BToken.sol";
 import "./BMath.sol";
+import "../IPoolRestrictions.sol";
 
 contract BPool is BBronze, BToken, BMath {
 
@@ -72,6 +73,8 @@ contract BPool is BBronze, BToken, BMath {
 
     address private _controller; // has CONTROL role
     bool private _publicSwap; // true if PUBLIC can call SWAP functions
+
+    IPoolRestrictions _restrictions;
 
     // `setSwapFee` and `finalize` require CONTROL
     // `finalize` sets `PUBLIC can SWAP`, `PUBLIC can JOIN`
@@ -224,6 +227,15 @@ contract BPool is BBronze, BToken, BMath {
         require(communitySwapFee <= MAX_COMMUNITY_FEE, "ERR_MAX_INNER_TOKEN_FEE");
         _communitySwapFee = communitySwapFee;
         _communitySwapFeeReceiver = communitySwapFeeReceiver;
+    }
+
+    function setRestrictions(IPoolRestrictions restrictions)
+        external
+        _logs_
+        _lock_
+    {
+        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
+        _restrictions = restrictions;
     }
 
     function setController(address manager)
@@ -750,6 +762,10 @@ contract BPool is BBronze, BToken, BMath {
     function _mintPoolShare(uint amount)
         internal
     {
+        if(address(_restrictions) != address(0)) {
+            uint maxTotalSupply = _restrictions.getMaxTotalSupply(address(this));
+            require(badd(_totalSupply, amount) <= maxTotalSupply, "ERR_MAX_TOTAL_SUPPLY");
+        }
         _mint(amount);
     }
 

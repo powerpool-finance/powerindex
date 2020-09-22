@@ -86,6 +86,8 @@ contract BActions {
         } else {
             pool.setPublicSwap(true);
         }
+
+        pool.setController(msg.sender);
     }
 
     function setTokens(
