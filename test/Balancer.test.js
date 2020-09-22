@@ -19,12 +19,12 @@ function addBN(bn1, bn2) {
     return toBN(bn1.toString(10)).add(toBN(bn2.toString(10))).toString(10);
 }
 
-contract('Balancer', ([minter, bob, carol, alice, communityWallet]) => {
+contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) => {
     const name = 'My Pool';
     const symbol = 'MP';
     const balances = [ether('10'), ether('20')];
     const weights = [ether('25'), ether('25')];
-    const swapFee = ether('0.05');
+    const swapFee = ether('0.01');
     const communityFee = ether('0.05');
 
     let tokens;
@@ -32,7 +32,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet]) => {
     beforeEach(async () => {
         this.weth = await WETH.new();
 
-        this.bFactory = await BFactory.new({ from: minter });
+        this.bFactory = await BFactory.new(labsWallet, { from: minter });
         this.bActions = await BActions.new({ from: minter });
         this.bExchange = await ExchangeProxy.new(this.weth.address, { from: minter });
 
