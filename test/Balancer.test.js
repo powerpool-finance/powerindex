@@ -152,7 +152,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
         assert.equal((await this.token2.balanceOf(alice)).toString(), tokensOut.toString());
     });
 
-    it.only('pool restrictions should work properly', async () => {
+    it('pool restrictions should work properly', async () => {
         await this.token1.approve(this.bActions.address, balances[0]);
         await this.token2.approve(this.bActions.address, balances[1]);
 
