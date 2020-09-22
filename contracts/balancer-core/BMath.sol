@@ -266,9 +266,9 @@ contract BMath is BBronze, BConst, BNum {
         public pure
         returns (uint tokenAmountInAfterFee, uint tokenAmountFee)
     {
-        uint scale = bdiv(BONE, bsub(BONE, communityFee));
-        tokenAmountInAfterFee = bmul(tokenAmountIn, scale);
-        uint tokenAmountFee = tokenAmountIn - tokenAmountInAfterFee;
+        uint adjustedIn = bsub(BONE, communityFee);
+        tokenAmountInAfterFee = bmul(tokenAmountIn, adjustedIn);
+        uint tokenAmountFee = bsub(tokenAmountIn, tokenAmountInAfterFee);
         return (tokenAmountInAfterFee, tokenAmountFee);
     }
 }

@@ -500,7 +500,7 @@ contract BPool is BBronze, BToken, BMath {
 
         emit LOG_SWAP(msg.sender, tokenIn, tokenOut, tokenAmountInAfterFee, tokenAmountOut);
 
-        _pullCommunityFeeUnderlying(tokenIn, msg.sender, _communitySwapFee);
+        _pullCommunityFeeUnderlying(tokenIn, msg.sender, tokenAmountFee);
         _pullUnderlying(tokenIn, msg.sender, tokenAmountInAfterFee);
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
 

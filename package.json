@@ -15,7 +15,5 @@
     "truffle-flattener": "^1.4.4",
     "web3": "1.2.1"
   },
-  "devDependencies": {
-    "cli-table": "^0.3.1"
-  }
+  "devDependencies": {}
 }
