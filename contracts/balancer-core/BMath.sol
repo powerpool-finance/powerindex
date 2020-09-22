@@ -184,7 +184,7 @@ contract BMath is BBronze, BConst, BNum {
     /**********************************************************************************************
     // calcSingleOutGivenPoolIn                                                                  //
     // tAo = tokenAmountOut            /      /                                             \\   //
-    // bO = tokenBalanceOut           /      // pS - (pAi * (1 - eF)) \     /    1    \      \\  //
+    // bO = tokenBalanceOut           /      //       pS - pAi        \     /    1    \      \\  //
     // pAi = poolAmountIn            | bO - || ----------------------- | ^ | --------- | * b0 || //
     // ps = poolSupply                \      \\          pS           /     \(wO / tW)/      //  //
     // wI = tokenWeightIn      tAo =   \      \                                             //   //
@@ -204,10 +204,7 @@ contract BMath is BBronze, BConst, BNum {
         returns (uint tokenAmountOut)
     {
         uint normalizedWeight = bdiv(tokenWeightOut, totalWeight);
-        // charge exit fee on the pool token side
-        // pAiAfterExitFee = pAi*(1-exitFee)
-        uint poolAmountInAfterExitFee = bmul(poolAmountIn, bsub(BONE, EXIT_FEE));
-        uint newPoolSupply = bsub(poolSupply, poolAmountInAfterExitFee);
+        uint newPoolSupply = bsub(poolSupply, poolAmountIn);
         uint poolRatio = bdiv(newPoolSupply, poolSupply);
      
         // newBalTo = poolRatio^(1/weightTo) * balTo;
@@ -230,9 +227,8 @@ contract BMath is BBronze, BConst, BNum {
     // tAo = tokenAmountOut      pS - ||   \     1 - ((1 - (tO / tW)) * sF)/  | ^ \ tW /  * pS | //
     // ps = poolSupply                 \\ -----------------------------------/                /  //
     // wO = tokenWeightOut  pAi =       \\               bO                 /                /   //
-    // tW = totalWeight           -------------------------------------------------------------  //
-    // sF = swapFee                                        ( 1 - eF )                            //
-    // eF = exitFee                                                                              //
+    // tW = totalWeight                                                                          //
+    // sF = swapFee                                                                              //
     **********************************************************************************************/
     function calcPoolInGivenSingleOut(
         uint tokenBalanceOut,
@@ -259,13 +255,20 @@ contract BMath is BBronze, BConst, BNum {
         //uint newPoolSupply = (ratioTo ^ weightTo) * poolSupply;
         uint poolRatio = bpow(tokenOutRatio, normalizedWeight);
         uint newPoolSupply = bmul(poolRatio, poolSupply);
-        uint poolAmountInAfterExitFee = bsub(poolSupply, newPoolSupply);
-
-        // charge exit fee on the pool token side
-        // pAi = pAiAfterExitFee/(1-exitFee)
-        poolAmountIn = bdiv(poolAmountInAfterExitFee, bsub(BONE, EXIT_FEE));
+        uint poolAmountIn = bsub(poolSupply, newPoolSupply);
         return poolAmountIn;
     }
 
-
+    function calcAmountWithCommunityFee(
+        uint tokenAmountIn,
+        uint communityFee
+    )
+        public pure
+        returns (uint tokenAmountInAfterFee, uint tokenAmountFee)
+    {
+        uint adjustedIn = bsub(BONE, communityFee);
+        tokenAmountInAfterFee = bmul(tokenAmountIn, adjustedIn);
+        uint tokenAmountFee = bsub(tokenAmountIn, tokenAmountInAfterFee);
+        return (tokenAmountInAfterFee, tokenAmountFee);
+    }
 }

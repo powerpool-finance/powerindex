@@ -70,13 +70,14 @@ contract BPool is BBronze, BToken, BMath {
 
     bool private _mutex;
 
-    address private _factory;    // BFactory address to push token exitFee to
     address private _controller; // has CONTROL role
     bool private _publicSwap; // true if PUBLIC can call SWAP functions
 
     // `setSwapFee` and `finalize` require CONTROL
     // `finalize` sets `PUBLIC can SWAP`, `PUBLIC can JOIN`
     uint private _swapFee;
+    uint private _communitySwapFee;
+    address private _communitySwapFeeReceiver;
     bool private _finalized;
 
     address[] private _tokens;
@@ -87,8 +88,8 @@ contract BPool is BBronze, BToken, BMath {
         _name = name;
         _symbol = symbol;
         _controller = msg.sender;
-        _factory = msg.sender;
         _swapFee = MIN_FEE;
+        _communitySwapFee = MIN_COMMUNITY_FEE;
         _publicSwap = false;
         _finalized = false;
     }
@@ -184,6 +185,14 @@ contract BPool is BBronze, BToken, BMath {
         return _swapFee;
     }
 
+    function getCommunitySwapFee()
+        external view
+        _viewlock_
+        returns (uint)
+    {
+        return _communitySwapFee;
+    }
+
     function getController()
         external view
         _viewlock_
@@ -202,6 +211,19 @@ contract BPool is BBronze, BToken, BMath {
         require(swapFee >= MIN_FEE, "ERR_MIN_FEE");
         require(swapFee <= MAX_FEE, "ERR_MAX_FEE");
         _swapFee = swapFee;
+    }
+
+    function setCommunitySwapFeeAndReceiver(uint communitySwapFee, address communitySwapFeeReceiver)
+        external
+        _logs_
+        _lock_
+    {
+        require(!_finalized, "ERR_IS_FINALIZED");
+        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
+        require(communitySwapFee >= MIN_COMMUNITY_FEE, "ERR_MIN_INNER_TOKEN_FEE");
+        require(communitySwapFee <= MAX_COMMUNITY_FEE, "ERR_MAX_INNER_TOKEN_FEE");
+        _communitySwapFee = communitySwapFee;
+        _communitySwapFeeReceiver = communitySwapFeeReceiver;
     }
 
     function setController(address manager)
@@ -291,11 +313,8 @@ contract BPool is BBronze, BToken, BMath {
         if (balance > oldBalance) {
             _pullUnderlying(token, msg.sender, bsub(balance, oldBalance));
         } else if (balance < oldBalance) {
-            // In this case liquidity is being withdrawn, so charge EXIT_FEE
             uint tokenBalanceWithdrawn = bsub(oldBalance, balance);
-            uint tokenExitFee = bmul(tokenBalanceWithdrawn, EXIT_FEE);
-            _pushUnderlying(token, msg.sender, bsub(tokenBalanceWithdrawn, tokenExitFee));
-            _pushUnderlying(token, _factory, tokenExitFee);
+            _pushUnderlying(token, msg.sender, tokenBalanceWithdrawn);
         }
     }
 
@@ -310,7 +329,6 @@ contract BPool is BBronze, BToken, BMath {
         require(!_finalized, "ERR_IS_FINALIZED");
 
         uint tokenBalance = _records[token].balance;
-        uint tokenExitFee = bmul(tokenBalance, EXIT_FEE);
 
         _totalWeight = bsub(_totalWeight, _records[token].denorm);
 
@@ -328,8 +346,7 @@ contract BPool is BBronze, BToken, BMath {
             balance: 0
         });
 
-        _pushUnderlying(token, msg.sender, bsub(tokenBalance, tokenExitFee));
-        _pushUnderlying(token, _factory, tokenExitFee);
+        _pushUnderlying(token, msg.sender, tokenBalance);
     }
 
     // Absorb any tokens that have been sent to this contract into the pool
@@ -399,14 +416,11 @@ contract BPool is BBronze, BToken, BMath {
         require(_finalized, "ERR_NOT_FINALIZED");
 
         uint poolTotal = totalSupply();
-        uint exitFee = bmul(poolAmountIn, EXIT_FEE);
-        uint pAiAfterExitFee = bsub(poolAmountIn, exitFee);
-        uint ratio = bdiv(pAiAfterExitFee, poolTotal);
+        uint ratio = bdiv(poolAmountIn, poolTotal);
         require(ratio != 0, "ERR_MATH_APPROX");
 
         _pullPoolShare(msg.sender, poolAmountIn);
-        _pushPoolShare(_factory, exitFee);
-        _burnPoolShare(pAiAfterExitFee);
+        _burnPoolShare(poolAmountIn);
 
         for (uint i = 0; i < _tokens.length; i++) {
             address t = _tokens[i];
@@ -453,17 +467,22 @@ contract BPool is BBronze, BToken, BMath {
                                 );
         require(spotPriceBefore <= maxPrice, "ERR_BAD_LIMIT_PRICE");
 
+        (uint tokenAmountInAfterFee, uint tokenAmountFee) = calcAmountWithCommunityFee(
+                                                                tokenAmountIn,
+                                                                _communitySwapFee
+                                                            );
+
         tokenAmountOut = calcOutGivenIn(
                             inRecord.balance,
                             inRecord.denorm,
                             outRecord.balance,
                             outRecord.denorm,
-                            tokenAmountIn,
+                            tokenAmountInAfterFee,
                             _swapFee
                         );
         require(tokenAmountOut >= minAmountOut, "ERR_LIMIT_OUT");
 
-        inRecord.balance = badd(inRecord.balance, tokenAmountIn);
+        inRecord.balance = badd(inRecord.balance, tokenAmountInAfterFee);
         outRecord.balance = bsub(outRecord.balance, tokenAmountOut);
 
         spotPriceAfter = calcSpotPrice(
@@ -475,11 +494,12 @@ contract BPool is BBronze, BToken, BMath {
                             );
         require(spotPriceAfter >= spotPriceBefore, "ERR_MATH_APPROX");     
         require(spotPriceAfter <= maxPrice, "ERR_LIMIT_PRICE");
-        require(spotPriceBefore <= bdiv(tokenAmountIn, tokenAmountOut), "ERR_MATH_APPROX");
+        require(spotPriceBefore <= bdiv(tokenAmountInAfterFee, tokenAmountOut), "ERR_MATH_APPROX");
 
-        emit LOG_SWAP(msg.sender, tokenIn, tokenOut, tokenAmountIn, tokenAmountOut);
+        emit LOG_SWAP(msg.sender, tokenIn, tokenOut, tokenAmountInAfterFee, tokenAmountOut);
 
-        _pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
+        _pullCommunityFeeUnderlying(tokenIn, msg.sender, tokenAmountFee);
+        _pullUnderlying(tokenIn, msg.sender, tokenAmountInAfterFee);
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
 
         return (tokenAmountOut, spotPriceAfter);
@@ -645,13 +665,10 @@ contract BPool is BBronze, BToken, BMath {
 
         outRecord.balance = bsub(outRecord.balance, tokenAmountOut);
 
-        uint exitFee = bmul(poolAmountIn, EXIT_FEE);
-
         emit LOG_EXIT(msg.sender, tokenOut, tokenAmountOut);
 
         _pullPoolShare(msg.sender, poolAmountIn);
-        _burnPoolShare(bsub(poolAmountIn, exitFee));
-        _pushPoolShare(_factory, exitFee);
+        _burnPoolShare(poolAmountIn);
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
 
         return tokenAmountOut;
@@ -683,14 +700,11 @@ contract BPool is BBronze, BToken, BMath {
 
         outRecord.balance = bsub(outRecord.balance, tokenAmountOut);
 
-        uint exitFee = bmul(poolAmountIn, EXIT_FEE);
-
         emit LOG_EXIT(msg.sender, tokenOut, tokenAmountOut);
 
         _pullPoolShare(msg.sender, poolAmountIn);
-        _burnPoolShare(bsub(poolAmountIn, exitFee));
-        _pushPoolShare(_factory, exitFee);
-        _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);        
+        _burnPoolShare(poolAmountIn);
+        _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
 
         return poolAmountIn;
     }
@@ -711,6 +725,13 @@ contract BPool is BBronze, BToken, BMath {
         internal
     {
         bool xfer = IERC20(erc20).transfer(to, amount);
+        require(xfer, "ERR_ERC20_FALSE");
+    }
+
+    function _pullCommunityFeeUnderlying(address erc20, address from, uint amount)
+        internal
+    {
+        bool xfer = IERC20(erc20).transferFrom(from, _communitySwapFeeReceiver, amount);
         require(xfer, "ERR_ERC20_FALSE");
     }
 

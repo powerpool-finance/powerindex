@@ -24,9 +24,7 @@ contract TBPoolJoinExit is BNum {
     function exitPool(uint poolAmountIn, uint poolTotal, uint _records_t_balance)
         internal pure returns(uint)
     {
-        uint exitFee = bmul(poolAmountIn, EXIT_FEE);
-        uint pAiAfterExitFee = bsub(poolAmountIn, exitFee);
-        uint ratio = bdiv(pAiAfterExitFee, poolTotal);
+        uint ratio = bdiv(poolAmountIn, poolTotal);
         require(ratio != 0, "ERR_MATH_APPROX");
 
         uint bal = _records_t_balance;
