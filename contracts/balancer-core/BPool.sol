@@ -83,7 +83,9 @@ contract BPool is BBronze, BToken, BMath {
     mapping(address=>Record) private  _records;
     uint private _totalWeight;
 
-    constructor() public {
+    constructor(string memory name, string memory symbol) public {
+        _name = name;
+        _symbol = symbol;
         _controller = msg.sender;
         _factory = msg.sender;
         _swapFee = MIN_FEE;

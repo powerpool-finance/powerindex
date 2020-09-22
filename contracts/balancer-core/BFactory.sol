@@ -36,11 +36,11 @@ contract BFactory is BBronze {
         return _isBPool[b];
     }
 
-    function newBPool()
+    function newBPool(string calldata name, string calldata symbol)
         external
         returns (BPool)
     {
-        BPool bpool = new BPool();
+        BPool bpool = new BPool(name, symbol);
         _isBPool[address(bpool)] = true;
         emit LOG_NEW_POOL(msg.sender, address(bpool));
         bpool.setController(msg.sender);
