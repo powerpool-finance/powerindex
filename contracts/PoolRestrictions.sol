@@ -12,7 +12,7 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
     uint256 maxTotalSupply;
   }
   // token => restrictions
-  mapping(address => TotalRestrictions) internal totalRestrictions;
+  mapping(address => TotalRestrictions) public totalRestrictions;
 
   constructor() public Ownable() {}
 
