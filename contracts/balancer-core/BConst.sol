@@ -25,7 +25,6 @@ contract BConst is BBronze {
     uint public constant MAX_FEE           = BONE / 10;
     uint public constant MIN_COMMUNITY_FEE = BONE / 10**6;
     uint public constant MAX_COMMUNITY_FEE = BONE / 10;
-    uint public constant EXIT_FEE          = 0;
 
     uint public constant MIN_WEIGHT        = BONE;
     uint public constant MAX_WEIGHT        = BONE * 50;

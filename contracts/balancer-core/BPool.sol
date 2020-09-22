@@ -215,7 +215,7 @@ contract BPool is BBronze, BToken, BMath {
         _swapFee = swapFee;
     }
 
-    function setCommunitySwapFee(uint communitySwapFee)
+    function setCommunitySwapFeeAndReceiver(uint communitySwapFee, address communitySwapFeeReceiver)
         external
         _logs_
         _lock_
@@ -225,15 +225,6 @@ contract BPool is BBronze, BToken, BMath {
         require(communitySwapFee >= MIN_COMMUNITY_FEE, "ERR_MIN_INNER_TOKEN_FEE");
         require(communitySwapFee <= MAX_COMMUNITY_FEE, "ERR_MAX_INNER_TOKEN_FEE");
         _communitySwapFee = communitySwapFee;
-    }
-
-    function setCommunitySwapFeeReceiver(address communitySwapFeeReceiver)
-        external
-        _logs_
-        _lock_
-    {
-        require(!_finalized, "ERR_IS_FINALIZED");
-        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
         _communitySwapFeeReceiver = communitySwapFeeReceiver;
     }
 
@@ -324,11 +315,8 @@ contract BPool is BBronze, BToken, BMath {
         if (balance > oldBalance) {
             _pullUnderlying(token, msg.sender, bsub(balance, oldBalance));
         } else if (balance < oldBalance) {
-            // In this case liquidity is being withdrawn, so charge EXIT_FEE
             uint tokenBalanceWithdrawn = bsub(oldBalance, balance);
-            uint tokenExitFee = bmul(tokenBalanceWithdrawn, EXIT_FEE);
-            _pushUnderlying(token, msg.sender, bsub(tokenBalanceWithdrawn, tokenExitFee));
-            _pushUnderlying(token, _factory, tokenExitFee);
+            _pushUnderlying(token, msg.sender, tokenBalanceWithdrawn);
         }
     }
 
@@ -343,7 +331,6 @@ contract BPool is BBronze, BToken, BMath {
         require(!_finalized, "ERR_IS_FINALIZED");
 
         uint tokenBalance = _records[token].balance;
-        uint tokenExitFee = bmul(tokenBalance, EXIT_FEE);
 
         _totalWeight = bsub(_totalWeight, _records[token].denorm);
 
@@ -361,8 +348,7 @@ contract BPool is BBronze, BToken, BMath {
             balance: 0
         });
 
-        _pushUnderlying(token, msg.sender, bsub(tokenBalance, tokenExitFee));
-        _pushUnderlying(token, _factory, tokenExitFee);
+        _pushUnderlying(token, msg.sender, tokenBalance);
     }
 
     // Absorb any tokens that have been sent to this contract into the pool
@@ -432,14 +418,11 @@ contract BPool is BBronze, BToken, BMath {
         require(_finalized, "ERR_NOT_FINALIZED");
 
         uint poolTotal = totalSupply();
-        uint exitFee = bmul(poolAmountIn, EXIT_FEE);
-        uint pAiAfterExitFee = bsub(poolAmountIn, exitFee);
-        uint ratio = bdiv(pAiAfterExitFee, poolTotal);
+        uint ratio = bdiv(poolAmountIn, poolTotal);
         require(ratio != 0, "ERR_MATH_APPROX");
 
         _pullPoolShare(msg.sender, poolAmountIn);
-        _pushPoolShare(_factory, exitFee);
-        _burnPoolShare(pAiAfterExitFee);
+        _burnPoolShare(poolAmountIn);
 
         for (uint i = 0; i < _tokens.length; i++) {
             address t = _tokens[i];
@@ -684,13 +667,10 @@ contract BPool is BBronze, BToken, BMath {
 
         outRecord.balance = bsub(outRecord.balance, tokenAmountOut);
 
-        uint exitFee = bmul(poolAmountIn, EXIT_FEE);
-
         emit LOG_EXIT(msg.sender, tokenOut, tokenAmountOut);
 
         _pullPoolShare(msg.sender, poolAmountIn);
-        _burnPoolShare(bsub(poolAmountIn, exitFee));
-        _pushPoolShare(_factory, exitFee);
+        _burnPoolShare(poolAmountIn);
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
 
         return tokenAmountOut;
@@ -722,14 +702,11 @@ contract BPool is BBronze, BToken, BMath {
 
         outRecord.balance = bsub(outRecord.balance, tokenAmountOut);
 
-        uint exitFee = bmul(poolAmountIn, EXIT_FEE);
-
         emit LOG_EXIT(msg.sender, tokenOut, tokenAmountOut);
 
         _pullPoolShare(msg.sender, poolAmountIn);
-        _burnPoolShare(bsub(poolAmountIn, exitFee));
-        _pushPoolShare(_factory, exitFee);
-        _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);        
+        _burnPoolShare(poolAmountIn);
+        _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
 
         return poolAmountIn;
     }
