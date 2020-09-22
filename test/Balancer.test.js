@@ -7,7 +7,7 @@ const MockERC20 = artifacts.require('MockERC20');
 const {web3} = BFactory;
 const {toBN} = web3.utils;
 
-contract('Balancer', ([alice, bob, carol, minter]) => {
+contract.only('Balancer', ([alice, bob, carol, minter, communityWallet]) => {
     beforeEach(async () => {
         this.bFactory = await BFactory.new({ from: minter });
         this.bActions = await BActions.new({ from: minter });
@@ -23,6 +23,7 @@ contract('Balancer', ([alice, bob, carol, minter]) => {
         const balances = [ether('10'), ether('20')];
         const weights = [ether('25'), ether('25')];
         const swapFee = ether('0.05');
+        const communityFee = ether('0.05');
 
         await this.token1.approve(this.bActions.address, balances[0]);
         await this.token2.approve(this.bActions.address, balances[1]);
@@ -34,7 +35,8 @@ contract('Balancer', ([alice, bob, carol, minter]) => {
             tokens,
             balances,
             weights,
-            swapFee,
+            [swapFee, communityFee],
+            communityWallet,
             true
         );
 

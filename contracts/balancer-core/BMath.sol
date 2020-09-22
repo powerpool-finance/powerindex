@@ -267,5 +267,16 @@ contract BMath is BBronze, BConst, BNum {
         return poolAmountIn;
     }
 
-
+    function calcAmountWithCommunityFee(
+        uint tokenAmountIn,
+        uint communityFee
+    )
+        public pure
+        returns (uint tokenAmountInAfterFee, uint tokenAmountFee)
+    {
+        uint scale = bdiv(BONE, bsub(BONE, communityFee));
+        tokenAmountInAfterFee = bmul(tokenAmountIn, scale);
+        uint tokenAmountFee = tokenAmountIn - tokenAmountInAfterFee;
+        return (tokenAmountInAfterFee, tokenAmountFee);
+    }
 }

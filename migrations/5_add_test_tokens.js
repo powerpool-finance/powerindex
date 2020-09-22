@@ -73,7 +73,7 @@ module.exports = function(deployer, network, accounts) {
                 pair.balances.map(b => ether(b)),
                 pair.denorms.map(d => ether(d)),
                 ether(pair.swapFee),
-                true
+                false
             );
 
             const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
