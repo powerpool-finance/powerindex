@@ -39,7 +39,7 @@ abstract contract BPool is ERC20 {
 }
 
 abstract contract BFactory {
-    function newBPool() external virtual returns (BPool);
+    function newBPool(string calldata name, string calldata symbol) external virtual returns (BPool);
 }
 
 /********************************** WARNING **********************************/
@@ -53,6 +53,8 @@ contract BActions {
 
     function create(
         BFactory factory,
+        string calldata name,
+        string calldata symbol,
         address[] calldata tokens,
         uint[] calldata balances,
         uint[] calldata denorms,
@@ -62,7 +64,7 @@ contract BActions {
         require(tokens.length == balances.length, "ERR_LENGTH_MISMATCH");
         require(tokens.length == denorms.length, "ERR_LENGTH_MISMATCH");
 
-        pool = factory.newBPool();
+        pool = factory.newBPool(name, symbol);
         pool.setSwapFee(swapFee);
 
         for (uint i = 0; i < tokens.length; i++) {
