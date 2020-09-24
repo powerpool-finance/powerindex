@@ -17,7 +17,7 @@ import "./BToken.sol";
 import "./BMath.sol";
 import "../IPoolRestrictions.sol";
 
-contract BPool is BBronze, BToken, BMath {
+contract BPool is BToken, BMath {
 
     struct Record {
         bool bound;   // is token bound to pool
@@ -468,8 +468,6 @@ contract BPool is BBronze, BToken, BMath {
         Record storage inRecord = _records[address(tokenIn)];
         Record storage outRecord = _records[address(tokenOut)];
 
-        require(tokenAmountIn <= bmul(inRecord.balance, MAX_IN_RATIO), "ERR_MAX_IN_RATIO");
-
         uint spotPriceBefore = calcSpotPrice(
                                     inRecord.balance,
                                     inRecord.denorm,
@@ -479,10 +477,12 @@ contract BPool is BBronze, BToken, BMath {
                                 );
         require(spotPriceBefore <= maxPrice, "ERR_BAD_LIMIT_PRICE");
 
-        (uint tokenAmountInAfterFee, uint tokenAmountFee) = calcAmountWithCommunityFee(
+        (uint tokenAmountInAfterFee, uint tokenAmountInFee) = calcAmountWithCommunityFee(
                                                                 tokenAmountIn,
                                                                 _communitySwapFee
                                                             );
+
+        require(tokenAmountInAfterFee <= bmul(inRecord.balance, MAX_IN_RATIO), "ERR_MAX_IN_RATIO");
 
         tokenAmountOut = calcOutGivenIn(
                             inRecord.balance,
@@ -510,7 +510,7 @@ contract BPool is BBronze, BToken, BMath {
 
         emit LOG_SWAP(msg.sender, tokenIn, tokenOut, tokenAmountInAfterFee, tokenAmountOut);
 
-        _pullCommunityFeeUnderlying(tokenIn, msg.sender, tokenAmountFee);
+        _pullCommunityFeeUnderlying(tokenIn, msg.sender, tokenAmountInFee);
         _pullUnderlying(tokenIn, msg.sender, tokenAmountInAfterFee);
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
 
@@ -547,6 +547,11 @@ contract BPool is BBronze, BToken, BMath {
                                 );
         require(spotPriceBefore <= maxPrice, "ERR_BAD_LIMIT_PRICE");
 
+        (uint tokenAmountOutAfterFee, uint tokenAmountOutFee) = calcAmountWithCommunityFee(
+            tokenAmountOut,
+            _communitySwapFee
+        );
+
         tokenAmountIn = calcInGivenOut(
                             inRecord.balance,
                             inRecord.denorm,
@@ -569,12 +574,13 @@ contract BPool is BBronze, BToken, BMath {
                             );
         require(spotPriceAfter >= spotPriceBefore, "ERR_MATH_APPROX");
         require(spotPriceAfter <= maxPrice, "ERR_LIMIT_PRICE");
-        require(spotPriceBefore <= bdiv(tokenAmountIn, tokenAmountOut), "ERR_MATH_APPROX");
+        require(spotPriceBefore <= bdiv(tokenAmountIn, tokenAmountOutAfterFee), "ERR_MATH_APPROX");
 
-        emit LOG_SWAP(msg.sender, tokenIn, tokenOut, tokenAmountIn, tokenAmountOut);
+        emit LOG_SWAP(msg.sender, tokenIn, tokenOut, tokenAmountIn, tokenAmountOutAfterFee);
 
         _pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
-        _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
+        _pushUnderlying(tokenOut, msg.sender, tokenAmountOutAfterFee);
+        _pushUnderlying(tokenOut, _communitySwapFeeReceiver, tokenAmountOutFee);
 
         return (tokenAmountIn, spotPriceAfter);
     }
@@ -591,6 +597,11 @@ contract BPool is BBronze, BToken, BMath {
         require(_records[tokenIn].bound, "ERR_NOT_BOUND");
         require(tokenAmountIn <= bmul(_records[tokenIn].balance, MAX_IN_RATIO), "ERR_MAX_IN_RATIO");
 
+        (uint tokenAmountInAfterFee, uint tokenAmountInFee) = calcAmountWithCommunityFee(
+            tokenAmountIn,
+            _communitySwapFee
+        );
+
         Record storage inRecord = _records[tokenIn];
 
         poolAmountOut = calcPoolOutGivenSingleIn(
@@ -598,19 +609,20 @@ contract BPool is BBronze, BToken, BMath {
                             inRecord.denorm,
                             _totalSupply,
                             _totalWeight,
-                            tokenAmountIn,
+                            tokenAmountInAfterFee,
                             _swapFee
                         );
 
         require(poolAmountOut >= minPoolAmountOut, "ERR_LIMIT_OUT");
 
-        inRecord.balance = badd(inRecord.balance, tokenAmountIn);
+        inRecord.balance = badd(inRecord.balance, tokenAmountInAfterFee);
 
-        emit LOG_JOIN(msg.sender, tokenIn, tokenAmountIn);
+        emit LOG_JOIN(msg.sender, tokenIn, tokenAmountInAfterFee);
 
         _mintPoolShare(poolAmountOut);
         _pushPoolShare(msg.sender, poolAmountOut);
-        _pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
+        _pullCommunityFeeUnderlying(tokenIn, msg.sender, tokenAmountInFee);
+        _pullUnderlying(tokenIn, msg.sender, tokenAmountInAfterFee);
 
         return poolAmountOut;
     }
@@ -626,6 +638,11 @@ contract BPool is BBronze, BToken, BMath {
 
         Record storage inRecord = _records[tokenIn];
 
+        (uint poolAmountOutAfterFee, uint poolAmountOutFee) = calcAmountWithCommunityFee(
+            poolAmountOut,
+            _communitySwapFee
+        );
+
         tokenAmountIn = calcSingleInGivenPoolOut(
                             inRecord.balance,
                             inRecord.denorm,
@@ -637,7 +654,7 @@ contract BPool is BBronze, BToken, BMath {
 
         require(tokenAmountIn != 0, "ERR_MATH_APPROX");
         require(tokenAmountIn <= maxAmountIn, "ERR_LIMIT_IN");
-        
+
         require(tokenAmountIn <= bmul(_records[tokenIn].balance, MAX_IN_RATIO), "ERR_MAX_IN_RATIO");
 
         inRecord.balance = badd(inRecord.balance, tokenAmountIn);
@@ -645,7 +662,8 @@ contract BPool is BBronze, BToken, BMath {
         emit LOG_JOIN(msg.sender, tokenIn, tokenAmountIn);
 
         _mintPoolShare(poolAmountOut);
-        _pushPoolShare(msg.sender, poolAmountOut);
+        _pushPoolShare(msg.sender, poolAmountOutAfterFee);
+        _pushPoolShare(_communitySwapFeeReceiver, poolAmountOutFee);
         _pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
 
         return tokenAmountIn;
@@ -677,11 +695,17 @@ contract BPool is BBronze, BToken, BMath {
 
         outRecord.balance = bsub(outRecord.balance, tokenAmountOut);
 
-        emit LOG_EXIT(msg.sender, tokenOut, tokenAmountOut);
+        (uint tokenAmountOutAfterFee, uint tokenAmountOutFee) = calcAmountWithCommunityFee(
+            tokenAmountOut,
+            _communitySwapFee
+        );
+
+        emit LOG_EXIT(msg.sender, tokenOut, tokenAmountOutAfterFee);
 
         _pullPoolShare(msg.sender, poolAmountIn);
         _burnPoolShare(poolAmountIn);
-        _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
+        _pushUnderlying(tokenOut, msg.sender, tokenAmountOutAfterFee);
+        _pushUnderlying(tokenOut, _communitySwapFeeReceiver, tokenAmountOutFee);
 
         return tokenAmountOut;
     }
@@ -698,6 +722,11 @@ contract BPool is BBronze, BToken, BMath {
 
         Record storage outRecord = _records[tokenOut];
 
+        (uint tokenAmountOutAfterFee, uint tokenAmountOutFee) = calcAmountWithCommunityFee(
+            tokenAmountOut,
+            _communitySwapFee
+        );
+
         poolAmountIn = calcPoolInGivenSingleOut(
                             outRecord.balance,
                             outRecord.denorm,
@@ -712,11 +741,12 @@ contract BPool is BBronze, BToken, BMath {
 
         outRecord.balance = bsub(outRecord.balance, tokenAmountOut);
 
-        emit LOG_EXIT(msg.sender, tokenOut, tokenAmountOut);
+        emit LOG_EXIT(msg.sender, tokenOut, tokenAmountOutAfterFee);
 
         _pullPoolShare(msg.sender, poolAmountIn);
         _burnPoolShare(poolAmountIn);
-        _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
+        _pushUnderlying(tokenOut, msg.sender, tokenAmountOutAfterFee);
+        _pushUnderlying(tokenOut, _communitySwapFeeReceiver, tokenAmountOutFee);
 
         return poolAmountIn;
     }
