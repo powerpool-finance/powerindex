@@ -1,5 +1,5 @@
-# PowerSwap
-This repository contains PowerSwap smart contracs. PowerSwap is an ecosystem product of PowerPool. The main feature of PowerSwap is a possibility to create special pools, not available in Balancer with unique governance and pool design.
+# PowerIndex
+This repository contains PowerIndex smart contracs. PowerIndex is an ecosystem product of PowerPool. The main feature of PowerIndex is a possibility to create special pools, not available in Balancer with unique governance and pool design.
 
 🚨 **Security review status: an audit is in progress**
 
