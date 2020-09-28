@@ -191,9 +191,9 @@ contract BPool is BToken, BMath {
     function getCommunitySwapFee()
         external view
         _viewlock_
-        returns (uint)
+        returns (uint, address)
     {
-        return _communitySwapFee;
+        return (_communitySwapFee, _communitySwapFeeReceiver);
     }
 
     function getController()
