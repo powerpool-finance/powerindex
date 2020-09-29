@@ -29,7 +29,9 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
     const balances = [ether('10'), ether('20')];
     const weights = [ether('25'), ether('25')];
     const swapFee = ether('0.01');
-    const communityFee = ether('0.05');
+    const communitySwapFee = ether('0.05');
+    const communityJoinFee = ether('0.04');
+    const communityExitFee = ether('0.07');
 
     let tokens;
 
@@ -66,7 +68,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
             tokens,
             balances,
             weights,
-            [swapFee, communityFee],
+            [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
             communityWallet,
             true
         );
@@ -79,10 +81,20 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
         assert.equal((await resultPool.getDenormalizedWeight(tokens[0])).toString(), weights[0].toString());
         assert.equal((await resultPool.getDenormalizedWeight(tokens[1])).toString(), weights[1].toString());
         assert.equal((await resultPool.getSwapFee()).toString(), swapFee.toString());
+        const {
+            communitySwapFee: _communitySwapFee,
+            communityJoinFee: _communityJoinFee,
+            communityExitFee: _communityExitFee,
+            communityFeeReceiver: _communityFeeReceiver
+        } = await resultPool.getCommunitySwapFee();
+        assert.equal(_communitySwapFee.toString(), communitySwapFee.toString());
+        assert.equal(_communityJoinFee.toString(), communityJoinFee.toString());
+        assert.equal(_communityExitFee.toString(), communityExitFee.toString());
+        assert.equal(_communityFeeReceiver, communityWallet);
     });
 
     describe('community fee', () => {
-        let pool, amountToSwap, amountCommunityFee, amountAfterCommunityFee, expectedOut;
+        let pool, amountToSwap, amountCommunitySwapFee, amountAfterCommunitySwapFee, expectedSwapOut;
         beforeEach(async () => {
             await this.token1.approve(this.bActions.address, balances[0]);
             await this.token2.approve(this.bActions.address, balances[1]);
@@ -94,7 +106,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
                 tokens,
                 balances,
                 weights,
-                [swapFee, communityFee],
+                [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
                 communityWallet,
                 true
             );
@@ -107,15 +119,15 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
             await this.token1.approve(this.bExchange.address, amountToSwap, {from: alice});
             await this.token1.approve(this.bActions.address, amountToSwap, {from: alice});
 
-            amountCommunityFee = mulScalarBN(amountToSwap, communityFee);
-            amountAfterCommunityFee = subBN(amountToSwap, amountCommunityFee);
+            amountCommunitySwapFee = mulScalarBN(amountToSwap, communitySwapFee);
+            amountAfterCommunitySwapFee = subBN(amountToSwap, amountCommunitySwapFee);
 
-            expectedOut = (await pool.calcOutGivenIn(
+            expectedSwapOut = (await pool.calcOutGivenIn(
                 balances[0],
                 weights[0],
                 balances[1],
                 weights[1],
-                amountAfterCommunityFee,
+                amountAfterCommunitySwapFee,
                 swapFee
             )).toString(10);
         });
@@ -124,7 +136,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
             const price = (await pool.calcSpotPrice(
                 addBN(balances[0], amountToSwap),
                 weights[0],
-                subBN(balances[1], expectedOut),
+                subBN(balances[1], expectedSwapOut),
                 weights[1],
                 swapFee
             )).toString(10);
@@ -138,23 +150,23 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
                     tokenIn: this.token1.address,
                     tokenOut: this.token2.address,
                     swapAmount: amountToSwap,
-                    limitReturnAmount: expectedOut,
+                    limitReturnAmount: expectedSwapOut,
                     maxPrice: mulScalarBN(price, ether('1.05'))
                 }]],
                 this.token1.address,
                 this.token2.address,
                 amountToSwap,
-                expectedOut,
+                expectedSwapOut,
                 {from: alice}
             );
 
             assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-            assert.equal((await this.token1.balanceOf(communityWallet)).toString(), amountCommunityFee.toString());
+            assert.equal((await this.token1.balanceOf(communityWallet)).toString(), amountCommunitySwapFee.toString());
             assert.equal(
                 (await this.token1.balanceOf(pool.address)).toString(),
-                addBN(token1PoolBalanceBefore, amountAfterCommunityFee)
+                addBN(token1PoolBalanceBefore, amountAfterCommunitySwapFee)
             );
-            assert.equal((await this.token2.balanceOf(alice)).toString(), expectedOut.toString());
+            assert.equal((await this.token2.balanceOf(alice)).toString(), expectedSwapOut.toString());
         });
 
         it('community fee should work properly for multihopBatchSwapExactOut', async () => {
@@ -166,7 +178,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
                 amountToSwap,
                 swapFee
             )).toString(10);
-            const expectedOutFee = mulScalarBN(expectedOutWithFee, communityFee);
+            const expectedOutFee = mulScalarBN(expectedOutWithFee, communitySwapFee);
 
             const price = (await pool.calcSpotPrice(
                 addBN(balances[0], amountToSwap),
@@ -205,12 +217,24 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
         });
 
         it('community fee should work properly for joinswapExternAmountIn and exitswapPoolAmountIn', async () => {
+            const amountCommunityJoinFee = mulScalarBN(amountToSwap, communityJoinFee);
+            const amountAfterCommunityJoinFee = subBN(amountToSwap, amountCommunityJoinFee);
+
+            expectedSwapOut = (await pool.calcOutGivenIn(
+                balances[0],
+                weights[0],
+                balances[1],
+                weights[1],
+                amountAfterCommunityJoinFee,
+                swapFee
+            )).toString(10);
+
             const poolAmountOut = (await pool.calcPoolOutGivenSingleIn(
                 await pool.getBalance(this.token1.address),
                 await pool.getDenormalizedWeight(this.token1.address),
                 await pool.totalSupply(),
                 await pool.getTotalDenormalizedWeight(),
-                amountAfterCommunityFee,
+                amountAfterCommunityJoinFee,
                 swapFee
             )).toString(10);
 
@@ -225,10 +249,10 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
             );
 
             assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-            assert.equal((await this.token1.balanceOf(communityWallet)).toString(), amountCommunityFee);
+            assert.equal((await this.token1.balanceOf(communityWallet)).toString(), amountCommunityJoinFee.toString());
             assert.equal(
                 (await this.token1.balanceOf(pool.address)).toString(),
-                addBN(token1PoolBalanceBefore, amountAfterCommunityFee)
+                addBN(token1PoolBalanceBefore, amountAfterCommunityJoinFee)
             );
             assert.equal((await pool.balanceOf(alice)).toString(), poolAmountOut.toString());
 
@@ -250,14 +274,13 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
                 {from: alice}
             );
 
-
-            const exitTokenAmountCommunityFee = mulScalarBN(exitTokenAmountOut, communityFee);
+            const exitTokenAmountCommunityFee = mulScalarBN(exitTokenAmountOut, communityExitFee);
             const exitTokenAmountAfterCommunityFee = subBN(exitTokenAmountOut, exitTokenAmountCommunityFee);
 
             assert.equal((await this.token1.balanceOf(alice)).toString(), exitTokenAmountAfterCommunityFee);
             assert.equal(
                 (await this.token1.balanceOf(communityWallet)).toString(),
-                addBN(amountCommunityFee, exitTokenAmountCommunityFee)
+                addBN(amountCommunityJoinFee, exitTokenAmountCommunityFee)
             );
             assert.equal(
                 (await this.token1.balanceOf(pool.address)).toString(),
@@ -278,7 +301,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
             tokens,
             balances,
             weights,
-            [swapFee, communityFee],
+            [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
             communityWallet,
             true,
             { from: minter }
