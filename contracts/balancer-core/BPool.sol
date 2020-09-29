@@ -92,7 +92,7 @@ contract BPool is BToken, BMath {
         _symbol = symbol;
         _controller = msg.sender;
         _swapFee = MIN_FEE;
-        _communitySwapFee = MIN_COMMUNITY_FEE;
+        _communitySwapFee = MIN_FEE;
         _publicSwap = false;
         _finalized = false;
     }
@@ -166,8 +166,7 @@ contract BPool is BToken, BMath {
     {
 
         require(_records[token].bound, "ERR_NOT_BOUND");
-        uint denorm = _records[token].denorm;
-        return bdiv(denorm, _totalWeight);
+        return bdiv(_records[token].denorm, _totalWeight);
     }
 
     function getBalance(address token)
@@ -211,8 +210,7 @@ contract BPool is BToken, BMath {
     { 
         require(!_finalized, "ERR_IS_FINALIZED");
         require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
-        require(swapFee >= MIN_FEE, "ERR_MIN_FEE");
-        require(swapFee <= MAX_FEE, "ERR_MAX_FEE");
+        require(swapFee >= MIN_FEE && swapFee <= MAX_FEE, "ERR_FEE_BOUNDS");
         _swapFee = swapFee;
     }
 
@@ -223,8 +221,7 @@ contract BPool is BToken, BMath {
     {
         require(!_finalized, "ERR_IS_FINALIZED");
         require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
-        require(communitySwapFee >= MIN_COMMUNITY_FEE, "ERR_MIN_INNER_TOKEN_FEE");
-        require(communitySwapFee <= MAX_COMMUNITY_FEE, "ERR_MAX_INNER_TOKEN_FEE");
+        require(communitySwapFee >= MIN_FEE && communitySwapFee <= MAX_FEE, "ERR_FEE_BOUNDS");
         _communitySwapFee = communitySwapFee;
         _communitySwapFeeReceiver = communitySwapFeeReceiver;
     }
@@ -305,8 +302,7 @@ contract BPool is BToken, BMath {
         require(_records[token].bound, "ERR_NOT_BOUND");
         require(!_finalized, "ERR_IS_FINALIZED");
 
-        require(denorm >= MIN_WEIGHT, "ERR_MIN_WEIGHT");
-        require(denorm <= MAX_WEIGHT, "ERR_MAX_WEIGHT");
+        require(denorm >= MIN_WEIGHT && denorm <= MAX_WEIGHT, "ERR_WEIGHT_BOUNDS");
         require(balance >= MIN_BALANCE, "ERR_MIN_BALANCE");
 
         // Adjust the denorm and totalWeight
@@ -376,8 +372,7 @@ contract BPool is BToken, BMath {
         _viewlock_
         returns (uint spotPrice)
     {
-        require(_records[tokenIn].bound, "ERR_NOT_BOUND");
-        require(_records[tokenOut].bound, "ERR_NOT_BOUND");
+        require(_records[tokenIn].bound && _records[tokenOut].bound, "ERR_NOT_BOUND");
         Record storage inRecord = _records[tokenIn];
         Record storage outRecord = _records[tokenOut];
         return calcSpotPrice(inRecord.balance, inRecord.denorm, outRecord.balance, outRecord.denorm, _swapFee);
@@ -388,8 +383,7 @@ contract BPool is BToken, BMath {
         _viewlock_
         returns (uint spotPrice)
     {
-        require(_records[tokenIn].bound, "ERR_NOT_BOUND");
-        require(_records[tokenOut].bound, "ERR_NOT_BOUND");
+        require(_records[tokenIn].bound && _records[tokenOut].bound, "ERR_NOT_BOUND");
         Record storage inRecord = _records[tokenIn];
         Record storage outRecord = _records[tokenOut];
         return calcSpotPrice(inRecord.balance, inRecord.denorm, outRecord.balance, outRecord.denorm, 0);
@@ -461,8 +455,7 @@ contract BPool is BToken, BMath {
         returns (uint tokenAmountOut, uint spotPriceAfter)
     {
 
-        require(_records[tokenIn].bound, "ERR_NOT_BOUND");
-        require(_records[tokenOut].bound, "ERR_NOT_BOUND");
+        require(_records[tokenIn].bound && _records[tokenOut].bound, "ERR_NOT_BOUND");
         require(_publicSwap, "ERR_SWAP_NOT_PUBLIC");
 
         Record storage inRecord = _records[address(tokenIn)];
@@ -529,8 +522,7 @@ contract BPool is BToken, BMath {
         _lock_ 
         returns (uint tokenAmountIn, uint spotPriceAfter)
     {
-        require(_records[tokenIn].bound, "ERR_NOT_BOUND");
-        require(_records[tokenOut].bound, "ERR_NOT_BOUND");
+        require(_records[tokenIn].bound && _records[tokenOut].bound, "ERR_NOT_BOUND");
         require(_publicSwap, "ERR_SWAP_NOT_PUBLIC");
 
         Record storage inRecord = _records[address(tokenIn)];
