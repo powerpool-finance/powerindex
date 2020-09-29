@@ -26,7 +26,7 @@ abstract contract BPool is ERC20 {
     function getFinalTokens() external view virtual returns(address[] memory);
     function getBalance(address token) external view virtual returns (uint);
     function setSwapFee(uint swapFee) external virtual;
-    function setCommunitySwapFeeAndReceiver(uint swapFee, address swapFeeReceiver) external virtual;
+    function setCommunityFeeAndReceiver(uint swapFee, uint joinFee, uint exitFee, address swapFeeReceiver) external virtual;
     function setController(address controller) external virtual;
     function setPublicSwap(bool public_) external virtual;
     function finalize() external virtual;
@@ -59,7 +59,7 @@ contract BActions {
         address[] calldata tokens,
         uint[] calldata balances,
         uint[] calldata denorms,
-        uint[2] calldata fees,
+        uint[4] calldata fees,
         address communityFeeReceiver,
         bool finalize
     ) external returns (BPool pool) {
@@ -68,7 +68,7 @@ contract BActions {
 
         pool = factory.newBPool(name, symbol);
         pool.setSwapFee(fees[0]);
-        pool.setCommunitySwapFeeAndReceiver(fees[1], communityFeeReceiver);
+        pool.setCommunityFeeAndReceiver(fees[1], fees[2], fees[3], communityFeeReceiver);
 
         for (uint i = 0; i < tokens.length; i++) {
             ERC20 token = ERC20(tokens[i]);

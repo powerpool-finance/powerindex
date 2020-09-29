@@ -80,7 +80,9 @@ contract BPool is BToken, BMath {
     // `finalize` sets `PUBLIC can SWAP`, `PUBLIC can JOIN`
     uint private _swapFee;
     uint private _communitySwapFee;
-    address private _communitySwapFeeReceiver;
+    uint private _communityJoinFee;
+    uint private _communityExitFee;
+    address private _communityFeeReceiver;
     bool private _finalized;
 
     address[] private _tokens;
@@ -92,7 +94,9 @@ contract BPool is BToken, BMath {
         _symbol = symbol;
         _controller = msg.sender;
         _swapFee = MIN_FEE;
-        _communitySwapFee = MIN_FEE;
+        _communitySwapFee = 0;
+        _communityJoinFee = 0;
+        _communityExitFee = 0;
         _publicSwap = false;
         _finalized = false;
     }
@@ -190,9 +194,9 @@ contract BPool is BToken, BMath {
     function getCommunitySwapFee()
         external view
         _viewlock_
-        returns (uint, address)
+        returns (uint communitySwapFee, uint communityJoinFee, uint communityExitFee, address communityFeeReceiver)
     {
-        return (_communitySwapFee, _communitySwapFeeReceiver);
+        return (_communitySwapFee, _communityJoinFee, _communityExitFee, _communityFeeReceiver);
     }
 
     function getController()
@@ -214,7 +218,12 @@ contract BPool is BToken, BMath {
         _swapFee = swapFee;
     }
 
-    function setCommunitySwapFeeAndReceiver(uint communitySwapFee, address communitySwapFeeReceiver)
+    function setCommunityFeeAndReceiver(
+        uint communitySwapFee,
+        uint communityJoinFee,
+        uint communityExitFee,
+        address communityFeeReceiver
+    )
         external
         _logs_
         _lock_
@@ -223,7 +232,9 @@ contract BPool is BToken, BMath {
         require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
         require(communitySwapFee >= MIN_FEE && communitySwapFee <= MAX_FEE, "ERR_FEE_BOUNDS");
         _communitySwapFee = communitySwapFee;
-        _communitySwapFeeReceiver = communitySwapFeeReceiver;
+        _communityJoinFee = communityJoinFee;
+        _communityExitFee = communityExitFee;
+        _communityFeeReceiver = communityFeeReceiver;
     }
 
     function setRestrictions(IPoolRestrictions restrictions)
@@ -410,8 +421,15 @@ contract BPool is BToken, BMath {
             emit LOG_JOIN(msg.sender, t, tokenAmountIn);
             _pullUnderlying(t, msg.sender, tokenAmountIn);
         }
+
+        (uint poolAmountOutAfterFee, uint poolAmountOutFee) = calcAmountWithCommunityFee(
+            poolAmountOut,
+            _communityJoinFee
+        );
+
         _mintPoolShare(poolAmountOut);
-        _pushPoolShare(msg.sender, poolAmountOut);
+        _pushPoolShare(msg.sender, poolAmountOutAfterFee);
+        _pushPoolShare(_communityFeeReceiver, poolAmountOutFee);
     }
 
     function exitPool(uint poolAmountIn, uint[] calldata minAmountsOut)
@@ -421,12 +439,18 @@ contract BPool is BToken, BMath {
     {
         require(_finalized, "ERR_NOT_FINALIZED");
 
+        (uint poolAmountInAfterFee, uint poolAmountInFee) = calcAmountWithCommunityFee(
+            poolAmountIn,
+            _communityExitFee
+        );
+
         uint poolTotal = totalSupply();
-        uint ratio = bdiv(poolAmountIn, poolTotal);
+        uint ratio = bdiv(poolAmountInAfterFee, poolTotal);
         require(ratio != 0, "ERR_MATH_APPROX");
 
         _pullPoolShare(msg.sender, poolAmountIn);
-        _burnPoolShare(poolAmountIn);
+        _pushPoolShare(_communityFeeReceiver, poolAmountInFee);
+        _burnPoolShare(poolAmountInAfterFee);
 
         for (uint i = 0; i < _tokens.length; i++) {
             address t = _tokens[i];
@@ -572,7 +596,7 @@ contract BPool is BToken, BMath {
 
         _pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOutAfterFee);
-        _pushUnderlying(tokenOut, _communitySwapFeeReceiver, tokenAmountOutFee);
+        _pushUnderlying(tokenOut, _communityFeeReceiver, tokenAmountOutFee);
 
         return (tokenAmountIn, spotPriceAfter);
     }
@@ -591,7 +615,7 @@ contract BPool is BToken, BMath {
 
         (uint tokenAmountInAfterFee, uint tokenAmountInFee) = calcAmountWithCommunityFee(
             tokenAmountIn,
-            _communitySwapFee
+            _communityJoinFee
         );
 
         Record storage inRecord = _records[tokenIn];
@@ -632,7 +656,7 @@ contract BPool is BToken, BMath {
 
         (uint poolAmountOutAfterFee, uint poolAmountOutFee) = calcAmountWithCommunityFee(
             poolAmountOut,
-            _communitySwapFee
+            _communityJoinFee
         );
 
         tokenAmountIn = calcSingleInGivenPoolOut(
@@ -655,7 +679,7 @@ contract BPool is BToken, BMath {
 
         _mintPoolShare(poolAmountOut);
         _pushPoolShare(msg.sender, poolAmountOutAfterFee);
-        _pushPoolShare(_communitySwapFeeReceiver, poolAmountOutFee);
+        _pushPoolShare(_communityFeeReceiver, poolAmountOutFee);
         _pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
 
         return tokenAmountIn;
@@ -689,7 +713,7 @@ contract BPool is BToken, BMath {
 
         (uint tokenAmountOutAfterFee, uint tokenAmountOutFee) = calcAmountWithCommunityFee(
             tokenAmountOut,
-            _communitySwapFee
+            _communityExitFee
         );
 
         emit LOG_EXIT(msg.sender, tokenOut, tokenAmountOutAfterFee);
@@ -697,7 +721,7 @@ contract BPool is BToken, BMath {
         _pullPoolShare(msg.sender, poolAmountIn);
         _burnPoolShare(poolAmountIn);
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOutAfterFee);
-        _pushUnderlying(tokenOut, _communitySwapFeeReceiver, tokenAmountOutFee);
+        _pushUnderlying(tokenOut, _communityFeeReceiver, tokenAmountOutFee);
 
         return tokenAmountOut;
     }
@@ -716,7 +740,7 @@ contract BPool is BToken, BMath {
 
         (uint tokenAmountOutAfterFee, uint tokenAmountOutFee) = calcAmountWithCommunityFee(
             tokenAmountOut,
-            _communitySwapFee
+            _communityExitFee
         );
 
         poolAmountIn = calcPoolInGivenSingleOut(
@@ -738,7 +762,7 @@ contract BPool is BToken, BMath {
         _pullPoolShare(msg.sender, poolAmountIn);
         _burnPoolShare(poolAmountIn);
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOutAfterFee);
-        _pushUnderlying(tokenOut, _communitySwapFeeReceiver, tokenAmountOutFee);
+        _pushUnderlying(tokenOut, _communityFeeReceiver, tokenAmountOutFee);
 
         return poolAmountIn;
     }
@@ -765,7 +789,7 @@ contract BPool is BToken, BMath {
     function _pullCommunityFeeUnderlying(address erc20, address from, uint amount)
         internal
     {
-        bool xfer = IERC20(erc20).transferFrom(from, _communitySwapFeeReceiver, amount);
+        bool xfer = IERC20(erc20).transferFrom(from, _communityFeeReceiver, amount);
         require(xfer, "ERR_ERC20_FALSE");
     }
 
