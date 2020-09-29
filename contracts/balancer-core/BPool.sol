@@ -421,8 +421,15 @@ contract BPool is BToken, BMath {
             emit LOG_JOIN(msg.sender, t, tokenAmountIn);
             _pullUnderlying(t, msg.sender, tokenAmountIn);
         }
+
+        (uint poolAmountOutAfterFee, uint poolAmountOutFee) = calcAmountWithCommunityFee(
+            poolAmountOut,
+            _communityJoinFee
+        );
+
         _mintPoolShare(poolAmountOut);
-        _pushPoolShare(msg.sender, poolAmountOut);
+        _pushPoolShare(msg.sender, poolAmountOutAfterFee);
+        _pushPoolShare(_communityFeeReceiver, poolAmountOutFee);
     }
 
     function exitPool(uint poolAmountIn, uint[] calldata minAmountsOut)
@@ -432,12 +439,18 @@ contract BPool is BToken, BMath {
     {
         require(_finalized, "ERR_NOT_FINALIZED");
 
+        (uint poolAmountInAfterFee, uint poolAmountInFee) = calcAmountWithCommunityFee(
+            poolAmountIn,
+            _communityExitFee
+        );
+
         uint poolTotal = totalSupply();
-        uint ratio = bdiv(poolAmountIn, poolTotal);
+        uint ratio = bdiv(poolAmountInAfterFee, poolTotal);
         require(ratio != 0, "ERR_MATH_APPROX");
 
         _pullPoolShare(msg.sender, poolAmountIn);
-        _burnPoolShare(poolAmountIn);
+        _pushPoolShare(_communityFeeReceiver, poolAmountInFee);
+        _burnPoolShare(poolAmountInAfterFee);
 
         for (uint i = 0; i < _tokens.length; i++) {
             address t = _tokens[i];

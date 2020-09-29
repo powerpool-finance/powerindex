@@ -23,6 +23,14 @@ function addBN(bn1, bn2) {
     return toBN(bn1.toString(10)).add(toBN(bn2.toString(10))).toString(10);
 }
 
+function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
+    bn1 = toBN(bn1.toString(10));
+    bn2 = toBN(bn2.toString(10));
+    const bn1GreaterThenBn2 = bn1.gt(bn2);
+    let diff = bn1GreaterThenBn2 ? bn1.sub(bn2) : bn2.sub(bn1);
+    assert.equal(diff.lte(toBN(accuracyWei)), true, message);
+}
+
 contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) => {
     const name = 'My Pool';
     const symbol = 'MP';
@@ -116,8 +124,10 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
 
             amountToSwap = ether('0.1').toString(10);
             await this.token1.transfer(alice, amountToSwap);
+            await this.token2.transfer(alice, mulScalarBN(amountToSwap, ether('2')));
             await this.token1.approve(this.bExchange.address, amountToSwap, {from: alice});
             await this.token1.approve(this.bActions.address, amountToSwap, {from: alice});
+            await this.token2.approve(this.bActions.address, mulScalarBN(amountToSwap, ether('2')), {from: alice});
 
             amountCommunitySwapFee = mulScalarBN(amountToSwap, communitySwapFee);
             amountAfterCommunitySwapFee = subBN(amountToSwap, amountCommunitySwapFee);
@@ -143,6 +153,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
 
             assert.equal((await this.token1.balanceOf(alice)).toString(), amountToSwap.toString());
             const token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
+            const token2AliceBalanceBefore = (await this.token2.balanceOf(alice)).toString();
 
             await this.bExchange.multihopBatchSwapExactIn(
                 [[{
@@ -166,7 +177,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
                 (await this.token1.balanceOf(pool.address)).toString(),
                 addBN(token1PoolBalanceBefore, amountAfterCommunitySwapFee)
             );
-            assert.equal((await this.token2.balanceOf(alice)).toString(), expectedSwapOut.toString());
+            assert.equal((await this.token2.balanceOf(alice)).toString(), addBN(token2AliceBalanceBefore, expectedSwapOut).toString());
         });
 
         it('community fee should work properly for multihopBatchSwapExactOut', async () => {
@@ -191,6 +202,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
             assert.equal((await this.token1.balanceOf(alice)).toString(), amountToSwap.toString());
             const token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
             const token2PoolBalanceBefore = (await this.token2.balanceOf(pool.address)).toString();
+            const token2AliceBalanceBefore = (await this.token2.balanceOf(alice)).toString();
 
             await this.bExchange.multihopBatchSwapExactOut(
                 [[{
@@ -213,7 +225,11 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
                 (await this.token1.balanceOf(pool.address)).toString(),
                 addBN(token1PoolBalanceBefore, amountToSwap)
             );
-            assert.equal((await this.token2.balanceOf(alice)).toString(), subBN(expectedOutWithFee, expectedOutFee).toString());
+            assert.equal(
+                (await this.token2.balanceOf(pool.address)).toString(),
+                subBN(token2PoolBalanceBefore, expectedOutWithFee)
+            );
+            assert.equal((await this.token2.balanceOf(alice)).toString(), addBN(token2AliceBalanceBefore, subBN(expectedOutWithFee, expectedOutFee)).toString());
         });
 
         it('community fee should work properly for joinswapExternAmountIn and exitswapPoolAmountIn', async () => {
@@ -287,6 +303,53 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
                 subBN(token1PoolBalanceBefore, exitTokenAmountOut)
             );
             assert.equal((await pool.balanceOf(alice)).toString(), '0');
+        });
+
+        it('community fee should work properly for joinPool and exitPool', async () => {
+            const poolOutAmount = divScalarBN(
+                mulScalarBN(amountToSwap, await pool.totalSupply()),
+                await pool.getBalance(this.token1.address)
+            );
+            let ratio = divScalarBN(poolOutAmount, await pool.totalSupply());
+            const token1InAmount = mulScalarBN(ratio, await pool.getBalance(this.token1.address));
+            const token2InAmount = mulScalarBN(ratio, await pool.getBalance(this.token2.address));
+
+            const poolOutAmountFee = mulScalarBN(poolOutAmount, communityJoinFee);
+            const poolOutAmountAfterFee = subBN(poolOutAmount, poolOutAmountFee);
+
+            await this.bActions.joinPool(
+                pool.address,
+                poolOutAmount,
+                [token1InAmount, token2InAmount],
+                {from: alice}
+            );
+
+            assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
+            assert.equal((await this.token2.balanceOf(alice)).toString(), '0');
+            assert.equal((await pool.balanceOf(communityWallet)).toString(), poolOutAmountFee.toString());
+            assert.equal(await this.token1.balanceOf(pool.address), addBN(token1InAmount, balances[0]));
+            assert.equal(await this.token2.balanceOf(pool.address), addBN(token2InAmount, balances[1]));
+            assert.equal((await pool.balanceOf(alice)).toString(), poolOutAmountAfterFee.toString());
+
+            const poolInAmountFee = mulScalarBN(poolOutAmountAfterFee, communityExitFee);
+            const poolInAmountAfterFee = subBN(poolOutAmountAfterFee, poolInAmountFee);
+
+            ratio = divScalarBN(poolInAmountAfterFee, await pool.totalSupply());
+            const token1OutAmount = mulScalarBN(ratio, await pool.getBalance(this.token1.address));
+            const token2OutAmount = mulScalarBN(ratio, await pool.getBalance(this.token2.address));
+
+            await pool.exitPool(
+                poolOutAmountAfterFee,
+                [token1OutAmount, token2OutAmount],
+                {from: alice}
+            );
+
+            assertEqualWithAccuracy((await pool.balanceOf(alice)).toString(), '0');
+            assertEqualWithAccuracy((await this.token1.balanceOf(alice)).toString(), token1OutAmount);
+            assertEqualWithAccuracy((await this.token2.balanceOf(alice)).toString(), token2OutAmount);
+            assertEqualWithAccuracy((await pool.balanceOf(communityWallet)).toString(), addBN(poolOutAmountFee, poolInAmountFee).toString());
+            assertEqualWithAccuracy(await this.token1.balanceOf(pool.address), subBN(addBN(token1InAmount, balances[0]), token1OutAmount));
+            assertEqualWithAccuracy(await this.token2.balanceOf(pool.address), subBN(addBN(token2InAmount, balances[1]), token2OutAmount));
         });
     })
 
