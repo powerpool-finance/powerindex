@@ -13,9 +13,7 @@
 
 pragma solidity 0.6.12;
 
-import "./BColor.sol";
-
-contract BConst is BBronze {
+contract BConst {
     uint public constant BONE              = 10**18;
 
     uint public constant MIN_BOUND_TOKENS  = 2;
@@ -23,8 +21,6 @@ contract BConst is BBronze {
 
     uint public constant MIN_FEE           = BONE / 10**6;
     uint public constant MAX_FEE           = BONE / 10;
-    uint public constant MIN_COMMUNITY_FEE = BONE / 10**6;
-    uint public constant MAX_COMMUNITY_FEE = BONE / 10;
 
     uint public constant MIN_WEIGHT        = BONE;
     uint public constant MAX_WEIGHT        = BONE * 50;
