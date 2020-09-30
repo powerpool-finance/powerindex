@@ -199,7 +199,7 @@ contract BPool is BToken, BMath {
         return _swapFee;
     }
 
-    function getCommunitySwapFee()
+    function getCommunityFee()
         external view
         _viewlock_
         returns (uint communitySwapFee, uint communityJoinFee, uint communityExitFee, address communityFeeReceiver)
@@ -220,7 +220,6 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
-        require(!_finalized, "IS_FINALIZED");
         require(msg.sender == _controller, "NOT_CONTROLLER");
         require(swapFee >= MIN_FEE && swapFee <= MAX_FEE, "FEE_BOUNDS");
         _swapFee = swapFee;
@@ -236,9 +235,10 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
-        require(!_finalized, "IS_FINALIZED");
         require(msg.sender == _controller, "NOT_CONTROLLER");
         require(communitySwapFee >= MIN_FEE && communitySwapFee <= MAX_FEE, "FEE_BOUNDS");
+        require(communityJoinFee >= MIN_FEE && communityJoinFee <= MAX_FEE, "FEE_BOUNDS");
+        require(communityExitFee >= MIN_FEE && communityExitFee <= MAX_FEE, "FEE_BOUNDS");
         _communitySwapFee = communitySwapFee;
         _communityJoinFee = communityJoinFee;
         _communityExitFee = communityExitFee;
