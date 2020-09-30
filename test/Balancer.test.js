@@ -107,22 +107,22 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
     });
 
     it('bound check should work properly', async () => {
-        assert.equal(await pool.name(), name);
-        assert.equal(await pool.symbol(), symbol);
-        assert.sameMembers(await pool.getCurrentTokens(), tokens);
-        assert.equal((await pool.getDenormalizedWeight(tokens[0])).toString(), weights[0].toString());
-        assert.equal((await pool.getDenormalizedWeight(tokens[1])).toString(), weights[1].toString());
-        assert.equal((await pool.getSwapFee()).toString(), swapFee.toString());
-        const {
-            communitySwapFee: _communitySwapFee,
-            communityJoinFee: _communityJoinFee,
-            communityExitFee: _communityExitFee,
-            communityFeeReceiver: _communityFeeReceiver
-        } = await pool.getCommunityFee();
-        assert.equal(_communitySwapFee.toString(), communitySwapFee.toString());
-        assert.equal(_communityJoinFee.toString(), communityJoinFee.toString());
-        assert.equal(_communityExitFee.toString(), communityExitFee.toString());
-        assert.equal(_communityFeeReceiver, communityWallet);
+        await expectRevert(pool.getDenormalizedWeight(alice), 'NOT_BOUND');
+        await expectRevert(pool.getNormalizedWeight(alice), 'NOT_BOUND');
+        await expectRevert(pool.getBalance(alice), 'NOT_BOUND');
+        await expectRevert(pool.rebind(alice, '0', '0', {from: minter}), 'NOT_BOUND');
+        await expectRevert(pool.unbind(alice, {from: minter}), 'NOT_BOUND');
+        await expectRevert(pool.gulp(alice, {from: minter}), 'NOT_BOUND');
+        await expectRevert(pool.getSpotPriceSansFee(this.token1.address, alice), 'NOT_BOUND');
+        await expectRevert(pool.getSpotPriceSansFee(alice, this.token1.address), 'NOT_BOUND');
+        await expectRevert(pool.swapExactAmountIn(alice, '0', this.token1.address, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.swapExactAmountIn(this.token1.address, '0', alice, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.swapExactAmountOut(alice, '0', this.token1.address, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.swapExactAmountOut(this.token1.address, '0', alice, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.joinswapExternAmountIn(alice, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.joinswapPoolAmountOut(alice, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.exitswapPoolAmountIn(alice, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.exitswapExternAmountOut(alice, '0', '0'), 'NOT_BOUND');
     });
 
     describe('community fee', () => {
