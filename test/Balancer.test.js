@@ -3,6 +3,8 @@ const BFactory = artifacts.require('BFactory');
 const BActions = artifacts.require('BActions');
 const BPool = artifacts.require('BPool');
 const MockERC20 = artifacts.require('MockERC20');
+const MockVoting = artifacts.require('MockVoting');
+const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('WETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
@@ -42,6 +44,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
     const communityExitFee = ether('0.07');
 
     let tokens;
+    let pool;
 
     beforeEach(async () => {
         this.weth = await WETH.new();
@@ -50,22 +53,11 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
         this.bActions = await BActions.new({ from: minter });
         this.bExchange = await ExchangeProxy.new(this.weth.address, { from: minter });
 
-        this.token1 = await MockERC20.new('My Token 1', 'MT1', ether('1000000'));
+        this.token1 = await MockCvp.new();
         this.token2 = await MockERC20.new('My Token 2', 'MT2', ether('1000000'));
         tokens = [this.token1.address, this.token2.address];
 
-        this.getTokensToJoinPoolAndApprove = async (pool, amountToMint) => {
-            const poolTotalSupply = (await pool.totalSupply()).toString(10);
-            const ratio = divScalarBN(amountToMint, poolTotalSupply);
-            const token1Amount = mulScalarBN(ratio, (await pool.getBalance(this.token1.address)).toString(10));
-            const token2Amount = mulScalarBN(ratio, (await pool.getBalance(this.token2.address)).toString(10));
-            await this.token1.approve(this.bActions.address, token1Amount);
-            await this.token2.approve(this.bActions.address, token2Amount);
-            return [token1Amount, token2Amount];
-        }
-    });
 
-    it('should set name and symbol for new pool', async () => {
         await this.token1.approve(this.bActions.address, balances[0]);
         await this.token2.approve(this.bActions.address, balances[1]);
 
@@ -82,19 +74,32 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
         );
 
         const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
-        const resultPool = await BPool.at(logNewPool.args.pool);
-        assert.equal(await resultPool.name(), name);
-        assert.equal(await resultPool.symbol(), symbol);
-        assert.sameMembers(await resultPool.getCurrentTokens(), tokens);
-        assert.equal((await resultPool.getDenormalizedWeight(tokens[0])).toString(), weights[0].toString());
-        assert.equal((await resultPool.getDenormalizedWeight(tokens[1])).toString(), weights[1].toString());
-        assert.equal((await resultPool.getSwapFee()).toString(), swapFee.toString());
+        pool = await BPool.at(logNewPool.args.pool);
+
+        this.getTokensToJoinPoolAndApprove = async (_pool, amountToMint) => {
+            const poolTotalSupply = (await _pool.totalSupply()).toString(10);
+            const ratio = divScalarBN(amountToMint, poolTotalSupply);
+            const token1Amount = mulScalarBN(ratio, (await _pool.getBalance(this.token1.address)).toString(10));
+            const token2Amount = mulScalarBN(ratio, (await _pool.getBalance(this.token2.address)).toString(10));
+            await this.token1.approve(this.bActions.address, token1Amount);
+            await this.token2.approve(this.bActions.address, token2Amount);
+            return [token1Amount, token2Amount];
+        }
+    });
+
+    it('should set name and symbol for new pool', async () => {
+        assert.equal(await pool.name(), name);
+        assert.equal(await pool.symbol(), symbol);
+        assert.sameMembers(await pool.getCurrentTokens(), tokens);
+        assert.equal((await pool.getDenormalizedWeight(tokens[0])).toString(), weights[0].toString());
+        assert.equal((await pool.getDenormalizedWeight(tokens[1])).toString(), weights[1].toString());
+        assert.equal((await pool.getSwapFee()).toString(), swapFee.toString());
         const {
             communitySwapFee: _communitySwapFee,
             communityJoinFee: _communityJoinFee,
             communityExitFee: _communityExitFee,
             communityFeeReceiver: _communityFeeReceiver
-        } = await resultPool.getCommunitySwapFee();
+        } = await pool.getCommunitySwapFee();
         assert.equal(_communitySwapFee.toString(), communitySwapFee.toString());
         assert.equal(_communityJoinFee.toString(), communityJoinFee.toString());
         assert.equal(_communityExitFee.toString(), communityExitFee.toString());
@@ -354,52 +359,101 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
     })
 
     it('pool restrictions should work properly', async () => {
-        await this.token1.approve(this.bActions.address, balances[0]);
-        await this.token2.approve(this.bActions.address, balances[1]);
-
-        const res = await this.bActions.create(
-            this.bFactory.address,
-            name,
-            symbol,
-            tokens,
-            balances,
-            weights,
-            [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
-            communityWallet,
-            true,
-            { from: minter }
-        );
-
-        const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
-        const resultPool = await BPool.at(logNewPool.args.pool);
-
-        assert.equal((await resultPool.totalSupply()).toString(10), ether('100').toString(10));
+        assert.equal((await pool.totalSupply()).toString(10), ether('100').toString(10));
 
         const poolRestrictions = await PoolRestrictions.new();
-        await poolRestrictions.setTotalRestrictions([resultPool.address], [ether('200').toString(10)], { from: minter });
+        await poolRestrictions.setTotalRestrictions([pool.address], [ether('200').toString(10)], { from: minter });
 
-        await resultPool.setRestrictions(poolRestrictions.address, { from: minter });
+        await pool.setRestrictions(poolRestrictions.address, { from: minter });
 
         let amountToMint = ether('50').toString(10);
 
-        let [token1Amount, token2Amount] = await this.getTokensToJoinPoolAndApprove(resultPool, amountToMint)
+        let [token1Amount, token2Amount] = await this.getTokensToJoinPoolAndApprove(pool, amountToMint)
 
         await this.bActions.joinPool(
-            resultPool.address,
+            pool.address,
             amountToMint,
             [token1Amount, token2Amount]
         );
 
-        assert.equal((await resultPool.totalSupply()).toString(10), ether('150').toString(10));
+        assert.equal((await pool.totalSupply()).toString(10), ether('150').toString(10));
 
         amountToMint = ether('60').toString(10);
 
-        [token1Amount, token2Amount] = await this.getTokensToJoinPoolAndApprove(resultPool, amountToMint)
+        [token1Amount, token2Amount] = await this.getTokensToJoinPoolAndApprove(pool, amountToMint)
 
         await expectRevert(this.bActions.joinPool(
-            resultPool.address,
+            pool.address,
             amountToMint,
             [token1Amount, token2Amount]
-        ), 'ERR_MAX_TOTAL_SUPPLY');
+        ), 'MAX_SUPPLY');
+    });
+
+    it('controller should be able to call any voting contract by pool', async () => {
+        const poolRestrictions = await PoolRestrictions.new();
+        await pool.setRestrictions(poolRestrictions.address, { from: minter });
+
+        assert.equal(await this.token1.delegated(pool.address, pool.address), '0');
+
+        const delegateData = this.token1.contract.methods.delegate(pool.address).encodeABI();
+        const delegateSig = delegateData.slice(0, 10);
+        await expectRevert(
+            pool.callVoting(this.token1.address, delegateSig, '0x' + delegateData.slice(10), '0', { from: minter }),
+            'NOT_ALLOWED_SIG'
+        );
+        await poolRestrictions.setVotingSignaturesForAddress(this.token1.address, true, [delegateSig], [true], { from: minter });
+
+        await pool.callVoting(this.token1.address, delegateSig, '0x' + delegateData.slice(10), '0', { from: minter });
+
+        assert.equal(
+            (await this.token1.delegated(pool.address, pool.address)).toString(10),
+            (await this.token1.balanceOf(pool.address)).toString(10)
+        );
+
+        await poolRestrictions.setVotingSignaturesForAddress(this.token1.address, false, [delegateSig], [false], { from: minter });
+        await expectRevert(
+            pool.callVoting(this.token1.address, delegateSig, '0x' + delegateData.slice(10), '0', { from: minter }),
+            'NOT_ALLOWED_SIG'
+        );
+
+        const voting = await MockVoting.new(tokens[0]);
+        let proposalReceiptBefore = await voting.getReceipt('1', pool.address);
+        assert.equal(proposalReceiptBefore.hasVoted, false);
+
+        const castVoteData = voting.contract.methods.castVote('1', true).encodeABI();
+        const castVoteSig = castVoteData.slice(0, 10);
+        await expectRevert(
+            pool.callVoting(voting.address, castVoteSig, '0x' + castVoteData.slice(10), '0', { from: minter }),
+            'NOT_ALLOWED_SIG'
+        );
+        await poolRestrictions.setVotingSignatures([castVoteSig], [true], { from: minter });
+
+        await pool.callVoting(voting.address, castVoteSig, '0x' + castVoteData.slice(10), '0', { from: minter });
+
+        let proposalReceiptAfter = await voting.getReceipt('1', pool.address);
+        assert.equal(proposalReceiptAfter.hasVoted, true);
+
+        const newCastVoteData = voting.contract.methods.castVote('2', true).encodeABI();
+        assert.equal(newCastVoteData.slice(0, 10), castVoteSig);
+
+        proposalReceiptBefore = await voting.getReceipt('2', pool.address);
+        assert.equal(proposalReceiptBefore.hasVoted, false);
+
+        await poolRestrictions.setVotingSignaturesForAddress(voting.address, true, [castVoteSig], [false], { from: minter });
+        await expectRevert(
+            pool.callVoting(voting.address, castVoteSig, '0x' + newCastVoteData.slice(10), '0', { from: minter }),
+            'NOT_ALLOWED_SIG'
+        );
+
+        await poolRestrictions.setVotingSignaturesForAddress(voting.address, false, [castVoteSig], [false], { from: minter });
+        await pool.callVoting(voting.address, castVoteSig, '0x' + newCastVoteData.slice(10), '0', { from: minter });
+
+        proposalReceiptAfter = await voting.getReceipt('2', pool.address);
+        assert.equal(proposalReceiptAfter.hasVoted, true);
+
+        await expectRevert(
+            pool.callVoting(voting.address, castVoteSig, '0x' + newCastVoteData.slice(10), '0', { from: minter }),
+            'NOT_SUCCESS'
+        );
     });
 });

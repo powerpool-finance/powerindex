@@ -7,6 +7,8 @@ import "./IPoolRestrictions.sol";
 contract PoolRestrictions is IPoolRestrictions, Ownable {
 
   event SetTotalRestrictions(address indexed token, uint256 maxTotalSupply);
+  event SetSignatureAllowed(bytes4 indexed signature, bool allowed);
+  event SetSignatureAllowedForAddress(address indexed voting, bytes4 indexed signature, bool allowed, bool overrideAllowed);
 
   struct TotalRestrictions {
     uint256 maxTotalSupply;
@@ -14,14 +16,40 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
   // token => restrictions
   mapping(address => TotalRestrictions) public totalRestrictions;
 
+  // signature => allowed
+  mapping(bytes4 => bool) public signaturesAllowed;
+
+  struct VotingSignature {
+    bool allowed;
+    bool overrideAllowed;
+  }
+  // votingAddress => signature => data
+  mapping(address => mapping(bytes4 => VotingSignature)) public votingSignatures;
+
   constructor() public Ownable() {}
 
   function setTotalRestrictions(address[] calldata _poolsList, uint256[] calldata _maxTotalSupplyList) external onlyOwner {
     _setTotalRestrictions(_poolsList, _maxTotalSupplyList);
   }
 
+  function setVotingSignatures(bytes4[] calldata _signatures, bool[] calldata _allowed) external onlyOwner {
+    _setVotingSignatures(_signatures, _allowed);
+  }
+
+  function setVotingSignaturesForAddress(address _votingAddress, bool _override, bytes4[] calldata _signatures, bool[] calldata _allowed) external onlyOwner {
+    _setVotingSignaturesForAddress(_votingAddress, _override, _signatures, _allowed);
+  }
+
   function getMaxTotalSupply(address _poolAddress) external override view returns(uint256) {
     return totalRestrictions[_poolAddress].maxTotalSupply;
+  }
+
+  function isVotingSignatureAllowed(address _votingAddress, bytes4 _signature) external override view returns(bool) {
+    if(votingSignatures[_votingAddress][_signature].overrideAllowed) {
+      return votingSignatures[_votingAddress][_signature].allowed;
+    } else {
+      return signaturesAllowed[_signature];
+    }
   }
 
   /*** Internal Functions ***/
@@ -33,6 +61,26 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
     for(uint256 i = 0; i < len; i++) {
       totalRestrictions[_poolsList[i]] = TotalRestrictions(_maxTotalSupplyList[i]);
       emit SetTotalRestrictions(_poolsList[i], _maxTotalSupplyList[i]);
+    }
+  }
+
+  function _setVotingSignatures(bytes4[] memory _signatures, bool[] memory _allowed) internal {
+    uint256 len = _signatures.length;
+    require(len == _allowed.length , "Arrays lengths are not equals");
+
+    for(uint256 i = 0; i < len; i++) {
+      signaturesAllowed[_signatures[i]] = _allowed[i];
+      emit SetSignatureAllowed(_signatures[i], _allowed[i]);
+    }
+  }
+
+  function _setVotingSignaturesForAddress(address _votingAddress, bool _override, bytes4[] memory _signatures, bool[] memory _allowed) internal {
+    uint256 len = _signatures.length;
+    require(len == _allowed.length , "Arrays lengths are not equals");
+
+    for(uint256 i = 0; i < len; i++) {
+      votingSignatures[_votingAddress][_signatures[i]] = VotingSignature(_allowed[i], _override);
+      emit SetSignatureAllowedForAddress(_votingAddress, _signatures[i], _allowed[i], _override);
     }
   }
 }
