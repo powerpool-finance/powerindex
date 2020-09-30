@@ -33,7 +33,7 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
     assert.equal(diff.lte(toBN(accuracyWei)), true, message);
 }
 
-contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) => {
+contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityWallet]) => {
     const name = 'My Pool';
     const symbol = 'MP';
     const balances = [ether('10'), ether('20')];
@@ -99,11 +99,30 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
             communityJoinFee: _communityJoinFee,
             communityExitFee: _communityExitFee,
             communityFeeReceiver: _communityFeeReceiver
-        } = await pool.getCommunitySwapFee();
+        } = await pool.getCommunityFee();
         assert.equal(_communitySwapFee.toString(), communitySwapFee.toString());
         assert.equal(_communityJoinFee.toString(), communityJoinFee.toString());
         assert.equal(_communityExitFee.toString(), communityExitFee.toString());
         assert.equal(_communityFeeReceiver, communityWallet);
+    });
+
+    it('bound check should work properly', async () => {
+        await expectRevert(pool.getDenormalizedWeight(alice), 'NOT_BOUND');
+        await expectRevert(pool.getNormalizedWeight(alice), 'NOT_BOUND');
+        await expectRevert(pool.getBalance(alice), 'NOT_BOUND');
+        await expectRevert(pool.rebind(alice, '0', '0', {from: minter}), 'NOT_BOUND');
+        await expectRevert(pool.unbind(alice, {from: minter}), 'NOT_BOUND');
+        await expectRevert(pool.gulp(alice, {from: minter}), 'NOT_BOUND');
+        await expectRevert(pool.getSpotPriceSansFee(this.token1.address, alice), 'NOT_BOUND');
+        await expectRevert(pool.getSpotPriceSansFee(alice, this.token1.address), 'NOT_BOUND');
+        await expectRevert(pool.swapExactAmountIn(alice, '0', this.token1.address, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.swapExactAmountIn(this.token1.address, '0', alice, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.swapExactAmountOut(alice, '0', this.token1.address, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.swapExactAmountOut(this.token1.address, '0', alice, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.joinswapExternAmountIn(alice, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.joinswapPoolAmountOut(alice, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.exitswapPoolAmountIn(alice, '0', '0'), 'NOT_BOUND');
+        await expectRevert(pool.exitswapExternAmountOut(alice, '0', '0'), 'NOT_BOUND');
     });
 
     describe('community fee', () => {
@@ -145,6 +164,43 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, labsWallet]) 
                 amountAfterCommunitySwapFee,
                 swapFee
             )).toString(10);
+        });
+
+        it('should be able to set community fee and swap fee after finalized', async () => {
+            assert.equal(await pool.isFinalized(), true);
+
+            const newSwapFee = ether('0.02');
+            await expectRevert(pool.setSwapFee(newSwapFee, {from: alice}), 'NOT_CONTROLLER');
+            await pool.setSwapFee(newSwapFee, {from: minter});
+            assert.equal((await pool.getSwapFee()).toString(), newSwapFee.toString());
+
+            const newCommunitySwapFee = ether('0.01');
+            const newCommunityJoinFee = ether('0.02');
+            const newCommunityExitFee = ether('0.03');
+            await expectRevert(
+                pool.setCommunityFeeAndReceiver(
+                    newCommunitySwapFee,
+                    newCommunityJoinFee,
+                    newCommunityExitFee,
+                    newCommunityWallet,
+                    {from: alice}
+                ),
+                'NOT_CONTROLLER'
+            );
+
+            await pool.setCommunityFeeAndReceiver(
+                newCommunitySwapFee,
+                newCommunityJoinFee,
+                newCommunityExitFee,
+                newCommunityWallet,
+                {from: minter}
+            );
+
+            const communityFee = await pool.getCommunityFee();
+            assert.equal(communityFee.communitySwapFee.toString(10), newCommunitySwapFee);
+            assert.equal(communityFee.communityJoinFee.toString(10), newCommunityJoinFee);
+            assert.equal(communityFee.communityExitFee.toString(10), newCommunityExitFee);
+            assert.equal(communityFee.communityFeeReceiver.toString(10), newCommunityWallet);
         });
 
         it('community fee should work properly for multihopBatchSwapExactIn', async () => {
