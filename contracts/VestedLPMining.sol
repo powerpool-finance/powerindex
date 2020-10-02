@@ -27,17 +27,19 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         uint32 vestingBlock;      // block by when all entitled CVP tokens to be vested
         uint32 lastUpdateBlock;   // block when the params (above) were updated
         /** @dev
-         * At any time, the amount of CVP tokens entitled to a user but not yet vested (released) is:
-         *   pendingCVP = ( user.lptAmount * pool.accCvpPerLpt - user.cvpAdjust );
-         * By that time, the amount of CVP tokens that may be vested (released) to the user is:
-         *   vestableCVP =  user.entitledCvp + pendingCVP - user.vestedCvp
+         * At any time, the amount of CVP tokens entitled to a user but not yet vested is the sum of:
+         * (1) CVP tokens entitled after a latest LP token deposit or withdrawal by the user
+         *     = (user.lptAmount * pool.accCvpPerLpt) - user.cvpAdjust
+         * (2) CVP tokens entitled before the deposit or withdrawal and pending since then
+         *     = user.entitledCvp - user.vestedCvp
          *
          * Whenever a user deposits or withdraws LP tokens to a pool:
-         *   1. The pool's `accCvpPerLpt` gets updated;
-         *   2. User's `lptAmount` and `cvpAdjust` and `entitledCvp` get updated;
-         *   3. CVP tokens amount that may be vested to the user (`vestableCVP`) gets computed;
-         *   4. The user receives `vestableCVP` tokens (sent to his/her account);
-         *   5. User's `vestedCvp` gets updated.
+         *   1. `pool.accCvpPerLpt` for the pool gets updated;
+         *   2. CVP token amounts to be entitled and vested to the user get computed;
+         *   3. Tokens which may be vested, computed on the previous step, get sent to the user;
+         *   3. User' `lptAmount`, `cvpAdjust`, `entitledCvp` and `vestedCvp` get updated.
+         *
+         * Note comments on vesting rules in the `function computeCvpVesting` code bellow.
          */
     }
 
@@ -58,7 +60,7 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
     // Reservoir address
     address public reservoir;
     // Vesting duration in blocks
-    uint32 cvpVestingPeriodInBlocks;
+    uint32 public cvpVestingPeriodInBlocks;
     // The amount of CVP tokens rewarded to all pools every block
     uint256 public cvpPerBlock;
     // The migrator contract (only the owner may assign it)
@@ -92,13 +94,13 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         address _reservoir,
         uint256 _cvpPerBlock,
         uint256 _startBlock,
-        uint256 _cvpVestingBlocks
+        uint256 _cvpVestingPeriodInBlocks
     ) public {
         cvp = _cvp;
         reservoir = _reservoir;
         cvpPerBlock = _cvpPerBlock;
         startBlock = _startBlock;
-        cvpVestingPeriodInBlocks = safeUint32(_cvpVestingBlocks);
+        cvpVestingPeriodInBlocks = safeUint32(_cvpVestingPeriodInBlocks);
 
         emit SetCvpPerBlock(_cvpPerBlock);
     }
@@ -183,34 +185,32 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
     }
 
     /// @notice Return reward multiplier over the given _from to _to block
-    function getMultiplier(uint256 _from, uint256 _to) public view returns (uint256) {
+    function getMultiplier(uint256 _from, uint256 _to) public pure returns (uint256) {
         return _to.sub(_from);
     }
 
     /// @notice Return the amount of pending CVPs entitled to the given user of the pool
     /// @dev Intended for frontend use
     function pendingCvp(uint256 _pid, address _user) external view returns (uint256) {
-        Pool storage pool = pools[_pid];
+        Pool memory _pool = pools[_pid];
         User storage user = users[_pid][_user];
-        (uint256 newAccCvpPerLpt, , ) = computePoolReward(pool);
+        computePoolReward(_pool);
+
         return computeCvpToEntitle(
             user.lptAmount,
             user.cvpAdjust,
-            newAccCvpPerLpt > 0 ? newAccCvpPerLpt : pool.accCvpPerLpt
+            _pool.accCvpPerLpt
         );
     }
 
     /// @notice Return the amount of CVP tokens which may be vested to a user of a pool in the current block
     /// @dev Intended for frontend use
-    function vestableCvp(uint256 _pid, address _user) external view returns (uint256) {
-        Pool storage pool = pools[_pid];
-        User storage user = users[_pid][_user];
-        (uint256 newAccCvpPerLpt, , ) = computePoolReward(pool);
+    function vestableCvp(uint256 _pid, address user) external view returns (uint256) {
+        Pool memory _pool = pools[_pid];
+        User memory _user = users[_pid][user];
 
-        ( , uint256 newlyVested, , , ) = computeCvpVesting(
-            user,
-            newAccCvpPerLpt > 0 ? newAccCvpPerLpt : pool.accCvpPerLpt
-        );
+        computePoolReward(_pool);
+        ( , uint256 newlyVested) = computeCvpVesting(_user, _pool.accCvpPerLpt);
 
         return newlyVested;
     }
@@ -241,6 +241,7 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         Pool storage pool = pools[_pid];
         User storage user = users[_pid][msg.sender];
 
+        doPoolUpdate(pool);
         uint256 vested = vestUserCvp(user, pool.accCvpPerLpt);
 
         if (vested > 0) {
@@ -335,66 +336,70 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
 
     /// @dev must be guarded for reentrancy
     function doPoolUpdate(Pool storage pool) internal {
-        (uint256 newAccCvpPerLpt, uint256 poolCvpReward, uint32 newLastUpdateBlock) = computePoolReward(pool);
+        Pool memory _pool = pool;
+        uint32 prevBlock = _pool.lastUpdateBlock;
+        uint256 prevBalance = _pool.cvpBalance;
+        uint256 prevAcc = _pool.accCvpPerLpt;
 
-        if (newAccCvpPerLpt > 0) {
-            pool.accCvpPerLpt = newAccCvpPerLpt;
+        computePoolReward(_pool);
+
+        if (_pool.accCvpPerLpt > prevAcc) {
+            pool.accCvpPerLpt = _pool.accCvpPerLpt;
         }
-        if (poolCvpReward > 0) {
-            pool.cvpBalance = pool.cvpBalance.add(poolCvpReward);
+        if (_pool.cvpBalance > prevBalance) {
+            pool.cvpBalance = _pool.cvpBalance;
         }
-        if (newLastUpdateBlock > 0) {
-            pool.lastUpdateBlock = newLastUpdateBlock;
+        if (_pool.lastUpdateBlock > prevBlock) {
+            pool.lastUpdateBlock = _pool.lastUpdateBlock;
         }
     }
 
     function vestUserCvp(User storage user, uint256 accCvpPerLpt) internal returns (uint256) {
-        (
-            uint256 newlyEntitled,
-            uint256 newlyVested,
-            uint256 entitled,
-            uint256 vested,
-            uint32 vestingBlock
-        ) = computeCvpVesting(user, accCvpPerLpt);
+        User memory _user = user;
+        uint32 prevVestingBlock = _user.vestingBlock;
+        uint32 prevUpdateBlock = _user.lastUpdateBlock;
+        (uint256 newlyEntitled, uint256 newlyVested) = computeCvpVesting(_user, accCvpPerLpt);
 
-        if (vestingBlock != 0) {
-            user.vestingBlock = vestingBlock;
-        }
-        if (newlyVested != 0 || newlyEntitled != 0) {
-            user.entitledCvp = entitled;
-            user.vestingBlock = vestingBlock;
+        if (newlyEntitled != 0) {
+            user.entitledCvp = _user.entitledCvp;
         }
         if (newlyVested != 0) {
-            user.vestedCvp = vested;
+            user.vestedCvp = _user.vestedCvp;
             transferCvp(msg.sender, newlyVested);
+        }
+        if (_user.vestingBlock > prevVestingBlock) {
+            user.vestingBlock = _user.vestingBlock;
+        }
+        if (_user.lastUpdateBlock > prevUpdateBlock) {
+            user.lastUpdateBlock = _user.lastUpdateBlock;
         }
 
         return newlyVested;
     }
 
     /* @dev Compute the amount of CVP tokens to be entitled and vested to a user of a pool
-     * @param user - user to compute tokens for
+     * ... and update the `_user` instance (in the memory):
+     *   `_user.entitledCvp` gets increased by `newlyEntitled`
+     *   `_user.vestedCvp` gets increased by `newlyVested`
+     *   `_user.vestingBlock` set to the updated value
+     *   `_user.lastUpdateBlock` set to the current block
+     *
+     * @param _user - user to compute tokens for
      * @param accCvpPerLpt - value of the pool' `pool.accCvpPerLpt`
-     * @return newlyEntitled - CVP amount to entitle (on top of `user.entitledCvp` tokens entitled so far)
-     * @return newlyVested - CVP amount to vest (on top `user.vestedCvp` tokens already vested)
-     * @return entitledCvp - updated value for `user.entitledCvp` (increased by `newlyEntitled`)
-     * @return vestedCvp - updated value for `user.vestedCvp` (increased by `newlyVested`)
-     * @return vestingBlock - updated value for `user.vestingBlock`
+     * @return newlyEntitled - CVP amount to entitle (on top of `_user.entitledCvp` tokens entitled so far)
+     * @return newlyVested - CVP amount to vest (on top `_user.vestedCvp` tokens already vested)
      */
-    function computeCvpVesting(User storage _user, uint256 accCvpPerLpt) internal view returns (
+    function computeCvpVesting(User memory _user, uint256 accCvpPerLpt) internal view returns (
         uint256 newlyEntitled,
-        uint256 newlyVested,
-        uint256 entitledCvp,
-        uint256 vestedCvp,
-        uint32 vestingBlock
+        uint256 newlyVested
     ) {
-        User memory user = _user;
-        uint32 age = uint32(block.number) - user.lastUpdateBlock;
+        _user.lastUpdateBlock = uint32(block.number);
+        uint32 age = _user.lastUpdateBlock - _user.lastUpdateBlock;
 
         // Tokens which are to be entitled starting from the `user.lastUpdateBlock`, shall be
         // vested proportionally to the number of blocks already minted within the period between
         // the `user.lastUpdateBlock` and `cvpVestingPeriodInBlocks` following the current block
-        newlyEntitled = computeCvpToEntitle(user.lptAmount, user.cvpAdjust, accCvpPerLpt);
+        newlyEntitled = computeCvpToEntitle(_user.lptAmount, _user.cvpAdjust, accCvpPerLpt);
         uint256 newToVest = newlyEntitled == 0 ? 0 : (
             newlyEntitled.mul(uint256(age)).div(uint256(age + cvpVestingPeriodInBlocks))
         );
@@ -403,7 +408,7 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         // - in full, if the `user.vestingBlock` has been mined
         // - otherwise, proportionally to the number of blocks already mined so far in the period
         //   between the `user.lastUpdateBlock` and the (not yet mined) `user.vestingBlock`
-        uint256 pended = user.entitledCvp >= user.vestedCvp ? 0 : user.entitledCvp.sub(user.vestedCvp);
+        uint256 pended = _user.entitledCvp >= _user.vestedCvp ? 0 : _user.entitledCvp.sub(_user.vestedCvp);
         uint256 pendedToVest = pended == 0 ? 0 : (
             age >= cvpVestingPeriodInBlocks
                 ? pended
@@ -411,14 +416,14 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         );
 
         newlyVested = pendedToVest.add(newToVest);
-        entitledCvp = user.entitledCvp.add(newlyEntitled);
-        vestedCvp = user.vestedCvp.add(newlyVested);
+        _user.entitledCvp = _user.entitledCvp.add(newlyEntitled);
+        _user.vestedCvp = _user.vestedCvp.add(newlyVested);
 
         // The vesting period for tokens pending from now, if there are any, is the weighted average
         // between remaining periods to vest "old" pended tokens and newly entitled ones.
         uint256 pending = pended.add(newlyEntitled).sub(newlyVested);
         if (pending == 0) {
-            vestingBlock = 0;
+            _user.vestingBlock = 0;
         } else {
             uint256 weighted = 0;
             if (pended != 0 && pended > pendedToVest) {
@@ -429,37 +434,34 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
             if (newlyEntitled != 0) {
                 weighted = newlyEntitled.sub(newToVest).mul(uint256(cvpVestingPeriodInBlocks));
             }
-            vestingBlock = uint32(block.number.add(
+            _user.vestingBlock = uint32(block.number.add(
                     weighted.div(2).div(pending)
             ));
         }
 
-        return (newlyEntitled, newlyVested, entitledCvp, vestedCvp, vestingBlock);
+        return (newlyEntitled, newlyVested);
     }
 
-    function computePoolReward(Pool storage pool) private view returns (
-        uint256 newAccCvpPerLpt,
-        uint256 poolCvpReward,
-        uint32 newLastUpdateBlock
-    ) {
-        uint256 lastUpdateBlock = uint256(pool.lastUpdateBlock);
-        if (block.number > lastUpdateBlock) {
-            uint256 lptBalance = pool.lpToken.balanceOf(address(this));
+    function computePoolReward(Pool memory _pool) internal view {
+        if (block.number > _pool.lastUpdateBlock) {
+            uint256 multiplier = getMultiplier(_pool.lastUpdateBlock, block.number);
+            _pool.lastUpdateBlock = uint32(block.number);
+
+            uint256 lptBalance = _pool.lpToken.balanceOf(address(this));
             if (lptBalance != 0) {
-                uint256 multiplier = getMultiplier(lastUpdateBlock, block.number);
-                poolCvpReward = multiplier
+                uint256 poolCvpReward = multiplier
                     .mul(cvpPerBlock)
-                    .mul(uint256(pool.allocPoint))
+                    .mul(uint256(_pool.allocPoint))
                     .div(totalAllocPoint);
-                newAccCvpPerLpt = pool.accCvpPerLpt.add(poolCvpReward.mul(SCALE).div(lptBalance));
+
+                _pool.cvpBalance = _pool.cvpBalance.add(poolCvpReward);
+                _pool.accCvpPerLpt = _pool.accCvpPerLpt.add(poolCvpReward.mul(SCALE).div(lptBalance));
             }
-            newLastUpdateBlock = uint32(block.number);
         }
-        return (newAccCvpPerLpt, poolCvpReward, newLastUpdateBlock);
     }
 
     function computeCvpToEntitle(uint256 userLpt, uint256 userCvpAdjust, uint256 poolAccCvpPerLpt)
-    internal pure returns (uint256)
+    private pure returns (uint256)
     {
         return userLpt == 0 ? 0 : userLpt.mul(poolAccCvpPerLpt).div(SCALE).sub(userCvpAdjust);
     }
