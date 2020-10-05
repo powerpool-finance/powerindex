@@ -258,17 +258,4 @@ contract BMath is BConst, BNum {
         uint poolAmountIn = bsub(poolSupply, newPoolSupply);
         return poolAmountIn;
     }
-
-    function calcAmountWithCommunityFee(
-        uint tokenAmountIn,
-        uint communityFee
-    )
-        public pure
-        returns (uint tokenAmountInAfterFee, uint tokenAmountFee)
-    {
-        uint adjustedIn = bsub(BONE, communityFee);
-        tokenAmountInAfterFee = bmul(tokenAmountIn, adjustedIn);
-        uint tokenAmountFee = bsub(tokenAmountIn, tokenAmountInAfterFee);
-        return (tokenAmountInAfterFee, tokenAmountFee);
-    }
 }

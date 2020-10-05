@@ -9,6 +9,7 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
   event SetTotalRestrictions(address indexed token, uint256 maxTotalSupply);
   event SetSignatureAllowed(bytes4 indexed signature, bool allowed);
   event SetSignatureAllowedForAddress(address indexed voting, bytes4 indexed signature, bool allowed, bool overrideAllowed);
+  event SetWithoutFee(address indexed addr, bool withoutFee);
 
   struct TotalRestrictions {
     uint256 maxTotalSupply;
@@ -26,6 +27,8 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
   // votingAddress => signature => data
   mapping(address => mapping(bytes4 => VotingSignature)) public votingSignatures;
 
+  mapping(address => bool) public withoutFeeAddresses;
+
   constructor() public Ownable() {}
 
   function setTotalRestrictions(address[] calldata _poolsList, uint256[] calldata _maxTotalSupplyList) external onlyOwner {
@@ -40,6 +43,14 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
     _setVotingSignaturesForAddress(_votingAddress, _override, _signatures, _allowed);
   }
 
+  function setWithoutFee(address[] calldata _addresses, bool _withoutFee) external onlyOwner {
+    uint len = _addresses.length;
+    for (uint i = 0; i < len; i++) {
+      withoutFeeAddresses[_addresses[i]] = _withoutFee;
+      emit SetWithoutFee(_addresses[i], _withoutFee);
+    }
+  }
+
   function getMaxTotalSupply(address _poolAddress) external override view returns(uint256) {
     return totalRestrictions[_poolAddress].maxTotalSupply;
   }
@@ -50,6 +61,10 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
     } else {
       return signaturesAllowed[_signature];
     }
+  }
+
+  function isWithoutFee(address _address) external override view returns(bool) {
+    return withoutFeeAddresses[_address];
   }
 
   /*** Internal Functions ***/

@@ -70,8 +70,8 @@ module.exports = function(deployer, network, accounts) {
             //     swapFee: 0.05,
             //     miningVotes: true
             // },{
-            name: 'Power Pool Token',
-            symbol: 'PPT',
+            name: 'Power Index Token',
+            symbol: 'PIT',
             tokens: [lendToken.address, yfiToken.address, compToken.address, umaToken.address, mkrToken.address, uniToken.address, crvToken.address, snxToken.address],
             balances: [50, 10, 100, 200, 150, 75, 125, 60],
             denorms: [6.25, 6.25, 6.25, 6.25, 6.25, 6.25, 6.25, 6.25],
