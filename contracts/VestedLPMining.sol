@@ -203,6 +203,11 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         );
     }
 
+    /// @notice Return the amount of pending CVPs entitled to all users of the given pool
+    function pendingPoolCvp(uint256 _pid) external view returns (uint256) {
+        return pools[_pid].cvpBalance;
+    }
+
     /// @notice Return the amount of CVP tokens which may be vested to a user of a pool in the current block
     /// @dev Intended for frontend use
     function vestableCvp(uint256 _pid, address user) external view returns (uint256) {
@@ -254,7 +259,7 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         user.cvpAdjust = user.lptAmount.mul(pool.accCvpPerLpt).div(SCALE);
         emit Deposit(msg.sender, _pid, _amount);
 
-        checkpointVotes(msg.sender);
+        doCheckpointVotes(msg.sender);
     }
 
     /// @notice Withdraw the given amount of LP tokens from the given pool
@@ -276,7 +281,7 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         user.cvpAdjust = user.lptAmount.mul(pool.accCvpPerLpt).div(SCALE);
         emit Withdraw(msg.sender, _pid, _amount);
 
-        checkpointVotes(msg.sender);
+        doCheckpointVotes(msg.sender);
     }
 
     /// @notice Withdraw LP tokens without caring about pending CVP tokens. EMERGENCY ONLY.
@@ -297,11 +302,15 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         user.vestedCvp = 0;
         user.vestingBlock = 0;
 
-        checkpointVotes(msg.sender);
+        doCheckpointVotes(msg.sender);
     }
 
     /// @notice Write votes of the given user at the current block
     function checkpointVotes(address _user) public nonReentrant {
+        doCheckpointVotes(_user);
+    }
+
+    function doCheckpointVotes(address _user) internal {
         uint256 length = pools.length;
 
         uint256 totalVotes = 0;
@@ -393,8 +402,9 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         uint256 newlyEntitled,
         uint256 newlyVested
     ) {
+        uint32 prevBlock = _user.lastUpdateBlock;
         _user.lastUpdateBlock = uint32(block.number);
-        uint32 age = _user.lastUpdateBlock - _user.lastUpdateBlock;
+        uint32 age = _user.lastUpdateBlock - prevBlock;
 
         // Tokens which are to be entitled starting from the `user.lastUpdateBlock`, shall be
         // vested proportionally to the number of blocks already minted within the period between
@@ -408,7 +418,7 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         // - in full, if the `user.vestingBlock` has been mined
         // - otherwise, proportionally to the number of blocks already mined so far in the period
         //   between the `user.lastUpdateBlock` and the (not yet mined) `user.vestingBlock`
-        uint256 pended = _user.entitledCvp >= _user.vestedCvp ? 0 : _user.entitledCvp.sub(_user.vestedCvp);
+        uint256 pended = _user.vestedCvp >= _user.entitledCvp ? 0 : _user.entitledCvp.sub(_user.vestedCvp);
         uint256 pendedToVest = pended == 0 ? 0 : (
             age >= cvpVestingPeriodInBlocks
                 ? pended
