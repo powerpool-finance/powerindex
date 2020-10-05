@@ -419,6 +419,7 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         // - otherwise, proportionally to the number of blocks already mined so far in the period
         //   between the `user.lastUpdateBlock` and the (not yet mined) `user.vestingBlock`
         uint256 pended = _user.vestedCvp >= _user.entitledCvp ? 0 : _user.entitledCvp.sub(_user.vestedCvp);
+        age = _user.lastUpdateBlock - _user.vestingBlock;
         uint256 pendedToVest = pended == 0 ? 0 : (
             age >= cvpVestingPeriodInBlocks
                 ? pended
