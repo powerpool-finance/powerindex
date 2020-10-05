@@ -82,7 +82,7 @@ contract BPool is BToken, BMath {
     address private _controller; // has CONTROL role
     bool private _publicSwap; // true if PUBLIC can call SWAP functions
 
-    IPoolRestrictions _restrictions;
+    IPoolRestrictions private _restrictions;
 
     // `setSwapFee` and `finalize` require CONTROL
     // `finalize` sets `PUBLIC can SWAP`, `PUBLIC can JOIN`
@@ -215,12 +215,20 @@ contract BPool is BToken, BMath {
         return _controller;
     }
 
+    function getRestrictions()
+        external view
+        _viewlock_
+        returns (address)
+    {
+        return address(_restrictions);
+    }
+
     function setSwapFee(uint swapFee)
         external
         _logs_
         _lock_
     {
-        require(msg.sender == _controller, "NOT_CONTROLLER");
+        _checkController();
         require(swapFee >= MIN_FEE && swapFee <= MAX_FEE, "FEE_BOUNDS");
         _swapFee = swapFee;
     }
@@ -235,7 +243,7 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
-        require(msg.sender == _controller, "NOT_CONTROLLER");
+        _checkController();
         require(communitySwapFee >= MIN_FEE && communitySwapFee <= MAX_FEE, "FEE_BOUNDS");
         require(communityJoinFee >= MIN_FEE && communityJoinFee <= MAX_FEE, "FEE_BOUNDS");
         require(communityExitFee >= MIN_FEE && communityExitFee <= MAX_FEE, "FEE_BOUNDS");
@@ -250,7 +258,7 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
-        require(msg.sender == _controller, "NOT_CONTROLLER");
+        _checkController();
         _restrictions = restrictions;
     }
 
@@ -259,7 +267,7 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
-        require(msg.sender == _controller, "NOT_CONTROLLER");
+        _checkController();
         _controller = manager;
     }
 
@@ -268,8 +276,8 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
-        require(!_finalized, "IS_FINALIZED");
-        require(msg.sender == _controller, "NOT_CONTROLLER");
+        _checkFinalized();
+        _checkController();
         _publicSwap = public_;
     }
 
@@ -278,8 +286,8 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
-        require(msg.sender == _controller, "NOT_CONTROLLER");
-        require(!_finalized, "IS_FINALIZED");
+        _checkController();
+        _checkFinalized();
         require(_tokens.length >= MIN_BOUND_TOKENS, "MIN_TOKENS");
 
         _finalized = true;
@@ -289,9 +297,13 @@ contract BPool is BToken, BMath {
         _pushPoolShare(msg.sender, INIT_POOL_SUPPLY);
     }
 
-    function callVoting(address voting, bytes4 signature, bytes calldata args, uint value) external {
+    function callVoting(address voting, bytes4 signature, bytes calldata args, uint value)
+        external
+        _logs_
+        _lock_
+    {
         require(_restrictions.isVotingSignatureAllowed(voting, signature), "NOT_ALLOWED_SIG");
-        require(msg.sender == _controller, "NOT_CONTROLLER");
+        _checkController();
 
         (bool success, bytes memory data) = voting.call{ value: value }(abi.encodePacked(signature, args));
         require(success, "NOT_SUCCESS");
@@ -303,9 +315,9 @@ contract BPool is BToken, BMath {
         _logs_
         // _lock_  Bind does not lock because it jumps to `rebind`, which does
     {
-        require(msg.sender == _controller, "NOT_CONTROLLER");
+        _checkController();
         require(!_records[token].bound, "IS_BOUND");
-        require(!_finalized, "IS_FINALIZED");
+        _checkFinalized();
 
         require(_tokens.length < MAX_BOUND_TOKENS, "MAX_TOKENS");
 
@@ -325,9 +337,9 @@ contract BPool is BToken, BMath {
         _lock_
     {
 
-        require(msg.sender == _controller, "NOT_CONTROLLER");
+        _checkController();
         _checkBound(token);
-        require(!_finalized, "IS_FINALIZED");
+        _checkFinalized();
 
         require(denorm >= MIN_WEIGHT && denorm <= MAX_WEIGHT, "WEIGHT_BOUNDS");
         require(balance >= MIN_BALANCE, "MIN_BALANCE");
@@ -359,9 +371,9 @@ contract BPool is BToken, BMath {
         _lock_
     {
 
-        require(msg.sender == _controller, "NOT_CONTROLLER");
+        _checkController();
         _checkBound(token);
-        require(!_finalized, "IS_FINALIZED");
+        _checkFinalized();
 
         uint tokenBalance = _records[token].balance;
 
@@ -441,7 +453,8 @@ contract BPool is BToken, BMath {
 
         (uint poolAmountOutAfterFee, uint poolAmountOutFee) = calcAmountWithCommunityFee(
             poolAmountOut,
-            _communityJoinFee
+            _communityJoinFee,
+            msg.sender
         );
 
         _mintPoolShare(poolAmountOut);
@@ -458,7 +471,8 @@ contract BPool is BToken, BMath {
 
         (uint poolAmountInAfterFee, uint poolAmountInFee) = calcAmountWithCommunityFee(
             poolAmountIn,
-            _communityExitFee
+            _communityExitFee,
+            msg.sender
         );
 
         uint poolTotal = totalSupply();
@@ -497,7 +511,7 @@ contract BPool is BToken, BMath {
     {
         _checkBound(tokenIn);
         _checkBound(tokenOut);
-        require(_publicSwap, "SWAP_NOT_PUBLIC");
+        require(_publicSwap, "NOT_PUBLIC");
 
         Record storage inRecord = _records[address(tokenIn)];
         Record storage outRecord = _records[address(tokenOut)];
@@ -509,11 +523,12 @@ contract BPool is BToken, BMath {
                                     outRecord.denorm,
                                     _swapFee
                                 );
-        require(spotPriceBefore <= maxPrice, "BAD_LIMIT_PRICE");
+        require(spotPriceBefore <= maxPrice, "LIMIT_PRICE");
 
         (uint tokenAmountInAfterFee, uint tokenAmountInFee) = calcAmountWithCommunityFee(
                                                                 tokenAmountIn,
-                                                                _communitySwapFee
+                                                                _communitySwapFee,
+                                                                msg.sender
                                                             );
 
         require(tokenAmountInAfterFee <= bmul(inRecord.balance, MAX_IN_RATIO), "MAX_IN_RATIO");
@@ -568,12 +583,12 @@ contract BPool is BToken, BMath {
     {
         _checkBound(tokenIn);
         _checkBound(tokenOut);
-        require(_publicSwap, "SWAP_NOT_PUBLIC");
+        require(_publicSwap, "NOT_PUBLIC");
 
         Record storage inRecord = _records[address(tokenIn)];
         Record storage outRecord = _records[address(tokenOut)];
 
-        require(tokenAmountOut <= bmul(outRecord.balance, MAX_OUT_RATIO), "MAX_OUT_RATIO");
+        require(tokenAmountOut <= bmul(outRecord.balance, MAX_OUT_RATIO), "OUT_RATIO");
 
         uint spotPriceBefore = calcSpotPrice(
                                     inRecord.balance,
@@ -582,11 +597,12 @@ contract BPool is BToken, BMath {
                                     outRecord.denorm,
                                     _swapFee
                                 );
-        require(spotPriceBefore <= maxPrice, "BAD_LIMIT_PRICE");
+        require(spotPriceBefore <= maxPrice, "LIMIT_PRICE");
 
         (uint tokenAmountOutAfterFee, uint tokenAmountOutFee) = calcAmountWithCommunityFee(
             tokenAmountOut,
-            _communitySwapFee
+            _communitySwapFee,
+            msg.sender
         );
 
         tokenAmountIn = calcInGivenOut(
@@ -639,7 +655,8 @@ contract BPool is BToken, BMath {
 
         (uint tokenAmountInAfterFee, uint tokenAmountInFee) = calcAmountWithCommunityFee(
             tokenAmountIn,
-            _communityJoinFee
+            _communityJoinFee,
+            msg.sender
         );
 
         Record storage inRecord = _records[tokenIn];
@@ -680,7 +697,8 @@ contract BPool is BToken, BMath {
 
         (uint poolAmountOutAfterFee, uint poolAmountOutFee) = calcAmountWithCommunityFee(
             poolAmountOut,
-            _communityJoinFee
+            _communityJoinFee,
+            msg.sender
         );
 
         tokenAmountIn = calcSingleInGivenPoolOut(
@@ -731,13 +749,14 @@ contract BPool is BToken, BMath {
 
         require(tokenAmountOut >= minAmountOut, "LIMIT_OUT");
         
-        require(tokenAmountOut <= bmul(_records[tokenOut].balance, MAX_OUT_RATIO), "MAX_OUT_RATIO");
+        require(tokenAmountOut <= bmul(_records[tokenOut].balance, MAX_OUT_RATIO), "OUT_RATIO");
 
         outRecord.balance = bsub(outRecord.balance, tokenAmountOut);
 
         (uint tokenAmountOutAfterFee, uint tokenAmountOutFee) = calcAmountWithCommunityFee(
             tokenAmountOut,
-            _communityExitFee
+            _communityExitFee,
+            msg.sender
         );
 
         emit LOG_EXIT(msg.sender, tokenOut, tokenAmountOutAfterFee);
@@ -758,13 +777,14 @@ contract BPool is BToken, BMath {
     {
         require(_finalized, "NOT_FINALIZED");
         _checkBound(tokenOut);
-        require(tokenAmountOut <= bmul(_records[tokenOut].balance, MAX_OUT_RATIO), "MAX_OUT_RATIO");
+        require(tokenAmountOut <= bmul(_records[tokenOut].balance, MAX_OUT_RATIO), "OUT_RATIO");
 
         Record storage outRecord = _records[tokenOut];
 
         (uint tokenAmountOutAfterFee, uint tokenAmountOutFee) = calcAmountWithCommunityFee(
             tokenAmountOut,
-            _communityExitFee
+            _communityExitFee,
+            msg.sender
         );
 
         poolAmountIn = calcPoolInGivenSingleOut(
@@ -849,5 +869,34 @@ contract BPool is BToken, BMath {
         internal view
     {
         require(_records[token].bound, "NOT_BOUND");
+    }
+
+    function _checkController()
+        internal view
+    {
+        require(msg.sender == _controller, "NOT_CONTROLLER");
+    }
+
+    function _checkFinalized()
+        internal view
+    {
+        require(!_finalized, "IS_FINALIZED");
+    }
+
+    function calcAmountWithCommunityFee(
+        uint tokenAmountIn,
+        uint communityFee,
+        address operator
+    )
+        public view
+        returns (uint tokenAmountInAfterFee, uint tokenAmountFee)
+    {
+        if (address(_restrictions) != address(0) && _restrictions.isWithoutFee(operator)) {
+            return (tokenAmountIn, 0);
+        }
+        uint adjustedIn = bsub(BONE, communityFee);
+        tokenAmountInAfterFee = bmul(tokenAmountIn, adjustedIn);
+        uint tokenAmountFee = bsub(tokenAmountIn, tokenAmountInAfterFee);
+        return (tokenAmountInAfterFee, tokenAmountFee);
     }
 }

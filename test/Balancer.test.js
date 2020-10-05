@@ -125,6 +125,21 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
         await expectRevert(pool.exitswapExternAmountOut(alice, '0', '0'), 'NOT_BOUND');
     });
 
+    it('controller check should work properly', async () => {
+        await expectRevert(pool.setSwapFee('0', { from: alice }), 'NOT_CONTROLLER');
+        await expectRevert(pool.setCommunityFeeAndReceiver('0', '0', '0', alice, { from: alice }), 'NOT_CONTROLLER');
+        await expectRevert(pool.setRestrictions(alice, { from: alice }), 'NOT_CONTROLLER');
+        await expectRevert(pool.setController(alice, { from: alice }), 'NOT_CONTROLLER');
+        await expectRevert(pool.finalize({from: alice}), 'NOT_CONTROLLER');
+        await expectRevert(pool.bind(alice, '0', '0', {from: alice}), 'NOT_CONTROLLER');
+        await expectRevert(pool.rebind(this.token1.address, '0', '0', {from: alice}), 'NOT_CONTROLLER');
+        await expectRevert(pool.unbind(this.token1.address, {from: alice}), 'NOT_CONTROLLER');
+    });
+
+    it('finalized check should work properly', async () => {
+        await expectRevert(pool.setPublicSwap(true, { from: alice }), 'IS_FINALIZED');
+    });
+
     describe('community fee', () => {
         let pool, amountToSwap, amountCommunitySwapFee, amountAfterCommunitySwapFee, expectedSwapOut;
         beforeEach(async () => {
@@ -412,15 +427,61 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
             assertEqualWithAccuracy(await this.token1.balanceOf(pool.address), subBN(addBN(token1InAmount, balances[0]), token1OutAmount));
             assertEqualWithAccuracy(await this.token2.balanceOf(pool.address), subBN(addBN(token2InAmount, balances[1]), token2OutAmount));
         });
+
+        it('community fee should be zero for address set to without fee restrictions', async () => {
+            const poolRestrictions = await PoolRestrictions.new();
+            await pool.setRestrictions(poolRestrictions.address, { from: minter });
+            await poolRestrictions.setWithoutFee([alice], { from: minter });
+
+            const expectedSwapOutWithoutFee = (await pool.calcOutGivenIn(
+                balances[0],
+                weights[0],
+                balances[1],
+                weights[1],
+                amountToSwap,
+                swapFee
+            )).toString(10);
+
+            const price = (await pool.calcSpotPrice(
+                addBN(balances[0], amountToSwap),
+                weights[0],
+                subBN(balances[1], expectedSwapOutWithoutFee),
+                weights[1],
+                swapFee
+            )).toString(10);
+
+            assert.equal((await this.token1.balanceOf(alice)).toString(), amountToSwap.toString());
+            const token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
+            const token2AliceBalanceBefore = (await this.token2.balanceOf(alice)).toString();
+
+            await this.token1.approve(pool.address, amountToSwap, {from: alice});
+
+            await pool.swapExactAmountIn(
+                this.token1.address,
+                amountToSwap,
+                this.token2.address,
+                expectedSwapOutWithoutFee,
+                mulScalarBN(price, ether('1.05')),
+                {from: alice}
+            );
+
+            assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
+            assert.equal((await this.token1.balanceOf(communityWallet)).toString(), '0');
+            assert.equal(
+                (await this.token1.balanceOf(pool.address)).toString(),
+                addBN(token1PoolBalanceBefore, amountToSwap)
+            );
+
+            assert.equal((await this.token2.balanceOf(alice)).toString(), addBN(token2AliceBalanceBefore, expectedSwapOutWithoutFee).toString());
+        });
     })
 
     it('pool restrictions should work properly', async () => {
         assert.equal((await pool.totalSupply()).toString(10), ether('100').toString(10));
 
         const poolRestrictions = await PoolRestrictions.new();
-        await poolRestrictions.setTotalRestrictions([pool.address], [ether('200').toString(10)], { from: minter });
-
         await pool.setRestrictions(poolRestrictions.address, { from: minter });
+        await poolRestrictions.setTotalRestrictions([pool.address], [ether('200').toString(10)], { from: minter });
 
         let amountToMint = ether('50').toString(10);
 
@@ -458,6 +519,11 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
             'NOT_ALLOWED_SIG'
         );
         await poolRestrictions.setVotingSignaturesForAddress(this.token1.address, true, [delegateSig], [true], { from: minter });
+
+        await expectRevert(
+            pool.callVoting(this.token1.address, delegateSig, '0x' + delegateData.slice(10), '0', { from: alice }),
+            'NOT_CONTROLLER'
+        );
 
         await pool.callVoting(this.token1.address, delegateSig, '0x' + delegateData.slice(10), '0', { from: minter });
 
