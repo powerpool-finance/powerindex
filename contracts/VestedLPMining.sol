@@ -36,7 +36,7 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
          * Whenever a user deposits or withdraws LP tokens to a pool:
          *   1. `pool.accCvpPerLpt` for the pool gets updated;
          *   2. CVP token amounts to be entitled and vested to the user get computed;
-         *   3. Tokens which may be vested, computed on the previous step, get sent to the user;
+         *   3. Tokens which may be vested (computed on the previous step) get sent to the user;
          *   3. User' `lptAmount`, `cvpAdjust`, `entitledCvp` and `vestedCvp` get updated.
          *
          * Note comments on vesting rules in the `function computeCvpVesting` code bellow.
@@ -50,7 +50,6 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         uint32 allocPoint;        // points assigned to the pool, which affect CVPs distribution between pools
         uint32 lastUpdateBlock;   // latest block when the pool params which follow was updated
         uint256 accCvpPerLpt;     // accumulated distributed CVPs per one deposited LP token, times 1e12
-        uint256 cvpBalance;       // total amount of CVP tokens pending to be vested to the pool' users
     }
     // scale factor for `accCvpPerLpt`
     uint256 internal constant SCALE = 1e12;
@@ -76,6 +75,8 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
     uint256 public totalAllocPoint = 0;
     // The block number when CVP mining starts
     uint256 public startBlock;
+    // total amount of CVP tokens pending to be vested to users
+    uint256 public cvpVestingPool;
 
     event AddLpToken(address indexed lpToken, uint256 indexed pid, uint256 allocPoint);
     event SetLpToken(address indexed lpToken, uint256 indexed pid, uint256 allocPoint);
@@ -128,8 +129,7 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
             poolType: _poolType,
             allocPoint: safeUint32(_allocPoint),
             lastUpdateBlock: uint32(lastUpdateBlock),
-            accCvpPerLpt: 0,
-            cvpBalance: 0
+            accCvpPerLpt: 0
         }));
         poolPidByAddress[address(_lpToken)] = pid;
 
@@ -194,18 +194,15 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
     function pendingCvp(uint256 _pid, address _user) external view returns (uint256) {
         Pool memory _pool = pools[_pid];
         User storage user = users[_pid][_user];
-        computePoolReward(_pool);
 
-        return computeCvpToEntitle(
+        computePoolReward(_pool);
+        uint256 newlyEntitled = computeCvpToEntitle(
             user.lptAmount,
             user.cvpAdjust,
             _pool.accCvpPerLpt
         );
-    }
 
-    /// @notice Return the amount of pending CVPs entitled to all users of the given pool
-    function pendingPoolCvp(uint256 _pid) external view returns (uint256) {
-        return pools[_pid].cvpBalance;
+        return newlyEntitled.add(user.entitledCvp.sub(user.vestedCvp));
     }
 
     /// @notice Return the amount of CVP tokens which may be vested to a user of a pool in the current block
@@ -247,12 +244,9 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         User storage user = users[_pid][msg.sender];
 
         doPoolUpdate(pool);
-        uint256 vested = vestUserCvp(user, pool.accCvpPerLpt);
+        vestUserCvp(user, pool.accCvpPerLpt);
 
-        if (vested > 0) {
-            pool.cvpBalance.sub(vested);
-        }
-        if(_amount > 0) {
+        if(_amount != 0) {
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
             user.lptAmount = user.lptAmount.add(_amount);
         }
@@ -269,12 +263,9 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         require(user.lptAmount >= _amount, "VestedLPMining: amount exceeds balance");
 
         doPoolUpdate(pool);
-        uint256 vested = vestUserCvp(user, pool.accCvpPerLpt);
+        vestUserCvp(user, pool.accCvpPerLpt);
 
-        if (vested > 0) {
-            pool.cvpBalance.sub(vested);
-        }
-        if(_amount > 0) {
+        if(_amount != 0) {
             user.lptAmount = user.lptAmount.sub(_amount);
             pool.lpToken.safeTransfer(address(msg.sender), _amount);
         }
@@ -293,7 +284,7 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         emit EmergencyWithdraw(msg.sender, _pid, user.lptAmount);
 
         if (user.entitledCvp > user.vestedCvp) {
-            pool.cvpBalance.sub(user.entitledCvp.sub(user.vestedCvp));
+            cvpVestingPool.sub(user.entitledCvp.sub(user.vestedCvp));
         }
 
         user.lptAmount = 0;
@@ -347,23 +338,21 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
     function doPoolUpdate(Pool storage pool) internal {
         Pool memory _pool = pool;
         uint32 prevBlock = _pool.lastUpdateBlock;
-        uint256 prevBalance = _pool.cvpBalance;
         uint256 prevAcc = _pool.accCvpPerLpt;
 
-        computePoolReward(_pool);
-
+        uint256 cvpReward = computePoolReward(_pool);
+        if (cvpReward != 0) {
+            cvpVestingPool = cvpVestingPool.add(cvpReward);
+        }
         if (_pool.accCvpPerLpt > prevAcc) {
             pool.accCvpPerLpt = _pool.accCvpPerLpt;
-        }
-        if (_pool.cvpBalance > prevBalance) {
-            pool.cvpBalance = _pool.cvpBalance;
         }
         if (_pool.lastUpdateBlock > prevBlock) {
             pool.lastUpdateBlock = _pool.lastUpdateBlock;
         }
     }
 
-    function vestUserCvp(User storage user, uint256 accCvpPerLpt) internal returns (uint256) {
+    function vestUserCvp(User storage user, uint256 accCvpPerLpt) internal {
         User memory _user = user;
         uint32 prevVestingBlock = _user.vestingBlock;
         uint32 prevUpdateBlock = _user.lastUpdateBlock;
@@ -374,6 +363,8 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         }
         if (newlyVested != 0) {
             user.vestedCvp = _user.vestedCvp;
+            cvpVestingPool = cvpVestingPool.sub(newlyVested);
+
             transferCvp(msg.sender, newlyVested);
         }
         if (_user.vestingBlock > prevVestingBlock) {
@@ -382,8 +373,6 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         if (_user.lastUpdateBlock > prevUpdateBlock) {
             user.lastUpdateBlock = _user.lastUpdateBlock;
         }
-
-        return newlyVested;
     }
 
     /* @dev Compute the amount of CVP tokens to be entitled and vested to a user of a pool
@@ -463,19 +452,18 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         return (newlyEntitled, newlyVested);
     }
 
-    function computePoolReward(Pool memory _pool) internal view {
+    function computePoolReward(Pool memory _pool) internal view returns (uint256 poolCvpReward) {
         if (block.number > _pool.lastUpdateBlock) {
             uint256 multiplier = getMultiplier(_pool.lastUpdateBlock, block.number);
             _pool.lastUpdateBlock = uint32(block.number);
 
             uint256 lptBalance = _pool.lpToken.balanceOf(address(this));
             if (lptBalance != 0) {
-                uint256 poolCvpReward = multiplier
+                poolCvpReward = multiplier
                     .mul(cvpPerBlock)
                     .mul(uint256(_pool.allocPoint))
                     .div(totalAllocPoint);
 
-                _pool.cvpBalance = _pool.cvpBalance.add(poolCvpReward);
                 _pool.accCvpPerLpt = _pool.accCvpPerLpt.add(poolCvpReward.mul(SCALE).div(lptBalance));
             }
         }

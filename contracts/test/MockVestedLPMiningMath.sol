@@ -49,26 +49,25 @@ contract MockVestedLPMiningMath is VestedLPMining {
     }
 
     event _UpdatedPool(
-        uint32 lastUpdateBlock, uint256 accCvpPerLpt, uint256 cvpBalance
+        uint32 lastUpdateBlock, uint256 accCvpPerLpt, uint256 cvpReward
     );
 
     function _computePoolReward(
         uint32 _allocPoint,
         uint32 _lastUpdateBlock,
-        uint256 _accCvpPerLpt,
-        uint256 _cvpBalance
+        uint256 _accCvpPerLpt
     ) external returns (
         uint32 lastUpdateBlock,
         uint256 accCvpPerLpt,
-        uint256 cvpBalance
+        uint256 cvpReward
     ) {
         Pool memory p = Pool(
-            IERC20(address(this)), true, 0x01, _allocPoint, _lastUpdateBlock, _accCvpPerLpt, _cvpBalance
+            IERC20(address(this)), true, 0x01, _allocPoint, _lastUpdateBlock, _accCvpPerLpt
         );
 
-        super.computePoolReward(p);
+        cvpReward = super.computePoolReward(p);
 
-        emit _UpdatedPool(p.lastUpdateBlock, p.accCvpPerLpt, p.cvpBalance);
-        return (p.lastUpdateBlock, p.accCvpPerLpt, p.cvpBalance);
+        emit _UpdatedPool(p.lastUpdateBlock, p.accCvpPerLpt, cvpReward);
+        return (p.lastUpdateBlock, p.accCvpPerLpt, cvpReward);
     }
 }

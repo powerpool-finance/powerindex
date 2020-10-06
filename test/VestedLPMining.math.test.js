@@ -1,7 +1,4 @@
 /* global after, afterEach, artifacts, assert, before, beforeEach, context, contract, describe, it, web3 */
-const { appendFileSync } = require('fs');
-const DEBUG_LOG = (msg) => appendFileSync('.debug-log.txt', `*** DEBUG (${(new Date()).toLocaleTimeString()}): ${msg}\n`);
-
 const { time } = require('@openzeppelin/test-helpers');
 const { createSnapshot, revertToSnapshot } = require('./helpers/blockchain');
 const MockVestedLPMiningMath = artifacts.require('MockVestedLPMiningMath');
@@ -45,49 +42,44 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
     context('computePoolReward function', () => {
 
         it('should return zero reward params computed for zero allocation points', async () => {
-            const [ allocPoint, lastUpdateBlock, accCvpPerLpt, cvpBalance ] = [ '0', '0', '0', '0' ];
+            const [ allocPoint, lastUpdateBlock, accCvpPerLpt ] = [ '0', '0', '0' ];
 
             await time.advanceBlockTo('50');
-            const tx = await this.vestingMath._computePoolReward(allocPoint, lastUpdateBlock, accCvpPerLpt, cvpBalance);
+            const tx = await this.vestingMath._computePoolReward(allocPoint, lastUpdateBlock, accCvpPerLpt);
             const res = tx.receipt.logs[0].args;
             const curBlock = await web3.eth.getBlockNumber();
 
             assert(this.deployBlock.toString() !== curBlock.toString());
             assert.equal(res.lastUpdateBlock.toString(), curBlock.toString());
             assert.equal(res.accCvpPerLpt.toString(), '0');
-            assert.equal(res.cvpBalance.toString(), '0');
+            assert.equal(res.cvpReward.toString(), '0');
         });
 
         it('should return non-zero reward params computed for non-zero allocation points', async () => {
-            const [ allocPoint, lastUpdateBlock, accCvpPerLpt, cvpBalance ] = [ '1000', '10', '0', '0' ];
-            const eCvpBalance = toBN(cvpPerBlock).mul(toBN('50')).div(mockTotalAllocPoint).mul(toBN(allocPoint));
-            const eAccCvpPerLpt = eCvpBalance.mul(Scale).div(mockLptBalance);
+            const [ allocPoint, lastUpdateBlock, accCvpPerLpt ] = [ '1000', '10', '0' ];
+            const eCvpReward = toBN(cvpPerBlock).mul(toBN('50')).div(mockTotalAllocPoint).mul(toBN(allocPoint));
+            const eAccCvpPerLpt = eCvpReward.mul(Scale).div(mockLptBalance);
 
             await time.advanceBlockTo('59');
-            const tx = await this.vestingMath._computePoolReward(allocPoint, lastUpdateBlock, accCvpPerLpt, cvpBalance);
+            const tx = await this.vestingMath._computePoolReward(allocPoint, lastUpdateBlock, accCvpPerLpt);
             const res = tx.receipt.logs[0].args;
 
             assert.equal(res.lastUpdateBlock.toString(), '60');
             assert.equal(res.accCvpPerLpt.toString(), eAccCvpPerLpt);
-            assert.equal(res.cvpBalance.toString(), eCvpBalance);
+            assert.equal(res.cvpReward.toString(), eCvpReward);
         });
 
         it('should return computed reward params being "called"', async () => {
-            const [ allocPoint, lastUpdateBlock, accCvpPerLpt, cvpBalance ] = [ '1000', '10', `${3e6}`, `${10e6}` ];
-            const eCvpBalance = toBN(cvpBalance).add(
-                toBN(cvpPerBlock).mul(toBN('50')).div(mockTotalAllocPoint).mul(toBN(allocPoint))
-            );
-            const eAccCvpPerLpt = toBN(accCvpPerLpt).add(
-                eCvpBalance.mul(Scale).div(mockLptBalance)
-            );
+            const [ allocPoint, lastUpdateBlock, accCvpPerLpt ] = [ '1000', '10', `${3e6}` ];
+            const eCvpReward = toBN(cvpPerBlock).mul(toBN('50')).div(mockTotalAllocPoint).mul(toBN(allocPoint));
+            const eAccCvpPerLpt = toBN(accCvpPerLpt).add(eCvpReward.mul(Scale).div(mockLptBalance));
 
             await time.advanceBlockTo('60');
-            const res = await this.vestingMath
-                ._computePoolReward.call(allocPoint, lastUpdateBlock, accCvpPerLpt, cvpBalance);
+            const res = await this.vestingMath._computePoolReward.call(allocPoint, lastUpdateBlock, accCvpPerLpt);
 
             assert.equal(res.lastUpdateBlock.toString(), '60');
             assert.equal(res.accCvpPerLpt.toString(), eAccCvpPerLpt);
-            assert.equal(res.cvpBalance.toString(), eCvpBalance);
+            assert.equal(res.cvpReward.toString(), eCvpReward);
         });
     });
 
@@ -104,7 +96,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
 
         context('with all CVPs vested on the latest deposit/withdrawal', () => {
 
-            context('if the LPT balance has remained zero since the withdrawal', () => {
+            context('if the LPT balance has remained zero', () => {
                 it('should nether entitle nor vest new CVPs', async () => {
                     const user = getTestUser();
                     user.lptAmount = '0';
@@ -112,9 +104,8 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     const currentBlock = '50';
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
-                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt); // new block mined
+                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
                     const res = tx.receipt.logs[0].args;
-                    DEBUG_LOG(JSON.stringify(res));
 
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
                     // new CVPs neither entitled nor vested
@@ -146,9 +137,8 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                         .mul(toBN(`${age}`)).div(toBN(`${age + 1*vestPeriod}`));
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
-                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt); // new block mined
+                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
                     const res = tx.receipt.logs[0].args;
-                    DEBUG_LOG(JSON.stringify(res));
 
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
                     // new CVPs entitled
@@ -161,7 +151,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     assert.equal(res.vestingBlock.toString(), `${1*currentBlock + 1*vestPeriod}`);
                 });
 
-                it('should vest newly entitled CVPs in a part even if the vesting period past', async () => {
+                it('should vest newly entitled CVPs partially even if the vesting period past', async () => {
                     const user = getTestUser();
                     user.lptAmount = '5'+e18;
                     user.cvpAdjust = `${0.5e6}`;
@@ -176,7 +166,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                         .mul(toBN(`${age}`)).div(toBN(`${age + 1*vestPeriod}`));
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
-                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt); // new block mined
+                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
                     const res = tx.receipt.logs[0].args;
 
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -192,10 +182,11 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
             });
         });
 
-        context('with CVPs remaining frozen since the last deposit/withdrawal', () => {
-            context('even if the LPT balance is zero after the withdrawal', () => {
+        context('with CVPs pending since the last deposit/withdrawal', () => {
 
-                it('should vest CVPs proportionally to mined blocks since the withdrawal', async () => {
+            context('if the LPT balance has remained zero', () => {
+
+                it('should vest pending CVPs proportionally to mined blocks', async () => {
                     const user = getTestUser();
                     user.lptAmount = '0';
                     user.vestedCvp = `${3e6}`;
@@ -210,9 +201,8 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                         .div(toBN(`${1*user.vestingBlock - 1*user.lastUpdateBlock}`));
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
-                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt); // new block mined
+                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
                     const res = tx.receipt.logs[0].args;
-                    DEBUG_LOG(JSON.stringify(res));
 
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
                     // no new CVPs entitled
@@ -234,9 +224,8 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     const currentBlock = '50'
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
-                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt); // new block mined
+                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
                     const res = tx.receipt.logs[0].args;
-                    DEBUG_LOG(JSON.stringify(res));
 
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
                     // no new CVPs entitled
@@ -246,6 +235,87 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     assert.equal(res.newlyVested.toString(), `${2e6}`);
                     assert.equal(res.vestedCvp.toString(), `${5e6}`);
                     assert.equal(res.vestingBlock.toString(), currentBlock);
+                });
+            });
+
+            context('if the LPT balance has not been zero', () => {
+
+                it('should entitle new CVPs and vest CVPs in proportion to mined blocks', async () => {
+                    const user = getTestUser();
+                    user.lptAmount = '2'+e18;
+                    user.vestedCvp = `${4e6}`;
+                    user.lastUpdateBlock = '30';
+                    user.vestingBlock = '38';
+                    user.cvpAdjust = `${0.5e6}`;
+                    // less than `user.vestingBlock`
+                    const currentBlock = '35'
+
+                    const pended = toBN(user.entitledCvp).sub(toBN(user.vestedCvp));
+                    const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale)
+                        .sub(toBN(user.cvpAdjust))
+                    const age = 1*currentBlock - 1*user.lastUpdateBlock;
+                    const entitledVesting = expectedEntitled
+                        .mul(toBN(`${age}`)).div(toBN(`${age + 1*vestPeriod}`));
+                    const pendedVesting = pended
+                        .mul(toBN(`${1*currentBlock - 1*user.lastUpdateBlock}`))
+                        .div(toBN(`${1*user.vestingBlock - 1*user.lastUpdateBlock}`));
+                    const expectedVesting = entitledVesting.add(pendedVesting);
+                    const pendingPended = pended.sub(pendedVesting);
+                    const pendingEntitled = expectedEntitled.sub(entitledVesting);
+                    // weighted average between pending periods of "pended" and "entitled" CVPs
+                    const averageVestingPeriod = (
+                        pendingPended.mul(toBN(`${1*user.vestingBlock - 1*currentBlock}`))
+                        .add(pendingEntitled.mul(toBN(vestPeriod)))
+                    ).div(pendingPended.add(pendingEntitled)).toString();
+
+                    await time.advanceBlockTo(`${1*currentBlock - 1}`);
+                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
+                    const res = tx.receipt.logs[0].args;
+
+                    assert.equal(res.lastUpdateBlock.toString(), currentBlock);
+                    // new CVPs entitled
+                    assert.equal(res.newlyEntitled.toString(), expectedEntitled.toString());
+                    assert.equal(res.entitledCvp.toString(), expectedEntitled.add(toBN(user.entitledCvp)).toString());
+                    // a part of "new" CVPs and a part of "old" CVPs are vested
+                    assert.equal(res.newlyVested.toString(), expectedVesting.toString());
+                    assert.equal(res.vestedCvp.toString(), toBN(user.vestedCvp).add(expectedVesting).toString());
+                    // new vesting block is between the old vesting block and `vestingPeriod` blocks from now
+                    assert.equal(1*currentBlock + 1*averageVestingPeriod > 1*user.vestingBlock, true);
+                    assert.equal(1*averageVestingPeriod  < 1*vestPeriod, true);
+                    assert.equal(res.vestingBlock.toString(), `${1*currentBlock + 1*averageVestingPeriod}`);
+                });
+
+                it('should vest entitled CVPs partially even if the vesting period past', async () => {
+                    const user = getTestUser();
+                    user.lptAmount = '2'+e18;
+                    user.vestedCvp = `${4e6}`;
+                    user.lastUpdateBlock = '30';
+                    user.vestingBlock = '38';
+                    user.cvpAdjust = `${0.5e6}`;
+                    // more than `user.vestingBlock`
+                    const currentBlock = '40'
+
+                    const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale)
+                        .sub(toBN(user.cvpAdjust))
+                    const age = 1*currentBlock - 1*user.lastUpdateBlock;
+                    const entitledVesting = expectedEntitled
+                        .mul(toBN(`${age}`)).div(toBN(`${age + 1*vestPeriod}`));
+                    const pendedVesting = toBN(user.entitledCvp).sub(toBN(user.vestedCvp));
+                    const expectedVesting = entitledVesting.add(pendedVesting);
+
+                    await time.advanceBlockTo(`${1*currentBlock - 1}`);
+                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
+                    const res = tx.receipt.logs[0].args;
+
+                    assert.equal(res.lastUpdateBlock.toString(), currentBlock);
+                    // new CVPs entitled
+                    assert.equal(res.newlyEntitled.toString(), expectedEntitled.toString());
+                    assert.equal(res.entitledCvp.toString(), expectedEntitled.add(toBN(user.entitledCvp)).toString());
+                    // a part of "new" CVPs and a part of "old" CVPs are vested
+                    assert.equal(res.newlyVested.toString(), expectedVesting.toString());
+                    assert.equal(res.vestedCvp.toString(), toBN(user.vestedCvp).add(expectedVesting).toString());
+                    // only newly entitled CVPs remain pending with the vesting block to be in vesting period from now
+                    assert.equal(res.vestingBlock.toString(), `${1*currentBlock + 1*vestPeriod}`);
                 });
             });
         });
