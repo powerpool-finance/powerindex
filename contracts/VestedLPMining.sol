@@ -404,6 +404,10 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
     ) {
         uint32 prevBlock = _user.lastUpdateBlock;
         _user.lastUpdateBlock = uint32(block.number);
+        if (prevBlock >= _user.lastUpdateBlock) {
+            return (0, 0);
+        }
+
         uint32 age = _user.lastUpdateBlock - prevBlock;
 
         // Tokens which are to be entitled starting from the `user.lastUpdateBlock`, shall be
@@ -417,38 +421,44 @@ contract VestedLPMining is Ownable, ReentrancyGuard, Checkpoints {
         // Tokens which have been pended since the `user.lastUpdateBlock` shall be vested:
         // - in full, if the `user.vestingBlock` has been mined
         // - otherwise, proportionally to the number of blocks already mined so far in the period
-        //   between the `user.lastUpdateBlock` and the (not yet mined) `user.vestingBlock`
+        //   between the `user.lastUpdateBlock` and the `user.vestingBlock` (not yet mined)
         uint256 pended = _user.vestedCvp >= _user.entitledCvp ? 0 : _user.entitledCvp.sub(_user.vestedCvp);
-        age = _user.lastUpdateBlock - _user.vestingBlock;
+        age = _user.lastUpdateBlock >= _user.vestingBlock
+            ? cvpVestingPeriodInBlocks
+            : _user.lastUpdateBlock - prevBlock;
         uint256 pendedToVest = pended == 0 ? 0 : (
             age >= cvpVestingPeriodInBlocks
                 ? pended
-                : pended.mul(uint256(age)).div(uint256(cvpVestingPeriodInBlocks))
+                : pended.mul(uint256(age)).div(uint256(_user.vestingBlock - prevBlock))
         );
 
         newlyVested = pendedToVest.add(newToVest);
         _user.entitledCvp = _user.entitledCvp.add(newlyEntitled);
         _user.vestedCvp = _user.vestedCvp.add(newlyVested);
 
-        // The vesting period for tokens pending from now, if there are any, is the weighted average
-        // between remaining periods to vest "old" pended tokens and newly entitled ones.
-        uint256 pending = pended.add(newlyEntitled).sub(newlyVested);
+        // Amount of CVP token pending to be vested from now
+        uint256 remainingPended = pended == 0 ? 0 : pended.sub(pendedToVest);
+        uint256 unreleasedNewly = newlyEntitled == 0 ? 0 : newlyEntitled.sub(newlyVested);
+        uint256 pending = remainingPended.add(unreleasedNewly);
+
+        // Compute the vesting block (i.e. when the pending tokens to be all vested)
+        uint256 period = 0;
         if (pending == 0) {
-            _user.vestingBlock = 0;
+            // `period` remains 0
+        } else if (remainingPended == 0) {
+            // only newly entitled CVPs remain pending
+            period = cvpVestingPeriodInBlocks;
         } else {
-            uint256 weighted = 0;
-            if (pended != 0 && pended > pendedToVest) {
-                weighted = pended.sub(pendedToVest)
-                    .mul(uint256(cvpVestingPeriodInBlocks - age))
-                    .div(uint256(cvpVestingPeriodInBlocks));
-            }
-            if (newlyEntitled != 0) {
-                weighted = newlyEntitled.sub(newToVest).mul(uint256(cvpVestingPeriodInBlocks));
-            }
-            _user.vestingBlock = uint32(block.number.add(
-                    weighted.div(2).div(pending)
-            ));
+            // "old" CVPs and, perhaps, "new" CVPs are pending - the weighted average applied
+            age = _user.vestingBlock - _user.lastUpdateBlock;
+            period = (
+                (remainingPended.mul(age))
+                .add(unreleasedNewly.mul(cvpVestingPeriodInBlocks))
+            ).div(pending);
         }
+        _user.vestingBlock = _user.lastUpdateBlock + (
+            cvpVestingPeriodInBlocks > uint32(period) ? uint32(period) : cvpVestingPeriodInBlocks
+        );
 
         return (newlyEntitled, newlyVested);
     }
