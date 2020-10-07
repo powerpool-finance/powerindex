@@ -13,7 +13,7 @@ const {web3} = MockERC20;
 const {toBN, toWei} = web3.utils;
 
 module.exports = function(deployer, network, accounts) {
-    if(network === 'test' || network === 'mainnet') {
+    if(network === 'test' || network !== 'mainnet') {
         return;
     }
 
@@ -72,7 +72,7 @@ module.exports = function(deployer, network, accounts) {
             const pool = await BPool.at(logNewPool.args.pool);
             console.log('pool.address', pool.address);
             await pool.setRestrictions(poolRestrictions.address);
-            await poolRestrictions.setTotalRestrictions([pool.address], [ether(50000)]);
+            await poolRestrictions.setTotalRestrictions([pool.address], [ether(20000)]);
 
             await pool.setController(admin);
         }

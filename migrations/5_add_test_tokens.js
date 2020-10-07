@@ -5,6 +5,9 @@ const Reservoir = artifacts.require("Reservoir");
 const BFactory = artifacts.require("BFactory");
 const BActions = artifacts.require("BActions");
 const WETH = artifacts.require("WETH");
+const PoolRestrictions = artifacts.require("PoolRestrictions");
+const BPool = artifacts.require("BPool");
+const PermanentVotingPowerV1 = artifacts.require("PermanentVotingPowerV1");
 
 WETH.numberFormat = 'String';
 
@@ -17,17 +20,11 @@ module.exports = function(deployer, network, accounts) {
     }
 
     deployer.then(async () => {
-        const weth = await WETH.deployed();
         const bFactory = await BFactory.deployed();
         const bActions = await BActions.deployed();
-        const lpMining = await LPMining.deployed();
+        const poolRestrictions = await deployer.deploy(PoolRestrictions);
+        const pvpV1 = await deployer.deploy(PermanentVotingPowerV1);
 
-        let mockCvp;
-        if(process.env.CVP) {
-            mockCvp = await MockCvp.at(process.env.CVP);
-        } else {
-            mockCvp = await MockCvp.deployed();
-        }
         const lendToken = await deployer.deploy(MockERC20, 'LEND', 'LEND', ether(10e6));
         const compToken = await deployer.deploy(MockERC20, 'COMP', 'COMP', ether(10e6));
         const yfiToken = await deployer.deploy(MockERC20, 'YFI', 'YFI', ether(10e6));
@@ -37,72 +34,45 @@ module.exports = function(deployer, network, accounts) {
         const crvToken = await deployer.deploy(MockERC20, 'CRV', 'CRV', ether(10e6));
         const snxToken = await deployer.deploy(MockERC20, 'SNX', 'SNX', ether(10e6));
 
-        const pairs = [{
-            //     name: 'WETH-CVP',
-            //     symbol: 'WETH-CVP',
-            //     tokens: [weth.address, mockCvp.address],
-            //     balances: [50, 500],
-            //     denorms: [25, 25],
-            //     swapFee: 0.05,
-            //     miningVotes: true
-            // },{
-            //     name: 'WETH-LEND',
-            //     symbol: 'WETH-LEND',
-            //     tokens: [weth.address, lendToken.address],
-            //     balances: [50, 1000],
-            //     denorms: [25, 25],
-            //     swapFee: 0.05,
-            //     miningVotes: true
-            // },{
-            //     name: 'WETH-COMP',
-            //     symbol: 'WETH-COMP',
-            //     tokens: [weth.address, compToken.address],
-            //     balances: [50, 2000],
-            //     denorms: [25, 25],
-            //     swapFee: 0.05,
-            //     miningVotes: true
-            // },{
-            //     name: 'WETH-YFI',
-            //     symbol: 'WETH-YFI',
-            //     tokens: [weth.address, yfiToken.address],
-            //     balances: [50, 200],
-            //     denorms: [25, 25],
-            //     swapFee: 0.05,
-            //     miningVotes: true
-            // },{
-            name: 'Power Index Token',
-            symbol: 'PIT',
+        const pools = [{
+            name: 'Test Index Token',
+            symbol: 'TIT',
             tokens: [lendToken.address, yfiToken.address, compToken.address, umaToken.address, mkrToken.address, uniToken.address, crvToken.address, snxToken.address],
             balances: [50, 10, 100, 200, 150, 75, 125, 60],
             denorms: [6.25, 6.25, 6.25, 6.25, 6.25, 6.25, 6.25, 6.25],
-            swapFee: 0.0002,
-            communityFee: 0.0001,
-            communityFeeReceiver: '0xc979e468038435E2a08d4724198dDDD4d9811452',
+            swapFee: 0.002,
+            communitySwapFee: 0.001,
+            communityJoinFee: 0.001,
+            communityExitFee: 0.001,
+            communityFeeReceiver: pvpV1.address,
             miningVotes: false
         }];
 
-        for(let i = 0; i < pairs.length; i++) {
-            const pair = pairs[i];
+        for(let i = 0; i < pools.length; i++) {
+            const poolConfig = pools[i];
 
-            for(let i = 0; i < pair.tokens.length; i++) {
-                const pairToken = await MockERC20.at(pair.tokens[i]);
-                await pairToken.approve(bActions.address, ether(pair.balances[i]));
+            for(let i = 0; i < poolConfig.tokens.length; i++) {
+                const pairToken = await MockERC20.at(poolConfig.tokens[i]);
+                await pairToken.approve(bActions.address, ether(poolConfig.balances[i]));
             }
 
             const res = await bActions.create(
                 bFactory.address,
-                pair.name,
-                pair.symbol,
-                pair.tokens,
-                pair.balances.map(b => ether(b)),
-                pair.denorms.map(d => ether(d)),
-                [ether(pair.swapFee), ether(pair.communityFee)],
-                pair.communityFeeReceiver,
+                poolConfig.name,
+                poolConfig.symbol,
+                poolConfig.tokens,
+                poolConfig.balances.map(b => ether(b)),
+                poolConfig.denorms.map(d => ether(d)),
+                [ether(poolConfig.swapFee), ether(poolConfig.communitySwapFee), ether(poolConfig.communityJoinFee), ether(poolConfig.communityExitFee)],
+                poolConfig.communityFeeReceiver,
                 true
             );
 
             const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
-            await lpMining.add('50', logNewPool.args.pool, '1', pair.miningVotes, true);
+            const pool = await BPool.at(logNewPool.args.pool);
+            console.log('pool.address', pool.address);
+            await pool.setRestrictions(poolRestrictions.address);
+            await poolRestrictions.setTotalRestrictions([pool.address], [ether(20000)]);
         }
 
         // await lpMining.transferOwnership(deployer);
