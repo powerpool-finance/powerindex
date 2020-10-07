@@ -44,8 +44,7 @@ module.exports = function(deployer, network, accounts) {
             communitySwapFee: 0.001,
             communityJoinFee: 0.001,
             communityExitFee: 0.001,
-            communityFeeReceiver: pvpV1.address,
-            miningVotes: false
+            communityFeeReceiver: pvpV1.address
         }];
 
         for(let i = 0; i < poolConfigs.length; i++) {
