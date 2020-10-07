@@ -60,6 +60,7 @@ contract('Balancer', ([minter, bob, carol, alice, feeManager, feeReceiver, newCo
         tokens = [this.token1.address, this.token2.address];
 
         permanentVotingPower = await PermanentVotingPowerV1.new();
+        await permanentVotingPower.setFeeManager(feeManager, {from: minter});
 
         await this.token1.approve(this.bActions.address, balances[0]);
         await this.token2.approve(this.bActions.address, balances[1]);
@@ -266,13 +267,11 @@ contract('Balancer', ([minter, bob, carol, alice, feeManager, feeReceiver, newCo
                 "Ownable: caller is not the owner"
             );
 
-            await permanentVotingPower.setFeeManager(feeManager, {from: minter});
-
             await expectRevert(
-                permanentVotingPower.withdraw(this.token1.address, feeReceiver, amountCommunitySwapFee, {from: alice}),
+                permanentVotingPower.withdraw([this.token1.address], [amountCommunitySwapFee], feeReceiver, {from: alice}),
                 "NOT_FEE_MANAGER"
             );
-            await permanentVotingPower.withdraw(this.token1.address, feeReceiver, amountCommunitySwapFee, {from: feeManager});
+            await permanentVotingPower.withdraw([this.token1.address], [amountCommunitySwapFee], feeReceiver, {from: feeManager});
 
             assert.equal(
                 (await this.token1.balanceOf(feeReceiver)).toString(),

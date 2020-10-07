@@ -25,7 +25,12 @@ contract PermanentVotingPowerV1 is Ownable {
         emit SetFeeManager(_feeManager);
     }
 
-    function withdraw(address _token, address _to, uint256 _amount) onlyFeeManager external {
-        IERC20(_token).transfer(_to, _amount);
+    function withdraw(address[] calldata _tokens, uint256[] calldata _amounts, address _to) onlyFeeManager external {
+        uint256 len = _tokens.length;
+        require(len == _amounts.length , "Arrays lengths are not equals");
+
+        for(uint256 i = 0; i < len; i++) {
+            IERC20(_tokens[i]).transfer(_to, _amounts[i]);
+        }
     }
 }
