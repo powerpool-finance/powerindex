@@ -55,7 +55,7 @@ module.exports = function(deployer, network, accounts) {
             for(let i = 0; i < poolConfig.tokens.length; i++) {
                 const token = await MockERC20.at(poolConfig.tokens[i]);
                 balances[i] = (await token.balanceOf(accounts[0])).toString(10);
-                await token.approve(bActions.address, ether(balances[i]));
+                await token.approve(bActions.address, balances[i]);
             }
 
             const res = await bActions.create(
