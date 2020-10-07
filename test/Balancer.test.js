@@ -8,6 +8,7 @@ const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('WETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
+const PermanentVotingPowerV1 = artifacts.require('PermanentVotingPowerV1');
 
 const {web3} = BFactory;
 const {toBN} = web3.utils;
@@ -33,7 +34,7 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
     assert.equal(diff.lte(toBN(accuracyWei)), true, message);
 }
 
-contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityWallet]) => {
+contract('Balancer', ([minter, bob, carol, alice, feeManager, feeReceiver, newCommunityWallet]) => {
     const name = 'My Pool';
     const symbol = 'MP';
     const balances = [ether('10'), ether('20')];
@@ -45,6 +46,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
 
     let tokens;
     let pool;
+    let permanentVotingPower;
 
     beforeEach(async () => {
         this.weth = await WETH.new();
@@ -57,6 +59,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
         this.token2 = await MockERC20.new('My Token 2', 'MT2', ether('1000000'));
         tokens = [this.token1.address, this.token2.address];
 
+        permanentVotingPower = await PermanentVotingPowerV1.new();
 
         await this.token1.approve(this.bActions.address, balances[0]);
         await this.token2.approve(this.bActions.address, balances[1]);
@@ -69,7 +72,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
             balances,
             weights,
             [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
-            communityWallet,
+            permanentVotingPower.address,
             true
         );
 
@@ -103,7 +106,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
         assert.equal(_communitySwapFee.toString(), communitySwapFee.toString());
         assert.equal(_communityJoinFee.toString(), communityJoinFee.toString());
         assert.equal(_communityExitFee.toString(), communityExitFee.toString());
-        assert.equal(_communityFeeReceiver, communityWallet);
+        assert.equal(_communityFeeReceiver, permanentVotingPower.address);
     });
 
     it('bound check should work properly', async () => {
@@ -154,7 +157,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
                 balances,
                 weights,
                 [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
-                communityWallet,
+                permanentVotingPower.address,
                 true
             );
 
@@ -248,12 +251,35 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
             );
 
             assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-            assert.equal((await this.token1.balanceOf(communityWallet)).toString(), amountCommunitySwapFee.toString());
+            assert.equal(
+                (await this.token1.balanceOf(permanentVotingPower.address)).toString(),
+                amountCommunitySwapFee.toString()
+            );
             assert.equal(
                 (await this.token1.balanceOf(pool.address)).toString(),
                 addBN(token1PoolBalanceBefore, amountAfterCommunitySwapFee)
             );
             assert.equal((await this.token2.balanceOf(alice)).toString(), addBN(token2AliceBalanceBefore, expectedSwapOut).toString());
+
+            await expectRevert(
+                permanentVotingPower.setFeeManager(feeManager, {from: alice}),
+                "Ownable: caller is not the owner"
+            );
+
+            await permanentVotingPower.setFeeManager(feeManager, {from: minter});
+
+            await expectRevert(
+                permanentVotingPower.withdraw(this.token1.address, feeReceiver, amountCommunitySwapFee, {from: alice}),
+                "NOT_FEE_MANAGER"
+            );
+            await permanentVotingPower.withdraw(this.token1.address, feeReceiver, amountCommunitySwapFee, {from: feeManager});
+
+            assert.equal(
+                (await this.token1.balanceOf(feeReceiver)).toString(),
+                amountCommunitySwapFee.toString()
+            );
+            assert.equal((await this.token1.balanceOf(feeManager)).toString(), '0');
+            assert.equal((await this.token1.balanceOf(permanentVotingPower.address)).toString(), '0');
         });
 
         it('community fee should work properly for multihopBatchSwapExactOut', async () => {
@@ -296,7 +322,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
             );
 
             assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-            assert.equal((await this.token2.balanceOf(communityWallet)).toString(), expectedOutFee);
+            assert.equal((await this.token2.balanceOf(permanentVotingPower.address)).toString(), expectedOutFee);
             assert.equal(
                 (await this.token1.balanceOf(pool.address)).toString(),
                 addBN(token1PoolBalanceBefore, amountToSwap)
@@ -341,7 +367,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
             );
 
             assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-            assert.equal((await this.token1.balanceOf(communityWallet)).toString(), amountCommunityJoinFee.toString());
+            assert.equal((await this.token1.balanceOf(permanentVotingPower.address)).toString(), amountCommunityJoinFee.toString());
             assert.equal(
                 (await this.token1.balanceOf(pool.address)).toString(),
                 addBN(token1PoolBalanceBefore, amountAfterCommunityJoinFee)
@@ -371,7 +397,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
 
             assert.equal((await this.token1.balanceOf(alice)).toString(), exitTokenAmountAfterCommunityFee);
             assert.equal(
-                (await this.token1.balanceOf(communityWallet)).toString(),
+                (await this.token1.balanceOf(permanentVotingPower.address)).toString(),
                 addBN(amountCommunityJoinFee, exitTokenAmountCommunityFee)
             );
             assert.equal(
@@ -402,7 +428,10 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
 
             assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
             assert.equal((await this.token2.balanceOf(alice)).toString(), '0');
-            assert.equal((await pool.balanceOf(communityWallet)).toString(), poolOutAmountFee.toString());
+            assert.equal(
+                (await pool.balanceOf(permanentVotingPower.address)).toString(),
+                poolOutAmountFee.toString()
+            );
             assert.equal(await this.token1.balanceOf(pool.address), addBN(token1InAmount, balances[0]));
             assert.equal(await this.token2.balanceOf(pool.address), addBN(token2InAmount, balances[1]));
             assert.equal((await pool.balanceOf(alice)).toString(), poolOutAmountAfterFee.toString());
@@ -423,7 +452,10 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
             assertEqualWithAccuracy((await pool.balanceOf(alice)).toString(), '0');
             assertEqualWithAccuracy((await this.token1.balanceOf(alice)).toString(), token1OutAmount);
             assertEqualWithAccuracy((await this.token2.balanceOf(alice)).toString(), token2OutAmount);
-            assertEqualWithAccuracy((await pool.balanceOf(communityWallet)).toString(), addBN(poolOutAmountFee, poolInAmountFee).toString());
+            assertEqualWithAccuracy(
+                (await pool.balanceOf(permanentVotingPower.address)).toString(),
+                addBN(poolOutAmountFee, poolInAmountFee).toString()
+            );
             assertEqualWithAccuracy(await this.token1.balanceOf(pool.address), subBN(addBN(token1InAmount, balances[0]), token1OutAmount));
             assertEqualWithAccuracy(await this.token2.balanceOf(pool.address), subBN(addBN(token2InAmount, balances[1]), token2OutAmount));
         });
@@ -466,7 +498,7 @@ contract('Balancer', ([minter, bob, carol, alice, communityWallet, newCommunityW
             );
 
             assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-            assert.equal((await this.token1.balanceOf(communityWallet)).toString(), '0');
+            assert.equal((await this.token1.balanceOf(permanentVotingPower.address)).toString(), '0');
             assert.equal(
                 (await this.token1.balanceOf(pool.address)).toString(),
                 addBN(token1PoolBalanceBefore, amountToSwap)
