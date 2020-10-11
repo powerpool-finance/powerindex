@@ -1,6 +1,8 @@
 # PowerIndex
 This repository contains PowerIndex smart contracs. PowerIndex is an ecosystem product of PowerPool. The main feature of PowerIndex is a possibility to create special pools, not available in Balancer with unique governance and pool design.
 
+Based on Uniswap, Balancer, and Sushiswap code.
+
 🚨 Security review status: **partially audited**
 
 ## Contracts on Ethereum Main Network
