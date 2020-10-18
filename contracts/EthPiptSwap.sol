@@ -37,20 +37,30 @@ contract ExchangeProxy {
     }
 
     receive() external payable {
-        (, uint256 valueToSwap) = takeEthFee(msg.value);
+        (, uint256 swapAmount) = takeEthFee(msg.value);
+
+        address[] memory tokens = pipt.getCurrentTokens();
 
         (
             uint256[] memory tokensInPipt,
             uint256[] memory ethInUniswap,
             uint256 poolAmountOut
-        ) = getEthAndTokensIn(valueToSwape, tokens);
+        ) = getEthAndTokensIn(swapAmount, tokens);
+
         swapEthToPipt(tokensInPipt, ethInUniswap, poolAmountOut);
     }
 
-    function swapEthToPipt(uint256[] memory tokensInPipt, uint256[] memory ethInUniswap, uint256 poolAmountOut) public {
+    function swapEthToPipt(
+        uint256[] memory tokensInPipt,
+        uint256[] memory ethInUniswap,
+        uint256 poolAmountOut
+    )
+        public
+        payable
+    {
         weth.deposit.value(msg.value)();
 
-        (uint256 valueFe, uint256 valueToSwap) = takeEthFee(msg.value);
+        (uint256 feeAmount, uint256 swapAmount) = takeEthFee(msg.value);
 
         address[] memory tokens = pipt.getCurrentTokens();
         uint256 len = tokens.length;
@@ -67,12 +77,12 @@ contract ExchangeProxy {
         pipt.joinPool(poolAmountOut, tokensInPipt);
 
         pipt.transfer(msg.sender, poolAmountOut);
-        uint256 ethDiff = valueToSwap.sub(totalEthSwap);
+        uint256 ethDiff = swapAmount.sub(totalEthSwap);
         if (ethDiff > 0) {
             weth.safeTransfer(msg.sender, ethDiff);
         }
 
-        weth.safeTransfer(feePayout, valueFee);
+        weth.safeTransfer(feePayout, feeAmount);
     }
 
     function getEthAndTokensIn(uint256 _ethValue, address[] memory tokens) public returns(
@@ -81,13 +91,8 @@ contract ExchangeProxy {
         uint256 poolOut
     ) {
         uint256 piptTotalSupply = pipt.totalSupply();
-        uint256 piptTotalWeight = pipt.getTotalDenormalizedWeight();
-        uint256 swapFee = pipt.getSwapFee();
 
         uint256 len = tokens.length;
-
-        uint256[] memory poolOuts = new uint256[](len);
-        uint256 totalPoolOut = 0;
 
         uint256 firstTokenBalance = pipt.getBalance(tokens[0]);
 
@@ -95,22 +100,24 @@ contract ExchangeProxy {
         uint256 totalPoolOut = piptTotalSupply.mul(1 ether).div(firstTokenBalance);
         uint256 poolRatio = totalPoolOut.mul(1 ether).div(piptTotalSupply);
 
+        uint256 i = 0;
+
         // get shares and eth required for each share
         uint256[] memory tokensShares = new uint256[](len);
         uint256[] memory ethRequired = new uint256[](len);
         uint256 totalEthRequired = 0;
-        for (uint256 i = 0; i < len; i++) {
+        for (i = 0; i < len; i++) {
             tokensShares[i] = poolRatio.mul(pipt.getBalance(tokens[i])).div(1 ether);
             IUniswapV2Pair tokenPair = uniswapPairFor(tokens[i]);
             (uint256 tokenReserve, uint256 ethReserve,) = tokenPair.getReserves();
             ethRequired[i] = getAmountIn(tokensShares[i], tokenReserve, ethReserve);
-            totalEthRequired = totalEthRequired.add( ethRequired[i]);
+            totalEthRequired = totalEthRequired.add(ethRequired[i]);
         }
 
         // calculate eth and tokensIn based on shares and normalize if totalEthRequired more than 100%
         tokensInPipt = new uint256[](len);
         ethInUniswap = new uint256[](len);
-        for (uint256 i = 0; i < len; i++) {
+        for (i = 0; i < len; i++) {
             uint256 ethShare;
             if (totalEthRequired > 1 ether) {
                 ethShare = ethRequired[i].mul(1 ether).div(totalEthRequired);
@@ -130,7 +137,7 @@ contract ExchangeProxy {
 
     function takeEthFee(uint256 ethValue) public returns(uint256 ethFee, uint256 ethAfterFee) {
         ethFee = ethValue.mul(fee).div(1 ether);
-        ethAfterFee = ethValue.sub(valueFee);
+        ethAfterFee = ethValue.sub(ethFee);
     }
 
     // given an output amount of an asset and pair reserves, returns a required input amount of the other asset
