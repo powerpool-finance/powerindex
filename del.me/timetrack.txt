@@ -1,0 +1,15 @@
+Time Specification
+==================
+Task:
+Report date: .10.2020 at hh:mm
+Time spent: HHhMMm
+
+- Task analyzed
+  sub-tasks:
+    - analyzed codebase
+    - clarified the tasks with N.
+      fixed typos/errors in comments
+  +30m to the counter
+  time counter 01h32m (+30m) on 25-09-2020 at 12:34
+    commit ... on DD.10.2020 at HH:MM (WIP: msg)
+

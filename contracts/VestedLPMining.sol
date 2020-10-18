@@ -8,10 +8,14 @@ import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/SafeERC20
 import "@openzeppelin/contracts-ethereum-package/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/utils/EnumerableSet.sol";
 import "./interfaces/IVestedLPMining.sol";
-import "./lib/SafeUint.sol";
+import "./lib/SafeMath96.sol";
+import "./lib/SafeMath32.sol";
 
 contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVestedLPMining {
     using SafeMath for uint256;
+    using SafeMath96 for uint96;
+    using SafeMath32 for uint32;
+
     using SafeERC20 for IERC20;
 
     struct User {
@@ -89,7 +93,7 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         reservoir = _reservoir;
         cvpPerBlock = _cvpPerBlock;
         startBlock = _startBlock;
-        cvpVestingPeriodInBlocks = _safe32(_cvpVestingPeriodInBlocks);
+        cvpVestingPeriodInBlocks = SafeMath32.fromUint(_cvpVestingPeriodInBlocks, "VLPMining: too big vest period");
 
         emit SetCvpPerBlock(_cvpPerBlock);
     }
@@ -116,7 +120,7 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
             lpToken: _lpToken,
             votesEnabled: _votesEnabled,
             poolType: _poolType,
-            allocPoint: _safe32(_allocPoint),
+            allocPoint: SafeMath32.fromUint(_allocPoint, "VLPMining: too big allocation"),
             lastUpdateBlock: uint32(lastUpdateBlock),
             accCvpPerLpt: 0
         }));
@@ -133,7 +137,7 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
             updateAllPools();
         }
         totalAllocPoint = totalAllocPoint.sub(uint256(pools[_pid].allocPoint)).add(_allocPoint);
-        pools[_pid].allocPoint = _safe32(_allocPoint);
+        pools[_pid].allocPoint = SafeMath32.fromUint(_allocPoint, "VLPMining: too big allocation");
         pools[_pid].votesEnabled = _votesEnabled;
         pools[_pid].poolType = _poolType;
 
@@ -189,11 +193,7 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
             _pool.accCvpPerLpt
         );
 
-        return uint256(SafeUint.add96(
-            newlyEntitled,
-            _sub96(user.entitledCvp, user.vestedCvp),
-            "VLPMining::pendCvp overflow"
-        ));
+        return uint256(newlyEntitled.add(user.entitledCvp.sub(user.vestedCvp)));
     }
 
     /// @inheritdoc IVestedLPMining
@@ -274,9 +274,9 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
 
         if (user.entitledCvp > user.vestedCvp) {
             // TODO: Make user.entitledCvp be updated as of the pool' lastUpdateBlock
-            uint96 pending = _sub96(user.entitledCvp, user.vestedCvp);
+            uint96 pending = user.entitledCvp.sub(user.vestedCvp);
             if (pending > cvpVestingPool) {
-                cvpVestingPool = _sub96(cvpVestingPool, pending);
+                cvpVestingPool = cvpVestingPool.sub(pending);
             } else {
                 cvpVestingPool = 0;
             }
@@ -302,7 +302,7 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         uint256 userTotalLpCvp = 0;
         uint256 totalLpCvp = 0;
         for (uint256 pid = 0; pid < length; ++pid) {
-            uint256 pending = uint256(_sub96(users[pid][_user].entitledCvp, users[pid][_user].vestedCvp));
+            uint256 pending = uint256(users[pid][_user].entitledCvp.sub(users[pid][_user].vestedCvp));
             userPendedCvp = userPendedCvp.add(pending);
 
             Pool storage pool = pools[pid];
@@ -351,9 +351,8 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
 
         uint256 cvpReward = computePoolReward(_pool);
         if (cvpReward != 0) {
-            cvpVestingPool = SafeUint.add96(
-                cvpVestingPool,
-                SafeUint.safe96(cvpReward, "VLPMining::doPoolUpdate:1"),
+            cvpVestingPool = cvpVestingPool.add(
+                SafeMath96.fromUint(cvpReward, "VLPMining::doPoolUpdate:1"),
                 "VLPMining::doPoolUpdate:2"
             );
         }
@@ -376,10 +375,9 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         }
         if (newlyVested != 0) {
             user.vestedCvp = _user.vestedCvp;
-            cvpVestingPool = SafeUint.sub96(
-                cvpVestingPool,
-                SafeUint.safe96(newlyVested, "VLPMining: unsafe newlyVested"),
-                "VLPMining: newlyVested exceeds pool"
+            cvpVestingPool = cvpVestingPool.sub(
+                SafeMath96.fromUint(newlyVested, "VLPMining::vestUserCvp:1"),
+                "VLPMining::vestUserCvp:2"
             );
 
             transferCvp(msg.sender, newlyVested);
@@ -428,7 +426,7 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         // - in full, if the `user.vestingBlock` has been mined
         // - otherwise, proportionally to the number of blocks already mined so far in the period
         //   between the `user.lastUpdateBlock` and the `user.vestingBlock` (not yet mined)
-        uint256 pended = _user.vestedCvp >= _user.entitledCvp ? 0 : uint256(_sub96(_user.entitledCvp, _user.vestedCvp));
+        uint256 pended = _user.vestedCvp >= _user.entitledCvp ? 0 : uint256(_user.entitledCvp.sub(_user.vestedCvp));
         age = _user.lastUpdateBlock >= _user.vestingBlock
             ? cvpVestingPeriodInBlocks
             : _user.lastUpdateBlock - prevBlock;
@@ -439,14 +437,9 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         );
 
         newlyVested = pendedToVest.add(newToVest);
-        _user.entitledCvp = SafeUint.add96(
-            _user.entitledCvp,
-            uint96(newlyEntitled),
-            "VLPMining::computeCvpVes:1"
-        );
-        _user.vestedCvp = SafeUint.add96(
-            _user.vestedCvp,
-            SafeUint.safe96(newlyVested, "VLPMining::computeCvpVest:2"),
+        _user.entitledCvp = _user.entitledCvp.add(uint96(newlyEntitled), "VLPMining::computeCvpVes:1");
+        _user.vestedCvp = _user.vestedCvp.add(
+            SafeMath96.fromUint(newlyVested, "VLPMining::computeCvpVest:2"),
             "VLPMining::computeCvpVest:3"
         );
 
@@ -498,26 +491,16 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
     function _computeCvpToEntitle(uint256 userLpt, uint96 userCvpAdjust, uint256 poolAccCvpPerLpt)
     private pure returns (uint96)
     {
-        return userLpt == 0 ? 0 : SafeUint.sub96(
-            SafeUint.safe96(userLpt.mul(poolAccCvpPerLpt).div(SCALE), "VLPMining::computeCvp:1"),
-            userCvpAdjust,
-            "VLPMining::computeCvp:2"
+        return userLpt == 0 ? 0 : (
+            SafeMath96.fromUint(userLpt.mul(poolAccCvpPerLpt).div(SCALE), "VLPMining::computeCvp:1")
+                .sub(userCvpAdjust, "VLPMining::computeCvp:2")
         );
     }
 
     function _computeCvpAdjustment(uint256 lptAmount, uint256 accCvpPerLpt) private pure returns (uint96) {
-        return SafeUint.safe96(
+        return SafeMath96.fromUint(
             lptAmount.mul(accCvpPerLpt).div(SCALE),
             "VLPMining::_computeCvpAdj"
         );
-    }
-
-    function _sub96(uint96 a, uint96 b) private pure returns (uint96) {
-        return SafeUint.sub96(a, b, "VLPMining::_sub96 error");
-    }
-
-    function _safe32(uint256 i) private pure returns (uint32) {
-        require(i <= 2**32 - 1, "VLPMining: unsafe uint32");
-        return uint32(i);
     }
 }

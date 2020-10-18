@@ -1,9 +1,6 @@
 pragma solidity 0.6.12;
 
 
-import "./SafeUint.sol";
-
-
 library CacheCheckpoints {
 
     /// @dev A checkpoint storing some data effective from a given block
@@ -48,7 +45,7 @@ library CacheCheckpoints {
     function getPriorData(Record storage record, uint blockNumber, uint checkpointId)
     internal view returns (uint192)
     {
-        uint32 blockNum = SafeUint.safeMinedBlockNum(blockNumber);
+        uint32 blockNum = safeMinedBlockNum(blockNumber);
         Record memory _record = record;
         Checkpoint memory cp;
 
@@ -87,7 +84,7 @@ library CacheCheckpoints {
     function findCheckpoint(Record storage record, uint blockNumber)
     internal view returns (uint32 id, uint192 data)
     {
-        uint32 blockNum = SafeUint.safeMinedBlockNum(blockNumber);
+        uint32 blockNum = safeMinedBlockNum(blockNumber);
         uint32 numCheckpoints = record.numCheckpoints;
 
         (id, data) = _findCheckpoint(record, numCheckpoints, blockNum);
@@ -99,7 +96,7 @@ library CacheCheckpoints {
     function writeCheckpoint(Record storage record, uint192 data)
     internal returns (uint32 id)
     {
-        uint32 blockNum = SafeUint.safeBlockNum(block.number);
+        uint32 blockNum = safeBlockNum(block.number);
         Record memory _record = record;
 
         if (_record.lastCheckpointBlock != blockNum) {
@@ -125,6 +122,16 @@ library CacheCheckpoints {
     function writeCache(Record storage record, uint192 data) internal
     {
         record.cache = data;
+    }
+
+    function safeBlockNum(uint256 blockNumber) internal pure returns (uint32) {
+        require(blockNumber < 2**32, "ChPoints: blockNum >= 2**32");
+        return uint32(blockNumber);
+    }
+
+    function safeMinedBlockNum(uint256 blockNumber) internal view returns (uint32) {
+        require(blockNumber < block.number, "ChPoints: block not yet mined");
+        return safeBlockNum(blockNumber);
     }
 
     function _findCheckpoint(Record storage record, uint32 numCheckpoints, uint32 blockNum)

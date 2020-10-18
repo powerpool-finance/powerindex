@@ -1,5 +1,4 @@
 /* global after, afterEach, artifacts, assert, before, beforeEach, contract, describe, it, web3 */
-// const { expectRevert, time } = require('@openzeppelin/test-helpers');
 const MockCacheCheckpoint = artifacts.require('MockCacheCheckpoint');
 
 const str = (bn) => bn.toString(10);
