@@ -9,23 +9,16 @@ contract MockVestedLPMiningMath is VestedLPMining {
 
     uint256 private _mockLptBalance;
 
-    constructor(
-        IERC20 _cvp,
-        address _reservoir,
-        uint256 _cvpPerBlock,
-        uint256 _startBlock,
-        uint256 _cvpVestingPeriodInBlocks
-    ) public
-    VestedLPMining(_cvp, _reservoir, _cvpPerBlock, _startBlock, _cvpVestingPeriodInBlocks)
-    {
-    }
-
     function _setMockParams(uint256 mockLptBalance, uint256 mockTotalAllocPoint) external
     {
-        // Assigning CVP mock "balance" (hacking Checkpoints::balanceOf)
-        balances[address(this)] = uint96(mockLptBalance);
-        // .. and moc "totalAllocPoint" (hacking VestedLPMining::mockTotalAllocPoint)
+        _mockLptBalance = uint96(mockLptBalance);
+        // hacking VestedLPMining::mockTotalAllocPoint
         totalAllocPoint = mockTotalAllocPoint;
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        require(account == address(this), "MockVestedLPMiningMath::balanceOf");
+        return _mockLptBalance;
     }
 
     event _UpdatedUser(

@@ -25,6 +25,11 @@ module.exports = {
   //}
   //
   networks: {
+     develop: {
+       host: "127.0.0.1",
+       port: 9545,
+       network_id: "*"
+     },
     mainnet: {
       host: "https://mainnet.infura.io/v3/0451559fb28d46b7b7489fbb87062222",     // Localhost (default: none)
       port: 8545,            // Standard Ethereum port (default: none)
