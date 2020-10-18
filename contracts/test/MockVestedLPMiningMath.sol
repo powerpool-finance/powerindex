@@ -25,8 +25,7 @@ contract MockVestedLPMiningMath is VestedLPMining {
         uint256 newlyEntitled,
         uint256 newlyVested,
         uint256 cvpAdjust,
-        uint256 entitledCvp,
-        uint256 vestedCvp,
+        uint256 pendedCvp,
         uint32 vestingBlock,
         uint32 lastUpdateBlock
     );
@@ -37,7 +36,7 @@ contract MockVestedLPMiningMath is VestedLPMining {
 
         (newlyEntitled, newlyVested) = super.computeCvpVesting(u, _accCvpPerLpt);
 
-        emit _UpdatedUser(newlyEntitled, newlyVested, u.cvpAdjust, u.entitledCvp, u.vestedCvp, u.vestingBlock, u.lastUpdateBlock);
+        emit _UpdatedUser(newlyEntitled, newlyVested, u.cvpAdjust, u.pendedCvp, u.vestingBlock, u.lastUpdateBlock);
         return (newlyEntitled, newlyVested);
     }
 

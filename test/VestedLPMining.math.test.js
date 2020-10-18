@@ -19,8 +19,9 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
 
     before(async () => {
         this.startBlock = await web3.eth.getBlockNumber();
-        this.vestingMath = await MockVestedLPMiningMath.new(
-            doesNotMatter,
+        this.vestingMath = await MockVestedLPMiningMath.new();
+        await this.vestingMath.initialize(
+            this.vestingMath.address,
             doesNotMatter,
             cvpPerBlock,
             this.startBlock,
@@ -87,8 +88,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
         const getTestUser = () => ({
             lptAmount: '20'+e18,
             cvpAdjust: '0',
-            entitledCvp: `${5e6}`,
-            vestedCvp: `${5e6}`,
+            pendedCvp: '0',
             vestingBlock: '30',
             lastUpdateBlock: '30',
         });
@@ -101,6 +101,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     const user = getTestUser();
                     user.lptAmount = '0';
                     user.vestingBlock = '1';
+                    user.pendedCvp = '0';
                     const currentBlock = '50';
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
@@ -111,12 +112,8 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     // new CVPs neither entitled nor vested
                     assert.equal(res.newlyEntitled.toString(), '0');
                     assert.equal(res.newlyVested.toString(), '0');
-                    // therefore other params remain unchanged
-                    assert.equal(res.entitledCvp.toString(), user.entitledCvp);
-                    assert.equal(res.vestedCvp.toString(), user.vestedCvp);
-                    // no CVPs pend to be entitled
-                    assert.equal(res.entitledCvp.toString(), res.vestedCvp.toString());
-                    assert.equal(res.vestingBlock.toString(), currentBlock);
+                    // no CVPs remain pended
+                    assert.equal(res.pendedCvp.toString(), user.pendedCvp);
                 });
             });
 
@@ -125,6 +122,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                 it('should entitled and vest new CVPs proportionally to mined blocks', async () => {
                     const user = getTestUser();
                     user.lptAmount = '5'+e18;
+                    user.pendedCvp = '0';
                     user.cvpAdjust = `${0.5e6}`;
                     // less than `vestPeriod` since `user.lastUpdateBlock`
                     const currentBlock = '35';
@@ -143,11 +141,10 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
                     // new CVPs entitled
                     assert.equal(res.newlyEntitled.toString(), expectedEntitled.toString());
-                    assert.equal(res.entitledCvp.toString(), toBN(user.entitledCvp).add(expectedEntitled));
                     // some of entitled CVPs get vested
                     assert.equal(res.newlyVested.toString(), expectedVesting.toString());
-                    assert.equal(res.vestedCvp.toString(), toBN(user.vestedCvp).add(expectedVesting).toString());
-                    // only new CVPs entitled remain pending
+                    // only new CVPs entitled remain pended
+                    assert.equal(res.pendedCvp.toString(), expectedEntitled.sub(expectedVesting).toString());
                     assert.equal(res.vestingBlock.toString(), `${1*currentBlock + 1*vestPeriod}`);
                 });
 
@@ -155,6 +152,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     const user = getTestUser();
                     user.lptAmount = '5'+e18;
                     user.cvpAdjust = `${0.5e6}`;
+                    user.pendedCvp = '0';
                     // more than `vestPeriod` since `user.lastUpdateBlock`
                     const currentBlock = '50';
 
@@ -172,11 +170,10 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
                     // new CVPs entitled
                     assert.equal(res.newlyEntitled.toString(), expectedEntitled.toString());
-                    assert.equal(res.entitledCvp.toString(), toBN(user.entitledCvp).add(expectedEntitled));
                     // all entitled CVPs get vested
                     assert.equal(res.newlyVested.toString(), expectedVesting.toString());
-                    assert.equal(res.vestedCvp.toString(), toBN(user.vestedCvp).add(expectedVesting).toString());
                     // only new CVPs entitled remain pending
+                    assert.equal(res.pendedCvp.toString(), expectedEntitled.sub(expectedVesting).toString());
                     assert.equal(res.vestingBlock.toString(), `${1*currentBlock + 1*vestPeriod}`);
                 });
             });
@@ -189,15 +186,14 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                 it('should vest pending CVPs proportionally to mined blocks', async () => {
                     const user = getTestUser();
                     user.lptAmount = '0';
-                    user.vestedCvp = `${3e6}`;
+                    user.pendedCvp = `${2e6}`;
                     user.lastUpdateBlock = '30';
                     user.vestingBlock = '38';
                     // less than `user.vestingBlock`
                     const currentBlock = '35'
 
-                    const expectedVesting = toBN(
-                        toBN(user.entitledCvp).sub(toBN(user.vestedCvp))
-                    ).mul(toBN(`${1*currentBlock - 1*user.lastUpdateBlock}`))
+                    const expectedVesting = toBN(user.pendedCvp)
+                        .mul(toBN(`${1*currentBlock - 1*user.lastUpdateBlock}`))
                         .div(toBN(`${1*user.vestingBlock - 1*user.lastUpdateBlock}`));
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
@@ -207,10 +203,9 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
                     // no new CVPs entitled
                     assert.equal(res.newlyEntitled.toString(), '0');
-                    assert.equal(res.entitledCvp.toString(), user.entitledCvp);
                     // but some "old" pended CVPs are vested
                     assert.equal(res.newlyVested.toString(), expectedVesting.toString());
-                    assert.equal(res.vestedCvp.toString(), toBN(user.vestedCvp).add(expectedVesting).toString());
+                    assert.equal(res.pendedCvp.toString(), toBN(user.pendedCvp).sub(expectedVesting).toString());
                     // only "old" pended CVPs remain pending with the same vesting block
                     assert.equal(res.vestingBlock.toString(), `${user.vestingBlock}`);
                 });
@@ -218,7 +213,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                 it('should vest all remaining CVPs if the vesting period past', async () => {
                     const user = getTestUser();
                     user.lptAmount = '0';
-                    user.vestedCvp = `${3e6}`;
+                    user.pendedCvp = `${2e6}`;
                     user.vestingBlock = '35';
                     // more than `vestPeriod` since `user.vestingBlock`
                     const currentBlock = '50'
@@ -230,10 +225,9 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
                     // no new CVPs entitled
                     assert.equal(res.newlyEntitled.toString(), '0');
-                    assert.equal(res.entitledCvp.toString(), user.entitledCvp);
-                    // but pended CVPs get vested
+                    // but pended CVPs all get vested
                     assert.equal(res.newlyVested.toString(), `${2e6}`);
-                    assert.equal(res.vestedCvp.toString(), `${5e6}`);
+                    assert.equal(res.pendedCvp.toString(), '0');
                     assert.equal(res.vestingBlock.toString(), currentBlock);
                 });
             });
@@ -243,14 +237,14 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                 it('should entitle new CVPs and vest CVPs in proportion to mined blocks', async () => {
                     const user = getTestUser();
                     user.lptAmount = '2'+e18;
-                    user.vestedCvp = `${4e6}`;
+                    user.pendedCvp = `${1e6}`;
                     user.lastUpdateBlock = '30';
                     user.vestingBlock = '38';
                     user.cvpAdjust = `${0.5e6}`;
                     // less than `user.vestingBlock`
                     const currentBlock = '35'
 
-                    const pended = toBN(user.entitledCvp).sub(toBN(user.vestedCvp));
+                    const pended = toBN(user.pendedCvp);
                     const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale)
                         .sub(toBN(user.cvpAdjust))
                     const age = 1*currentBlock - 1*user.lastUpdateBlock;
@@ -275,10 +269,9 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
                     // new CVPs entitled
                     assert.equal(res.newlyEntitled.toString(), expectedEntitled.toString());
-                    assert.equal(res.entitledCvp.toString(), expectedEntitled.add(toBN(user.entitledCvp)).toString());
                     // a part of "new" CVPs and a part of "old" CVPs are vested
                     assert.equal(res.newlyVested.toString(), expectedVesting.toString());
-                    assert.equal(res.vestedCvp.toString(), toBN(user.vestedCvp).add(expectedVesting).toString());
+                    assert.equal(res.pendedCvp.toString(), pended.add(expectedEntitled).sub(expectedVesting).toString());
                     // new vesting block is between the old vesting block and `vestingPeriod` blocks from now
                     assert.equal(1*currentBlock + 1*averageVestingPeriod > 1*user.vestingBlock, true);
                     assert.equal(1*averageVestingPeriod  < 1*vestPeriod, true);
@@ -288,7 +281,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                 it('should vest entitled CVPs partially even if the vesting period past', async () => {
                     const user = getTestUser();
                     user.lptAmount = '2'+e18;
-                    user.vestedCvp = `${4e6}`;
+                    user.pendedCvp = `${1e6}`;
                     user.lastUpdateBlock = '30';
                     user.vestingBlock = '38';
                     user.cvpAdjust = `${0.5e6}`;
@@ -300,7 +293,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     const age = 1*currentBlock - 1*user.lastUpdateBlock;
                     const entitledVesting = expectedEntitled
                         .mul(toBN(`${age}`)).div(toBN(`${age + 1*vestPeriod}`));
-                    const pendedVesting = toBN(user.entitledCvp).sub(toBN(user.vestedCvp));
+                    const pendedVesting = toBN(user.pendedCvp);
                     const expectedVesting = entitledVesting.add(pendedVesting);
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
@@ -310,11 +303,13 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
                     // new CVPs entitled
                     assert.equal(res.newlyEntitled.toString(), expectedEntitled.toString());
-                    assert.equal(res.entitledCvp.toString(), expectedEntitled.add(toBN(user.entitledCvp)).toString());
                     // a part of "new" CVPs and a part of "old" CVPs are vested
                     assert.equal(res.newlyVested.toString(), expectedVesting.toString());
-                    assert.equal(res.vestedCvp.toString(), toBN(user.vestedCvp).add(expectedVesting).toString());
-                    // only newly entitled CVPs remain pending with the vesting block to be in vesting period from now
+                    // only newly entitled CVPs remain pended with the vesting block in vesting period from now
+                    assert.equal(
+                        res.pendedCvp.toString(),
+                        toBN(user.pendedCvp).add(expectedEntitled).sub(expectedVesting).toString())
+                    ;
                     assert.equal(res.vestingBlock.toString(), `${1*currentBlock + 1*vestPeriod}`);
                 });
             });
