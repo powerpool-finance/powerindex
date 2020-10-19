@@ -46,7 +46,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
             const [ allocPoint, lastUpdateBlock, accCvpPerLpt ] = [ '0', '0', '0' ];
 
             await time.advanceBlockTo('50');
-            const tx = await this.vestingMath._computePoolReward(allocPoint, lastUpdateBlock, accCvpPerLpt);
+            const tx = await this.vestingMath.__computePoolReward(allocPoint, lastUpdateBlock, accCvpPerLpt);
             const res = tx.receipt.logs[0].args;
             const curBlock = await web3.eth.getBlockNumber();
 
@@ -62,7 +62,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
             const eAccCvpPerLpt = eCvpReward.mul(Scale).div(mockLptBalance);
 
             await time.advanceBlockTo('59');
-            const tx = await this.vestingMath._computePoolReward(allocPoint, lastUpdateBlock, accCvpPerLpt);
+            const tx = await this.vestingMath.__computePoolReward(allocPoint, lastUpdateBlock, accCvpPerLpt);
             const res = tx.receipt.logs[0].args;
 
             assert.equal(res.lastUpdateBlock.toString(), '60');
@@ -76,7 +76,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
             const eAccCvpPerLpt = toBN(accCvpPerLpt).add(eCvpReward.mul(Scale).div(mockLptBalance));
 
             await time.advanceBlockTo('60');
-            const res = await this.vestingMath._computePoolReward.call(allocPoint, lastUpdateBlock, accCvpPerLpt);
+            const res = await this.vestingMath.__computePoolReward.call(allocPoint, lastUpdateBlock, accCvpPerLpt);
 
             assert.equal(res.lastUpdateBlock.toString(), '60');
             assert.equal(res.accCvpPerLpt.toString(), eAccCvpPerLpt);
@@ -105,7 +105,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     const currentBlock = '50';
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
-                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
+                    const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
                     const res = tx.receipt.logs[0].args;
 
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -135,7 +135,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                         .mul(toBN(`${age}`)).div(toBN(`${age + 1*vestPeriod}`));
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
-                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
+                    const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
                     const res = tx.receipt.logs[0].args;
 
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -164,7 +164,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                         .mul(toBN(`${age}`)).div(toBN(`${age + 1*vestPeriod}`));
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
-                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
+                    const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
                     const res = tx.receipt.logs[0].args;
 
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -197,7 +197,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                         .div(toBN(`${1*user.vestingBlock - 1*user.lastUpdateBlock}`));
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
-                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
+                    const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
                     const res = tx.receipt.logs[0].args;
 
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -219,7 +219,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     const currentBlock = '50'
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
-                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
+                    const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
                     const res = tx.receipt.logs[0].args;
 
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -263,7 +263,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     ).div(pendingPended.add(pendingEntitled)).toString();
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
-                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
+                    const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
                     const res = tx.receipt.logs[0].args;
 
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -297,7 +297,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     const expectedVesting = entitledVesting.add(pendedVesting);
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
-                    const tx = await this.vestingMath._computeCvpVesting(user, accCvpPerLpt);
+                    const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
                     const res = tx.receipt.logs[0].args;
 
                     assert.equal(res.lastUpdateBlock.toString(), currentBlock);

@@ -1,12 +1,13 @@
 pragma solidity ^0.6.12;
 
 
-import "../lib/CacheCheckpoints.sol";
+import "../lib/DelegatableCheckpoints.sol";
 
-contract MockCacheCheckpoint {
-    using CacheCheckpoints for CacheCheckpoints.Record;
 
-    mapping (address => CacheCheckpoints.Record) public records;
+contract MockDelegatableCheckpoints {
+    using DelegatableCheckpoints for DelegatableCheckpoints.Record;
+
+    mapping (address => DelegatableCheckpoints.Record) public records;
 
     function getLatestData(address user) public view returns (uint192) {
         return records[user].getLatestData();
@@ -26,11 +27,13 @@ contract MockCacheCheckpoint {
         emit DEBUG32(id);
     }
 
-    function getCache(address user) public view returns (uint192) {
-        return records[user].getCache();
+    function getProperties(address user)
+    public view returns (uint32 numCheckpoints, uint32 lastCheckpointBlock, address delegatee)
+    {
+        return records[user].getProperties();
     }
 
-    function writeCache(address user, uint192 data) public {
-        records[user].writeCache(data);
+    function writeDelegatee(address user, address delegatee) public {
+        records[user].writeDelegatee(delegatee);
     }
 }

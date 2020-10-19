@@ -8,11 +8,18 @@ import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/SafeERC20
 import "@openzeppelin/contracts-ethereum-package/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/utils/EnumerableSet.sol";
 import "./interfaces/IVestedLPMining.sol";
-import "./lib/CacheCheckpoints.sol";
+import "./lib/ReservedSlots.sol";
 import "./lib/SafeMath96.sol";
 import "./lib/SafeMath32.sol";
+import "./DelegatableVotes.sol";
 
-contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVestedLPMining {
+contract VestedLPMining is
+    OwnableUpgradeSafe,
+    ReentrancyGuardUpgradeSafe,
+    ReservedSlots,
+    DelegatableVotes,
+    IVestedLPMining
+{
     using SafeMath for uint256;
     using SafeMath96 for uint96;
     using SafeMath32 for uint32;
@@ -43,7 +50,7 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
          *   3. Token amount which may be vested get sent to the user;
          *   3. User' `lptAmount`, `cvpAdjust` and `pendedCvp` get updated.
          *
-         * Note comments on vesting rules in the `function computeCvpVesting` code bellow.
+         * Note comments on vesting rules in the `function _computeCvpVesting` code bellow.
          */
     }
 
@@ -196,7 +203,7 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         Pool memory _pool = pools[_pid];
         User storage user = users[_pid][_user];
 
-        computePoolReward(_pool);
+        _computePoolReward(_pool);
         uint96 newlyEntitled = _computeCvpToEntitle(
             user.lptAmount,
             user.cvpAdjust,
@@ -211,8 +218,8 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         Pool memory _pool = pools[_pid];
         User memory _user = users[_pid][user];
 
-        computePoolReward(_pool);
-        ( , uint256 newlyVested) = computeCvpVesting(_user, _pool.accCvpPerLpt);
+        _computePoolReward(_pool);
+        ( , uint256 newlyVested) = _computeCvpVesting(_user, _pool.accCvpPerLpt);
 
         return newlyVested;
     }
@@ -234,7 +241,7 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
     /// @inheritdoc IVestedLPMining
     function updatePool(uint256 _pid) public override nonReentrant {
         Pool storage pool = pools[_pid];
-        doPoolUpdate(pool);
+        _doPoolUpdate(pool);
     }
 
     /// @inheritdoc IVestedLPMining
@@ -242,8 +249,8 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         Pool storage pool = pools[_pid];
         User storage user = users[_pid][msg.sender];
 
-        doPoolUpdate(pool);
-        vestUserCvp(user, pool.accCvpPerLpt);
+        _doPoolUpdate(pool);
+        _vestUserCvp(user, pool.accCvpPerLpt);
 
         if(_amount != 0) {
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
@@ -252,7 +259,7 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         user.cvpAdjust = _computeCvpAdjustment(user.lptAmount, pool.accCvpPerLpt);
         emit Deposit(msg.sender, _pid, _amount);
 
-        doCheckpointVotes(msg.sender);
+        _doCheckpointVotes(msg.sender);
     }
 
     /// @inheritdoc IVestedLPMining
@@ -261,8 +268,8 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         User storage user = users[_pid][msg.sender];
         require(user.lptAmount >= _amount, "VLPMining: amount exceeds balance");
 
-        doPoolUpdate(pool);
-        vestUserCvp(user, pool.accCvpPerLpt);
+        _doPoolUpdate(pool);
+        _vestUserCvp(user, pool.accCvpPerLpt);
 
         if(_amount != 0) {
             user.lptAmount = user.lptAmount.sub(_amount);
@@ -271,7 +278,7 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         user.cvpAdjust = _computeCvpAdjustment(user.lptAmount, pool.accCvpPerLpt);
         emit Withdraw(msg.sender, _pid, _amount);
 
-        doCheckpointVotes(msg.sender);
+        _doCheckpointVotes(msg.sender);
     }
 
     /// @inheritdoc IVestedLPMining
@@ -296,25 +303,28 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         user.pendedCvp = 0;
         user.vestingBlock = 0;
 
-        doCheckpointVotes(msg.sender);
+        _doCheckpointVotes(msg.sender);
     }
 
     /// @inheritdoc IVestedLPMining
     function checkpointVotes(address _user) public override nonReentrant {
-        doCheckpointVotes(_user);
+        _doCheckpointVotes(_user);
     }
 
-    function doCheckpointVotes(address _user) internal {
+    function _doCheckpointVotes(address _user) internal {
         uint256 length = pools.length;
-        uint256 userPendedCvp = 0;
+        uint96 userPendedCvp = 0;
         uint256 userTotalLpCvp = 0;
-        uint256 totalLpCvp = 0;
+        uint96 totalLpCvp = 0;
         for (uint256 pid = 0; pid < length; ++pid) {
-            uint256 pended = uint256(users[pid][_user].pendedCvp);
-            userPendedCvp = userPendedCvp.add(pended);
+            userPendedCvp = userPendedCvp.add(users[pid][_user].pendedCvp);
 
             Pool storage pool = pools[pid];
-            uint256 lpCvp = cvp.balanceOf(address(pool.lpToken));
+            uint96 lpCvp = SafeMath96.fromUint(
+                cvp.balanceOf(address(pool.lpToken)),
+                // this and similar error messages are not intended for end-users
+                "VLPMining::_doCheckpointVotes:1"
+            );
             totalLpCvp = totalLpCvp.add(lpCvp);
 
             if (!pool.votesEnabled) {
@@ -324,7 +334,7 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
             uint256 lptTotalSupply = pool.lpToken.totalSupply();
             uint256 lptAmount = users[pid][_user].lptAmount;
             if (lptAmount != 0 && lptTotalSupply != 0) {
-                uint256 cvpPerLpt = lpCvp.mul(SCALE).div(lptTotalSupply);
+                uint256 cvpPerLpt = uint256(lpCvp).mul(SCALE).div(lptTotalSupply);
                 uint256 userLpCvp = lptAmount.mul(cvpPerLpt).div(SCALE);
                 userTotalLpCvp = userTotalLpCvp.add(userLpCvp);
 
@@ -332,37 +342,35 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
             }
         }
 
-        uint256 lpCvpUserShare = (userTotalLpCvp == 0 || totalLpCvp == 0)
+        uint96 lpCvpUserShare = (userTotalLpCvp == 0 || totalLpCvp == 0)
             ? 0
-            : userTotalLpCvp.mul(SCALE).div(totalLpCvp);
+            : SafeMath96.fromUint(
+                userTotalLpCvp.mul(SCALE).div(totalLpCvp),
+                "VLPMining::_doCheckpointVotes:2"
+            );
 
         emit CheckpointTotalLpVotes(totalLpCvp);
-        emit CheckpointUserVotes(_user, userPendedCvp, lpCvpUserShare);
+        emit CheckpointUserVotes(_user, uint256(userPendedCvp), lpCvpUserShare);
 
-//        _write(
-//            _user,
-//            safe96(userPendedCvp, "VLPMining: Amount overflow"),
-//            safe96(lpCvpUserShare, "VLPMining: Amount overflow"),
-//            totalLpCvp
-//        );
+        _writeUserData(_user, _packData(userPendedCvp, lpCvpUserShare));
+        _writeSharedData(_packData(0, totalLpCvp));
     }
 
-    function transferCvp(address _to, uint256 _amount) internal {
+    function _transferCvp(address _to, uint256 _amount) internal {
         SafeERC20.safeTransferFrom(cvp, reservoir, _to, _amount);
     }
 
     /// @dev must be guarded for reentrancy
-    function doPoolUpdate(Pool storage pool) internal {
+    function _doPoolUpdate(Pool storage pool) internal {
         Pool memory _pool = pool;
         uint32 prevBlock = _pool.lastUpdateBlock;
         uint256 prevAcc = _pool.accCvpPerLpt;
 
-        uint256 cvpReward = computePoolReward(_pool);
+        uint256 cvpReward = _computePoolReward(_pool);
         if (cvpReward != 0) {
             cvpVestingPool = cvpVestingPool.add(
-                // here and bellow, error messages are for developers only
-                SafeMath96.fromUint(cvpReward, "VLPMining::doPoolUpdate:1"),
-                "VLPMining::doPoolUpdate:2"
+                SafeMath96.fromUint(cvpReward, "VLPMining::_doPoolUpdate:1"),
+                "VLPMining::_doPoolUpdate:2"
             );
         }
         if (_pool.accCvpPerLpt > prevAcc) {
@@ -373,22 +381,22 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         }
     }
 
-    function vestUserCvp(User storage user, uint256 accCvpPerLpt) internal {
+    function _vestUserCvp(User storage user, uint256 accCvpPerLpt) internal {
         User memory _user = user;
         uint32 prevVestingBlock = _user.vestingBlock;
         uint32 prevUpdateBlock = _user.lastUpdateBlock;
-        (uint256 newlyEntitled, uint256 newlyVested) = computeCvpVesting(_user, accCvpPerLpt);
+        (uint256 newlyEntitled, uint256 newlyVested) = _computeCvpVesting(_user, accCvpPerLpt);
 
         if (newlyEntitled != 0) {
             user.pendedCvp = _user.pendedCvp;
         }
         if (newlyVested != 0) {
             cvpVestingPool = cvpVestingPool.sub(
-                SafeMath96.fromUint(newlyVested, "VLPMining::vestUserCvp:1"),
-                "VLPMining::vestUserCvp:2"
+                SafeMath96.fromUint(newlyVested, "VLPMining::_vestUserCvp:1"),
+                "VLPMining::_vestUserCvp:2"
             );
 
-            transferCvp(msg.sender, newlyVested);
+            _transferCvp(msg.sender, newlyVested);
         }
         if (_user.vestingBlock > prevVestingBlock) {
             user.vestingBlock = _user.vestingBlock;
@@ -409,10 +417,9 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
      * @return newlyEntitled - CVP amount to entitle (on top of tokens entitled so far)
      * @return newlyVested - CVP amount to vest (on top of tokens already vested)
      */
-    function computeCvpVesting(User memory _user, uint256 accCvpPerLpt) internal view returns (
-        uint256 newlyEntitled,
-        uint256 newlyVested
-    ) {
+    function _computeCvpVesting(User memory _user, uint256 accCvpPerLpt)
+    internal view returns (uint256 newlyEntitled, uint256 newlyVested)
+    {
         uint32 prevBlock = _user.lastUpdateBlock;
         _user.lastUpdateBlock = _currBlock();
         if (prevBlock >= _user.lastUpdateBlock) {
@@ -476,7 +483,9 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         return (newlyEntitled, newlyVested);
     }
 
-    function computePoolReward(Pool memory _pool) internal view returns (uint256 poolCvpReward) {
+    function _computePoolReward(Pool memory _pool)
+    internal view returns (uint256 poolCvpReward)
+    {
         poolCvpReward = 0;
         uint32 blockNum = _currBlock();
         if (blockNum > _pool.lastUpdateBlock) {
@@ -495,6 +504,20 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         }
     }
 
+    function _computeUserVotes(uint192 userData, uint192 sharedData)
+    internal override pure returns (uint96 votes)
+    {
+        (uint96 ownCvp, uint96 pooledCvpShare) = _unpackData(userData);
+        (uint96 totalPooledCvp, ) = _unpackData(sharedData);
+
+        if (pooledCvpShare == 0) {
+            votes = ownCvp;
+        } else {
+            uint256 pooledCvp = uint256(pooledCvpShare).mul(totalPooledCvp).div(SCALE);
+            votes = ownCvp.add(SafeMath96.fromUint(pooledCvp, "VLPMining::_computeVotes"));
+        }
+    }
+
     function _computeCvpToEntitle(uint256 userLpt, uint96 userCvpAdjust, uint256 poolAccCvpPerLpt)
     private pure returns (uint96)
     {
@@ -504,7 +527,9 @@ contract VestedLPMining is OwnableUpgradeSafe, ReentrancyGuardUpgradeSafe, IVest
         );
     }
 
-    function _computeCvpAdjustment(uint256 lptAmount, uint256 accCvpPerLpt) private pure returns (uint96) {
+    function _computeCvpAdjustment(uint256 lptAmount, uint256 accCvpPerLpt)
+    private pure returns (uint96)
+    {
         return SafeMath96.fromUint(
             lptAmount.mul(accCvpPerLpt).div(SCALE),
             "VLPMining::_computeCvpAdj"

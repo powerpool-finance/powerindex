@@ -1,7 +1,7 @@
 pragma solidity 0.6.12;
 
 
-library CacheCheckpoints {
+library DelegatableCheckpoints {
 
     /// @dev A checkpoint storing some data effective from a given block
     struct Checkpoint {
@@ -10,20 +10,37 @@ library CacheCheckpoints {
         // uint32 __reserved;
     }
 
-    /// @dev A set of checkpoints and some arbitrary cached data
+    /// @dev A set of checkpoints and a 'delegatee'
     struct Record {
+        /// @dev new slot
         uint32 numCheckpoints;
         uint32 lastCheckpointBlock;
-        // Abstract data (but NOT the last checkpoint data)
-        uint192 cache;
+        address delegatee;
+        // uint32 __reserved;
+
+        /// @dev new slot
         // Checkpoints by IDs
         mapping (uint32 => Checkpoint) checkpoints;
         // @dev Checkpoint IDs get counted from 1 (but not from 0) -
-        // the 1st checkpoint has ID of 1, and the last checkpoint' ID is equal to `numCheckpoints`
+        // the 1st checkpoint has ID of 1, and the last checkpoint' ID is `numCheckpoints`
+    }
+
+    function getCheckpoint(Record storage record, uint checkpointId)
+    internal view returns (uint32 fromBlock, uint192 data)
+    {
+        return checkpointId == 0 || checkpointId > record.numCheckpoints
+            ? (0, 0)
+            : _getCheckpoint(record, uint32(checkpointId));
+    }
+
+    function _getCheckpoint(Record storage record, uint32 checkpointId)
+    internal view returns (uint32 fromBlock, uint192 data)
+    {
+        return (record.numCheckpoints, record.checkpoints[checkpointId].data);
     }
 
     /**
-     * @dev Gets the latest data recorded in the given record
+     * @dev Gets the data recorded in the latest checkpoint of the given record
      */
     function getLatestData(Record storage record)
     internal view returns (uint192)
@@ -45,7 +62,7 @@ library CacheCheckpoints {
     function getPriorData(Record storage record, uint blockNumber, uint checkpointId)
     internal view returns (uint192)
     {
-        uint32 blockNum = safeMinedBlockNum(blockNumber);
+        uint32 blockNum = _safeMinedBlockNum(blockNumber);
         Record memory _record = record;
         Checkpoint memory cp;
 
@@ -84,7 +101,7 @@ library CacheCheckpoints {
     function findCheckpoint(Record storage record, uint blockNumber)
     internal view returns (uint32 id, uint192 data)
     {
-        uint32 blockNum = safeMinedBlockNum(blockNumber);
+        uint32 blockNum = _safeMinedBlockNum(blockNumber);
         uint32 numCheckpoints = record.numCheckpoints;
 
         (id, data) = _findCheckpoint(record, numCheckpoints, blockNum);
@@ -96,7 +113,7 @@ library CacheCheckpoints {
     function writeCheckpoint(Record storage record, uint192 data)
     internal returns (uint32 id)
     {
-        uint32 blockNum = safeBlockNum(block.number);
+        uint32 blockNum = _safeBlockNum(block.number);
         Record memory _record = record;
 
         if (_record.lastCheckpointBlock != blockNum) {
@@ -109,29 +126,27 @@ library CacheCheckpoints {
     }
 
     /**
-     * @dev Gets data cached in the given record
+     * @dev Gets the given record properties (w/o mappings)
      */
-    function getCache(Record storage record) internal view returns (uint192)
-    {
-        return record.cache;
+    function getProperties(Record storage record) internal view returns (uint32, uint32, address) {
+        return (record.numCheckpoints, record.lastCheckpointBlock, record.delegatee);
     }
 
     /**
-     * @dev Writes given data to the cache of the given record
+     * @dev Writes given delegatee to the given record
      */
-    function writeCache(Record storage record, uint192 data) internal
-    {
-        record.cache = data;
+    function writeDelegatee(Record storage record, address delegatee) internal {
+        record.delegatee = delegatee;
     }
 
-    function safeBlockNum(uint256 blockNumber) internal pure returns (uint32) {
+    function _safeBlockNum(uint256 blockNumber) private pure returns (uint32) {
         require(blockNumber < 2**32, "ChPoints: blockNum >= 2**32");
         return uint32(blockNumber);
     }
 
-    function safeMinedBlockNum(uint256 blockNumber) internal view returns (uint32) {
+    function _safeMinedBlockNum(uint256 blockNumber) private view returns (uint32) {
         require(blockNumber < block.number, "ChPoints: block not yet mined");
-        return safeBlockNum(blockNumber);
+        return _safeBlockNum(blockNumber);
     }
 
     function _findCheckpoint(Record storage record, uint32 numCheckpoints, uint32 blockNum)

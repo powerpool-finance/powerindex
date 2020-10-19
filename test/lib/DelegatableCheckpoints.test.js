@@ -1,35 +1,35 @@
 /* global after, afterEach, artifacts, assert, before, beforeEach, contract, describe, it, web3 */
-const MockCacheCheckpoint = artifacts.require('MockCacheCheckpoint');
+const MockCacheCheckpoint = artifacts.require('MockDelegatableCheckpoints');
 
 const str = (bn) => bn.toString(10);
 
-contract('CacheCheckpoints lib', ([ , accountA, accountB ]) => {
+contract('DelegatableCheckpoints lib', ([ , accountA, accountB, delegateeC, delegateeD , delegateeE]) => {
 
     before(async () => {
         this.records = await MockCacheCheckpoint.new();
         const txs = Array(
-            /* 0*/ await this.records.getCache(accountA),
-            /* 1*/ await this.records.writeCache(accountA, 100),
-            /* 2*/ await this.records.getCache(accountA),
+            /* 0*/ await this.records.getProperties(accountA),
+            /* 1*/ await this.records.writeDelegatee(accountA, delegateeC),
+            /* 2*/ await this.records.getProperties(accountA),
             /* 3*/ await web3.eth.getBlockNumber(),
             /* 4*/ await this.records.writeCheckpoint(accountB, 101),
             /* 5*/ await this.records.getLatestData(accountB),
-            /* 6*/ await this.records.writeCache(accountB, 102),
+            /* 6*/ await this.records.writeDelegatee(accountB, delegateeD),
             /* 7*/ await this.records.writeCheckpoint(accountB, 103),
             /* 8*/ await this.records.writeCheckpoint(accountB, 104),
             /* 9*/ await this.records.writeCheckpoint(accountB, 105),
-            /*10*/ await this.records.writeCache(accountA, 106),
+            /*10*/ await this.records.writeDelegatee(accountA, delegateeE),
             /*11*/ await this.records.writeCheckpoint(accountB, 107),
             /*12*/ await this.records.writeCheckpoint(accountA, 108),
             /*13*/ await this.records.getLatestData(accountB),
             /*14*/ await this.records.getLatestData(accountA),
             /*15*/ await this.records.writeCheckpoint(accountB, 109),
-            /*16*/ await this.records.writeCache(accountB, 110),
-            /*17*/ await this.records.writeCache(accountB, 111),
-            /*18*/ await this.records.writeCache(accountB, 112),
+            /*16*/ await this.records.writeDelegatee(accountB, delegateeC),
+            /*17*/ await this.records.writeDelegatee(accountB, delegateeE),
+            /*18*/ await this.records.writeDelegatee(accountB, delegateeD),
             /*19*/ await this.records.writeCheckpoint(accountA, 113),
-            /*20*/ await this.records.getCache(accountA),
-            /*21*/ await this.records.getCache(accountB),
+            /*20*/ await this.records.getProperties(accountA),
+            /*21*/ await this.records.getProperties(accountB),
         );
         const results = [];
         // Run one by one
