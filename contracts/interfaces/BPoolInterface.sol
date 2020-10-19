@@ -11,7 +11,11 @@ abstract contract BPoolInterface {
     function getBalance(address) external view virtual returns (uint);
     function getSwapFee() external view virtual returns (uint);
     function totalSupply() external view virtual returns (uint);
+    function balanceOf(address) external view virtual returns (uint);
     function getTotalDenormalizedWeight() external view virtual returns (uint);
+
+    function getCommunityFee() external view virtual returns (uint, uint, uint, address);
+    function calcAmountWithCommunityFee(uint, uint, address) external view virtual returns (uint, uint);
 
     function getCurrentTokens() external view virtual returns (address[] memory tokens);
 }

@@ -5,8 +5,11 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./interfaces/BPoolInterface.sol";
 import "./interfaces/TokenInterface.sol";
 import "./uniswapv2/interfaces/IUniswapV2Pair.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract ExchangeProxy {
+import "@nomiclabs/buidler/console.sol";
+
+contract EthPiptSwap is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for TokenInterface;
 
@@ -23,25 +26,26 @@ contract ExchangeProxy {
     struct CalculationStruct {
         uint256 tokenShare;
         uint256 ethRequired;
+        uint256 tokenReserve;
+        uint256 ethReserve;
     }
 
     constructor(
         address _weth,
         address _pipt,
-        address _uniswapRouter,
         uint256 _fee,
         address _feePayout,
         address _feeManager
-    ) public {
+    ) public Ownable() {
         weth = TokenInterface(_weth);
         pipt = BPoolInterface(_pipt);
-        fee = _fee;
         fee = _fee;
         feePayout = _feePayout;
         feeManager = _feeManager;
     }
 
     receive() external payable {
+        console.log("payable");
         (, uint256 swapAmount) = takeEthFee(msg.value);
 
         address[] memory tokens = pipt.getCurrentTokens();
@@ -63,6 +67,7 @@ contract ExchangeProxy {
         public
         payable
     {
+        console.log("swapEthToPipt");
         weth.deposit.value(msg.value)();
 
         (uint256 feeAmount, uint256 swapAmount) = takeEthFee(msg.value);
@@ -73,21 +78,29 @@ contract ExchangeProxy {
         uint256 totalEthSwap = 0;
         for(uint256 i = 0; i < len; i++) {
             IUniswapV2Pair tokenPair = uniswapPairFor(tokens[i]);
-            weth.approve(address(tokenPair), ethInUniswap[i]);
+            weth.transfer(address(tokenPair), ethInUniswap[i]);
             tokenPair.swap(tokensInPipt[i], uint(0), address(this), new bytes(0));
-            //TODO: add swap check
             totalEthSwap = totalEthSwap.add(ethInUniswap[i]);
+
+            TokenInterface(tokens[i]).approve(address(pipt), tokensInPipt[i]);
         }
+
+        (, uint communityJoinFee, ,) = pipt.getCommunityFee();
+        (uint poolAmountOutAfterFee,) = pipt.calcAmountWithCommunityFee(
+            poolAmountOut,
+            communityJoinFee,
+            address(this)
+        );
 
         pipt.joinPool(poolAmountOut, tokensInPipt);
+        pipt.transfer(msg.sender, poolAmountOutAfterFee);
 
-        pipt.transfer(msg.sender, poolAmountOut);
         uint256 ethDiff = swapAmount.sub(totalEthSwap);
         if (ethDiff > 0) {
-            weth.safeTransfer(msg.sender, ethDiff);
+            // TODO: fix revert ERR_INSUFFICIENT_BAL
+//            weth.withdraw(ethDiff);
+//            msg.sender.transfer(ethDiff);
         }
-
-        weth.safeTransfer(feePayout, feeAmount);
     }
 
     function getEthAndTokensIn(uint256 _ethValue, address[] memory tokens) public returns(
@@ -110,8 +123,13 @@ contract ExchangeProxy {
         uint256 totalEthRequired = 0;
         for (i = 0; i < tokens.length; i++) {
             calculations[i].tokenShare = poolRatio.mul(pipt.getBalance(tokens[i])).div(1 ether);
-            (uint256 tokenReserve, uint256 ethReserve,) = uniswapPairFor(tokens[i]).getReserves();
-            calculations[i].ethRequired = getAmountIn(calculations[i].tokenShare, tokenReserve, ethReserve);
+            (calculations[i].tokenReserve, calculations[i].ethReserve,) = uniswapPairFor(tokens[i]).getReserves();
+            calculations[i].ethRequired = getAmountIn(
+                calculations[i].tokenShare,
+                calculations[i].ethReserve,
+                calculations[i].tokenReserve
+            );
+            calculations[i].ethRequired = calculations[i].ethRequired.mul(10001).div(10000);
             totalEthRequired = totalEthRequired.add(calculations[i].ethRequired);
         }
 
@@ -119,16 +137,21 @@ contract ExchangeProxy {
         tokensInPipt = new uint256[](tokens.length);
         ethInUniswap = new uint256[](tokens.length);
         for (i = 0; i < tokens.length; i++) {
-            if (totalEthRequired > 1 ether) {
-                ethInUniswap[i] = _ethValue.mul(calculations[i].ethRequired.mul(1 ether).div(totalEthRequired)).div(1 ether);
-                tokensInPipt[i] = calculations[i].tokenShare.mul(calculations[i].ethRequired.mul(1 ether).div(totalEthRequired)).div(1 ether);
-            } else {
-                ethInUniswap[i] = _ethValue.mul(calculations[i].ethRequired).div(1 ether);
-                tokensInPipt[i] = calculations[i].tokenShare.mul(calculations[i].ethRequired).div(1 ether);
-            }
+            ethInUniswap[i] = _ethValue.mul(calculations[i].ethRequired.mul(1 ether).div(totalEthRequired)).div(1 ether);
+//            tokensInPipt[i] = calculations[i].tokenShare.mul(ethInUniswap[i]).div(calculations[i].ethRequired);
+            tokensInPipt[i] = getAmountOut(ethInUniswap[i], calculations[i].ethReserve, calculations[i].tokenReserve);
         }
 
         poolOut = piptTotalSupply.mul(tokensInPipt[0]).div(firstTokenBalance);
+        poolOut = poolOut.mul(9999).div(10000);
+    }
+
+    function setUniswapPairFor(address[] memory _tokens, address[] memory _pairs) external onlyOwner {
+        uint256 len = _tokens.length;
+        require(len == _pairs.length, "Lengths are not equal");
+        for(uint i = 0; i < _tokens.length; i++) {
+            uniswapEthPairByTokenAddress[_tokens[i]] = _pairs[i];
+        }
     }
 
     function uniswapPairFor(address token) internal returns(IUniswapV2Pair) {
@@ -147,5 +170,15 @@ contract ExchangeProxy {
         uint numerator = reserveIn.mul(amountOut).mul(1000);
         uint denominator = reserveOut.sub(amountOut).mul(997);
         amountIn = (numerator / denominator).add(1);
+    }
+
+    // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
+    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) internal pure returns (uint amountOut) {
+        require(amountIn > 0, 'UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT');
+        require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
+        uint amountInWithFee = amountIn.mul(997);
+        uint numerator = amountInWithFee.mul(reserveOut);
+        uint denominator = reserveIn.mul(1000).add(amountInWithFee);
+        amountOut = numerator / denominator;
     }
 }

@@ -5,7 +5,7 @@ const BPool = artifacts.require('BPool');
 const MockERC20 = artifacts.require('MockERC20');
 const MockVoting = artifacts.require('MockVoting');
 const MockCvp = artifacts.require('MockCvp');
-const WETH = artifacts.require('WETH');
+const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const PermanentVotingPowerV1 = artifacts.require('PermanentVotingPowerV1');
@@ -34,7 +34,7 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
     assert.equal(diff.lte(toBN(accuracyWei)), true, message);
 }
 
-describe('Balancer', ([minter, bob, carol, alice, feeManager, feeReceiver, newCommunityWallet]) => {
+describe('Balancer', () => {
     const name = 'My Pool';
     const symbol = 'MP';
     const balances = [ether('10'), ether('20')];
@@ -48,8 +48,13 @@ describe('Balancer', ([minter, bob, carol, alice, feeManager, feeReceiver, newCo
     let pool;
     let permanentVotingPower;
 
+    let minter, bob, carol, alice, feeManager, feeReceiver, newCommunityWallet;
+    before(async function() {
+        [minter, bob, carol, alice, feeManager, feeReceiver, newCommunityWallet] = await web3.eth.getAccounts();
+    });
+
     beforeEach(async () => {
-        this.weth = await WETH.new();
+        this.weth = await WETH.new('1');
 
         this.bFactory = await BFactory.new({ from: minter });
         this.bActions = await BActions.new({ from: minter });

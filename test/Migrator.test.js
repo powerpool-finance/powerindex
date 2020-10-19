@@ -6,8 +6,14 @@ const UniswapV2Pair = artifacts.require('UniswapV2Pair');
 const UniswapV2Factory = artifacts.require('UniswapV2Factory');
 const Migrator = artifacts.require('Migrator');
 const Reservoir = artifacts.require('Reservoir');
+const {web3} = Reservoir;
 
-describe('Migrator', ([alice, bob, minter]) => {
+describe('Migrator', () => {
+    let alice, bob, minter;
+    before(async function() {
+        [alice, bob, minter] = await web3.eth.getAccounts();
+    });
+
     beforeEach(async () => {
         this.factory1 = await UniswapV2Factory.new(alice, { from: alice });
         this.factory2 = await UniswapV2Factory.new(alice, { from: alice });
