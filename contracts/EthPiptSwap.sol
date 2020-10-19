@@ -2,6 +2,7 @@ pragma solidity 0.6.12;
 
 import "./interfaces/BPoolInterface.sol";
 import "./interfaces/TokenInterface.sol";
+import "./IPoolRestrictions.sol";
 import "./uniswapv2/interfaces/IUniswapV2Pair.sol";
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -80,6 +81,12 @@ contract EthPiptSwap is Ownable {
         public
         payable
     {
+        address poolRestrictions = pipt.getRestrictions();
+        if(address(poolRestrictions) != address(0)) {
+            uint maxTotalSupply = IPoolRestrictions(poolRestrictions).getMaxTotalSupply(address(pipt));
+            require(pipt.totalSupply().add(poolAmountOut) <= maxTotalSupply, "MAX_SUPPLY");
+        }
+
         require(msg.value > 0, "ETH required");
         weth.deposit.value(msg.value)();
 

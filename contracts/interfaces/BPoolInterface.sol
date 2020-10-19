@@ -16,6 +16,7 @@ abstract contract BPoolInterface {
 
     function getCommunityFee() external view virtual returns (uint, uint, uint, address);
     function calcAmountWithCommunityFee(uint, uint, address) external view virtual returns (uint, uint);
+    function getRestrictions() external view virtual returns (address);
 
     function getCurrentTokens() external view virtual returns (address[] memory tokens);
 }
