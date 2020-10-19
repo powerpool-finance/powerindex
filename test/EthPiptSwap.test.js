@@ -8,6 +8,7 @@ const UniswapV2Pair = artifacts.require('UniswapV2Pair');
 const UniswapV2Router02 = artifacts.require('UniswapV2Router02');
 const WETH = artifacts.require('MockWETH');
 const EthPiptSwap = artifacts.require('EthPiptSwap');
+const PoolRestrictions = artifacts.require('PoolRestrictions');
 
 MockERC20.numberFormat = 'String';
 UniswapV2Pair.numberFormat = 'String';
@@ -47,6 +48,8 @@ describe('EthPiptSwap', () => {
         this.uniswapFactory = await UniswapV2Factory.new(feeManager, { from: minter });
         this.uniswapRouter = await UniswapV2Router02.new(this.uniswapFactory.address, this.weth.address, { from: minter });
 
+        // this.poolRestrictions = await PoolRestrictions.new();
+
         this.getPairAmountOut = async (pair, amountIn, inWeth = true) => {
             const reserves = await pair.getReserves();
             return this.uniswapRouter.getAmountOut(
@@ -75,7 +78,9 @@ describe('EthPiptSwap', () => {
             );
 
             const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
-            return BPool.at(logNewPool.args.pool);
+            const pool = await BPool.at(logNewPool.args.pool);
+            // await pool.setRestrictions(this.poolRestrictions.address, { from: minter });
+            return pool;
         }
 
         this.makeUniswapPair = async (token, tokenBalance, wethBalance) => {
@@ -126,15 +131,17 @@ describe('EthPiptSwap', () => {
 
             const tokens = [this.token1, this.token2];
             const pairs = [pair1, pair2];
-            await expectRevert(ethPiptSwap.setUniswapPairFor(
+            await expectRevert(ethPiptSwap.setTokensSettings(
                 tokens.map(t => t.address).concat([this.cvp.address]),
                 pairs.map(p => p.address).concat([cvpPair.address]),
+                [true, false, false],
                 {from: bob}
             ), 'Ownable: caller is not the owner');
 
-            await ethPiptSwap.setUniswapPairFor(
+            await ethPiptSwap.setTokensSettings(
                 [this.token1.address, this.token2.address, this.cvp.address],
                 [pair1.address, pair2.address, cvpPair.address],
+                [true, false, false],
                 { from: minter }
             );
 
@@ -163,6 +170,21 @@ describe('EthPiptSwap', () => {
 
             const bobBalanceBefore = await web3.eth.getBalance(bob);
 
+            // await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('10').toString(10)], { from: minter });
+
+            // await expectRevert(ethPiptSwap.swapEthToPipt(
+            //     ethAndTokensIn.tokensInPipt,
+            //     ethAndTokensIn.ethInUniswap,
+            //     ethAndTokensIn.poolOut,
+            //     {
+            //         from: bob,
+            //         value: ethToSwap,
+            //         gasPrice
+            //     }
+            // ), 'MAX_SUPPLY');
+
+            // await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('200').toString(10)], { from: minter });
+
             //TODO: fix uniswap revert on run multiple tests in the same time
             let res = await ethPiptSwap.swapEthToPipt(
                 ethAndTokensIn.tokensInPipt,
@@ -174,6 +196,8 @@ describe('EthPiptSwap', () => {
                     gasPrice
                 }
             );
+
+            console.log('res.receipt.gasUsed', res.receipt.gasUsed);
 
             const weiUsed = res.receipt.gasUsed * gasPrice;
             const balanceAfterWeiUsed = subBN(bobBalanceBefore, weiUsed);

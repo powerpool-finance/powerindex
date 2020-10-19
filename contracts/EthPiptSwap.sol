@@ -26,6 +26,7 @@ contract EthPiptSwap is Ownable {
     address public feeManager;
 
     mapping(address => address) uniswapEthPairByTokenAddress;
+    mapping(address => bool) reApproveTokens;
 
     struct CalculationStruct {
         uint256 tokenShare;
@@ -70,7 +71,7 @@ contract EthPiptSwap is Ownable {
             uint256 poolAmountOut
         ) = getEthAndTokensIn(swapAmount, tokens);
 
-        swapEthToPipt(tokensInPipt, ethInUniswap, poolAmountOut);
+        swapEthToPipt(tokensInPipt, ethInUniswap, poolAmountOut.mul(999).div(1000));
     }
 
     function swapEthToPipt(
@@ -106,6 +107,10 @@ contract EthPiptSwap is Ownable {
 
             tokenPair.swap(tokensInPipt[i], uint(0), address(this), new bytes(0));
             totalEthSwap = totalEthSwap.add(ethInUniswap[i]);
+
+            if(reApproveTokens[tokens[i]]) {
+                TokenInterface(tokens[i]).approve(address(pipt), 0);
+            }
 
             TokenInterface(tokens[i]).approve(address(pipt), tokensInPipt[i]);
         }
@@ -223,11 +228,16 @@ contract EthPiptSwap is Ownable {
         poolOut = poolOut.mul(999999).div(1000000);
     }
 
-    function setUniswapPairFor(address[] memory _tokens, address[] memory _pairs) external onlyOwner {
+    function setTokensSettings(
+        address[] memory _tokens,
+        address[] memory _pairs,
+        bool[] memory _reapprove
+    ) external onlyOwner {
         uint256 len = _tokens.length;
-        require(len == _pairs.length, "Lengths are not equal");
+        require(len == _pairs.length && len == _reapprove.length, "Lengths are not equal");
         for(uint i = 0; i < _tokens.length; i++) {
             uniswapEthPairByTokenAddress[_tokens[i]] = _pairs[i];
+            reApproveTokens[_tokens[i]] = _reapprove[i];
         }
     }
 
