@@ -54,7 +54,7 @@ describe('Balancer', () => {
     });
 
     beforeEach(async () => {
-        this.weth = await WETH.new('1');
+        this.weth = await WETH.new();
 
         this.bFactory = await BFactory.new({ from: minter });
         this.bActions = await BActions.new({ from: minter });

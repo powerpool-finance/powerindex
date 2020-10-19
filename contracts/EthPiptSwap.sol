@@ -1,10 +1,11 @@
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./interfaces/BPoolInterface.sol";
 import "./interfaces/TokenInterface.sol";
 import "./uniswapv2/interfaces/IUniswapV2Pair.sol";
+
+import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "@nomiclabs/buidler/console.sol";
@@ -16,8 +17,11 @@ contract EthPiptSwap is Ownable {
     address private constant ETH_ADDRESS = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
 
     TokenInterface public weth;
+    TokenInterface public cvp;
     BPoolInterface public pipt;
-    uint256 public fee;
+
+    uint256[] public feeLevels;
+    uint256[] public feeAmounts;
     address public feePayout;
     address public feeManager;
 
@@ -30,23 +34,33 @@ contract EthPiptSwap is Ownable {
         uint256 ethReserve;
     }
 
+    event EthToPiptSwap(address indexed user, uint256 ethAmount, uint256 piptAmount, uint256 ethFee, uint256 piptCommunityFee);
+    event OddEth(address indexed user, uint256 amount);
+    event PayoutCVP(address indexed receiver, uint256 wethAmount, uint256 cvpAmount);
+    event SetFees(address indexed sender, uint256[] newFeeLevels, uint256[] newFeeAmounts, address indexed feePayout, address indexed feeManager);
+
     constructor(
         address _weth,
+        address _cvp,
         address _pipt,
-        uint256 _fee,
-        address _feePayout,
         address _feeManager
     ) public Ownable() {
         weth = TokenInterface(_weth);
+        cvp = TokenInterface(_cvp);
         pipt = BPoolInterface(_pipt);
-        fee = _fee;
-        feePayout = _feePayout;
         feeManager = _feeManager;
     }
 
+    modifier onlyFeeManager() {
+        require(msg.sender == feeManager, "NOT_FEE_MANAGER");
+        _;
+    }
+
     receive() external payable {
-        console.log("payable");
-        (, uint256 swapAmount) = takeEthFee(msg.value);
+        if (msg.sender != tx.origin) {
+            return;
+        }
+        (, uint256 swapAmount) = calcEthFee(msg.value);
 
         address[] memory tokens = pipt.getCurrentTokens();
 
@@ -67,10 +81,10 @@ contract EthPiptSwap is Ownable {
         public
         payable
     {
-        console.log("swapEthToPipt");
+        require(msg.value > 0, "ETH required");
         weth.deposit.value(msg.value)();
 
-        (uint256 feeAmount, uint256 swapAmount) = takeEthFee(msg.value);
+        (uint256 feeAmount, uint256 swapAmount) = calcEthFee(msg.value);
 
         address[] memory tokens = pipt.getCurrentTokens();
         uint256 len = tokens.length;
@@ -86,24 +100,75 @@ contract EthPiptSwap is Ownable {
         }
 
         (, uint communityJoinFee, ,) = pipt.getCommunityFee();
-        (uint poolAmountOutAfterFee,) = pipt.calcAmountWithCommunityFee(
+        (uint poolAmountOutAfterFee, uint poolAmountOutFee) = pipt.calcAmountWithCommunityFee(
             poolAmountOut,
             communityJoinFee,
             address(this)
         );
+
+        emit EthToPiptSwap(msg.sender, msg.value, poolAmountOut, feeAmount, poolAmountOutFee);
 
         pipt.joinPool(poolAmountOut, tokensInPipt);
         pipt.transfer(msg.sender, poolAmountOutAfterFee);
 
         uint256 ethDiff = swapAmount.sub(totalEthSwap);
         if (ethDiff > 0) {
-            // TODO: fix revert ERR_INSUFFICIENT_BAL
-//            weth.withdraw(ethDiff);
-//            msg.sender.transfer(ethDiff);
+            weth.withdraw(ethDiff);
+            msg.sender.transfer(ethDiff);
+            emit OddEth(msg.sender, ethDiff);
         }
     }
 
-    function getEthAndTokensIn(uint256 _ethValue, address[] memory tokens) public returns(
+    function setFees(
+        uint256[] calldata _feeLevels,
+        uint256[] calldata _feeAmounts,
+        address _feePayout,
+        address _feeManager
+    )
+        external
+        onlyFeeManager
+    {
+        feeLevels = _feeLevels;
+        feeAmounts = _feeAmounts;
+        feePayout = _feePayout;
+        feeManager = _feeManager;
+
+        emit SetFees(msg.sender, _feeLevels, _feeAmounts, _feePayout, _feeManager);
+    }
+
+    function convertOddToCvpAndSendToPayout(address[] memory oddTokens) public {
+        uint256 len = oddTokens.length;
+
+        uint256 totalEthSwap = 0;
+        for(uint256 i = 0; i < len; i++) {
+            uint256 tokenBalance = TokenInterface(oddTokens[i]).balanceOf(address(this));
+            IUniswapV2Pair tokenPair = uniswapPairFor(oddTokens[i]);
+
+            (uint256 tokenReserve, uint256 ethReserve,) = tokenPair.getReserves();
+            uint256 wethOut = getAmountOut(tokenBalance, tokenReserve, ethReserve);
+
+            TokenInterface(oddTokens[i]).transfer(address(tokenPair), tokenBalance);
+
+            tokenPair.swap(uint(0), wethOut, address(this), new bytes(0));
+        }
+
+        uint256 wethBalance = weth.balanceOf(address(this));
+
+        IUniswapV2Pair cvpPair = uniswapPairFor(address(cvp));
+
+        (uint256 cvpReserve, uint256 ethReserve,) = cvpPair.getReserves();
+        uint256 cvpOut = getAmountOut(wethBalance, ethReserve, cvpReserve);
+
+        weth.transfer(address(cvpPair), wethBalance);
+
+        cvpPair.swap(cvpOut, uint(0), address(this), new bytes(0));
+
+        cvp.transfer(feePayout, cvpOut);
+
+        emit PayoutCVP(feePayout, wethBalance, cvpOut);
+    }
+
+    function getEthAndTokensIn(uint256 _ethValue, address[] memory tokens) public view returns(
         uint256[] memory tokensInPipt,
         uint256[] memory ethInUniswap,
         uint256 poolOut
@@ -129,7 +194,6 @@ contract EthPiptSwap is Ownable {
                 calculations[i].ethReserve,
                 calculations[i].tokenReserve
             );
-            calculations[i].ethRequired = calculations[i].ethRequired.mul(10001).div(10000);
             totalEthRequired = totalEthRequired.add(calculations[i].ethRequired);
         }
 
@@ -143,7 +207,7 @@ contract EthPiptSwap is Ownable {
         }
 
         poolOut = piptTotalSupply.mul(tokensInPipt[0]).div(firstTokenBalance);
-        poolOut = poolOut.mul(9999).div(10000);
+        poolOut = poolOut.mul(999999).div(1000000);
     }
 
     function setUniswapPairFor(address[] memory _tokens, address[] memory _pairs) external onlyOwner {
@@ -154,17 +218,24 @@ contract EthPiptSwap is Ownable {
         }
     }
 
-    function uniswapPairFor(address token) internal returns(IUniswapV2Pair) {
+    function uniswapPairFor(address token) internal view returns(IUniswapV2Pair) {
         return IUniswapV2Pair(uniswapEthPairByTokenAddress[token]);
     }
 
-    function takeEthFee(uint256 ethValue) public returns(uint256 ethFee, uint256 ethAfterFee) {
-        ethFee = ethValue.mul(fee).div(1 ether);
+    function calcEthFee(uint256 ethValue) public view returns(uint256 ethFee, uint256 ethAfterFee) {
+        ethFee = 0;
+        uint len = feeLevels.length;
+        for(uint i = 0; i < len; i++) {
+            if(feeLevels[i] >= ethValue) {
+                ethFee = ethValue.mul(feeAmounts[i]).div(1 ether);
+                break;
+            }
+        }
         ethAfterFee = ethValue.sub(ethFee);
     }
 
     // given an output amount of an asset and pair reserves, returns a required input amount of the other asset
-    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) internal pure returns (uint amountIn) {
+    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) public pure returns (uint amountIn) {
         require(amountOut > 0, 'UniswapV2Library: INSUFFICIENT_OUTPUT_AMOUNT');
         require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
         uint numerator = reserveIn.mul(amountOut).mul(1000);
@@ -173,7 +244,7 @@ contract EthPiptSwap is Ownable {
     }
 
     // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
-    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) internal pure returns (uint amountOut) {
+    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) public pure returns (uint amountOut) {
         require(amountIn > 0, 'UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT');
         require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
         uint amountInWithFee = amountIn.mul(997);
