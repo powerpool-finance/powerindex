@@ -124,9 +124,11 @@ describe('EthPiptSwap', () => {
 
             await ethPiptSwap.setFees([ether('0.1'), ether('0.2')], [ether('0.01'), ether('0.02')], feeReceiver, feeManager, {from: feeManager});
 
+            const tokens = [this.token1, this.token2];
+            const pairs = [pair1, pair2];
             await expectRevert(ethPiptSwap.setUniswapPairFor(
-                [this.token1.address, this.token2.address, this.cvp.address],
-                [pair1.address, pair2.address, cvpPair.address],
+                tokens.map(t => t.address).concat([this.cvp.address]),
+                pairs.map(p => p.address).concat([cvpPair.address]),
                 {from: bob}
             ), 'Ownable: caller is not the owner');
 
@@ -142,13 +144,26 @@ describe('EthPiptSwap', () => {
             assert.equal(ethFee, ether('0.001').toString(10));
             assert.equal(ethAfterFee, ether('0.099').toString(10));
 
+            const {ethFee: ethFee2, ethAfterFee: ethAfterFee2} = await ethPiptSwap.calcEthFee(ether('0.2'));
+            assert.equal(ethFee2, ether('0.004').toString(10));
+            assert.equal(ethAfterFee2, ether('0.196').toString(10));
+
             const ethAndTokensIn = await ethPiptSwap.getEthAndTokensIn(
                 ethAfterFee,
                 [this.token1.address, this.token2.address]
             );
 
+            console.log('ethAndTokensIn', ethAndTokensIn);
+
+            for(let i = 0; i < ethAndTokensIn.ethInUniswap.length; i++) {
+                console.log('ethInUniswap', ethAndTokensIn.ethInUniswap[i]);
+                console.log('tokensInPipt', ethAndTokensIn.tokensInPipt[i]);
+                console.log('tokenOutByEth', await this.getPairAmountOut(pairs[i], ethAndTokensIn.ethInUniswap[i]));
+            }
+
             const bobBalanceBefore = await web3.eth.getBalance(bob);
 
+            //TODO: fix uniswap revert on run multiple tests in the same time
             let res = await ethPiptSwap.swapEthToPipt(
                 ethAndTokensIn.tokensInPipt,
                 ethAndTokensIn.ethInUniswap,
