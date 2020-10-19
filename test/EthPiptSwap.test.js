@@ -35,7 +35,7 @@ describe.only('EthPiptSwap', () => {
     });
 
     beforeEach(async () => {
-        this.weth = await WETH.new('1');
+        this.weth = await WETH.new();
         this.weth.deposit({value: ether('1000')});
 
         this.bFactory = await BFactory.new({ from: minter });

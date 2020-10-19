@@ -45,7 +45,9 @@ contract EthPiptSwap is Ownable {
     }
 
     receive() external payable {
-        console.log("payable");
+        if (msg.sender != tx.origin) {
+            return;
+        }
         (, uint256 swapAmount) = takeEthFee(msg.value);
 
         address[] memory tokens = pipt.getCurrentTokens();
@@ -67,7 +69,6 @@ contract EthPiptSwap is Ownable {
         public
         payable
     {
-        console.log("swapEthToPipt");
         weth.deposit.value(msg.value)();
 
         (uint256 feeAmount, uint256 swapAmount) = takeEthFee(msg.value);
@@ -97,9 +98,8 @@ contract EthPiptSwap is Ownable {
 
         uint256 ethDiff = swapAmount.sub(totalEthSwap);
         if (ethDiff > 0) {
-            // TODO: fix revert ERR_INSUFFICIENT_BAL
-//            weth.withdraw(ethDiff);
-//            msg.sender.transfer(ethDiff);
+            weth.withdraw(ethDiff);
+            msg.sender.transfer(ethDiff);
         }
     }
 
@@ -164,7 +164,7 @@ contract EthPiptSwap is Ownable {
     }
 
     // given an output amount of an asset and pair reserves, returns a required input amount of the other asset
-    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) internal pure returns (uint amountIn) {
+    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) public pure returns (uint amountIn) {
         require(amountOut > 0, 'UniswapV2Library: INSUFFICIENT_OUTPUT_AMOUNT');
         require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
         uint numerator = reserveIn.mul(amountOut).mul(1000);
@@ -173,7 +173,7 @@ contract EthPiptSwap is Ownable {
     }
 
     // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
-    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) internal pure returns (uint amountOut) {
+    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) public pure returns (uint amountOut) {
         require(amountIn > 0, 'UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT');
         require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
         uint amountInWithFee = amountIn.mul(997);
