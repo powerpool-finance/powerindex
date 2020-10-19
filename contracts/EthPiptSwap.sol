@@ -141,6 +141,8 @@ contract EthPiptSwap is Ownable {
     }
 
     function convertOddToCvpAndSendToPayout(address[] memory oddTokens) public {
+        require(msg.sender == tx.origin, "Call from contract not allowed");
+
         uint256 len = oddTokens.length;
 
         uint256 totalEthSwap = 0;

@@ -202,6 +202,7 @@ describe('EthPiptSwap', () => {
 
             assert.equal(await this.cvp.balanceOf(feeReceiver), '0');
 
+            // TODO: check msg.sender == tx.origin
             res = await ethPiptSwap.convertOddToCvpAndSendToPayout([], { from: bob });
             assert.equal(await this.cvp.balanceOf(feeReceiver), cvpOutForReceiver);
             assert.equal(await this.weth.balanceOf(ethPiptSwap.address), '0');
