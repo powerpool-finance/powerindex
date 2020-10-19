@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "@nomiclabs/buidler/console.sol";
 
 contract EthPiptSwap is Ownable {
     using SafeMath for uint256;
@@ -92,7 +91,12 @@ contract EthPiptSwap is Ownable {
         uint256 totalEthSwap = 0;
         for(uint256 i = 0; i < len; i++) {
             IUniswapV2Pair tokenPair = uniswapPairFor(tokens[i]);
+
+            (uint256 tokenReserve, uint256 ethReserve,) = tokenPair.getReserves();
+            tokensInPipt[i] = getAmountOut(ethInUniswap[i], ethReserve, tokenReserve);
+
             weth.transfer(address(tokenPair), ethInUniswap[i]);
+
             tokenPair.swap(tokensInPipt[i], uint(0), address(this), new bytes(0));
             totalEthSwap = totalEthSwap.add(ethInUniswap[i]);
 
