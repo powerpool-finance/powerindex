@@ -20,6 +20,11 @@ contract ExchangeProxy {
 
     mapping(address => address) uniswapEthPairByTokenAddress;
 
+    struct CalculationStruct {
+        uint256 tokenShare;
+        uint256 ethRequired;
+    }
+
     constructor(
         address _weth,
         address _pipt,
@@ -92,8 +97,6 @@ contract ExchangeProxy {
     ) {
         uint256 piptTotalSupply = pipt.totalSupply();
 
-        uint256 len = tokens.length;
-
         uint256 firstTokenBalance = pipt.getBalance(tokens[0]);
 
         // get pool out for 1 ether as 100% for calculate shares
@@ -103,29 +106,26 @@ contract ExchangeProxy {
         uint256 i = 0;
 
         // get shares and eth required for each share
-        uint256[] memory tokensShares = new uint256[](len);
-        uint256[] memory ethRequired = new uint256[](len);
+        CalculationStruct[] memory calculations = new CalculationStruct[](tokens.length);
         uint256 totalEthRequired = 0;
-        for (i = 0; i < len; i++) {
-            tokensShares[i] = poolRatio.mul(pipt.getBalance(tokens[i])).div(1 ether);
-            IUniswapV2Pair tokenPair = uniswapPairFor(tokens[i]);
-            (uint256 tokenReserve, uint256 ethReserve,) = tokenPair.getReserves();
-            ethRequired[i] = getAmountIn(tokensShares[i], tokenReserve, ethReserve);
-            totalEthRequired = totalEthRequired.add(ethRequired[i]);
+        for (i = 0; i < tokens.length; i++) {
+            calculations[i].tokenShare = poolRatio.mul(pipt.getBalance(tokens[i])).div(1 ether);
+            (uint256 tokenReserve, uint256 ethReserve,) = uniswapPairFor(tokens[i]).getReserves();
+            calculations[i].ethRequired = getAmountIn(calculations[i].tokenShare, tokenReserve, ethReserve);
+            totalEthRequired = totalEthRequired.add(calculations[i].ethRequired);
         }
 
         // calculate eth and tokensIn based on shares and normalize if totalEthRequired more than 100%
-        tokensInPipt = new uint256[](len);
-        ethInUniswap = new uint256[](len);
-        for (i = 0; i < len; i++) {
-            uint256 ethShare;
+        tokensInPipt = new uint256[](tokens.length);
+        ethInUniswap = new uint256[](tokens.length);
+        for (i = 0; i < tokens.length; i++) {
             if (totalEthRequired > 1 ether) {
-                ethShare = ethRequired[i].mul(1 ether).div(totalEthRequired);
+                ethInUniswap[i] = _ethValue.mul(calculations[i].ethRequired.mul(1 ether).div(totalEthRequired)).div(1 ether);
+                tokensInPipt[i] = calculations[i].tokenShare.mul(calculations[i].ethRequired.mul(1 ether).div(totalEthRequired)).div(1 ether);
             } else {
-                ethShare = ethRequired[i];
+                ethInUniswap[i] = _ethValue.mul(calculations[i].ethRequired).div(1 ether);
+                tokensInPipt[i] = calculations[i].tokenShare.mul(calculations[i].ethRequired).div(1 ether);
             }
-            ethInUniswap[i] = _ethValue.mul(ethShare).div(1 ether);
-            tokensInPipt[i] = tokensShares[i].mul(ethShare).div(1 ether);
         }
 
         poolOut = piptTotalSupply.mul(tokensInPipt[0]).div(firstTokenBalance);
