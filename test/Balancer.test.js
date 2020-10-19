@@ -34,7 +34,7 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
     assert.equal(diff.lte(toBN(accuracyWei)), true, message);
 }
 
-contract('Balancer', ([minter, bob, carol, alice, feeManager, feeReceiver, newCommunityWallet]) => {
+describe('Balancer', ([minter, bob, carol, alice, feeManager, feeReceiver, newCommunityWallet]) => {
     const name = 'My Pool';
     const symbol = 'MP';
     const balances = [ether('10'), ether('20')];

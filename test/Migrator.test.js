@@ -7,7 +7,7 @@ const UniswapV2Factory = artifacts.require('UniswapV2Factory');
 const Migrator = artifacts.require('Migrator');
 const Reservoir = artifacts.require('Reservoir');
 
-contract('Migrator', ([alice, bob, minter]) => {
+describe('Migrator', ([alice, bob, minter]) => {
     beforeEach(async () => {
         this.factory1 = await UniswapV2Factory.new(alice, { from: alice });
         this.factory2 = await UniswapV2Factory.new(alice, { from: alice });

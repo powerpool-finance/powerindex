@@ -7,7 +7,7 @@ const Reservoir = artifacts.require('Reservoir');
 const {web3} = Reservoir;
 const {toBN} = web3.utils;
 
-contract('LPMining', ([alice, bob, carol, minter]) => {
+describe('LPMining', ([alice, bob, carol, minter]) => {
     let supply;
     let reservoirInitialBalance;
     beforeEach(async () => {
