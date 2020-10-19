@@ -9,25 +9,29 @@ const UniswapV2Router02 = artifacts.require('UniswapV2Router02');
 const WETH = artifacts.require('MockWETH');
 const EthPiptSwap = artifacts.require('EthPiptSwap');
 
+MockERC20.numberFormat = 'String';
 UniswapV2Pair.numberFormat = 'String';
 UniswapV2Router02.numberFormat = 'String';
 EthPiptSwap.numberFormat = 'String';
+BPool.numberFormat = 'String';
 
 const {web3} = BFactory;
 const {toBN} = web3.utils;
 
-function mulScalarBN(bn1, bn2) {
-    return toBN(bn1.toString(10)).mul(toBN(bn2.toString(10))).div(toBN(ether('1').toString(10))).toString(10);
+function subBN(bn1, bn2) {
+    return toBN(bn1.toString(10)).sub(toBN(bn2.toString(10))).toString(10);
 }
-function divScalarBN(bn1, bn2) {
-    return toBN(bn1.toString(10)).mul(toBN(ether('1').toString(10))).div(toBN(bn2.toString(10))).toString(10);
+function addBN(bn1, bn2) {
+    return toBN(bn1.toString(10)).add(toBN(bn2.toString(10))).toString(10);
 }
 
-describe.only('EthPiptSwap', () => {
+describe('EthPiptSwap', () => {
     const swapFee = ether('0.01');
     const communitySwapFee = ether('0.05');
     const communityJoinFee = ether('0.04');
     const communityExitFee = ether('0.07');
+
+    const gasPrice = 1000000000;
 
     let minter, bob, carol, alice, feeManager, feeReceiver, permanentVotingPower;
     before(async function() {
@@ -43,28 +47,13 @@ describe.only('EthPiptSwap', () => {
         this.uniswapFactory = await UniswapV2Factory.new(feeManager, { from: minter });
         this.uniswapRouter = await UniswapV2Router02.new(this.uniswapFactory.address, this.weth.address, { from: minter });
 
-        this.getTokensToJoinPoolAndApprove = async (_pool, amountToMint) => {
-            const poolTotalSupply = (await _pool.totalSupply()).toString(10);
-            const ratio = divScalarBN(amountToMint, poolTotalSupply);
-            const token1Amount = mulScalarBN(ratio, (await _pool.getBalance(this.token1.address)).toString(10));
-            const token2Amount = mulScalarBN(ratio, (await _pool.getBalance(this.token2.address)).toString(10));
-            await this.token1.approve(this.bActions.address, token1Amount);
-            await this.token2.approve(this.bActions.address, token2Amount);
-            return [token1Amount, token2Amount];
-        }
-
-        this.getPairsBuyByEth = async (eth, pairs) => {
-            const ethShare = eth / pairs.length;
-            const result = [];
-            for (let i = 0; i < pairs.length; i++) {
-                const reserves = await pairs[i].getReserves();
-                result[i] = await this.uniswapRouter.getAmountOut(
-                    ether(ethShare.toString(10)).toString(10),
-                    reserves[1].toString(10),
-                    reserves[0].toString(10)
-                );
-            }
-            return result;
+        this.getPairAmountOut = async (pair, amountIn, inWeth = true) => {
+            const reserves = await pair.getReserves();
+            return this.uniswapRouter.getAmountOut(
+                amountIn,
+                inWeth ? reserves[1].toString(10) : reserves[0].toString(10),
+                inWeth ? reserves[0].toString(10) : reserves[1].toString(10)
+            );
         }
 
         this.makeBalancerPool = async (tokens, balances) => {
@@ -99,7 +88,7 @@ describe.only('EthPiptSwap', () => {
         }
     });
 
-    describe('community fee', () => {
+    describe('swapEthToPipt', () => {
         // balancer pool:
         // Lend: 161038.016
         // YFI: 4.313
@@ -108,8 +97,11 @@ describe.only('EthPiptSwap', () => {
         // Lend reserve1: 6402.032
         // YFI reserve0: 425.403
         // YFI reserve1: 16736.456
+        // CVP reserve0: 6072.57692
+        // CVP reserve1: 26.88494
 
-        it('community fee should work properly for joinPool and exitPool', async () => {
+        it('swapEthToPipt should work properly', async () => {
+            this.cvp = await MockERC20.new('CVP', 'CVP', ether('100000000'));
             this.token1 = await MockERC20.new('LEND', 'LEND', ether('100000000'));
             this.token2 = await MockERC20.new('YFI', 'YFI', ether('100000000'));
 
@@ -117,38 +109,100 @@ describe.only('EthPiptSwap', () => {
 
             const pair1 = await this.makeUniswapPair(this.token1, 61462.58889, 64.02032);
             const pair2 = await this.makeUniswapPair(this.token2, 4.25403, 167.36456);
+            const cvpPair = await this.makeUniswapPair(this.cvp, 6072.57692, 26.88494);
 
             const ethPiptSwap = await EthPiptSwap.new(
                 this.weth.address,
+                this.cvp.address,
                 pool.address,
-                '0',
-                feeReceiver,
-                feeManager
+                feeManager,
+                { from: minter }
             );
+
+            await expectRevert(ethPiptSwap.setFees([ether('1')], [ether('0.1')], bob, bob, {from: minter}), 'NOT_FEE_MANAGER');
+            await expectRevert(ethPiptSwap.setFees([ether('1')], [ether('0.1')], bob, bob, {from: bob}), 'NOT_FEE_MANAGER');
+
+            await ethPiptSwap.setFees([ether('0.1'), ether('0.2')], [ether('0.01'), ether('0.02')], feeReceiver, feeManager, {from: feeManager});
+
+            await expectRevert(ethPiptSwap.setUniswapPairFor(
+                [this.token1.address, this.token2.address, this.cvp.address],
+                [pair1.address, pair2.address, cvpPair.address],
+                {from: bob}
+            ), 'Ownable: caller is not the owner');
 
             await ethPiptSwap.setUniswapPairFor(
-                [this.token1.address, this.token2.address],
-                [pair1.address, pair2.address]
+                [this.token1.address, this.token2.address, this.cvp.address],
+                [pair1.address, pair2.address, cvpPair.address],
+                { from: minter }
             );
 
-            const pairsByEth = await this.getPairsBuyByEth(1, [pair1, pair2]);
-            console.log('pairsByEth', pairsByEth);
+            const ethToSwap = ether('0.1').toString(10);
 
-            const ethAndTokensIn = await ethPiptSwap.contract.methods.getEthAndTokensIn(
-                ether('1').toString(10),
+            const {ethFee, ethAfterFee} = await ethPiptSwap.calcEthFee(ethToSwap);
+            assert.equal(ethFee, ether('0.001').toString(10));
+            assert.equal(ethAfterFee, ether('0.099').toString(10));
+
+            const ethAndTokensIn = await ethPiptSwap.getEthAndTokensIn(
+                ethAfterFee,
                 [this.token1.address, this.token2.address]
-            ).call();
+            );
 
-            console.log('ethAndTokensIn', ethAndTokensIn);
+            const bobBalanceBefore = await web3.eth.getBalance(bob);
 
-            await ethPiptSwap.swapEthToPipt(
+            let res = await ethPiptSwap.swapEthToPipt(
                 ethAndTokensIn.tokensInPipt,
                 ethAndTokensIn.ethInUniswap,
                 ethAndTokensIn.poolOut,
                 {
-                    value: ether('1')
+                    from: bob,
+                    value: ethToSwap,
+                    gasPrice
                 }
             );
+
+            const weiUsed = res.receipt.gasUsed * gasPrice;
+            const balanceAfterWeiUsed = subBN(bobBalanceBefore, weiUsed);
+            const oddEth = res.receipt.logs.filter(l => l.event === 'OddEth')[0].args;
+            assert.equal(
+                subBN(addBN(balanceAfterWeiUsed, oddEth.amount), ether('0.1')),
+                await web3.eth.getBalance(bob)
+            );
+            assert.equal(await this.weth.balanceOf(ethPiptSwap.address), ethFee);
+
+            const {tokenAmountInAfterFee: poolOutAfterFee, tokenAmountFee: poolOutFee} = await pool.calcAmountWithCommunityFee(
+                ethAndTokensIn.poolOut,
+                communityJoinFee,
+                ethPiptSwap.address
+            );
+
+            const swap = res.receipt.logs.filter(l => l.event === 'EthToPiptSwap')[0].args;
+            assert.equal(swap.ethAmount, ethToSwap);
+            assert.equal(swap.ethFee, ethFee);
+            assert.equal(swap.piptAmount, ethAndTokensIn.poolOut);
+            assert.equal(swap.piptCommunityFee, poolOutFee);
+
+            assert.equal(poolOutAfterFee, await pool.balanceOf(bob));
+
+            const cvpOutForReceiver = await this.getPairAmountOut(cvpPair, ethFee);
+
+            assert.equal(await this.cvp.balanceOf(feeReceiver), '0');
+
+            res = await ethPiptSwap.convertOddToCvpAndSendToPayout([], { from: bob });
+            assert.equal(await this.cvp.balanceOf(feeReceiver), cvpOutForReceiver);
+            assert.equal(await this.weth.balanceOf(ethPiptSwap.address), '0');
+
+            const payoutCVP = res.receipt.logs.filter(l => l.event === 'PayoutCVP')[0].args;
+            assert.equal(payoutCVP.wethAmount, swap.ethFee);
+
+            assert.notEqual(await this.token1.balanceOf(ethPiptSwap.address), '0');
+            assert.notEqual(await this.token2.balanceOf(ethPiptSwap.address), '0');
+            await ethPiptSwap.convertOddToCvpAndSendToPayout([
+                this.token1.address,
+                this.token2.address
+            ], { from: bob });
+            assert.equal(await this.token1.balanceOf(ethPiptSwap.address), '0');
+            assert.equal(await this.token2.balanceOf(ethPiptSwap.address), '0');
+            assert.notEqual(await this.cvp.balanceOf(feeReceiver), cvpOutForReceiver);
         });
     })
 });
