@@ -191,6 +191,7 @@ describe('EthPiptSwap', () => {
             assert.equal(await this.weth.balanceOf(ethPiptSwap.address), ethFee);
 
             const swap = res.receipt.logs.filter(l => l.event === 'EthToPiptSwap')[0].args;
+            assert.equal(swap.ethFeeAmount, ethFee);
             assert.equal(swap.ethSwapAmount, ethAfterFee);
             assert.equal(swap.piptAmount, ethAndTokensIn.poolOut);
             assert.equal(swap.piptCommunityFee, poolOutFee);

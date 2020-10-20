@@ -40,7 +40,7 @@ contract EthPiptSwap is Ownable {
     event SetDefaultSlippage(uint256 newDefaultSlippage);
     event SetFees(address indexed sender, uint256[] newFeeLevels, uint256[] newFeeAmounts, address indexed feePayout, address indexed feeManager);
 
-    event EthToPiptSwap(address indexed user, uint256 ethSwapAmount, uint256 piptAmount, uint256 piptCommunityFee);
+    event EthToPiptSwap(address indexed user, uint256 ethSwapAmount, uint256 ethFeeAmount, uint256 piptAmount, uint256 piptCommunityFee);
     event OddEth(address indexed user, uint256 amount);
     event PayoutCVP(address indexed receiver, uint256 wethAmount, uint256 cvpAmount);
 
@@ -103,10 +103,9 @@ contract EthPiptSwap is Ownable {
         require(msg.value > 0, "ETH required");
         weth.deposit.value(msg.value)();
 
-        (, uint256 swapAmount) = calcEthFee(msg.value);
-//
-        uint piptTotalSupply = pipt.totalSupply();
-        uint ratio = poolAmountOut.mul(1 ether).div(piptTotalSupply).add(10);
+        (uint256 feeAmount, uint256 swapAmount) = calcEthFee(msg.value);
+
+        uint ratio = poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(10);
 
         address[] memory tokens = pipt.getCurrentTokens();
         uint256 len = tokens.length;
@@ -138,7 +137,7 @@ contract EthPiptSwap is Ownable {
             address(this)
         );
 
-        emit EthToPiptSwap(msg.sender, swapAmount, poolAmountOut, poolAmountOutFee);
+        emit EthToPiptSwap(msg.sender, swapAmount, feeAmount, poolAmountOut, poolAmountOutFee);
 
         pipt.joinPool(poolAmountOut, tokensInPipt);
         pipt.transfer(msg.sender, poolAmountOutAfterFee);
