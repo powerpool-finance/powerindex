@@ -8,6 +8,7 @@ import "./uniswapv2/interfaces/IUniswapV2Pair.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 
 contract EthPiptSwap is Ownable {
@@ -66,7 +67,6 @@ contract EthPiptSwap is Ownable {
         }
         swapEthToPipt(defaultSlippage);
     }
-
 
     function swapEthToPipt(uint256 _slippage) public payable {
         (, uint256 swapAmount) = calcEthFee(msg.value);
@@ -149,7 +149,7 @@ contract EthPiptSwap is Ownable {
     }
 
     function convertOddToCvpAndSendToPayout(address[] memory oddTokens) public {
-        require(msg.sender == tx.origin, "Call from contract not allowed");
+        require(msg.sender == tx.origin && !Address.isContract(msg.sender), "Call from contract not allowed");
 
         uint256 len = oddTokens.length;
 
@@ -180,6 +180,42 @@ contract EthPiptSwap is Ownable {
         cvp.transfer(feePayout, cvpOut);
 
         emit PayoutCVP(feePayout, wethBalance, cvpOut);
+    }
+
+    function setFees(
+        uint256[] calldata _feeLevels,
+        uint256[] calldata _feeAmounts,
+        address _feePayout,
+        address _feeManager
+    )
+        external
+        onlyFeeManagerOrOwner
+    {
+        feeLevels = _feeLevels;
+        feeAmounts = _feeAmounts;
+        feePayout = _feePayout;
+        feeManager = _feeManager;
+
+        emit SetFees(msg.sender, _feeLevels, _feeAmounts, _feePayout, _feeManager);
+    }
+
+    function setTokensSettings(
+        address[] memory _tokens,
+        address[] memory _pairs,
+        bool[] memory _reapprove
+    ) external onlyOwner {
+        uint256 len = _tokens.length;
+        require(len == _pairs.length && len == _reapprove.length, "Lengths are not equal");
+        for(uint i = 0; i < _tokens.length; i++) {
+            uniswapEthPairByTokenAddress[_tokens[i]] = _pairs[i];
+            reApproveTokens[_tokens[i]] = _reapprove[i];
+            emit SetTokenSetting(_tokens[i], _reapprove[i], _pairs[i]);
+        }
+    }
+
+    function setDefaultSlippage(uint256 _defaultSlippage) external onlyOwner {
+        defaultSlippage = _defaultSlippage;
+        emit SetDefaultSlippage(_defaultSlippage);
     }
 
     function getEthAndTokensIn(uint256 _ethValue, address[] memory _tokens, uint256 _slippage) public view returns(
@@ -226,46 +262,6 @@ contract EthPiptSwap is Ownable {
         poolOut = pipt.totalSupply().mul(tokensInPipt[0]).div(pipt.getBalance(_tokens[0]));
     }
 
-    function setFees(
-        uint256[] calldata _feeLevels,
-        uint256[] calldata _feeAmounts,
-        address _feePayout,
-        address _feeManager
-    )
-        external
-        onlyFeeManagerOrOwner
-    {
-        feeLevels = _feeLevels;
-        feeAmounts = _feeAmounts;
-        feePayout = _feePayout;
-        feeManager = _feeManager;
-
-        emit SetFees(msg.sender, _feeLevels, _feeAmounts, _feePayout, _feeManager);
-    }
-
-    function setTokensSettings(
-        address[] memory _tokens,
-        address[] memory _pairs,
-        bool[] memory _reapprove
-    ) external onlyOwner {
-        uint256 len = _tokens.length;
-        require(len == _pairs.length && len == _reapprove.length, "Lengths are not equal");
-        for(uint i = 0; i < _tokens.length; i++) {
-            uniswapEthPairByTokenAddress[_tokens[i]] = _pairs[i];
-            reApproveTokens[_tokens[i]] = _reapprove[i];
-            emit SetTokenSetting(_tokens[i], _reapprove[i], _pairs[i]);
-        }
-    }
-
-    function setDefaultSlippage(uint256 _defaultSlippage) external onlyOwner {
-        defaultSlippage = _defaultSlippage;
-        emit SetDefaultSlippage(_defaultSlippage);
-    }
-
-    function uniswapPairFor(address token) internal view returns(IUniswapV2Pair) {
-        return IUniswapV2Pair(uniswapEthPairByTokenAddress[token]);
-    }
-
     function calcEthFee(uint256 ethValue) public view returns(uint256 ethFee, uint256 ethAfterFee) {
         ethFee = 0;
         uint len = feeLevels.length;
@@ -295,5 +291,9 @@ contract EthPiptSwap is Ownable {
         uint numerator = amountInWithFee.mul(reserveOut);
         uint denominator = reserveIn.mul(1000).add(amountInWithFee);
         amountOut = numerator / denominator;
+    }
+
+    function uniswapPairFor(address token) internal view returns(IUniswapV2Pair) {
+        return IUniswapV2Pair(uniswapEthPairByTokenAddress[token]);
     }
 }
