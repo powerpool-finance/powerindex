@@ -14,8 +14,6 @@ contract EthPiptSwap is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for TokenInterface;
 
-    address private constant ETH_ADDRESS = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
-
     TokenInterface public weth;
     TokenInterface public cvp;
     BPoolInterface public pipt;
@@ -57,8 +55,8 @@ contract EthPiptSwap is Ownable {
         defaultSlippage = 0.02 ether;
     }
 
-    modifier onlyFeeManager() {
-        require(msg.sender == feeManager, "NOT_FEE_MANAGER");
+    modifier onlyFeeManagerOrOwner() {
+        require(msg.sender == feeManager || msg.sender == owner(), "NOT_FEE_MANAGER");
         _;
     }
 
@@ -235,7 +233,7 @@ contract EthPiptSwap is Ownable {
         address _feeManager
     )
         external
-        onlyFeeManager
+        onlyFeeManagerOrOwner
     {
         feeLevels = _feeLevels;
         feeAmounts = _feeAmounts;

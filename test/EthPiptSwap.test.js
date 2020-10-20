@@ -133,9 +133,9 @@ describe('EthPiptSwap', () => {
                 { from: minter }
             );
 
-            await expectRevert(ethPiptSwap.setFees([ether('1')], [ether('0.1')], bob, bob, {from: minter}), 'NOT_FEE_MANAGER');
             await expectRevert(ethPiptSwap.setFees([ether('1')], [ether('0.1')], bob, bob, {from: bob}), 'NOT_FEE_MANAGER');
 
+            await ethPiptSwap.setFees([ether('1')], [ether('0.1')], feeReceiver, feeManager, {from: minter});
             await ethPiptSwap.setFees([ether('0.2'), ether('0.1')], [ether('0.02'), ether('0.01')], feeReceiver, feeManager, {from: feeManager});
 
             await expectRevert(ethPiptSwap.setTokensSettings(
