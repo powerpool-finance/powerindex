@@ -40,25 +40,44 @@ contract('DelegatableCheckpoints lib', ([ , accountA, accountB, delegateeC, dele
         this.results = results;
     });
 
-    describe('`getCache` function', () => {
-        it('should return zero if no data has been cached', () => {
-            assert.strictEqual(str(this.results[0]), '0');
+    describe('`getProperties` function', () => {
+        it('should return the "numCheckpoints" property', () => {
+            assert.strictEqual(typeof this.results[0].numCheckpoints, 'object');
+            assert.strictEqual(typeof this.results[0].lastCheckpointBlock, 'object');
+            assert.strictEqual(typeof this.results[0].delegatee, 'string');
         });
 
-        it('should return cached data', () => {
-            assert.strictEqual(str(this.results[2]), '100');
+        it('should return the "lastCheckpointBlock" property', () => {
+            assert.strictEqual(typeof this.results[0].numCheckpoints, 'object');
+            assert.strictEqual(typeof this.results[0].lastCheckpointBlock, 'object');
+            assert.strictEqual(typeof this.results[0].delegatee, 'string');
         });
 
-        it('should return latest cached data', () => {
-            assert.strictEqual(str(this.results[20]), '106');
-            assert.strictEqual(str(this.results[21]), '112');
+        it('should return the "delegatee" property', () => {
+            assert.strictEqual(typeof this.results[0].numCheckpoints, 'object');
+            assert.strictEqual(typeof this.results[0].lastCheckpointBlock, 'object');
+            assert.strictEqual(typeof this.results[0].delegatee, 'string');
+        });
+
+        it('should return zero values if no data has been recorded yet', () => {
+            assert.strictEqual(str(this.results[0].numCheckpoints), '0');
+            assert.strictEqual(str(this.results[0].lastCheckpointBlock), '0');
+        });
+
+        it('should return a number of checkpoints written', () => {
+            assert.strictEqual(str(this.results[21].numCheckpoints), '6');
+        });
+
+        it('should return the latest recorded delegatee', () => {
+            assert.strictEqual(str(this.results[20].delegatee), delegateeE);
+            assert.strictEqual(str(this.results[21].delegatee), delegateeD);
         });
     });
 
-    describe('`writeCache` function', () => {
-        it('should rewrite cached data', () => {
-            assert.strictEqual(str(this.results[2]), '100');
-            assert.strictEqual(str(this.results[21]), '112');
+    describe('`writeDelegatee` function', () => {
+        it('should rewrite delegatee', () => {
+            assert.strictEqual(str(this.results[2].delegatee), delegateeC);
+            assert.strictEqual(str(this.results[21].delegatee), delegateeD);
         });
     });
 
