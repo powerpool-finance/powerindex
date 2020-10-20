@@ -26,6 +26,13 @@ abstract contract DelegatableVotes {
     event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
 
     /**
+     * @notice Get the "delegatee" account for the message sender
+     */
+    function delegatee() public returns (address) {
+        return book[msg.sender].delegatee;
+    }
+
+    /**
      * @notice Delegate votes from `msg.sender` to `delegatee`
      * @param delegatee The address to delegate votes to
      */
