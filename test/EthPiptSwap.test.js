@@ -169,7 +169,7 @@ describe('EthPiptSwap', () => {
 
             await expectRevert(
                 ethPiptSwap.swapEthToPipt(slippage, { from: bob, value: ethToSwap, gasPrice }),
-                'MAX_SUPPLY'
+                'PIPT_MAX_SUPPLY'
             );
 
             await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('200').toString(10)], { from: minter });

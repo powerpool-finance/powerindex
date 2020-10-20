@@ -96,7 +96,7 @@ contract EthPiptSwap is Ownable {
             address poolRestrictions = pipt.getRestrictions();
             if(address(poolRestrictions) != address(0)) {
                 uint maxTotalSupply = IPoolRestrictions(poolRestrictions).getMaxTotalSupply(address(pipt));
-                require(pipt.totalSupply().add(poolAmountOut) <= maxTotalSupply, "MAX_SUPPLY");
+                require(pipt.totalSupply().add(poolAmountOut) <= maxTotalSupply, "PIPT_MAX_SUPPLY");
             }
         }
 
