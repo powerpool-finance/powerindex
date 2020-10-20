@@ -239,8 +239,6 @@ contract EthPiptSwap is Ownable {
             for (uint i = 0; i < _tokens.length; i++) {
                 calculations[i].tokenShare = poolRatio.mul(pipt.getBalance(_tokens[i])).div(1 ether);
 
-                calculations[i].tokenShare = calculations[i].tokenShare.add(calculations[i].tokenShare);
-
                 (calculations[i].tokenReserve, calculations[i].ethReserve,) = uniswapPairFor(_tokens[i]).getReserves();
                 calculations[i].ethRequired = getAmountIn(
                     calculations[i].tokenShare,
