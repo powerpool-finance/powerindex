@@ -25,7 +25,7 @@ contract EthPiptSwap is Ownable {
 
     mapping(address => address) public uniswapEthPairByTokenAddress;
     mapping(address => bool) public reApproveTokens;
-    uint256 defaultSlippage;
+    uint256 public defaultSlippage;
 
     struct CalculationStruct {
         uint256 tokenShare;
