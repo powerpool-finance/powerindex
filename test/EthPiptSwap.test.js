@@ -152,52 +152,43 @@ describe('EthPiptSwap', () => {
                 { from: minter }
             );
 
-            const ethToSwap = ether('100').toString(10);
+            const {ethFee: ethFee2, ethAfterFee: ethAfterFee2} = await ethPiptSwap.calcEthFee(ether('0.1'));
+            assert.equal(ethFee2, ether('0.001').toString(10));
+            assert.equal(ethAfterFee2, ether('0.099').toString(10));
+
+            const ethToSwap = ether('600').toString(10);
+            const slippage = ether('0.02');
 
             const {ethFee, ethAfterFee} = await ethPiptSwap.calcEthFee(ethToSwap);
             // assert.equal(ethFee, ether('0.2').toString(10));
             // assert.equal(ethAfterFee, ether('9.8').toString(10));
 
-            const {ethFee: ethFee2, ethAfterFee: ethAfterFee2} = await ethPiptSwap.calcEthFee(ether('0.1'));
-            assert.equal(ethFee2, ether('0.001').toString(10));
-            assert.equal(ethAfterFee2, ether('0.099').toString(10));
-
-            const ethAndTokensIn = await ethPiptSwap.getEthAndTokensIn(ethAfterFee, tokens.map(t => t.address), ether('0.01'));
+            const ethAndTokensIn = await ethPiptSwap.getEthAndTokensIn(ethAfterFee, tokens.map(t => t.address), slippage);
 
             await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('10').toString(10)], { from: minter });
 
-            await expectRevert(ethPiptSwap.swapEthToPipt(
-                ether('0.01'),
-                { from: bob, value: ethToSwap, gasPrice }
-            ), 'MAX_SUPPLY');
+            await expectRevert(
+                ethPiptSwap.swapEthToPipt(slippage, { from: bob, value: ethToSwap, gasPrice }),
+                'MAX_SUPPLY'
+            );
 
             await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('200').toString(10)], { from: minter });
 
             const bobBalanceBefore = await web3.eth.getBalance(bob);
-
-            let res = await ethPiptSwap.swapEthToPipt(
-                ether('0.01'),
-                {
-                    from: bob,
-                    value: ethToSwap,
-                    gasPrice
-                }
-            );
-
-            const weiUsed = res.receipt.gasUsed * gasPrice;
-            const balanceAfterWeiUsed = subBN(bobBalanceBefore, weiUsed);
-            const oddEth = res.receipt.logs.filter(l => l.event === 'OddEth')[0].args;
-            assert.equal(
-                subBN(addBN(balanceAfterWeiUsed, oddEth.amount), ethToSwap),
-                await web3.eth.getBalance(bob)
-            );
-            assert.equal(await this.weth.balanceOf(ethPiptSwap.address), ethFee);
 
             const {tokenAmountInAfterFee: poolOutAfterFee, tokenAmountFee: poolOutFee} = await pool.calcAmountWithCommunityFee(
                 ethAndTokensIn.poolOut,
                 communityJoinFee,
                 ethPiptSwap.address
             );
+
+            let res = await ethPiptSwap.swapEthToPipt(slippage, {from: bob, value: ethToSwap, gasPrice});
+
+            const weiUsed = res.receipt.gasUsed * gasPrice;
+            const balanceAfterWeiUsed = subBN(bobBalanceBefore, weiUsed);
+            const oddEth = res.receipt.logs.filter(l => l.event === 'OddEth')[0].args;
+            assert.equal(subBN(addBN(balanceAfterWeiUsed, oddEth.amount), ethToSwap), await web3.eth.getBalance(bob));
+            assert.equal(await this.weth.balanceOf(ethPiptSwap.address), ethFee);
 
             const swap = res.receipt.logs.filter(l => l.event === 'EthToPiptSwap')[0].args;
             assert.equal(swap.ethSwapAmount, ethAfterFee);

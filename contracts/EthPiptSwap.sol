@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+
 contract EthPiptSwap is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for TokenInterface;
@@ -53,7 +54,7 @@ contract EthPiptSwap is Ownable {
         cvp = TokenInterface(_cvp);
         pipt = BPoolInterface(_pipt);
         feeManager = _feeManager;
-        defaultSlippage = 0.01 ether;
+        defaultSlippage = 0.02 ether;
     }
 
     modifier onlyFeeManager() {
