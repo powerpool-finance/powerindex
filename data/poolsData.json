@@ -1,0 +1,82 @@
+[
+ {
+  "tokenAddress": "0x80fB784B7eD66730e8b1DBd9820aFD29931aab03",
+  "tokenSymbol": "LEND",
+  "balancerBalance": 181201.44201373216,
+  "uniswapPair": {
+   "address": "0xaB3F9bF1D81ddb224a2014e98B238638824bCf20",
+   "tokenReserve": 2785251.0525068203,
+   "ethReserve": 2570.444037981793
+  }
+ },
+ {
+  "tokenAddress": "0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e",
+  "tokenSymbol": "YFI",
+  "balancerBalance": 4.782531821234806,
+  "uniswapPair": {
+   "address": "0x2fDbAdf3C4D5A8666Bc06645B8358ab803996E28",
+   "tokenReserve": 426.64490572459937,
+   "ethReserve": 14843.548947951997
+  }
+ },
+ {
+  "tokenAddress": "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F",
+  "tokenSymbol": "SNX",
+  "balancerBalance": 18205.12687617218,
+  "uniswapPair": {
+   "address": "0x43AE24960e5534731Fc831386c07755A2dc33D47",
+   "tokenReserve": 427859.3094710088,
+   "ethReserve": 3898.3384488793517
+  }
+ },
+ {
+  "tokenAddress": "0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1",
+  "tokenSymbol": "CVP",
+  "balancerBalance": 41911.27754227718,
+  "uniswapPair": {
+   "address": "0x12D4444f96C644385D8ab355F6DDf801315b6254",
+   "tokenReserve": 572675.6913189894,
+   "ethReserve": 2255.5391100440347
+  }
+ },
+ {
+  "tokenAddress": "0xc00e94Cb662C3520282E6f5717214004A7f26888",
+  "tokenSymbol": "COMP",
+  "balancerBalance": 665.7880788656614,
+  "uniswapPair": {
+   "address": "0xCFfDdeD873554F362Ac02f8Fb1f02E5ada10516f",
+   "tokenReserve": 7972.441884853435,
+   "ethReserve": 2015.720527451359
+  }
+ },
+ {
+  "tokenAddress": "0x0d438F3b5175Bebc262bF23753C1E53d03432bDE",
+  "tokenSymbol": "wNXM",
+  "balancerBalance": 2432.8714711459343,
+  "uniswapPair": {
+   "address": "0x23bFf8ca20AAc06EFDf23cEe3B8ae296A30Dfd27",
+   "tokenReserve": 39610.30911915921,
+   "ethReserve": 2728.0165024534463
+  }
+ },
+ {
+  "tokenAddress": "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2",
+  "tokenSymbol": "MKR",
+  "balancerBalance": 110.6480185704023,
+  "uniswapPair": {
+   "address": "0xC2aDdA861F89bBB333c90c492cB837741916A225",
+   "tokenReserve": 5326.2431413491195,
+   "ethReserve": 8007.032798345296
+  }
+ },
+ {
+  "tokenAddress": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+  "tokenSymbol": "UNI",
+  "balancerBalance": 21464.91628471451,
+  "uniswapPair": {
+   "address": "0xd3d2E2692501A5c9Ca623199D38826e513033a17",
+   "tokenReserve": 7813879.793968768,
+   "ethReserve": 60365.568398544194
+  }
+ }
+]
