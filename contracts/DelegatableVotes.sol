@@ -37,6 +37,7 @@ abstract contract DelegatableVotes {
      * @param delegatee The address to delegate votes to
      */
     function delegate(address delegatee) public {
+        require(delegatee != address(this), "delegate: can't delegate to contract address");
         return _delegate(msg.sender, delegatee);
     }
 

@@ -391,11 +391,11 @@ contract VestedLPMining is
             user.pendedCvp = _user.pendedCvp;
         }
         if (newlyVested != 0) {
+            if (newlyVested > cvpVestingPool) newlyVested = uint256(cvpVestingPool);
             cvpVestingPool = cvpVestingPool.sub(
                 SafeMath96.fromUint(newlyVested, "VLPMining::_vestUserCvp:1"),
                 "VLPMining::_vestUserCvp:2"
             );
-
             _transferCvp(msg.sender, newlyVested);
         }
         if (_user.vestingBlock > prevVestingBlock) {

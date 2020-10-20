@@ -51,7 +51,8 @@ contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
     });
 
     it('should set correct state variables', async () => {
-        this.lpMining = await VestedLPMining.new(
+        this.lpMining = await VestedLPMining.new({ from: minter });
+        await this.lpMining.initialize(
             this.cvp.address, this.reservoir.address, '1000', '0', '100', { from: minter }
         );
         const cvp = await this.lpMining.cvp();
@@ -62,7 +63,8 @@ contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
 
         it('should allow emergency withdraw', async () => {
             // 100 per block farming rate starting at block 100 with 1 block vesting period
-            this.lpMining = await VestedLPMining.new(
+            this.lpMining = await VestedLPMining.new({ from: minter });
+            await this.lpMining.initialize(
                 this.cvp.address, this.reservoir.address, '100', '100', '100000', { from: minter }
             );
             await this.prepareReservoir();
@@ -77,7 +79,8 @@ contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
 
         it('should give out CVPs only after farming time', async () => {
             // 100 per block farming rate starting at block 100 with 50 block vesting period
-            this.lpMining = await VestedLPMining.new(
+            this.lpMining = await VestedLPMining.new({ from: minter });
+            await this.lpMining.initialize(
                 this.cvp.address, this.reservoir.address, '100', '100',  '50', { from: minter }
             );
             await this.prepareReservoir();
@@ -104,7 +107,8 @@ contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
 
         it('should not distribute CVPs if no one deposit', async () => {
             // 100 per block farming rate starting at block 200 with 50 block vesting period
-            this.lpMining = await VestedLPMining.new(
+            this.lpMining = await VestedLPMining.new({ from: minter });
+            await this.lpMining.initialize(
                 this.cvp.address, this.reservoir.address, '100', '200',  '50', { from: minter }
             );
             await this.prepareReservoir();
@@ -139,7 +143,8 @@ contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
 
         it('should distribute CVPs properly for each staker', async () => {
             // 100 per block farming rate starting at block 300
-            this.lpMining = await VestedLPMining.new(
+            this.lpMining = await VestedLPMining.new({ from: minter });
+            await this.lpMining.initialize(
                 this.cvp.address, this.reservoir.address, '100', '300',  '100', { from: minter }
             );
             await this.prepareReservoir();
@@ -222,19 +227,20 @@ contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
             // In 100 blocks after the withdrawal, the entire amount is vested.
             await time.advanceBlockTo('439')
             await this.lpMining.withdraw(0, '0', { from: alice });
-            assert.equal(await this.cvpBalanceOf(alice), '1159');
+            assert.equal(await this.cvpBalanceOf(alice), '1373');
             await time.advanceBlockTo('449')
             await this.lpMining.withdraw(0, '0', { from: bob });
             assert.equal(await this.cvpBalanceOf(bob), '1183');
             await time.advanceBlockTo('459')
-            await this.lpMining.withdraw(0, '0', { from: carol });
-            assert.equal(await this.cvpBalanceOf(carol), '2657');
+            const tx = await this.lpMining.withdraw(0, '0', { from: carol });
+            assert.equal(await this.cvpBalanceOf(carol), '2444');
             assert.equal((await this.lpMining.cvpVestingPool()).toString() * 1 <= 1, true);
         });
 
         it('should give proper CVPs allocation to each pool', async () => {
             // 100 per block farming rate starting at block 400
-            this.lpMining = await VestedLPMining.new(
+            this.lpMining = await VestedLPMining.new({ from: minter });
+            await this.lpMining.initialize(
                 this.cvp.address, this.reservoir.address, '100', '400',  '100', { from: minter }
             );
             await this.prepareReservoir();
@@ -254,7 +260,7 @@ contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
 
             await expectRevert(
                 this.lpMining.add('10', this.lp.address, '1', true, true, { from: minter }),
-                'VestedLPMining: LP token already added'
+                'VLPMining: token already added'
             );
 
             // Add LP2 to the pool with allocation 2 at block 420
@@ -302,7 +308,8 @@ contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
 
         it('should stop giving bonus CVPs after the bonus period ends', async () => {
             // 100 per block farming rate starting at block 500
-            this.lpMining = await VestedLPMining.new(
+            this.lpMining = await VestedLPMining.new({ from: minter });
+            await this.lpMining.initialize(
                 this.cvp.address, this.reservoir.address, '100', '500',  '100', { from: minter }
             );
             await this.prepareReservoir();
@@ -325,7 +332,8 @@ contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
         it('should correctly checkpoint votes', async () => {
             // 100 per block farming rate starting at block 700
             await time.advanceBlockTo('699');
-            this.lpMining = await VestedLPMining.new(
+            this.lpMining = await VestedLPMining.new({ from: minter });
+            await this.lpMining.initialize(
                 this.cvp.address, this.reservoir.address, '100', '700', '100', { from: minter }
             );
             await this.prepareReservoir();
@@ -434,7 +442,8 @@ contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
         it('cvpPerBlock can be changed by owner', async () => {
             await time.advanceBlockTo('899');
             // 100 per block farming rate starting at block 900
-            this.lpMining = await VestedLPMining.new(
+            this.lpMining = await VestedLPMining.new({ from: minter });
+            await this.lpMining.initialize(
                 this.cvp.address, this.reservoir.address, '100', '900', '100', { from: minter }
             );
             await this.prepareReservoir();
