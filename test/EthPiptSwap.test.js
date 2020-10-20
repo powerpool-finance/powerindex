@@ -187,9 +187,6 @@ describe('EthPiptSwap', () => {
 
             //TODO: fix uniswap revert on run multiple tests in the same time
             let res = await ethPiptSwap.swapEthToPipt(
-                ethAndTokensIn.tokensInPipt,
-                ethAndTokensIn.ethInUniswap,
-                ethAndTokensIn.poolOut,
                 {
                     from: bob,
                     value: ethToSwap,
