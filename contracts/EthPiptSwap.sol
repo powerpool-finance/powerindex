@@ -61,6 +61,11 @@ contract EthPiptSwap is Ownable {
         if (msg.sender != tx.origin) {
             return;
         }
+        swapEthToPipt();
+    }
+
+
+    function swapEthToPipt() public payable {
         (, uint256 swapAmount) = calcEthFee(msg.value);
 
         address[] memory tokens = pipt.getCurrentTokens();
@@ -71,10 +76,10 @@ contract EthPiptSwap is Ownable {
             uint256 poolAmountOut
         ) = getEthAndTokensIn(swapAmount, tokens);
 
-        swapEthToPipt(tokensInPipt, ethInUniswap, poolAmountOut.mul(999).div(1000));
+        swapEthToPiptByInputs(tokensInPipt, ethInUniswap, poolAmountOut);
     }
 
-    function swapEthToPipt(
+    function swapEthToPiptByInputs(
         uint256[] memory tokensInPipt,
         uint256[] memory ethInUniswap,
         uint256 poolAmountOut
@@ -123,6 +128,22 @@ contract EthPiptSwap is Ownable {
         );
 
         emit EthToPiptSwap(msg.sender, msg.value, poolAmountOut, feeAmount, poolAmountOutFee);
+
+        {
+            uint256 poolRatio = poolAmountOut.mul(1 ether).div(pipt.totalSupply());
+            for(uint256 i = 0; i < len; i++) {
+                uint256 tokenRequired = poolRatio.mul(pipt.getBalance(tokens[i])).div(1 ether);
+                if (tokenRequired <= tokensInPipt[i]) {
+                    continue;
+                }
+
+                uint256 oldTokenAmount = tokensInPipt[i];
+                for (uint256 k = 0; k < len; k++) {
+
+
+                }
+            }
+        }
 
         pipt.joinPool(poolAmountOut, tokensInPipt);
         pipt.transfer(msg.sender, poolAmountOutAfterFee);
@@ -225,7 +246,7 @@ contract EthPiptSwap is Ownable {
         }
 
         poolOut = piptTotalSupply.mul(tokensInPipt[0]).div(firstTokenBalance);
-        poolOut = poolOut.mul(999999).div(1000000);
+        poolOut = poolOut.mul(9999).div(10000);
     }
 
     function setTokensSettings(
