@@ -4,6 +4,7 @@ import "./interfaces/BPoolInterface.sol";
 import "./interfaces/TokenInterface.sol";
 import "./IPoolRestrictions.sol";
 import "./uniswapv2/interfaces/IUniswapV2Pair.sol";
+import "./uniswapv2/libraries/UniswapV2Library.sol";
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
@@ -73,23 +74,12 @@ contract EthPiptSwap is Ownable {
 
         address[] memory tokens = pipt.getCurrentTokens();
 
-        (
-            uint256[] memory tokensInPipt,
-            uint256[] memory ethInUniswap,
-            uint256 poolAmountOut
-        ) = getEthAndTokensIn(swapAmount, tokens, _slippage);
+        (, , uint256 poolAmountOut) = calcSwapInputs(swapAmount, tokens, _slippage);
 
-        swapEthToPiptByInputs(tokensInPipt, ethInUniswap, poolAmountOut);
+        swapEthToPiptByPoolOut(poolAmountOut);
     }
 
-    function swapEthToPiptByInputs(
-        uint256[] memory tokensInPipt,
-        uint256[] memory ethInUniswap,
-        uint256 poolAmountOut
-    )
-        public
-        payable
-    {
+    function swapEthToPiptByPoolOut(uint256 poolAmountOut) public payable {
         {
             address poolRestrictions = pipt.getRestrictions();
             if(address(poolRestrictions) != address(0)) {
@@ -108,18 +98,25 @@ contract EthPiptSwap is Ownable {
         address[] memory tokens = pipt.getCurrentTokens();
         uint256 len = tokens.length;
 
+        CalculationStruct[] memory calculations = new CalculationStruct[](tokens.length);
+        uint256[] memory tokensInPipt = new uint256[](tokens.length);
+
         uint256 totalEthSwap = 0;
         for(uint256 i = 0; i < len; i++) {
             IUniswapV2Pair tokenPair = uniswapPairFor(tokens[i]);
 
-            (uint256 tokenReserve, uint256 ethReserve,) = tokenPair.getReserves();
+            (calculations[i].tokenReserve, calculations[i].ethReserve,) = tokenPair.getReserves();
             tokensInPipt[i] = ratio.mul(pipt.getBalance(tokens[i])).div(1 ether);
-            ethInUniswap[i] = getAmountIn(tokensInPipt[i], ethReserve, tokenReserve);
+            calculations[i].ethRequired = UniswapV2Library.getAmountIn(
+                tokensInPipt[i],
+                calculations[i].ethReserve,
+                calculations[i].tokenReserve
+            );
 
-            weth.transfer(address(tokenPair), ethInUniswap[i]);
+            weth.transfer(address(tokenPair), calculations[i].ethRequired);
 
             tokenPair.swap(tokensInPipt[i], uint(0), address(this), new bytes(0));
-            totalEthSwap = totalEthSwap.add(ethInUniswap[i]);
+            totalEthSwap = totalEthSwap.add(calculations[i].ethRequired);
 
             if(reApproveTokens[tokens[i]]) {
                 TokenInterface(tokens[i]).approve(address(pipt), 0);
@@ -159,7 +156,7 @@ contract EthPiptSwap is Ownable {
             IUniswapV2Pair tokenPair = uniswapPairFor(oddTokens[i]);
 
             (uint256 tokenReserve, uint256 ethReserve,) = tokenPair.getReserves();
-            uint256 wethOut = getAmountOut(tokenBalance, tokenReserve, ethReserve);
+            uint256 wethOut = UniswapV2Library.getAmountOut(tokenBalance, tokenReserve, ethReserve);
 
             TokenInterface(oddTokens[i]).transfer(address(tokenPair), tokenBalance);
 
@@ -171,7 +168,7 @@ contract EthPiptSwap is Ownable {
         IUniswapV2Pair cvpPair = uniswapPairFor(address(cvp));
 
         (uint256 cvpReserve, uint256 ethReserve,) = cvpPair.getReserves();
-        uint256 cvpOut = getAmountOut(wethBalance, ethReserve, cvpReserve);
+        uint256 cvpOut = UniswapV2Library.getAmountOut(wethBalance, ethReserve, cvpReserve);
 
         weth.transfer(address(cvpPair), wethBalance);
 
@@ -218,7 +215,7 @@ contract EthPiptSwap is Ownable {
         emit SetDefaultSlippage(_defaultSlippage);
     }
 
-    function getEthAndTokensIn(uint256 _ethValue, address[] memory _tokens, uint256 _slippage) public view returns(
+    function calcSwapInputs(uint256 _ethValue, address[] memory _tokens, uint256 _slippage) public view returns(
         uint256[] memory tokensInPipt,
         uint256[] memory ethInUniswap,
         uint256 poolOut
@@ -240,7 +237,7 @@ contract EthPiptSwap is Ownable {
                 calculations[i].tokenShare = poolRatio.mul(pipt.getBalance(_tokens[i])).div(1 ether);
 
                 (calculations[i].tokenReserve, calculations[i].ethReserve,) = uniswapPairFor(_tokens[i]).getReserves();
-                calculations[i].ethRequired = getAmountIn(
+                calculations[i].ethRequired = UniswapV2Library.getAmountIn(
                     calculations[i].tokenShare,
                     calculations[i].ethReserve,
                     calculations[i].tokenReserve
@@ -272,23 +269,12 @@ contract EthPiptSwap is Ownable {
         ethAfterFee = ethValue.sub(ethFee);
     }
 
-    // given an output amount of an asset and pair reserves, returns a required input amount of the other asset
-    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) public pure returns (uint amountIn) {
-        require(amountOut > 0, 'UniswapV2Library: INSUFFICIENT_OUTPUT_AMOUNT');
-        require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
-        uint numerator = reserveIn.mul(amountOut).mul(1000);
-        uint denominator = reserveOut.sub(amountOut).mul(997);
-        amountIn = (numerator / denominator).add(1);
+    function getFeeLevels() public view returns(uint256[] memory) {
+        return feeLevels;
     }
 
-    // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
-    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) public pure returns (uint amountOut) {
-        require(amountIn > 0, 'UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT');
-        require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
-        uint amountInWithFee = amountIn.mul(997);
-        uint numerator = amountInWithFee.mul(reserveOut);
-        uint denominator = reserveIn.mul(1000).add(amountInWithFee);
-        amountOut = numerator / denominator;
+    function getFeeAmounts() public view returns(uint256[] memory) {
+        return feeAmounts;
     }
 
     function uniswapPairFor(address token) internal view returns(IUniswapV2Pair) {

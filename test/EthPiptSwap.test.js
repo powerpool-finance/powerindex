@@ -163,7 +163,7 @@ describe('EthPiptSwap', () => {
             // assert.equal(ethFee, ether('0.2').toString(10));
             // assert.equal(ethAfterFee, ether('9.8').toString(10));
 
-            const ethAndTokensIn = await ethPiptSwap.getEthAndTokensIn(ethAfterFee, tokens.map(t => t.address), slippage);
+            const ethAndTokensIn = await ethPiptSwap.calcSwapInputs(ethAfterFee, tokens.map(t => t.address), slippage);
 
             await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('10').toString(10)], { from: minter });
 
@@ -197,6 +197,8 @@ describe('EthPiptSwap', () => {
             assert.equal(swap.piptCommunityFee, poolOutFee);
 
             assert.equal(poolOutAfterFee, await pool.balanceOf(bob));
+
+            console.log('     ', web3.utils.fromWei(ethToSwap), 'ETH =>', web3.utils.fromWei(poolOutAfterFee), 'PIPT')
 
             const cvpOutForReceiver = await this.getPairAmountOut(cvpPair, ethFee);
 
