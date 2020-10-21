@@ -74,7 +74,7 @@ contract EthPiptSwap is Ownable {
 
         address[] memory tokens = pipt.getCurrentTokens();
 
-        (, , uint256 poolAmountOut) = calcSwapInputs(swapAmount, tokens, _slippage);
+        (, , uint256 poolAmountOut) = calcSwapEthToPiptInputs(swapAmount, tokens, _slippage);
 
         swapEthToPiptByPoolOut(poolAmountOut);
     }
@@ -215,7 +215,7 @@ contract EthPiptSwap is Ownable {
         emit SetDefaultSlippage(_defaultSlippage);
     }
 
-    function calcSwapInputs(uint256 _ethValue, address[] memory _tokens, uint256 _slippage) public view returns(
+    function calcSwapEthToPiptInputs(uint256 _ethValue, address[] memory _tokens, uint256 _slippage) public view returns(
         uint256[] memory tokensInPipt,
         uint256[] memory ethInUniswap,
         uint256 poolOut

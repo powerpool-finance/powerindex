@@ -163,7 +163,11 @@ describe('EthPiptSwap', () => {
             // assert.equal(ethFee, ether('0.2').toString(10));
             // assert.equal(ethAfterFee, ether('9.8').toString(10));
 
-            const ethAndTokensIn = await ethPiptSwap.calcSwapInputs(ethAfterFee, tokens.map(t => t.address), slippage);
+            const ethAndTokensIn = await ethPiptSwap.calcSwapEthToPiptInputs(
+                ethAfterFee,
+                tokens.map(t => t.address),
+                slippage
+            );
 
             await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('10').toString(10)], { from: minter });
 
