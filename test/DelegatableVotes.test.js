@@ -1,7 +1,12 @@
 /* global after, afterEach, artifacts, before, beforeEach, contract, describe, it, web3 */
 const MockDelegatableVotes = artifacts.require('MockDelegatableVotes');
 
-contract('DelegatableVotes', ([ , alice, bob, carol, carl ]) => {
+describe('DelegatableVotes', () => {
+
+    let alice, bob, carol, carl;
+    before(async function() {
+        [, alice, bob, carol, carl] = await web3.eth.getAccounts();
+    });
 
     describe('`getCurrentVotes`', () => {
         before(async () => {

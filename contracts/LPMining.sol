@@ -95,12 +95,10 @@ contract LPMining is Ownable, Checkpoints {
     }
 
     // Add a new lp to the pool. Can only be called by the owner.
-    function add(uint256 _allocPoint, IERC20 _lpToken, uint8 _poolType, bool _votesEnabled, bool _withUpdate) public onlyOwner {
+    function add(uint256 _allocPoint, IERC20 _lpToken, uint8 _poolType, bool _votesEnabled) public onlyOwner {
         require(!isLpTokenAdded(_lpToken), "add: Lp token already added");
 
-        if (_withUpdate) {
-            massUpdatePools();
-        }
+        massUpdatePools();
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
 
@@ -119,10 +117,8 @@ contract LPMining is Ownable, Checkpoints {
     }
 
     // Update the given pool's CVP allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, uint8 _poolType, bool _votesEnabled, bool _withUpdate) public onlyOwner {
-        if (_withUpdate) {
-            massUpdatePools();
-        }
+    function set(uint256 _pid, uint256 _allocPoint, uint8 _poolType, bool _votesEnabled) public onlyOwner {
+        massUpdatePools();
         totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
         poolInfo[_pid].allocPoint = _allocPoint;
         poolInfo[_pid].votesEnabled = _votesEnabled;
