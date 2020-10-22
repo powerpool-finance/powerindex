@@ -65,7 +65,7 @@ interface IVestedLPMining {
 
     /// @notice Update reward computation params for all pools
     /// @dev Be careful of gas spending
-    function updateAllPools() external;
+    function massUpdatePools() external;
 
     /// @notice Update CVP tokens allocation for the given pool
     function updatePool(uint256 _pid) external;
@@ -81,6 +81,10 @@ interface IVestedLPMining {
 
     /// @notice Write votes of the given user at the current block
     function checkpointVotes(address _user) external;
+
+    /// @notice Get CVP amount and the share of CVPs in LP pools for the given account and the checkpoint
+    function getCheckpoint(address account, uint32 checkpointId)
+    external view returns (uint32 fromBlock, uint96 cvpAmount, uint96 pooledCvpShare);
 
     event AddLpToken(address indexed lpToken, uint256 indexed pid, uint256 allocPoint);
     event SetLpToken(address indexed lpToken, uint256 indexed pid, uint256 allocPoint);

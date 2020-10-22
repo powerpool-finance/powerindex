@@ -100,6 +100,12 @@ abstract contract DelegatableVotes {
         (sharedCheckpointId, ) = book[address(this)].findCheckpoint(blockNumber);
     }
 
+    function _getCheckpoint(address account, uint32 checkpointId)
+    internal view returns (uint32 fromBlock, uint192 data)
+    {
+        (fromBlock, data) = book[account].getCheckpoint(checkpointId);
+    }
+
     function _writeSharedData(uint192 data) internal {
         book[address(this)].writeCheckpoint(data);
     }

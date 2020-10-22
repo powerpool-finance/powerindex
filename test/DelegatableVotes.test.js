@@ -38,28 +38,35 @@ contract('DelegatableVotes', ([ , alice, bob, carol, carl ]) => {
         });
     });
 
-    describe('`getPriorVotes`', () => {
+    describe('`_getCheckpoint`', () => {
+        before(async () => {
+            this.dlgVotes = await MockDelegatableVotes.new();
+            this.txs = [];
+            /*0*/ this.txs.push(await this.dlgVotes.__writeUserData(alice, 24));
+            /*1*/ this.txs.push((await(web3.eth.getBlockNumber())).toString());
+            /*2*/ this.txs.push(await this.dlgVotes.__writeUserData(alice, 511));
+            /*3*/ this.txs.push((await(web3.eth.getBlockNumber())).toString());
+            /*4*/ this.txs.push(await this.dlgVotes.__writeUserData(bob, 237));
+            /*5*/ this.txs.push((await(web3.eth.getBlockNumber())).toString());
+        });
 
-    });
-
-    describe('`getPriorVotes` extended version', () => {
-
-    });
-
-    describe('`findCheckpoints`', () => {
-
-    });
-
-    describe('`_writeSharedData`', () => {
-
-    });
-
-    describe('`_writeUserData`', () => {
-
-    });
-
-    describe('`_moveUserData`', () => {
-
+        it('should return correct checkpoint values', async () => {
+            const fact = [
+                await this.dlgVotes.__getCheckpoint(alice, 1),
+                await this.dlgVotes.__getCheckpoint(alice, 2),
+                await this.dlgVotes.__getCheckpoint(bob, 1),
+            ];
+            // First, check the block numbers
+            assert.equal(1*this.txs[3] - 1*this.txs[1], 1);
+            assert.equal(1*this.txs[5] - 1*this.txs[3], 1);
+            // Then let's check the function output
+            assert.equal(fact[0].fromBlock.toString(), this.txs[1]);
+            assert.equal(fact[1].fromBlock.toString(), this.txs[3]);
+            assert.equal(fact[2].fromBlock.toString(), this.txs[5]);
+            assert.equal(fact[0].data.toString(), '24');
+            assert.equal(fact[1].data.toString(), '511');
+            assert.equal(fact[2].data.toString(), '237');
+        });
     });
 
     describe('Running pre-defined scenario', () => {

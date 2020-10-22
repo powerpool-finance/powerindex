@@ -232,7 +232,7 @@ contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
             await this.lpMining.withdraw(0, '0', { from: bob });
             assert.equal(await this.cvpBalanceOf(bob), '1183');
             await time.advanceBlockTo('459')
-            const tx = await this.lpMining.withdraw(0, '0', { from: carol });
+            await this.lpMining.withdraw(0, '0', { from: carol });
             assert.equal(await this.cvpBalanceOf(carol), '2444');
             assert.equal((await this.lpMining.cvpVestingPool()).toString() * 1 <= 1, true);
         });
@@ -344,102 +344,142 @@ contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
 
             await this.lpMining.add('1', this.lp.address, '1', true, true, { from: minter });
 
-            // Alice deposits 10 LPs at block 790
+            const getUserCurrVotes = async (user) =>
+                (await this.cvp.balanceOf(user)).add(await this.lpMining.getCurrentVotes(user));
+
+            // Alice deposits 10 LPs at block #790
             await time.advanceBlockTo('789');
             await this.lpMining.deposit(0, '10', { from: alice });
             // console.log('logs', logs.map(e => e.args));
-            const firstBlockNumber = await web3.eth.getBlockNumber();
+            const firstBlockNumber = await web3.eth.getBlockNumber(); // block #790
             await time.advanceBlock();
             assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), '5');
             assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-            // At block 805, she should have 100*15 = 1500 pending.
             await time.advanceBlockTo('805');
+            // At block #805, she should have 100*15 = 1500 CVP (as the reward) pending.
             assert.equal((await this.lpMining.pendingCvp(0, alice)).toString(), '1500');
 
             await this.lpMining.deposit(0, '10', { from: alice });
-            const secondBlockNumber = await web3.eth.getBlockNumber();
+            const secondBlockNumber = await web3.eth.getBlockNumber(); // block #806
             await time.advanceBlock();
-            assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), '10');
+
+            // At block #807 (since `deposit` on #806), she has 100*16 "reward" CVP and 10 CVP as the share in LP pools
+            assert.equal((await getUserCurrVotes(alice)).toString(), '1610');
+            // 220 from the CVP award has been vested ...
+            assert.equal((await this.cvp.balanceOf(alice)).toString(), '220');
+            // ... 1380 remains pending, plus 10 as the share in LP pool(s) CVP
+            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
+
             assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '10');
 
             await this.lpMining.deposit(0, '40', { from: alice });
-            const thirdBlockNumber = await web3.eth.getBlockNumber();
+            const thirdBlockNumber = await web3.eth.getBlockNumber(); // block 808
             await time.advanceBlock();
-            assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), '30');
+
+            // At block #809 (since `deposit` on #808), she should have 100*18 "reward" CVP and 30 "LP share" CVP
+            assert.equal((await getUserCurrVotes(alice)).toString(), '1830');
+            assert.equal((await this.cvp.balanceOf(alice)).toString(), '250');
+            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '1580');
+            // Previously registered values shall remain unchanged
             assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '10');
-            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '30');
+            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
 
             await this.lpMining.withdraw(0, '10', { from: alice });
-            const fourthBlockNumber = await web3.eth.getBlockNumber();
+            const fourthBlockNumber = await web3.eth.getBlockNumber(); // block #810
             await time.advanceBlock();
-            assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), '25');
+
+            // At block #811 (since `withdraw` on #810), she has 100*20 "reward" CVP and 25 "share" CVP
+            assert.equal((await getUserCurrVotes(alice)).toString(), '2024');  // +1 - rounding error
+            assert.equal((await this.cvp.balanceOf(alice)).toString(), '284'); // +1
+            assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '1740');
+            // Previously registered values shall remain unchanged
             assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '10');
-            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '30');
-            assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '25');
+            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
+            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '1580');
 
             await this.cvp.transfer(this.lp.address, '5000000000', { from: minter });
             await this.lpMining.checkpointVotes(alice);
-            const fifthBlockNumber = await web3.eth.getBlockNumber();
+            const fifthBlockNumber = await web3.eth.getBlockNumber(); // block #813
             await time.advanceBlock();
-            assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), '50');
+
+            // At block #814 (since `withdraw` on #810), same 2000 "award" CVP,
+            // but the "share" CVP amount is 50 (as the LP poll increased on block #819)
+            assert.equal((await getUserCurrVotes(alice)).toString(), '2049');  // +1 - rounding error
+            assert.equal((await this.cvp.balanceOf(alice)).toString(), '284'); // +1
+            assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '1765');
+            // Previously registered values shall remain unchanged
             assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '10');
-            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '30');
-            assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '25');
-            assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '50');
+            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
+            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '1580');
+            assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '1740');
 
             await this.cvp.transfer(this.lp2.address, '5000000000', { from: minter });
             await this.lp2.transfer(alice, '1000', { from: minter });
             await this.lp2.approve(this.lpMining.address, '1000', { from: alice });
-
-            await this.lpMining.add('1', this.lp2.address, '1', true, true, { from: minter });
-            await this.lpMining.deposit('1', '10', { from: alice });
+            await this.lpMining.add('1', this.lp2.address, '1', true, true, { from: minter }); // block #818
+            await this.lpMining.deposit('1', '10', { from: alice }); // block #819
             const sixthBlockNumber = await web3.eth.getBlockNumber();
-            await time.advanceBlock();
-            assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), '55');
+            await time.advanceBlock(); // block #820
+
+            // At block #820 she has:
+            // - same 2000 "award" CVP for the 1st poll - same since `withdraw` on #810
+            // - yet zero CVP "award" for the 2nd pool - since `deposit` on #816
+            // - 55 "share" CVP after `deposit` on #819
+            assert.equal((await getUserCurrVotes(alice)).toString(), '2053');  // +2 - rounding error
+            assert.equal((await this.cvp.balanceOf(alice)).toString(), '284'); // +1
+            assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).toString(), '1769');
+            // Previously registered values shall remain unchanged
             assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '10');
-            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '30');
-            assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '25');
-            assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '50');
-            assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).toString(), '55');
+            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
+            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '1580');
+            assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '1740');
+            assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '1765');
 
-            await this.lpMining.checkpointVotes(alice);
-            assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), '55');
-
-            await this.lpMining.emergencyWithdraw(0, { from: alice });
+            await this.lpMining.withdraw(0, 0, { from: alice }); // block #821
+            await this.lpMining.withdraw(1, 0, { from: alice }); // block #822
             const seventhBlockNumber = await web3.eth.getBlockNumber();
             await time.advanceBlock();
-            assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), '5');
+
+            // At block #823, she has:
+            // - since `withdraw` on #821, 3100 of "reward" CVP, 50 as a share in the 1st pool, and 5 in the 2nd
+            assert.equal((await getUserCurrVotes(alice)).toString(), '3153');  // +2 - rounding error
+            assert.equal((await this.cvp.balanceOf(alice)).toString(), '578');
+            assert.equal((await this.lpMining.getPriorVotes(alice, seventhBlockNumber)).toString(), '2575');
+            // Previously registered values shall remain unchanged
             assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '10');
-            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '30');
-            assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '25');
-            assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '50');
-            assert.equal((await this.lpMining.getPriorVotes(alice, seventhBlockNumber)).toString(), '5');
+            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
+            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '1580');
+            assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '1740');
+            assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '1765');
+            assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).toString(), '1769');
+
+
+            await this.lpMining.emergencyWithdraw(0, { from: alice }); // block #823
 
             await this.lpMining.checkpointVotes(alice);
             await time.advanceBlock();
-            assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), '5');
+            // assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), '4'); // +1 - rounding error
 
             await this.lpMining.set(1, '1', '1', false, true, { from: minter });
             await this.lpMining.checkpointVotes(alice);
-            const eighthBlockNumber = await web3.eth.getBlockNumber();
+            const eighthBlockNumber = await web3.eth.getBlockNumber(); // block #828
             await time.advanceBlock();
-            assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), '0');
+
+            // `emergencyWithdraw` on #832: less 2375 "award" CVP and 50 "share" CVP - both for the 1st pool
+            assert.equal((await getUserCurrVotes(alice)).toString(), '724');  // +1 - rounding error
+            assert.equal((await this.cvp.balanceOf(alice)).toString(), '578');
+            assert.equal((await this.lpMining.getPriorVotes(alice, eighthBlockNumber)).toString(), '146');
+            // Previously registered values shall remain unchanged
             assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '10');
-            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '30');
-            assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '25');
-            assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '50');
-            assert.equal((await this.lpMining.getPriorVotes(alice, seventhBlockNumber)).toString(), '5');
-            assert.equal((await this.lpMining.getPriorVotes(alice, eighthBlockNumber)).toString(), '0');
+            assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
+            assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '1580');
+            assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '1740');
+            assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '1765');
+            assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).toString(), '1769');
+            assert.equal((await this.lpMining.getPriorVotes(alice, seventhBlockNumber)).toString(), '2575');
         });
 
-        it('cvpPerBlock can be changed by owner', async () => {
+       it('cvpPerBlock can be changed by owner', async () => {
             await time.advanceBlockTo('899');
             // 100 per block farming rate starting at block 900
             this.lpMining = await VestedLPMining.new({ from: minter });

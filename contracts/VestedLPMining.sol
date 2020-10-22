@@ -126,7 +126,7 @@ contract VestedLPMining is
         require(!isLpTokenAdded(_lpToken), "VLPMining: token already added");
 
         if (_withUpdate) {
-            updateAllPools();
+            massUpdatePools();
         }
         uint32 blockNum = _currBlock();
         uint32 lastUpdateBlock = blockNum > startBlock ? blockNum : startBlock;
@@ -151,7 +151,7 @@ contract VestedLPMining is
     public override onlyOwner
     {
         if (_withUpdate) {
-            updateAllPools();
+            massUpdatePools();
         }
         totalAllocPoint = totalAllocPoint.sub(uint256(pools[_pid].allocPoint)).add(_allocPoint);
         pools[_pid].allocPoint = SafeMath32.fromUint(_allocPoint, "VLPMining: too big allocation");
@@ -200,6 +200,8 @@ contract VestedLPMining is
 
     /// @inheritdoc IVestedLPMining
     function pendingCvp(uint256 _pid, address _user) external view override returns (uint256) {
+        if (_pid >= pools.length) return 0;
+
         Pool memory _pool = pools[_pid];
         User storage user = users[_pid][_user];
 
@@ -231,7 +233,7 @@ contract VestedLPMining is
     }
 
     /// @inheritdoc IVestedLPMining
-    function updateAllPools() public override {
+    function massUpdatePools() public override {
         uint256 length = pools.length;
         for (uint256 pid = 0; pid < length; ++pid) {
             updatePool(pid);
@@ -246,6 +248,8 @@ contract VestedLPMining is
 
     /// @inheritdoc IVestedLPMining
     function deposit(uint256 _pid, uint256 _amount) public override nonReentrant {
+        _validatePoolId(_pid);
+
         Pool storage pool = pools[_pid];
         User storage user = users[_pid][msg.sender];
 
@@ -264,6 +268,8 @@ contract VestedLPMining is
 
     /// @inheritdoc IVestedLPMining
     function withdraw(uint256 _pid, uint256 _amount) public override nonReentrant {
+        _validatePoolId(_pid);
+
         Pool storage pool = pools[_pid];
         User storage user = users[_pid][msg.sender];
         require(user.lptAmount >= _amount, "VLPMining: amount exceeds balance");
@@ -283,6 +289,8 @@ contract VestedLPMining is
 
     /// @inheritdoc IVestedLPMining
     function emergencyWithdraw(uint256 _pid) public override nonReentrant {
+        _validatePoolId(_pid);
+
         Pool storage pool = pools[_pid];
         User storage user = users[_pid][msg.sender];
 
@@ -309,6 +317,15 @@ contract VestedLPMining is
     /// @inheritdoc IVestedLPMining
     function checkpointVotes(address _user) public override nonReentrant {
         _doCheckpointVotes(_user);
+    }
+
+    /// @inheritdoc IVestedLPMining
+    function getCheckpoint(address account, uint32 checkpointId)
+    external override view returns (uint32 fromBlock, uint96 cvpAmount, uint96 pooledCvpShare)
+    {
+        uint192 data;
+        (fromBlock, data) = _getCheckpoint(account, checkpointId);
+        (cvpAmount, pooledCvpShare) = _unpackData(data);
     }
 
     function _doCheckpointVotes(address _user) internal {
@@ -353,7 +370,7 @@ contract VestedLPMining is
         emit CheckpointUserVotes(_user, uint256(userPendedCvp), lpCvpUserShare);
 
         _writeUserData(_user, _packData(userPendedCvp, lpCvpUserShare));
-        _writeSharedData(_packData(0, totalLpCvp));
+        _writeSharedData(_packData(totalLpCvp, 0));
     }
 
     function _transferCvp(address _to, uint256 _amount) internal {
@@ -534,6 +551,10 @@ contract VestedLPMining is
             lptAmount.mul(accCvpPerLpt).div(SCALE),
             "VLPMining::_computeCvpAdj"
         );
+    }
+
+    function _validatePoolId(uint256 pid) private view {
+        require(pid < pools.length, "VLPMining: invalid pool id");
     }
 
     function _currBlock() private view returns (uint32) {

@@ -36,7 +36,7 @@ library DelegatableCheckpoints {
     function _getCheckpoint(Record storage record, uint32 checkpointId)
     internal view returns (uint32 fromBlock, uint192 data)
     {
-        return (record.numCheckpoints, record.checkpoints[checkpointId].data);
+        return (record.checkpoints[checkpointId].fromBlock, record.checkpoints[checkpointId].data);
     }
 
     /**
@@ -116,12 +116,18 @@ library DelegatableCheckpoints {
         uint32 blockNum = _safeBlockNum(block.number);
         Record memory _record = record;
 
+        uint192 oldData = _record.numCheckpoints > 0 ? record.checkpoints[_record.numCheckpoints].data : 0;
+        bool isChanged = data != oldData;
+
         if (_record.lastCheckpointBlock != blockNum) {
             _record.numCheckpoints = _record.numCheckpoints + 1; // overflow chance ignored
             record.numCheckpoints = _record.numCheckpoints;
             record.lastCheckpointBlock = blockNum;
+            isChanged = true;
         }
-        record.checkpoints[_record.numCheckpoints] = Checkpoint(blockNum, data);
+        if (isChanged) {
+            record.checkpoints[_record.numCheckpoints] = Checkpoint(blockNum, data);
+        }
         id = _record.numCheckpoints;
     }
 

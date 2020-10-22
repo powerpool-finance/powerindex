@@ -16,10 +16,10 @@ contract MockDelegatableVotes is DelegatableVotes {
         _moveUserData(account, from, to);
     }
 
-    function __computeUserData(uint192 prevData, uint192 newDelegated, uint192 prevDelegated)
-    internal pure virtual returns (uint192 userData)
+    function __getCheckpoint(address account, uint32 checkpointId)
+    public view returns (uint32 fromBlock, uint192 data)
     {
-        return _computeUserData(prevData, newDelegated, prevDelegated);
+        return _getCheckpoint(account, checkpointId);
     }
 
     function _computeUserVotes(uint192 userData, uint192 sharedData)
