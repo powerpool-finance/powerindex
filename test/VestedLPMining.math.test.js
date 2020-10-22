@@ -30,6 +30,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
         );
         await this.vestingMath._setMockParams(mockLptBalance.toString(), mockTotalAllocPoint.toString());
         this.deployBlock = await web3.eth.getBlockNumber();
+        this.shiftBlock = blockNum => `${1 * this.startBlock + 1 * blockNum}`;
     });
 
     beforeEach(async function () {
@@ -43,9 +44,9 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
     context('computePoolReward function', () => {
 
         it('should return zero reward params computed for zero allocation points', async () => {
-            const [ allocPoint, lastUpdateBlock, accCvpPerLpt ] = [ '0', '0', '0' ];
+            const [ allocPoint, lastUpdateBlock, accCvpPerLpt ] = [ '0', this.shiftBlock('0'), '0' ];
 
-            await time.advanceBlockTo('50');
+            await time.advanceBlockTo(this.shiftBlock('50'));
             const tx = await this.vestingMath.__computePoolReward(allocPoint, lastUpdateBlock, accCvpPerLpt);
             const res = tx.receipt.logs[0].args;
             const curBlock = await web3.eth.getBlockNumber();
@@ -57,30 +58,30 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
         });
 
         it('should return non-zero reward params computed for non-zero allocation points', async () => {
-            const [ allocPoint, lastUpdateBlock, accCvpPerLpt ] = [ '1000', '10', '0' ];
+            const [ allocPoint, lastUpdateBlock, accCvpPerLpt ] = [ '1000', this.shiftBlock('10'), '0' ];
             const eCvpReward = toBN(cvpPerBlock).mul(toBN('50')).div(mockTotalAllocPoint).mul(toBN(allocPoint));
             const eAccCvpPerLpt = eCvpReward.mul(Scale).div(mockLptBalance);
 
-            await time.advanceBlockTo('59');
+            await time.advanceBlockTo(this.shiftBlock('59'));
             const tx = await this.vestingMath.__computePoolReward(allocPoint, lastUpdateBlock, accCvpPerLpt);
             const res = tx.receipt.logs[0].args;
 
-            assert.equal(res.lastUpdateBlock.toString(), '60');
-            assert.equal(res.accCvpPerLpt.toString(), eAccCvpPerLpt);
-            assert.equal(res.cvpReward.toString(), eCvpReward);
+            assert.equal(res.lastUpdateBlock.toString(), this.shiftBlock('60'));
+            assert.equal(res.accCvpPerLpt.toString(), eAccCvpPerLpt.toString());
+            assert.equal(res.cvpReward.toString(), eCvpReward.toString());
         });
 
         it('should return computed reward params being "called"', async () => {
-            const [ allocPoint, lastUpdateBlock, accCvpPerLpt ] = [ '1000', '10', `${3e6}` ];
+            const [ allocPoint, lastUpdateBlock, accCvpPerLpt ] = [ '1000', this.shiftBlock('10'), `${3e6}` ];
             const eCvpReward = toBN(cvpPerBlock).mul(toBN('50')).div(mockTotalAllocPoint).mul(toBN(allocPoint));
             const eAccCvpPerLpt = toBN(accCvpPerLpt).add(eCvpReward.mul(Scale).div(mockLptBalance));
 
-            await time.advanceBlockTo('60');
+            await time.advanceBlockTo(this.shiftBlock('60'));
             const res = await this.vestingMath.__computePoolReward.call(allocPoint, lastUpdateBlock, accCvpPerLpt);
 
-            assert.equal(res.lastUpdateBlock.toString(), '60');
-            assert.equal(res.accCvpPerLpt.toString(), eAccCvpPerLpt);
-            assert.equal(res.cvpReward.toString(), eCvpReward);
+            assert.equal(res.lastUpdateBlock.toString(), this.shiftBlock('60'));
+            assert.equal(res.accCvpPerLpt.toString(), eAccCvpPerLpt.toString());
+            assert.equal(res.cvpReward.toString(), eCvpReward.toString());
         });
     });
 
@@ -89,8 +90,8 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
             lptAmount: '20'+e18,
             cvpAdjust: '0',
             pendedCvp: '0',
-            vestingBlock: '30',
-            lastUpdateBlock: '30',
+            vestingBlock: this.shiftBlock('30'),
+            lastUpdateBlock: this.shiftBlock('30'),
         });
         const accCvpPerLpt = `${0.2 * 10e6}`;
 
@@ -100,9 +101,9 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                 it('should nether entitle nor vest new CVPs', async () => {
                     const user = getTestUser();
                     user.lptAmount = '0';
-                    user.vestingBlock = '1';
+                    user.vestingBlock = this.shiftBlock('1');
                     user.pendedCvp = '0';
-                    const currentBlock = '50';
+                    const currentBlock = this.shiftBlock('50');
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
                     const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
@@ -125,7 +126,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     user.pendedCvp = '0';
                     user.cvpAdjust = `${0.5e6}`;
                     // less than `vestPeriod` since `user.lastUpdateBlock`
-                    const currentBlock = '35';
+                    const currentBlock = this.shiftBlock('35');
 
                     const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale)
                         .sub(toBN(user.cvpAdjust))
@@ -154,7 +155,7 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     user.cvpAdjust = `${0.5e6}`;
                     user.pendedCvp = '0';
                     // more than `vestPeriod` since `user.lastUpdateBlock`
-                    const currentBlock = '50';
+                    const currentBlock = this.shiftBlock('50');
 
                     const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale)
                         .sub(toBN(user.cvpAdjust))
@@ -187,10 +188,10 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     const user = getTestUser();
                     user.lptAmount = '0';
                     user.pendedCvp = `${2e6}`;
-                    user.lastUpdateBlock = '30';
-                    user.vestingBlock = '38';
+                    user.lastUpdateBlock = this.shiftBlock('30');
+                    user.vestingBlock = this.shiftBlock('38');
                     // less than `user.vestingBlock`
-                    const currentBlock = '35'
+                    const currentBlock = this.shiftBlock('35');
 
                     const expectedVesting = toBN(user.pendedCvp)
                         .mul(toBN(`${1*currentBlock - 1*user.lastUpdateBlock}`))
@@ -214,9 +215,9 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     const user = getTestUser();
                     user.lptAmount = '0';
                     user.pendedCvp = `${2e6}`;
-                    user.vestingBlock = '35';
+                    user.vestingBlock = this.shiftBlock('35');
                     // more than `vestPeriod` since `user.vestingBlock`
-                    const currentBlock = '50'
+                    const currentBlock = this.shiftBlock('50');
 
                     await time.advanceBlockTo(`${1*currentBlock - 1}`);
                     const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
@@ -238,11 +239,11 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     const user = getTestUser();
                     user.lptAmount = '2'+e18;
                     user.pendedCvp = `${1e6}`;
-                    user.lastUpdateBlock = '30';
-                    user.vestingBlock = '38';
+                    user.lastUpdateBlock = this.shiftBlock('30');
+                    user.vestingBlock = this.shiftBlock('38');
                     user.cvpAdjust = `${0.5e6}`;
                     // less than `user.vestingBlock`
-                    const currentBlock = '35'
+                    const currentBlock = this.shiftBlock('35');
 
                     const pended = toBN(user.pendedCvp);
                     const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale)
@@ -282,11 +283,11 @@ contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
                     const user = getTestUser();
                     user.lptAmount = '2'+e18;
                     user.pendedCvp = `${1e6}`;
-                    user.lastUpdateBlock = '30';
-                    user.vestingBlock = '38';
+                    user.lastUpdateBlock = this.shiftBlock('30');
+                    user.vestingBlock = this.shiftBlock('38');
                     user.cvpAdjust = `${0.5e6}`;
                     // more than `user.vestingBlock`
-                    const currentBlock = '40'
+                    const currentBlock = this.shiftBlock('40');
 
                     const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale)
                         .sub(toBN(user.cvpAdjust))
