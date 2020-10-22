@@ -31,7 +31,7 @@ describe('Migrator', () => {
         await this.cvp.transfer(this.reservoir.address, supply, { from: alice });
         await this.reservoir.setApprove(this.cvp.address, this.lpMining.address, supply, { from: alice });
 
-        await this.lpMining.add('100', this.lp1.address, '1', true, true, { from: alice });
+        await this.lpMining.add('100', this.lp1.address, '1', true, { from: alice });
     });
 
     it('should do the migration successfully', async () => {
@@ -77,7 +77,7 @@ describe('Migrator', () => {
     it('should reject migration for not the Uniswap poolType', async () => {
         this.token2 = await MockERC20.new('TOKEN2', 'TOKEN2', '100000000', { from: minter });
         this.lp3 = await UniswapV2Pair.at((await this.factory1.createPair(this.weth.address, this.token2.address)).logs[0].args.pair);
-        await this.lpMining.add('100', this.lp3.address, '2', true, true, { from: alice });
+        await this.lpMining.add('100', this.lp3.address, '2', true, { from: alice });
 
         await this.token2.transfer(this.lp3.address, '10000000', { from: minter });
         await this.weth.transfer(this.lp3.address, '500000', { from: minter });

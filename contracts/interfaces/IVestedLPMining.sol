@@ -28,8 +28,7 @@ interface IVestedLPMining {
         uint256 _allocPoint,
         IERC20 _lpToken,
         uint8 _poolType,
-        bool _votesEnabled,
-        bool _withUpdate
+        bool _votesEnabled
     ) external;
 
     /// @notice Update parameters of the given pool (only the owner may call)
@@ -37,8 +36,7 @@ interface IVestedLPMining {
         uint256 _pid,
         uint256 _allocPoint,
         uint8 _poolType,
-        bool _votesEnabled,
-        bool _withUpdate
+        bool _votesEnabled
     ) external;
 
     /// @notice Set the migrator contract (only the owner may call)

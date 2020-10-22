@@ -120,14 +120,12 @@ contract VestedLPMining is
     }
 
     /// @inheritdoc IVestedLPMining
-    function add(uint256 _allocPoint, IERC20 _lpToken, uint8 _poolType, bool _votesEnabled, bool _withUpdate)
+    function add(uint256 _allocPoint, IERC20 _lpToken, uint8 _poolType, bool _votesEnabled)
     public override onlyOwner
     {
         require(!isLpTokenAdded(_lpToken), "VLPMining: token already added");
 
-        if (_withUpdate) {
-            massUpdatePools();
-        }
+        massUpdatePools();
         uint32 blockNum = _currBlock();
         uint32 lastUpdateBlock = blockNum > startBlock ? blockNum : startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
@@ -147,12 +145,10 @@ contract VestedLPMining is
     }
 
     /// @inheritdoc IVestedLPMining
-    function set(uint256 _pid, uint256 _allocPoint, uint8 _poolType, bool _votesEnabled, bool _withUpdate)
+    function set(uint256 _pid, uint256 _allocPoint, uint8 _poolType, bool _votesEnabled)
     public override onlyOwner
     {
-        if (_withUpdate) {
-            massUpdatePools();
-        }
+        massUpdatePools();
         totalAllocPoint = totalAllocPoint.sub(uint256(pools[_pid].allocPoint)).add(_allocPoint);
         pools[_pid].allocPoint = SafeMath32.fromUint(_allocPoint, "VLPMining: too big allocation");
         pools[_pid].votesEnabled = _votesEnabled;
