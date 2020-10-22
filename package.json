@@ -4,19 +4,31 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "test": "truffle test",
-    "compile": "truffle compile"
+    "build": "yarn run compile && yarn run typechain",
+    "clean": "buidler clean",
+    "compile": "buidler compile",
+    "test": "mocha --timeout 20000"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^3.1.0",
     "@openzeppelin/contracts-ethereum-package": "^3.0.0",
-    "@openzeppelin/test-helpers": "^0.5.6",
     "@openzeppelin/upgrades": "^2.8.0",
-    "@truffle/contract": "^4.2.26",
-    "@truffle/hdwallet-provider": "^1.0.44",
-    "truffle": "^5.1.41",
-    "truffle-flattener": "^1.4.4",
-    "web3": "^1.3.0"
+    "ethers": "^5.0.18",
+    "web3": "1.3.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@ethersproject/abstract-signer": "^5.0.1",
+    "@ethersproject/bignumber": "^5.0.3",
+    "@nomiclabs/buidler": "^1.4.4",
+    "@nomiclabs/buidler-ganache": "^1.3.3",
+    "@nomiclabs/buidler-truffle5": "^1.3.4",
+    "@nomiclabs/buidler-web3": "^1.3.3",
+    "@openzeppelin/test-helpers": "^0.5.6",
+    "@truffle/contract": "^4.2.26",
+    "buidler-contract-sizer": "^1.0.0",
+    "buidler-gas-reporter": "^0.1.3",
+    "mocha": "^8.0.1",
+    "solidity-coverage": "^0.7.9",
+    "typechain": "^3.0.0"
+  }
 }

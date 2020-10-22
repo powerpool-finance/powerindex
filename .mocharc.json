@@ -1,0 +1,8 @@
+{
+  "delay": false,
+  "exit": true,
+  "extension": ["js"],
+  "recursive": "test",
+  "require": ["@nomiclabs/buidler/register"],
+  "timeout": 10000
+}

@@ -14,25 +14,8 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-
-abstract contract PoolInterface {
-    function swapExactAmountIn(address, uint, address, uint, uint) external virtual returns (uint, uint);
-    function swapExactAmountOut(address, uint, address, uint, uint) external virtual returns (uint, uint);
-    function calcInGivenOut(uint, uint, uint, uint, uint, uint) public pure virtual returns (uint);
-    function getDenormalizedWeight(address) external view virtual returns (uint);
-    function getBalance(address) external view virtual returns (uint);
-    function getSwapFee() external view virtual returns (uint);
-}
-
-abstract contract TokenInterface {
-    function balanceOf(address) public view virtual returns (uint);
-    function allowance(address, address) public view virtual returns (uint);
-    function approve(address, uint) public virtual returns (bool);
-    function transfer(address, uint) public virtual returns (bool);
-    function transferFrom(address, address, uint) public virtual returns (bool);
-    function deposit() public virtual payable;
-    function withdraw(uint) public virtual;
-}
+import "../interfaces/BPoolInterface.sol";
+import "../interfaces/TokenInterface.sol";
 
 contract ExchangeProxy {
 
@@ -116,7 +99,7 @@ contract ExchangeProxy {
                     swap.swapAmount = tokenAmountOut;
                 }
 
-                PoolInterface pool = PoolInterface(swap.pool);
+                BPoolInterface pool = BPoolInterface(swap.pool);
                 if (SwapTokenIn.allowance(address(this), swap.pool) > 0) {
                     SwapTokenIn.approve(swap.pool, 0);
                 }
@@ -159,7 +142,7 @@ contract ExchangeProxy {
                 Swap memory swap = swapSequences[i][0];
                 TokenInterface SwapTokenIn = TokenInterface(swap.tokenIn);
 
-                PoolInterface pool = PoolInterface(swap.pool);
+                BPoolInterface pool = BPoolInterface(swap.pool);
                 if (SwapTokenIn.allowance(address(this), swap.pool) > 0) {
                     SwapTokenIn.approve(swap.pool, 0);
                 }
@@ -178,7 +161,7 @@ contract ExchangeProxy {
                 // To get the exact amount of C we then first need to calculate how much B we'll need:
                 uint intermediateTokenAmount; // This would be token B as described above
                 Swap memory secondSwap = swapSequences[i][1];
-                PoolInterface poolSecondSwap = PoolInterface(secondSwap.pool);
+                BPoolInterface poolSecondSwap = BPoolInterface(secondSwap.pool);
                 intermediateTokenAmount = poolSecondSwap.calcInGivenOut(
                     poolSecondSwap.getBalance(secondSwap.tokenIn),
                     poolSecondSwap.getDenormalizedWeight(secondSwap.tokenIn),
@@ -191,7 +174,7 @@ contract ExchangeProxy {
                 //// Buy intermediateTokenAmount of token B with A in the first pool
                 Swap memory firstSwap = swapSequences[i][0];
                 TokenInterface FirstSwapTokenIn = TokenInterface(firstSwap.tokenIn);
-                PoolInterface poolFirstSwap = PoolInterface(firstSwap.pool);
+                BPoolInterface poolFirstSwap = BPoolInterface(firstSwap.pool);
                 if (FirstSwapTokenIn.allowance(address(this), firstSwap.pool) < uint(-1)) {
                     FirstSwapTokenIn.approve(firstSwap.pool, uint(-1));
                 }

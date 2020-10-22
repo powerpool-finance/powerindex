@@ -40,8 +40,8 @@ module.exports = {
           100
       ),
       network_id: 1,
-      gas: 1000000,
-      gasPrice: 112000000000,
+      gas: 7000000,
+      gasPrice: 60000000000,
       confirmations: 2,
       timeoutBlocks: 200,
       allowUnlimitedContractSize: true,
