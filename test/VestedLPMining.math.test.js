@@ -5,7 +5,13 @@ const MockVestedLPMiningMath = artifacts.require('MockVestedLPMiningMath');
 
 const {toBN} = web3.utils;
 
-contract('VestedLPMining (internal math)', ([ , deployer, doesNotMatter ]) => {
+describe('VestedLPMining (internal math)', () => {
+
+    let deployer, doesNotMatter;
+    before(async function() {
+        [, deployer, doesNotMatter] = await web3.eth.getAccounts();
+    });
+
     const e18 = '000000000000000000';
     const Scale = toBN((1e12).toString());
 

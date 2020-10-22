@@ -9,7 +9,12 @@ const Reservoir = artifacts.require('Reservoir');
 const {web3} = Reservoir;
 const {toBN} = web3.utils;
 
-contract('VestedLPMining', ([ , alice, bob, carol, minter ]) => {
+describe('VestedLPMining', () => {
+
+    let alice, bob, carol, minter;
+    before(async function() {
+        [, alice, bob, carol, minter] = await web3.eth.getAccounts();
+    });
 
     before(async () => {
         this.startBlock = await web3.eth.getBlockNumber();
