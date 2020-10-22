@@ -1,25 +1,23 @@
+/* global artifacts, web3 */
 const MockERC20 = artifacts.require("MockERC20");
-const MockCvp = artifacts.require("MockCvp");
-const LPMining = artifacts.require("LPMining");
-const Reservoir = artifacts.require("Reservoir");
 const BFactory = artifacts.require("BFactory");
 const BActions = artifacts.require("BActions");
 const WETH = artifacts.require("WETH");
 const PoolRestrictions = artifacts.require("PoolRestrictions");
 const BPool = artifacts.require("BPool");
 const PermanentVotingPowerV1 = artifacts.require("PermanentVotingPowerV1");
+const getUserspace = require('./1_userspace');
 
 WETH.numberFormat = 'String';
 
 const {web3} = MockERC20;
-const {toBN, toWei} = web3.utils;
+const {toWei} = web3.utils;
 
 module.exports = function(deployer, network, accounts) {
-    if(network === 'test' || network === 'mainnet') {
-        return;
-    }
-
     deployer.then(async () => {
+        const userNs = process["__user__"] || getUserspace(deployer, network, accounts);
+        if ( userNs.isTestnet || userNs.isMainnet ) return;
+
         const bFactory = await BFactory.deployed();
         const bActions = await BActions.deployed();
         const poolRestrictions = await deployer.deploy(PoolRestrictions);
@@ -48,32 +46,40 @@ module.exports = function(deployer, network, accounts) {
             miningVotes: false
         }];
 
-        for(let i = 0; i < pools.length; i++) {
-            const poolConfig = pools[i];
+        // Run one by one
+        await pools.reduce(
+            async (promiseChain, poolConfig) => promiseChain.then(async () => {
 
-            for(let i = 0; i < poolConfig.tokens.length; i++) {
-                const pairToken = await MockERC20.at(poolConfig.tokens[i]);
-                await pairToken.approve(bActions.address, ether(poolConfig.balances[i]));
-            }
+                // Again, one by one
+                let index = 0;
+                await poolConfig.tokens.reduce(
+                    async (innerChain, tokenAddr) => innerChain.then(async () => {
+                        const pairToken = await MockERC20.at(tokenAddr);
+                        await pairToken.approve(bActions.address, ether(poolConfig.balances[index++]));
+                    }),
+                    Promise.resolve(),
+                );
 
-            const res = await bActions.create(
-                bFactory.address,
-                poolConfig.name,
-                poolConfig.symbol,
-                poolConfig.tokens,
-                poolConfig.balances.map(b => ether(b)),
-                poolConfig.denorms.map(d => ether(d)),
-                [ether(poolConfig.swapFee), ether(poolConfig.communitySwapFee), ether(poolConfig.communityJoinFee), ether(poolConfig.communityExitFee)],
-                poolConfig.communityFeeReceiver,
-                true
-            );
+                const res = await bActions.create(
+                    bFactory.address,
+                    poolConfig.name,
+                    poolConfig.symbol,
+                    poolConfig.tokens,
+                    poolConfig.balances.map(b => ether(b)),
+                    poolConfig.denorms.map(d => ether(d)),
+                    [ether(poolConfig.swapFee), ether(poolConfig.communitySwapFee), ether(poolConfig.communityJoinFee), ether(poolConfig.communityExitFee)],
+                    poolConfig.communityFeeReceiver,
+                    true
+                );
 
-            const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
-            const pool = await BPool.at(logNewPool.args.pool);
-            console.log('pool.address', pool.address);
-            await pool.setRestrictions(poolRestrictions.address);
-            await poolRestrictions.setTotalRestrictions([pool.address], [ether(20000)]);
-        }
+                const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
+                const pool = await BPool.at(logNewPool.args.pool);
+                console.log('pool.address', pool.address);
+                await pool.setRestrictions(poolRestrictions.address);
+                await poolRestrictions.setTotalRestrictions([pool.address], [ether(20000)]);
+            }),
+            Promise.resolve(),
+        );
 
         // await lpMining.transferOwnership(deployer);
         // await reservoir.transferOwnership(deployer);

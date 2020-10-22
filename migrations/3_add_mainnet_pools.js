@@ -1,14 +1,16 @@
-const MockERC20 = artifacts.require("MockERC20");
-const LPMining = artifacts.require("LPMining");
-const Reservoir = artifacts.require("Reservoir");
+/* global artifacts, web3 */
+const getUserspace = require('./1_userspace');
 
-module.exports = function(deployer, network) {
-    if(network === 'test' || network !== 'mainnet') {
-        return;
-    }
+module.exports = function(deployer, network, accounts) {
     deployer.then(async () => {
-        const lpMining = await LPMining.deployed();
-        const reservoir = await Reservoir.deployed();
+        const userNs = process["__user__"] || getUserspace(deployer, network, accounts);
+        if ( userNs.isTestnet || !userNs.isMainnet ) return;
+
+        const { admin } = userNs.addresses;
+        if (!web3.utils.isAddress(admin)) throw new Error('Invalid admin address');
+
+        const lpMining = userNs.instances.lpMining;
+        const reservoir = userNs.instances.reservoir;
 
         const testLpTokens = [{
             name: 'Uniswap',
@@ -28,13 +30,15 @@ module.exports = function(deployer, network) {
             poolType: '2'
         }];
 
-        for(let i = 0; i < testLpTokens.length; i++) {
-            console.log('add', testLpTokens[i].name);
-            await lpMining.add('10', testLpTokens[i].address, testLpTokens[i].poolType, true, true);
-            console.log('done', testLpTokens[i].name);
-        }
-
-        const admin = '0xB258302C3f209491d604165549079680708581Cc';
+        // Run one by one
+        await testLpTokens.reduce(
+            async (promiseChain, token) => promiseChain.then(async () => {
+                console.log('add', token.name);
+                await lpMining.add('10', token.address, token.poolType, true, true);
+                console.log('done', token.name);
+            }),
+            Promise.resolve(),
+        );
 
         await lpMining.transferOwnership(admin);
         await reservoir.transferOwnership(admin);

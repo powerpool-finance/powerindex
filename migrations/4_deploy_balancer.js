@@ -2,16 +2,15 @@ const BFactory = artifacts.require("BFactory");
 const ExchangeProxy = artifacts.require("ExchangeProxy");
 const BActions = artifacts.require("BActions");
 const WETH = artifacts.require("WETH");
-const {web3} = WETH;
-const {toBN} = web3.utils;
+const getUserspace = require('./1_userspace');
 
-module.exports = function(deployer, network) {
-    if(network === 'test' || network === 'mainnet') {
-        return;
-    }
+module.exports = function(deployer, network, accounts) {
     deployer.then(async () => {
+        const userNs = process["__user__"] || getUserspace(deployer, network, accounts);
+        if ( userNs.isTestnet || userNs.isMainnet ) return;
+
         let wethAddress;
-        if(network === 'mainnet') {
+        if (userNs.isMainnet) {
             wethAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
         } else {
             const weth = await deployer.deploy(WETH);

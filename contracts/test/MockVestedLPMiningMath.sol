@@ -9,42 +9,34 @@ contract MockVestedLPMiningMath is VestedLPMining {
 
     uint256 private _mockLptBalance;
 
-    constructor(
-        IERC20 _cvp,
-        address _reservoir,
-        uint256 _cvpPerBlock,
-        uint256 _startBlock,
-        uint256 _cvpVestingPeriodInBlocks
-    ) public
-    VestedLPMining(_cvp, _reservoir, _cvpPerBlock, _startBlock, _cvpVestingPeriodInBlocks)
-    {
-    }
-
     function _setMockParams(uint256 mockLptBalance, uint256 mockTotalAllocPoint) external
     {
-        // Assigning CVP mock "balance" (hacking Checkpoints::balanceOf)
-        balances[address(this)] = uint96(mockLptBalance);
-        // .. and moc "totalAllocPoint" (hacking VestedLPMining::mockTotalAllocPoint)
+        _mockLptBalance = uint96(mockLptBalance);
+        // hacking VestedLPMining::mockTotalAllocPoint
         totalAllocPoint = mockTotalAllocPoint;
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        require(account == address(this), "MockVestedLPMiningMath::balanceOf");
+        return _mockLptBalance;
     }
 
     event _UpdatedUser(
         uint256 newlyEntitled,
         uint256 newlyVested,
         uint256 cvpAdjust,
-        uint256 entitledCvp,
-        uint256 vestedCvp,
+        uint256 pendedCvp,
         uint32 vestingBlock,
         uint32 lastUpdateBlock
     );
 
-    function _computeCvpVesting(User calldata _user, uint256 _accCvpPerLpt) external returns (uint256 newlyEntitled, uint256 newlyVested)
+    function __computeCvpVesting(User calldata _user, uint256 _accCvpPerLpt) external returns (uint256 newlyEntitled, uint256 newlyVested)
     {
         User memory u = _user;
 
-        (newlyEntitled, newlyVested) = super.computeCvpVesting(u, _accCvpPerLpt);
+        (newlyEntitled, newlyVested) = super._computeCvpVesting(u, _accCvpPerLpt);
 
-        emit _UpdatedUser(newlyEntitled, newlyVested, u.cvpAdjust, u.entitledCvp, u.vestedCvp, u.vestingBlock, u.lastUpdateBlock);
+        emit _UpdatedUser(newlyEntitled, newlyVested, u.cvpAdjust, u.pendedCvp, u.vestingBlock, u.lastUpdateBlock);
         return (newlyEntitled, newlyVested);
     }
 
@@ -52,7 +44,7 @@ contract MockVestedLPMiningMath is VestedLPMining {
         uint32 lastUpdateBlock, uint256 accCvpPerLpt, uint256 cvpReward
     );
 
-    function _computePoolReward(
+    function __computePoolReward(
         uint32 _allocPoint,
         uint32 _lastUpdateBlock,
         uint256 _accCvpPerLpt
@@ -65,7 +57,7 @@ contract MockVestedLPMiningMath is VestedLPMining {
             IERC20(address(this)), true, 0x01, _allocPoint, _lastUpdateBlock, _accCvpPerLpt
         );
 
-        cvpReward = super.computePoolReward(p);
+        cvpReward = super._computePoolReward(p);
 
         emit _UpdatedPool(p.lastUpdateBlock, p.accCvpPerLpt, cvpReward);
         return (p.lastUpdateBlock, p.accCvpPerLpt, cvpReward);

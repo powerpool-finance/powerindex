@@ -1,3 +1,4 @@
+/* global artifacts, web3 */
 const MockERC20 = artifacts.require("MockERC20");
 const BFactory = artifacts.require("BFactory");
 const BActions = artifacts.require("BActions");
@@ -6,25 +7,26 @@ const ExchangeProxy = artifacts.require("ExchangeProxy");
 const PoolRestrictions = artifacts.require("PoolRestrictions");
 const BPool = artifacts.require("BPool");
 const PermanentVotingPowerV1 = artifacts.require("PermanentVotingPowerV1");
+const getUserspace = require('./1_userspace');
 
 WETH.numberFormat = 'String';
 
 const {web3} = MockERC20;
-const {toBN, toWei} = web3.utils;
+const {toWei} = web3.utils;
 
 module.exports = function(deployer, network, accounts) {
-    if(network === 'test' || network !== 'mainnet') {
-        return;
-    }
-
     deployer.then(async () => {
+        const userNs = process["__user__"] || getUserspace(deployer, network, accounts);
+        if ( userNs.isTestnet || !userNs.isMainnet ) return;
+
+        const { admin } = userNs.addresses;
+        if (!web3.utils.isAddress(admin)) throw new Error('Invalid admin address');
+
         const bFactory = await deployer.deploy(BFactory);
         const bActions = await deployer.deploy(BActions);
         await deployer.deploy(ExchangeProxy, '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2');
         const poolRestrictions = await deployer.deploy(PoolRestrictions);
         const pvpV1 = await deployer.deploy(PermanentVotingPowerV1);
-
-        const admin = '0xB258302C3f209491d604165549079680708581Cc';
 
         const poolConfigs = [{
             name: 'Power Index Pool Token',
@@ -47,35 +49,48 @@ module.exports = function(deployer, network, accounts) {
             communityFeeReceiver: pvpV1.address
         }];
 
-        for(let i = 0; i < poolConfigs.length; i++) {
-            const poolConfig = poolConfigs[i];
+        // Run one by one
+        await poolConfigs.reduce(
+            async (promiseChain, poolConfig) => promiseChain.then(async () => {
 
-            const balances = [];
-            for(let i = 0; i < poolConfig.tokens.length; i++) {
-                const token = await MockERC20.at(poolConfig.tokens[i]);
-                balances[i] = (await token.balanceOf(accounts[0])).toString(10);
-                await token.approve(bActions.address, balances[i]);
-            }
+                const balances = [];
+                let index = 0;
+                // Again, one by one
+                await poolConfig.tokens.reduce(
+                    async (innerChain, tokenAddr) => innerChain.then(async () => {
+                        const token = await MockERC20.at(tokenAddr);
+                        balances[index] = (await token.balanceOf(accounts[0])).toString(10);
+                        await token.approve(bActions.address, balances[index++]);
+                    }),
+                    Promise.resolve(),
+                );
 
-            const res = await bActions.create(
-                bFactory.address,
-                poolConfig.name,
-                poolConfig.symbol,
-                poolConfig.tokens,
-                balances,
-                poolConfig.denorms.map(d => ether(d)),
-                [ether(poolConfig.swapFee), ether(poolConfig.communitySwapFee), ether(poolConfig.communityJoinFee), ether(poolConfig.communityExitFee)],
-                poolConfig.communityFeeReceiver,
-                true
-            );
-            const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
-            const pool = await BPool.at(logNewPool.args.pool);
-            console.log('pool.address', pool.address);
-            await pool.setRestrictions(poolRestrictions.address);
-            await poolRestrictions.setTotalRestrictions([pool.address], [ether(20000)]);
+                const res = await bActions.create(
+                    bFactory.address,
+                    poolConfig.name,
+                    poolConfig.symbol,
+                    poolConfig.tokens,
+                    balances,
+                    poolConfig.denorms.map(d => ether(d)),
+                    [
+                        ether(poolConfig.swapFee),
+                        ether(poolConfig.communitySwapFee),
+                        ether(poolConfig.communityJoinFee),
+                        ether(poolConfig.communityExitFee),
+                    ],
+                    poolConfig.communityFeeReceiver,
+                    true
+                );
+                const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
+                const pool = await BPool.at(logNewPool.args.pool);
+                console.log('pool.address', pool.address);
+                await pool.setRestrictions(poolRestrictions.address);
+                await poolRestrictions.setTotalRestrictions([pool.address], [ether(20000)]);
 
-            await pool.setController(admin);
-        }
+                await pool.setController(admin);
+            }),
+            Promise.resolve(),
+        );
 
         await pvpV1.transferOwnership(admin);
         await poolRestrictions.transferOwnership(admin);
