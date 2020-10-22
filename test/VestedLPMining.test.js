@@ -2,12 +2,29 @@
 const { expectRevert, time } = require('@openzeppelin/test-helpers');
 const { createSnapshot, revertToSnapshot } = require('./helpers/blockchain');
 const CvpToken = artifacts.require('MockCvp');
+const LPMining = artifacts.require('LPMining');
 const VestedLPMining = artifacts.require('VestedLPMining');
 const MockERC20 = artifacts.require('MockERC20');
 const Reservoir = artifacts.require('Reservoir');
 
+LPMining.numberFormat = 'String';
+MockERC20.numberFormat = 'String';
+
 const {web3} = Reservoir;
 const {toBN} = web3.utils;
+
+function subBN(bn1, bn2) {
+    return toBN(bn1.toString(10)).sub(toBN(bn2.toString(10))).toString(10);
+}
+function addBN(bn1, bn2) {
+    return toBN(bn1.toString(10)).add(toBN(bn2.toString(10))).toString(10);
+}
+function mulBN(bn1, bn2) {
+    return toBN(bn1.toString(10)).mul(toBN(bn2.toString(10))).toString(10);
+}
+function divBN(bn1, bn2) {
+    return toBN(bn1.toString(10)).div(toBN(bn2.toString(10))).toString(10);
+}
 
 describe('VestedLPMining', () => {
 
@@ -513,6 +530,113 @@ describe('VestedLPMining', () => {
             await time.advanceBlockTo(this.shiftBlock('929'));
             await this.lpMining.deposit(0, '0', { from: bob }); // block 930
             assert.equal(await this.allCvpOf(bob), '2900');
+        });
+    });
+
+    describe('Migration from LPMining to VestedLPMining', () => {
+
+        it('should allow set cvpPerBlock 0 and migrate to new LPMining', async () => {
+            const startBlock = await web3.eth.getBlockNumber();
+            const cvpPerBlock = '100';
+
+            this.oldLpMining = await LPMining.new(this.cvp.address, this.reservoir.address, cvpPerBlock, '0', {
+                from: minter
+            });
+            await this.reservoir.setApprove(
+                this.cvp.address,
+                this.oldLpMining.address,
+                this.reservoirInitialBalance,
+                {from: minter}
+            );
+
+            await this.oldLpMining.add('100', this.lp.address, '1', true, {from: minter});
+
+            await this.lp.approve(this.oldLpMining.address, '1000', {from: bob});
+            await this.oldLpMining.deposit('0', '100', {from: bob});
+
+            await time.advanceBlockTo(startBlock + 100);
+
+            let pendingCvp = await this.oldLpMining.pendingCvp('0', bob);
+            let res = await this.oldLpMining.deposit('0', '0', {from: bob});
+            const {args: firstCvpReward} = CvpToken.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'Transfer')[0];
+
+            const stage1Balance = (await this.cvp.balanceOf(bob)).toString();
+            assert.equal(addBN(pendingCvp, cvpPerBlock), firstCvpReward.value.toString());
+            assert.equal(stage1Balance.toString(), firstCvpReward.value.toString());
+
+            await time.advanceBlockTo(startBlock + 200);
+
+            const pendingCvpBeforeDisable = mulBN(cvpPerBlock, '100');
+
+            // End of old LpMining, start migrating...
+            const poolUserBeforeDisabling = await this.oldLpMining.userInfo('0', bob);
+
+            assert.equal((await this.cvp.balanceOf(this.oldLpMining.address)).toString(), '0');
+            const poolBeforePreparingPool = await this.oldLpMining.poolInfo('0');
+            await this.oldLpMining.updatePool('0');
+            assert.equal((await this.cvp.balanceOf(this.oldLpMining.address)).toString(), pendingCvpBeforeDisable);
+
+            const pendingCvpBeforeDisablePool = await this.oldLpMining.pendingCvp('0', bob);
+
+            const poolBeforeDisabling = await this.oldLpMining.poolInfo('0');
+            assert.equal((await this.cvp.balanceOf(this.oldLpMining.address)).toString(), pendingCvpBeforeDisable);
+            await this.oldLpMining.setCvpPerBlock('0', {from: minter});
+
+            assert.equal((await this.cvp.balanceOf(this.oldLpMining.address)).toString(), pendingCvpBeforeDisable);
+            await this.oldLpMining.updatePool('0');
+            assert.equal((await this.cvp.balanceOf(this.oldLpMining.address)).toString(), pendingCvpBeforeDisable);
+
+            const poolAfterDisabling = await this.oldLpMining.poolInfo('0');
+            assert.notEqual(poolBeforePreparingPool.accCvpPerShare, poolBeforeDisabling.accCvpPerShare);
+            assert.equal(poolAfterDisabling.accCvpPerShare, poolBeforeDisabling.accCvpPerShare);
+
+            await time.advanceBlockTo(startBlock + 300);
+
+            const pendingCvpAfterDisablePool = await this.oldLpMining.pendingCvp('0', bob);
+
+            assert.equal(
+                pendingCvpBeforeDisablePool.toString(),
+                pendingCvpAfterDisablePool.toString()
+            );
+
+            await time.advanceBlockTo(startBlock + 400);
+
+            const pendingCvpAfterDisablePoolAndSpentSomeBlocks = await this.oldLpMining.pendingCvp('0', bob);
+
+            assert.equal(pendingCvpBeforeDisable, pendingCvpAfterDisablePoolAndSpentSomeBlocks);
+
+            const poolUserBeforeClaiming = await this.oldLpMining.userInfo('0', bob);
+            assert.equal(poolUserBeforeClaiming.rewardDebt, poolUserBeforeDisabling.rewardDebt);
+
+            assert.equal((await this.cvp.balanceOf(bob)).toString(), stage1Balance);
+            await this.oldLpMining.deposit('0', '0', {from: bob});
+
+            assert.equal((await this.cvp.balanceOf(bob)).toString(), addBN(stage1Balance, pendingCvpBeforeDisable));
+
+            await time.advanceBlockTo(startBlock + 500);
+
+            pendingCvp = await this.oldLpMining.pendingCvp('0', bob);
+            assert.equal(pendingCvp.toString(10), '0');
+
+            await this.oldLpMining.updatePool('0');
+            assert.equal((await this.cvp.balanceOf(this.oldLpMining.address)).toString(), '0');
+            await time.advanceBlockTo(startBlock + 600);
+            const lpBalanceBeforeWithdraw = await this.lp.balanceOf(bob);
+            await this.oldLpMining.withdraw('0', '100', {from: bob});
+            assert.equal((await this.cvp.balanceOf(this.oldLpMining.address)).toString(), '0');
+            assert.equal(await this.lp.balanceOf(bob), addBN(lpBalanceBeforeWithdraw, '100'));
+
+            // 100 per block farming rate starting at block 100 with 1 block vesting period
+            this.lpMining = await VestedLPMining.new({from: minter});
+            await this.lpMining.initialize(
+                this.cvp.address, this.reservoir.address, '100', this.shiftBlock('100'), '100000', {from: minter}
+            );
+            await this.prepareReservoir();
+
+            await this.lpMining.add('100', this.lp.address, '1', true, {from: minter});
+            await this.lp.approve(this.lpMining.address, '1000', {from: bob});
+            await this.lpMining.deposit(0, '100', {from: bob});
+            assert.equal((await this.lp.balanceOf(bob)).toString(), '900');
         });
     });
 });
