@@ -6,8 +6,15 @@ usePlugin('solidity-coverage');
 usePlugin('buidler-contract-sizer');
 usePlugin('buidler-gas-reporter');
 require('./tasks/fetchPoolsData');
+require('./tasks/deployVestedLpMining');
 
 const fs = require('fs');
+const homeDir = require('os').homedir();
+const _ = require('lodash');
+
+function getKey(network) {
+    return _.trim('0x' + fs.readFileSync(homeDir + '/.ethereum/' + network, {encoding: 'utf8'}));
+}
 
 const ethers = require('ethers');
 const testAccounts = [];
@@ -41,7 +48,7 @@ const config = {
         },
         mainnet: {
             url: 'https://mainnet-eth.compound.finance',
-            // accounts: [fs.readSync("~/.ethereum/mainnet")],
+            accounts: [getKey("mainnet")],
             gasPrice: 30000000000
         },
         local: {
@@ -49,7 +56,7 @@ const config = {
         },
         kovan: {
             url: 'https://kovan-eth.compound.finance',
-            accounts: ['YOUR_PRIVATE_KEY_HERE']
+            accounts: [getKey("kovan")],
         },
         coverage: {
             url: 'http://127.0.0.1:8555',
