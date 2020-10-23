@@ -46,6 +46,9 @@ interface IVestedLPMining {
     /// @dev Consider updating pool before calling this function
     function setCvpPerBlock(uint256 _cvpPerBlock) external;
 
+    /// @notice Set CVP vesting period in blocks (only the owner may call)
+    function setCvpVestingPeriodInBlocks(uint256 _cvpVestingPeriodInBlocks) external;
+
     /// @notice Migrate LP token to another LP contract
     function migrate(uint256 _pid) external;
 
@@ -88,6 +91,7 @@ interface IVestedLPMining {
     event SetLpToken(address indexed lpToken, uint256 indexed pid, uint256 allocPoint);
     event SetMigrator(address indexed migrator);
     event SetCvpPerBlock(uint256 cvpPerBlock);
+    event SetCvpVestingPeriodInBlocks(uint256 cvpVestingPeriodInBlocks);
     event MigrateLpToken(address indexed oldLpToken, address indexed newLpToken, uint256 indexed pid);
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);

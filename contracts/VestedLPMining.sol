@@ -172,6 +172,16 @@ contract VestedLPMining is
     }
 
     /// @inheritdoc IVestedLPMining
+    function setCvpVestingPeriodInBlocks(uint256 _cvpVestingPeriodInBlocks) public override onlyOwner {
+        cvpVestingPeriodInBlocks = SafeMath32.fromUint(
+            _cvpVestingPeriodInBlocks,
+            "VLPMining: too big cvpVestingPeriodInBlocks"
+        );
+
+        emit SetCvpVestingPeriodInBlocks(_cvpVestingPeriodInBlocks);
+    }
+
+    /// @inheritdoc IVestedLPMining
     /// @dev Anyone may call, so we have to trust the migrator contract
     function migrate(uint256 _pid) public override nonReentrant {
         require(address(migrator) != address(0), "VLPMining: no migrator");
