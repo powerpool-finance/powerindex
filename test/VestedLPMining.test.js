@@ -539,10 +539,11 @@ describe('VestedLPMining', () => {
             );
 
             await expectRevert(
-                this.lpMining.setCvpPerBlock('200', { from: alice }),
+                this.lpMining.setCvpVestingPeriodInBlocks('200', { from: alice }),
                 'Ownable: caller is not the owner'
             );
-            await this.lpMining.setCvpPerBlock('200', { from: minter });
+            await this.lpMining.setCvpVestingPeriodInBlocks('200', { from: minter });
+            assert.equal(await this.lpMining.cvpVestingPeriodInBlocks(), '200');
         });
     });
 
