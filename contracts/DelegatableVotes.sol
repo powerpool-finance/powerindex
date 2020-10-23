@@ -28,7 +28,7 @@ abstract contract DelegatableVotes {
     /**
      * @notice Get the "delegatee" account for the message sender
      */
-    function delegatee() public returns (address) {
+    function delegatee() public view returns (address) {
         return book[msg.sender].delegatee;
     }
 

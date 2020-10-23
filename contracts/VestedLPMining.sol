@@ -6,7 +6,6 @@ import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/utils/EnumerableSet.sol";
 import "./interfaces/IVestedLPMining.sol";
 import "./lib/ReservedSlots.sol";
 import "./lib/SafeMath96.sol";
@@ -81,7 +80,7 @@ contract VestedLPMining is
     // The block number when CVP mining starts
     uint32 public startBlock;
     // The amount of CVP tokens rewarded to all pools every block
-    uint32 public cvpPerBlock;
+    uint96 public cvpPerBlock;
 
     /// @dev new slot
     // The migrator contract (only the owner may assign it)
@@ -166,7 +165,7 @@ contract VestedLPMining is
 
     /// @inheritdoc IVestedLPMining
     function setCvpPerBlock(uint256 _cvpPerBlock) public override onlyOwner {
-        cvpPerBlock = SafeMath32.fromUint(_cvpPerBlock, "VLPMining: too big cvpPerBlock");
+        cvpPerBlock = SafeMath96.fromUint(_cvpPerBlock, "VLPMining: too big cvpPerBlock");
 
         emit SetCvpPerBlock(_cvpPerBlock);
     }
@@ -263,7 +262,7 @@ contract VestedLPMining is
         _vestUserCvp(user, pool.accCvpPerLpt);
 
         if(_amount != 0) {
-            pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+            pool.lpToken.safeTransferFrom(msg.sender, address(this), _amount);
             user.lptAmount = user.lptAmount.add(_amount);
         }
         user.cvpAdjust = _computeCvpAdjustment(user.lptAmount, pool.accCvpPerLpt);
@@ -285,7 +284,7 @@ contract VestedLPMining is
 
         if(_amount != 0) {
             user.lptAmount = user.lptAmount.sub(_amount);
-            pool.lpToken.safeTransfer(address(msg.sender), _amount);
+            pool.lpToken.safeTransfer(msg.sender, _amount);
         }
         user.cvpAdjust = _computeCvpAdjustment(user.lptAmount, pool.accCvpPerLpt);
         emit Withdraw(msg.sender, _pid, _amount);
@@ -300,7 +299,7 @@ contract VestedLPMining is
         Pool storage pool = pools[_pid];
         User storage user = users[_pid][msg.sender];
 
-        pool.lpToken.safeTransfer(address(msg.sender), user.lptAmount);
+        pool.lpToken.safeTransfer(msg.sender, user.lptAmount);
         emit EmergencyWithdraw(msg.sender, _pid, user.lptAmount);
 
         if (user.pendedCvp > 0) {
