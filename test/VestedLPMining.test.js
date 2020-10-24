@@ -531,7 +531,22 @@ describe('VestedLPMining', () => {
             await this.lpMining.deposit(0, '0', { from: bob }); // block 930
             assert.equal(await this.allCvpOf(bob), '2900');
         });
+
+        it('cvpVestingPeriodInBlocks can be changed by owner', async () => {
+            this.lpMining = await VestedLPMining.new({ from: minter });
+            await this.lpMining.initialize(
+                this.cvp.address, this.reservoir.address, '100', this.shiftBlock('900'), '100', { from: minter }
+            );
+
+            await expectRevert(
+                this.lpMining.setCvpVestingPeriodInBlocks('200', { from: alice }),
+                'Ownable: caller is not the owner'
+            );
+            await this.lpMining.setCvpVestingPeriodInBlocks('200', { from: minter });
+            assert.equal(await this.lpMining.cvpVestingPeriodInBlocks(), '200');
+        });
     });
+
 
     describe('Migration from LPMining to VestedLPMining', () => {
 

@@ -10,10 +10,15 @@
     "test": "mocha --timeout 20000"
   },
   "dependencies": {
+    "@nomiclabs/buidler-ethers": "^2.0.2",
+    "@openzeppelin/buidler-upgrades": "^1.2.1",
     "@openzeppelin/contracts": "^3.1.0",
     "@openzeppelin/contracts-ethereum-package": "^3.0.0",
+    "@openzeppelin/truffle-upgrades": "^1.2.1",
     "@openzeppelin/upgrades": "^2.8.0",
+    "@truffle/hdwallet-provider": "^1.1.1",
     "ethers": "^5.0.18",
+    "p-iteration": "^1.1.8",
     "web3": "1.3.0"
   },
   "devDependencies": {

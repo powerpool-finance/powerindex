@@ -15,7 +15,7 @@ module.exports = (web3) => {
     const Admin = contract({ abi: ozAdmin.abi, bytecode: ozAdmin.bytecode });
     Admin.setProvider(web3.currentProvider);
 
-    const VestedLpMiningProxy = async (logicAddr, adminAddr, argsArray, txOptions = { gas: '500000'}) =>
+    const VestedLpMiningProxy = async (logicAddr, adminAddr, argsArray, txOptions = { gas: '5000000'}) =>
         await Proxy.new(
             logicAddr,
             adminAddr,
