@@ -49,7 +49,8 @@ const config = {
         mainnet: {
             url: 'https://mainnet-eth.compound.finance',
             accounts: [getKey("mainnet")],
-            gasPrice: 30000000000
+            gasPrice: 30000000000,
+            gasMultiplier: 2
         },
         local: {
             url: 'http://127.0.0.1:8545',
@@ -57,6 +58,8 @@ const config = {
         kovan: {
             url: 'https://kovan-eth.compound.finance',
             accounts: [getKey("kovan")],
+            gasPrice: 1000000000,
+            gasMultiplier: 2
         },
         coverage: {
             url: 'http://127.0.0.1:8555',
