@@ -31,7 +31,7 @@ const config = {
     },
     contractSizer: {
         alphaSort: false,
-        runOnCompile: false,
+        runOnCompile: true,
     },
     defaultNetwork: 'buidlerevm',
     gasReporter: {

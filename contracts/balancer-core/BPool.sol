@@ -66,14 +66,14 @@ contract BPool is BToken, BMath {
     }
 
     modifier _lock_() {
-        require(!_mutex, "REENTRY");
+        _checkReentry();
         _mutex = true;
         _;
         _mutex = false;
     }
 
     modifier _viewlock_() {
-        require(!_mutex, "REENTRY");
+        _checkReentry();
         _;
     }
 
@@ -94,7 +94,7 @@ contract BPool is BToken, BMath {
     bool private _finalized;
 
     address[] private _tokens;
-    mapping(address=>Record) private  _records;
+    mapping(address => Record) private _records;
     uint private _totalWeight;
 
     constructor(string memory name, string memory symbol) public {
@@ -149,7 +149,7 @@ contract BPool is BToken, BMath {
         _viewlock_
         returns (address[] memory tokens)
     {
-        require(_finalized, "NOT_FINALIZED");
+        _checkNotFinalized();
         return _tokens;
     }
 
@@ -229,7 +229,7 @@ contract BPool is BToken, BMath {
         _lock_
     {
         _checkController();
-        require(swapFee >= MIN_FEE && swapFee <= MAX_FEE, "FEE_BOUNDS");
+        _checkFeeInBounds(swapFee);
         _swapFee = swapFee;
     }
 
@@ -244,9 +244,9 @@ contract BPool is BToken, BMath {
         _lock_
     {
         _checkController();
-        require(communitySwapFee >= MIN_FEE && communitySwapFee <= MAX_FEE, "FEE_BOUNDS");
-        require(communityJoinFee >= MIN_FEE && communityJoinFee <= MAX_FEE, "FEE_BOUNDS");
-        require(communityExitFee >= MIN_FEE && communityExitFee <= MAX_FEE, "FEE_BOUNDS");
+        _checkFeeInBounds(communitySwapFee);
+        _checkFeeInBounds(communityJoinFee);
+        _checkFeeInBounds(communityExitFee);
         _communitySwapFee = communitySwapFee;
         _communityJoinFee = communityJoinFee;
         _communityExitFee = communityExitFee;
@@ -434,17 +434,17 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
-        require(_finalized, "NOT_FINALIZED");
+        _checkNotFinalized();
 
         uint poolTotal = totalSupply();
         uint ratio = bdiv(poolAmountOut, poolTotal);
-        require(ratio != 0, "MATH_APPROX");
+        _checkMathApprox(ratio);
 
         for (uint i = 0; i < _tokens.length; i++) {
             address t = _tokens[i];
             uint bal = _records[t].balance;
             uint tokenAmountIn = bmul(ratio, bal);
-            require(tokenAmountIn != 0, "MATH_APPROX");
+            _checkMathApprox(tokenAmountIn);
             require(tokenAmountIn <= maxAmountsIn[i], "LIMIT_IN");
             _records[t].balance = badd(_records[t].balance, tokenAmountIn);
             emit LOG_JOIN(msg.sender, t, tokenAmountIn);
@@ -467,7 +467,7 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
-        require(_finalized, "NOT_FINALIZED");
+        _checkNotFinalized();
 
         (uint poolAmountInAfterFee, uint poolAmountInFee) = calcAmountWithCommunityFee(
             poolAmountIn,
@@ -477,7 +477,7 @@ contract BPool is BToken, BMath {
 
         uint poolTotal = totalSupply();
         uint ratio = bdiv(poolAmountInAfterFee, poolTotal);
-        require(ratio != 0, "MATH_APPROX");
+        _checkMathApprox(ratio);
 
         _pullPoolShare(msg.sender, poolAmountIn);
         _pushPoolShare(_communityFeeReceiver, poolAmountInFee);
@@ -487,7 +487,7 @@ contract BPool is BToken, BMath {
             address t = _tokens[i];
             uint bal = _records[t].balance;
             uint tokenAmountOut = bmul(ratio, bal);
-            require(tokenAmountOut != 0, "MATH_APPROX");
+            _checkMathApprox(tokenAmountOut);
             require(tokenAmountOut >= minAmountsOut[i], "LIMIT_OUT");
             _records[t].balance = bsub(_records[t].balance, tokenAmountOut);
             emit LOG_EXIT(msg.sender, t, tokenAmountOut);
@@ -648,8 +648,8 @@ contract BPool is BToken, BMath {
         _lock_
         returns (uint poolAmountOut)
 
-    {        
-        require(_finalized, "NOT_FINALIZED");
+    {
+        _checkNotFinalized();
         _checkBound(tokenIn);
         require(tokenAmountIn <= bmul(_records[tokenIn].balance, MAX_IN_RATIO), "MAX_IN_RATIO");
 
@@ -690,7 +690,7 @@ contract BPool is BToken, BMath {
         _lock_
         returns (uint tokenAmountIn)
     {
-        require(_finalized, "NOT_FINALIZED");
+        _checkNotFinalized();
         _checkBound(tokenIn);
 
         Record storage inRecord = _records[tokenIn];
@@ -710,7 +710,7 @@ contract BPool is BToken, BMath {
                             _swapFee
                         );
 
-        require(tokenAmountIn != 0, "MATH_APPROX");
+        _checkMathApprox(tokenAmountIn);
         require(tokenAmountIn <= maxAmountIn, "LIMIT_IN");
 
         require(tokenAmountIn <= bmul(_records[tokenIn].balance, MAX_IN_RATIO), "MAX_IN_RATIO");
@@ -733,7 +733,7 @@ contract BPool is BToken, BMath {
         _lock_
         returns (uint tokenAmountOut)
     {
-        require(_finalized, "NOT_FINALIZED");
+        _checkNotFinalized();
         _checkBound(tokenOut);
 
         Record storage outRecord = _records[tokenOut];
@@ -775,7 +775,7 @@ contract BPool is BToken, BMath {
         _lock_
         returns (uint poolAmountIn)
     {
-        require(_finalized, "NOT_FINALIZED");
+        _checkNotFinalized();
         _checkBound(tokenOut);
         require(tokenAmountOut <= bmul(_records[tokenOut].balance, MAX_OUT_RATIO), "OUT_RATIO");
 
@@ -796,7 +796,7 @@ contract BPool is BToken, BMath {
                             _swapFee
                         );
 
-        require(poolAmountIn != 0, "MATH_APPROX");
+        _checkMathApprox(poolAmountIn);
         require(poolAmountIn <= maxPoolAmountIn, "LIMIT_IN");
 
         outRecord.balance = bsub(outRecord.balance, tokenAmountOut);
@@ -881,6 +881,30 @@ contract BPool is BToken, BMath {
         internal view
     {
         require(!_finalized, "IS_FINALIZED");
+    }
+
+    function _checkNotFinalized()
+        internal view
+    {
+        require(_finalized, "NOT_FINALIZED");
+    }
+
+    function _checkFeeInBounds(uint256 _fee)
+        internal view
+    {
+        require(_fee >= MIN_FEE && _fee <= MAX_FEE, "FEE_BOUNDS");
+    }
+
+    function _checkMathApprox(uint256 _value)
+        internal view
+    {
+        require(_value != 0, "MATH_APPROX");
+    }
+
+    function _checkReentry()
+        internal view
+    {
+        require(!_mutex, "REENTRY");
     }
 
     function calcAmountWithCommunityFee(
