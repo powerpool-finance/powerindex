@@ -82,6 +82,9 @@ contract BPool is BToken, BMath {
     address private _controller; // has CONTROL role
     bool private _publicSwap; // true if PUBLIC can call SWAP functions
 
+    address private _wrapper; // can join, exit and swaps when _wrapperMode is true
+    bool private _wrapperMode;
+
     IPoolRestrictions private _restrictions;
 
     // `setSwapFee` and `finalize` require CONTROL
@@ -215,6 +218,22 @@ contract BPool is BToken, BMath {
         return _controller;
     }
 
+    function getWrapper()
+        external view
+        _viewlock_
+        returns (address)
+    {
+        return _wrapper;
+    }
+
+    function getWrapperMode()
+        external view
+        _viewlock_
+        returns (bool)
+    {
+        return _wrapperMode;
+    }
+
     function getRestrictions()
         external view
         _viewlock_
@@ -281,6 +300,16 @@ contract BPool is BToken, BMath {
         _publicSwap = public_;
     }
 
+    function setWrapper(address wrapper, bool wrapperMode)
+        external
+        _logs_
+        _lock_
+    {
+        _checkController();
+        _wrapper = wrapper;
+        _wrapperMode = wrapperMode;
+    }
+
     function finalize()
         external
         _logs_
@@ -336,7 +365,6 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
-
         _checkController();
         _checkBound(token);
         _checkFinalized();
@@ -370,7 +398,6 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
-
         _checkController();
         _checkBound(token);
         _checkFinalized();
@@ -434,6 +461,7 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
+        _checkWrapper();
         _checkNotFinalized();
 
         uint poolTotal = totalSupply();
@@ -467,6 +495,7 @@ contract BPool is BToken, BMath {
         _logs_
         _lock_
     {
+        _checkWrapper();
         _checkNotFinalized();
 
         (uint poolAmountInAfterFee, uint poolAmountInFee) = calcAmountWithCommunityFee(
@@ -509,6 +538,7 @@ contract BPool is BToken, BMath {
         _lock_
         returns (uint tokenAmountOut, uint spotPriceAfter)
     {
+        _checkWrapper();
         _checkBound(tokenIn);
         _checkBound(tokenOut);
         require(_publicSwap, "NOT_PUBLIC");
@@ -581,6 +611,7 @@ contract BPool is BToken, BMath {
         _lock_ 
         returns (uint tokenAmountIn, uint spotPriceAfter)
     {
+        _checkWrapper();
         _checkBound(tokenIn);
         _checkBound(tokenOut);
         require(_publicSwap, "NOT_PUBLIC");
@@ -650,6 +681,7 @@ contract BPool is BToken, BMath {
 
     {
         _checkNotFinalized();
+        _checkWrapper();
         _checkBound(tokenIn);
         require(tokenAmountIn <= bmul(_records[tokenIn].balance, MAX_IN_RATIO), "MAX_IN_RATIO");
 
@@ -691,6 +723,7 @@ contract BPool is BToken, BMath {
         returns (uint tokenAmountIn)
     {
         _checkNotFinalized();
+        _checkWrapper();
         _checkBound(tokenIn);
 
         Record storage inRecord = _records[tokenIn];
@@ -734,6 +767,7 @@ contract BPool is BToken, BMath {
         returns (uint tokenAmountOut)
     {
         _checkNotFinalized();
+        _checkWrapper();
         _checkBound(tokenOut);
 
         Record storage outRecord = _records[tokenOut];
@@ -766,7 +800,7 @@ contract BPool is BToken, BMath {
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOutAfterFee);
         _pushUnderlying(tokenOut, _communityFeeReceiver, tokenAmountOutFee);
 
-        return tokenAmountOut;
+        return tokenAmountOutAfterFee;
     }
 
     function exitswapExternAmountOut(address tokenOut, uint tokenAmountOut, uint maxPoolAmountIn)
@@ -776,6 +810,7 @@ contract BPool is BToken, BMath {
         returns (uint poolAmountIn)
     {
         _checkNotFinalized();
+        _checkWrapper();
         _checkBound(tokenOut);
         require(tokenAmountOut <= bmul(_records[tokenOut].balance, MAX_OUT_RATIO), "OUT_RATIO");
 
@@ -905,6 +940,12 @@ contract BPool is BToken, BMath {
         internal view
     {
         require(!_mutex, "REENTRY");
+    }
+
+    function _checkWrapper()
+        internal view
+    {
+        require(!_wrapperMode || msg.sender == _wrapper, "ONLY_WRAPPER");
     }
 
     function calcAmountWithCommunityFee(
