@@ -9,4 +9,8 @@ interface YearnGovernanceInterface {
     function voteFor(uint id) external virtual;
 
     function voteAgainst(uint id) external virtual;
+
+    function balanceOf(address) external view virtual returns (uint);
+
+    function voteLock(address) external view virtual returns (uint);
 }

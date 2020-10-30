@@ -336,7 +336,7 @@ contract BPool is BToken, BMath {
 
         (bool success, bytes memory data) = voting.call{ value: value }(abi.encodePacked(signature, args));
         require(success, "NOT_SUCCESS");
-        emit LOG_CALL_VOTING(voting, success, signature, msg.data, data);
+        emit LOG_CALL_VOTING(voting, success, signature, args, data);
     }
 
     function bind(address token, uint balance, uint denorm)

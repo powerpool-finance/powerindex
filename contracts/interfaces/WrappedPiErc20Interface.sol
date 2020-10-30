@@ -11,4 +11,6 @@ interface WrappedPiErc20Interface {
     function approveToken(address _to, uint256 _amount) external virtual;
 
     function callVoting(address voting, bytes4 signature, bytes calldata args, uint value) external virtual;
+
+    function getWrappedBalance() external virtual returns(uint);
 }

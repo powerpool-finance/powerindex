@@ -1,11 +1,10 @@
 
 pragma solidity 0.6.12;
 
-import "./interfaces/BPoolInterface.sol";
+import "./interfaces/PiRouterInterface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@nomiclabs/buidler/console.sol";
 
 
 contract WrappedPiErc20 is ERC20 {
@@ -30,9 +29,13 @@ contract WrappedPiErc20 is ERC20 {
     function deposit(uint256 _amount) external {
         token.transferFrom(_msgSender(), address(this), _amount);
         _mint(_msgSender(), _amount);
+
+        PiRouterInterface(router).wrapperCallback(0);
     }
 
     function withdraw(uint256 _amount) external {
+        PiRouterInterface(router).wrapperCallback(_amount);
+
         ERC20(address(this)).transferFrom(_msgSender(), address(this), _amount);
         _burn(address(this), _amount);
         token.transfer(address(this), _amount);
@@ -50,6 +53,10 @@ contract WrappedPiErc20 is ERC20 {
     function callVoting(address voting, bytes4 signature, bytes calldata args, uint value) external onlyRouter {
         (bool success, bytes memory data) = voting.call{ value: value }(abi.encodePacked(signature, args));
         require(success, "NOT_SUCCESS");
-        emit CallVoting(voting, success, signature, msg.data, data);
+        emit CallVoting(voting, success, signature, args, data);
+    }
+
+    function getWrappedBalance() external view returns (uint256) {
+        return token.balanceOf(address(this));
     }
 }
