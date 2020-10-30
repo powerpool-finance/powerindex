@@ -27,4 +27,9 @@ abstract contract BPoolInterface {
 
     function getCurrentTokens() external view virtual returns (address[] memory tokens);
     function getFinalTokens() external view virtual returns (address[] memory tokens);
+
+    function getController() external view virtual returns (address);
+
+    function bind(address, uint, uint) external view virtual;
+    function unbind(address) external view virtual;
 }
