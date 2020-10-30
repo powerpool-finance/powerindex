@@ -9,6 +9,10 @@ abstract contract BPoolInterface {
     function exitPool(uint poolAmountIn, uint[] calldata minAmountsOut) external virtual;
     function swapExactAmountIn(address, uint, address, uint, uint) external virtual returns (uint, uint);
     function swapExactAmountOut(address, uint, address, uint, uint) external virtual returns (uint, uint);
+    function joinswapExternAmountIn(address, uint, uint) external virtual returns (uint);
+    function joinswapPoolAmountOut(address, uint, uint) external virtual returns (uint);
+    function exitswapPoolAmountIn(address, uint, uint) external virtual returns (uint);
+    function exitswapExternAmountOut(address, uint, uint) external virtual returns (uint);
     function calcInGivenOut(uint, uint, uint, uint, uint, uint) public pure virtual returns (uint);
     function getDenormalizedWeight(address) external view virtual returns (uint);
     function getBalance(address) external view virtual returns (uint);
@@ -22,4 +26,5 @@ abstract contract BPoolInterface {
     function getRestrictions() external view virtual returns (address);
 
     function getCurrentTokens() external view virtual returns (address[] memory tokens);
+    function getFinalTokens() external view virtual returns (address[] memory tokens);
 }
