@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 contract PiRouter is Ownable {
     using SafeMath for uint256;
 
-    bytes4 private constant STAKE_SIG = bytes4(keccak256(bytes('transfer(uint256)')));
+    bytes4 private constant STAKE_SIG = bytes4(keccak256(bytes('stake(uint256)')));
     bytes4 private constant WITHDRAW_SIG = bytes4(keccak256(bytes('withdraw(uint256)')));
     bytes4 private constant VOTE_FOR_SIG = bytes4(keccak256(bytes('voteFor(uint256)')));
     bytes4 private constant VOTE_AGAINST_SIG = bytes4(keccak256(bytes('voteAgainst(uint256)')));
