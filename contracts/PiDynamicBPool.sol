@@ -44,41 +44,41 @@ contract PiDynamicBPool is BPool {
     }
 
     function _getDenormWeight(address token)
-        internal view
+        internal view override
         returns (uint)
     {
-        DynamicWeight dynamicWeight = _dynamicWeights[token];
-        if (dynamicWeight.targetTimestamp >= block.time) {
+        DynamicWeight memory dynamicWeight = _dynamicWeights[token];
+        if (dynamicWeight.targetTimestamp >= block.timestamp) {
             return dynamicWeight.targetDenorm;
         }
-        if (dynamicWeight.fromTimestamp <= block.time) {
+        if (dynamicWeight.fromTimestamp <= block.timestamp) {
             return _records[token].denorm;
         }
         if (dynamicWeight.targetDenorm == _records[token].denorm) {
             return _records[token].denorm;
         }
 
-        uint256 deltaTime = dynamicWeight.targetTimestamp - dynamicWeight.fromTimestamp;
+        uint256 deltaTime = bsub(dynamicWeight.targetTimestamp, dynamicWeight.fromTimestamp);
         uint256 deltaWeight;
         if (dynamicWeight.targetDenorm > _records[token].denorm) {
-            deltaWeight = dynamicWeight.targetDenorm.sub(_records[token].denorm);
-            uint256 weightPerSecond = deltaWeight.div(deltaTime);
-            return _records[token].denorm.add(weightPerSecond.mul(deltaTime));
+            deltaWeight = bsub(dynamicWeight.targetDenorm, _records[token].denorm);
+            uint256 weightPerSecond = bdiv(deltaWeight, deltaTime);
+            return badd(_records[token].denorm, bmul(weightPerSecond, deltaTime));
         } else {
-            deltaWeight = _records[token].denorm.sub(dynamicWeight.targetDenorm);
-            uint256 weightPerSecond = deltaWeight.div(deltaTime);
-            return _records[token].denorm.sub(weightPerSecond.mul(deltaTime));
+            deltaWeight = bsub(_records[token].denorm, dynamicWeight.targetDenorm);
+            uint256 weightPerSecond = bdiv(deltaWeight, deltaTime);
+            return bsub(_records[token].denorm, bmul(weightPerSecond, deltaTime));
         }
     }
 
     function _getTotalWeight()
-        internal view
+        internal view override
         returns (uint)
     {
         uint256 sum = 0;
         uint256 len = _tokens.length;
         for(uint256 i = 0; i < len; i++) {
-            sum = sum.add(_getDenormWeight(_tokens[i]));
+            sum = badd(sum, _getDenormWeight(_tokens[i]));
         }
         return sum;
     }

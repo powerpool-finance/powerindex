@@ -340,7 +340,7 @@ contract BPool is BToken, BMath {
     }
 
     function bind(address token, uint balance, uint denorm)
-        external
+        public
         _logs_
         // _lock_  Bind does not lock because it jumps to `rebind`, which does
     {
@@ -949,14 +949,14 @@ contract BPool is BToken, BMath {
     }
 
     function _getDenormWeight(address token)
-        internal view
+        internal view virtual
         returns (uint)
     {
         return _records[token].denorm;
     }
 
     function _getTotalWeight()
-        internal view
+        internal view virtual
         returns (uint)
     {
         return _totalWeight;
