@@ -48,10 +48,10 @@ contract PiDynamicBPool is BPool {
         returns (uint)
     {
         DynamicWeight memory dynamicWeight = _dynamicWeights[token];
-        if (dynamicWeight.targetTimestamp >= block.timestamp) {
+        if (block.timestamp >= dynamicWeight.targetTimestamp) {
             return dynamicWeight.targetDenorm;
         }
-        if (dynamicWeight.fromTimestamp <= block.timestamp) {
+        if (dynamicWeight.fromTimestamp == 0 || block.timestamp <= dynamicWeight.fromTimestamp) {
             return _records[token].denorm;
         }
         if (dynamicWeight.targetDenorm == _records[token].denorm) {
