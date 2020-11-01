@@ -17,7 +17,12 @@ contract PiDynamicBPool is BPool {
 
     }
 
-    function setDynamicWeight(address token, uint targetDenorm, uint fromTimestamp, uint targetTimestamp)
+    function setDynamicWeight(
+        address token,
+        uint targetDenorm,
+        uint fromTimestamp,
+        uint targetTimestamp
+    )
         public
         _logs_
         _lock_
@@ -25,6 +30,8 @@ contract PiDynamicBPool is BPool {
         _checkController();
 
         require(targetTimestamp >= fromTimestamp, "FROM_TO_TARGET_DELTA");
+
+        _records[token].denorm = _getDenormWeight(token);
 
         _dynamicWeights[token] = DynamicWeight({
             fromTimestamp: fromTimestamp,
