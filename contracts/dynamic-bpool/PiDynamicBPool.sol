@@ -6,6 +6,16 @@ import "@nomiclabs/buidler/console.sol";
 
 contract PiDynamicBPool is BPool {
 
+    event SetDynamicWeight(
+        address indexed token,
+        uint fromDenorm,
+        uint targetDenorm,
+        uint fromTimestamp,
+        uint targetTimestamp
+    );
+
+    event SetMaxWeightPerSecond(uint maxWeightPerSecond);
+
     struct DynamicWeight {
         uint fromTimestamp;
         uint targetTimestamp;
@@ -14,8 +24,21 @@ contract PiDynamicBPool is BPool {
 
     mapping(address => DynamicWeight) private _dynamicWeights;
 
-    constructor(string memory name, string memory symbol) public BPool(name, symbol) {
+    uint256 private _maxWeightPerSecond;
 
+    constructor(string memory name, string memory symbol, uint maxWeightPerSecond) public BPool(name, symbol) {
+        _maxWeightPerSecond = maxWeightPerSecond;
+    }
+
+    function setDynamicWeight(uint maxWeightPerSecond)
+        public
+        _logs_
+        _lock_
+    {
+        _checkController();
+        _maxWeightPerSecond = maxWeightPerSecond;
+
+        emit SetMaxWeightPerSecond(maxWeightPerSecond);
     }
 
     function setDynamicWeight(
@@ -28,19 +51,23 @@ contract PiDynamicBPool is BPool {
         _logs_
         _lock_
     {
-        // TODO: check weightPerSecond
         // TODO: check sum of all target weights
         _checkController();
 
         require(targetTimestamp >= fromTimestamp, "FROM_TO_TARGET_DELTA");
+        uint256 fromDenorm = _getDenormWeight(token);
+        uint256 weightPerSecond = _getWeightPerSecond(fromDenorm, targetDenorm, fromTimestamp, targetTimestamp);
+        require(weightPerSecond <= _maxWeightPerSecond, "MAX_WEIGHT_PER_SECOND");
 
-        _records[token].denorm = _getDenormWeight(token);
+        _records[token].denorm = fromDenorm;
 
         _dynamicWeights[token] = DynamicWeight({
             fromTimestamp: fromTimestamp,
             targetTimestamp: targetTimestamp,
             targetDenorm: targetDenorm
         });
+
+        emit SetDynamicWeight(token, _records[token].denorm, targetDenorm, fromTimestamp, targetTimestamp);
     }
 
     function bind(address token, uint balance, uint denorm, uint targetDenorm, uint fromTimestamp, uint targetTimestamp)
@@ -57,30 +84,36 @@ contract PiDynamicBPool is BPool {
         internal view override
         returns (uint)
     {
-        DynamicWeight storage dynamicWeight = _dynamicWeights[token];
-        if (
-            dynamicWeight.fromTimestamp == 0 ||
-            dynamicWeight.targetDenorm == _records[token].denorm ||
-            block.timestamp <= dynamicWeight.fromTimestamp
-        ) {
+        DynamicWeight storage dw = _dynamicWeights[token];
+        if (dw.fromTimestamp == 0 || dw.targetDenorm == _records[token].denorm || block.timestamp <= dw.fromTimestamp) {
             return _records[token].denorm;
         }
-        if (block.timestamp >= dynamicWeight.targetTimestamp) {
-            return dynamicWeight.targetDenorm;
+        if (block.timestamp >= dw.targetTimestamp) {
+            return dw.targetDenorm;
         }
 
-        uint256 deltaTargetTime = bsub(dynamicWeight.targetTimestamp, dynamicWeight.fromTimestamp);
-        uint256 deltaCurrentTime = bsub(block.timestamp, dynamicWeight.fromTimestamp);
-        uint256 deltaWeight;
-        if (dynamicWeight.targetDenorm > _records[token].denorm) {
-            deltaWeight = bsub(dynamicWeight.targetDenorm, _records[token].denorm);
-            uint256 weightPerSecond = bdiv(deltaWeight, deltaTargetTime);
-            return badd(_records[token].denorm, bmul(deltaCurrentTime, weightPerSecond));
+        uint256 weightPerSecond = _getWeightPerSecond(
+            _records[token].denorm,
+            dw.targetDenorm,
+            dw.fromTimestamp,
+            dw.targetTimestamp
+        );
+        uint256 deltaCurrentTime = bsub(block.timestamp, dw.fromTimestamp);
+        if (dw.targetDenorm > _records[token].denorm) {
+            return badd(_records[token].denorm, deltaCurrentTime * weightPerSecond);
         } else {
-            deltaWeight = bsub(_records[token].denorm, dynamicWeight.targetDenorm);
-            uint256 weightPerSecond = bdiv(deltaWeight, deltaTargetTime);
-            return bsub(_records[token].denorm, bmul(deltaCurrentTime, weightPerSecond));
+            return bsub(_records[token].denorm, deltaCurrentTime * weightPerSecond);
         }
+    }
+
+    function _getWeightPerSecond(
+        uint256 fromDenorm,
+        uint256 targetDenorm,
+        uint256 fromTimestamp,
+        uint256 targetTimestamp
+    ) internal view returns (uint) {
+        uint256 delta = targetDenorm > fromDenorm ? bsub(targetDenorm, fromDenorm) : bsub(fromDenorm, targetDenorm);
+        return delta / bsub(targetTimestamp, fromTimestamp);
     }
 
     function _getTotalWeight()
@@ -101,12 +134,7 @@ contract PiDynamicBPool is BPool {
         uint fromDenorm,
         uint targetDenorm
     ) {
-        DynamicWeight storage dynamicWeight = _dynamicWeights[token];
-        return (
-            dynamicWeight.fromTimestamp,
-            dynamicWeight.targetTimestamp,
-            _records[token].denorm,
-            dynamicWeight.targetDenorm
-        );
+        DynamicWeight storage dw = _dynamicWeights[token];
+        return (dw.fromTimestamp, dw.targetTimestamp, _records[token].denorm, dw.targetDenorm);
     }
 }

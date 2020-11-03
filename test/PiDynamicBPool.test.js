@@ -62,6 +62,7 @@ describe('PiDynamicBPool', () => {
     const communitySwapFee = ether('0.05');
     const communityJoinFee = ether('0.04');
     const communityExitFee = ether('0.07');
+    const maxWeightPerSecond = ether('0.1');
 
     let tokens;
     let pool;
@@ -92,6 +93,7 @@ describe('PiDynamicBPool', () => {
             this.bFactory.address,
             name,
             symbol,
+            maxWeightPerSecond,
             tokens.map((t, i) => ({
                 token: t,
                 balance: balances[i],

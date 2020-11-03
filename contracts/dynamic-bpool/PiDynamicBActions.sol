@@ -32,12 +32,13 @@ contract PiDynamicBActions {
         PiDynamicBFactoryInterface factory,
         string calldata name,
         string calldata symbol,
+        uint256 maxWeightPerSecond,
         TokenConfig[] calldata tokens,
         uint[4] calldata fees,
         address communityFeeReceiver,
         bool finalize
     ) external returns (PiDynamicBPoolInterface pool) {
-        pool = factory.newBPool(name, symbol);
+        pool = factory.newBPool(name, symbol, maxWeightPerSecond);
         pool.setSwapFee(fees[0]);
         pool.setCommunityFeeAndReceiver(fees[1], fees[2], fees[3], communityFeeReceiver);
 
