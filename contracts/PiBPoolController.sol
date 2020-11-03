@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@nomiclabs/buidler/console.sol";
 
 
 contract PiBPoolController is Ownable {
@@ -21,7 +20,7 @@ contract PiBPoolController is Ownable {
         bpool = BPoolInterface(_bpool);
     }
 
-    function replacePoolTokenByWrapped(
+    function replacePoolTokenWithWrapped(
         address _token,
         address _router,
         string calldata _name,
@@ -43,7 +42,7 @@ contract PiBPoolController is Ownable {
         bpool.bind(address(wrappedToken), balance, denormalizedWeight);
     }
 
-    function replacePoolTokenByNewVersion(
+    function replacePoolTokenWithNewVersion(
         address _oldToken,
         address _newToken,
         address _migrator,
@@ -60,6 +59,11 @@ contract PiBPoolController is Ownable {
         IERC20(_oldToken).approve(_migrator, balance);
         (bool success, bytes memory data) = _migrator.call(_migratorData);
         require(success, "NOT_SUCCESS");
+
+        require(
+            IERC20(_newToken).balanceOf(address(this)) >= balance,
+            "PiBPoolController:newVersion: insufficient newToken balance"
+        );
 
         IERC20(_newToken).approve(address(bpool), balance);
         bpool.bind(_newToken, balance, denormalizedWeight);
