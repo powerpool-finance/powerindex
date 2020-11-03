@@ -51,13 +51,22 @@ contract PiDynamicBPool is BPool {
         _logs_
         _lock_
     {
-        // TODO: check sum of all target weights
         _checkController();
 
-        require(targetTimestamp >= fromTimestamp, "FROM_TO_TARGET_DELTA");
+        require(targetTimestamp >= fromTimestamp, "TIMESTAMP_NEGATIVE_DELTA");
+        require(targetDenorm >= MIN_WEIGHT && targetDenorm <= MAX_WEIGHT, "TARGET_WEIGHT_BOUNDS");
+
         uint256 fromDenorm = _getDenormWeight(token);
         uint256 weightPerSecond = _getWeightPerSecond(fromDenorm, targetDenorm, fromTimestamp, targetTimestamp);
         require(weightPerSecond <= _maxWeightPerSecond, "MAX_WEIGHT_PER_SECOND");
+
+        uint256 denormSum = 0;
+        uint256 len = _tokens.length;
+        for (uint256 i = 0; i < len; i++) {
+            denormSum = badd(denormSum, _dynamicWeights[_tokens[i]].targetDenorm);
+        }
+
+        require(denormSum <= MAX_TOTAL_WEIGHT, "MAX_TARGET_TOTAL_WEIGHT");
 
         _records[token].denorm = fromDenorm;
 
@@ -122,7 +131,7 @@ contract PiDynamicBPool is BPool {
     {
         uint256 sum = 0;
         uint256 len = _tokens.length;
-        for(uint256 i = 0; i < len; i++) {
+        for (uint256 i = 0; i < len; i++) {
             sum = badd(sum, _getDenormWeight(_tokens[i]));
         }
         return sum;
