@@ -16,6 +16,7 @@ pragma solidity 0.6.12;
 import "./BToken.sol";
 import "./BMath.sol";
 import "../IPoolRestrictions.sol";
+import "@nomiclabs/buidler/console.sol";
 
 contract BPool is BToken, BMath {
 
@@ -571,6 +572,13 @@ contract BPool is BToken, BMath {
                             tokenAmountInAfterFee,
                             _swapFee
                         );
+//        console.log("inRecord.balance", inRecord.balance);
+//        console.log("_getDenormWeight(tokenIn)", _getDenormWeight(tokenIn));
+//        console.log("outRecord.balance", outRecord.balance);
+//        console.log("_getDenormWeight(tokenOut)", _getDenormWeight(tokenOut));
+//        console.log("tokenAmountInAfterFee", tokenAmountInAfterFee);
+//        console.log("_swapFee", _swapFee);
+//        console.log("tokenAmountOut", tokenAmountOut);
         require(tokenAmountOut >= minAmountOut, "LIMIT_OUT");
 
         inRecord.balance = badd(inRecord.balance, tokenAmountInAfterFee);
