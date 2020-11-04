@@ -27,11 +27,16 @@ contract PiDynamicPoolBFactory {
 
     constructor() public { }
 
-    function newBPool(string calldata name, string calldata symbol, uint256 maxWeightPerSecond)
+    function newBPool(
+        string calldata name,
+        string calldata symbol,
+        uint256 minWeightPerSecond,
+        uint256 maxWeightPerSecond
+    )
         external
         returns (PiDynamicBPool)
     {
-        PiDynamicBPool bpool = new PiDynamicBPool(name, symbol, maxWeightPerSecond);
+        PiDynamicBPool bpool = new PiDynamicBPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
         isBPool[address(bpool)] = true;
         emit LOG_NEW_POOL(msg.sender, address(bpool));
         bpool.setController(msg.sender);

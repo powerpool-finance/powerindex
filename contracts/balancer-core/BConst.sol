@@ -22,7 +22,7 @@ contract BConst {
     uint public constant MIN_FEE           = BONE / 10**6;
     uint public constant MAX_FEE           = BONE / 10;
 
-    uint public constant MIN_WEIGHT        = BONE;
+    uint public constant MIN_WEIGHT        = 1000000000;
     uint public constant MAX_WEIGHT        = BONE * 50;
     uint public constant MAX_TOTAL_WEIGHT  = BONE * 50;
     uint public constant MIN_BALANCE       = BONE / 10**12;

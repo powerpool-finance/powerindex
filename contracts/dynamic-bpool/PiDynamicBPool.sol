@@ -2,7 +2,6 @@
 pragma solidity 0.6.12;
 
 import "../balancer-core/BPool.sol";
-import "@nomiclabs/buidler/console.sol";
 
 contract PiDynamicBPool is BPool {
 
@@ -14,7 +13,7 @@ contract PiDynamicBPool is BPool {
         uint targetTimestamp
     );
 
-    event SetMaxWeightPerSecond(uint maxWeightPerSecond);
+    event SetWeightPerSecondBounds(uint minWeightPerSecond, uint maxWeightPerSecond);
 
     struct DynamicWeight {
         uint fromTimestamp;
@@ -24,21 +23,27 @@ contract PiDynamicBPool is BPool {
 
     mapping(address => DynamicWeight) private _dynamicWeights;
 
+    uint256 private _minWeightPerSecond;
     uint256 private _maxWeightPerSecond;
 
-    constructor(string memory name, string memory symbol, uint maxWeightPerSecond) public BPool(name, symbol) {
+    constructor(string memory name, string memory symbol, uint minWeightPerSecond, uint maxWeightPerSecond)
+        public
+        BPool(name, symbol)
+    {
+        _minWeightPerSecond = minWeightPerSecond;
         _maxWeightPerSecond = maxWeightPerSecond;
     }
 
-    function setDynamicWeight(uint maxWeightPerSecond)
+    function setWeightPerSecondBounds(uint minWeightPerSecond, uint maxWeightPerSecond)
         public
         _logs_
         _lock_
     {
         _checkController();
+        _minWeightPerSecond = minWeightPerSecond;
         _maxWeightPerSecond = maxWeightPerSecond;
 
-        emit SetMaxWeightPerSecond(maxWeightPerSecond);
+        emit SetWeightPerSecondBounds(minWeightPerSecond, maxWeightPerSecond);
     }
 
     function setDynamicWeight(
@@ -53,20 +58,14 @@ contract PiDynamicBPool is BPool {
     {
         _checkController();
 
+        require(fromTimestamp > block.timestamp, "CANT_SET_PAST_TIMESTAMP");
         require(targetTimestamp >= fromTimestamp, "TIMESTAMP_NEGATIVE_DELTA");
         require(targetDenorm >= MIN_WEIGHT && targetDenorm <= MAX_WEIGHT, "TARGET_WEIGHT_BOUNDS");
 
         uint256 fromDenorm = _getDenormWeight(token);
         uint256 weightPerSecond = _getWeightPerSecond(fromDenorm, targetDenorm, fromTimestamp, targetTimestamp);
         require(weightPerSecond <= _maxWeightPerSecond, "MAX_WEIGHT_PER_SECOND");
-
-        uint256 denormSum = 0;
-        uint256 len = _tokens.length;
-        for (uint256 i = 0; i < len; i++) {
-            denormSum = badd(denormSum, _dynamicWeights[_tokens[i]].targetDenorm);
-        }
-
-        require(denormSum <= MAX_TOTAL_WEIGHT, "MAX_TARGET_TOTAL_WEIGHT");
+        require(weightPerSecond >= _minWeightPerSecond, "MIN_WEIGHT_PER_SECOND");
 
         _records[token].denorm = fromDenorm;
 
@@ -76,15 +75,23 @@ contract PiDynamicBPool is BPool {
             targetDenorm: targetDenorm
         });
 
+        uint256 denormSum = 0;
+        uint256 len = _tokens.length;
+        for (uint256 i = 0; i < len; i++) {
+            denormSum = badd(denormSum, _dynamicWeights[_tokens[i]].targetDenorm);
+        }
+
+        require(denormSum <= MAX_TOTAL_WEIGHT, "MAX_TARGET_TOTAL_WEIGHT");
+
         emit SetDynamicWeight(token, _records[token].denorm, targetDenorm, fromTimestamp, targetTimestamp);
     }
 
-    function bind(address token, uint balance, uint denorm, uint targetDenorm, uint fromTimestamp, uint targetTimestamp)
+    function bind(address token, uint balance, uint targetDenorm, uint fromTimestamp, uint targetTimestamp)
         external
         _logs_
         // _lock_  Bind does not lock because it jumps to `rebind` and `setDynamicWeight`, which does
     {
-        super.bind(token, balance, denorm);
+        super.bind(token, balance, MIN_WEIGHT);
 
         setDynamicWeight(token, targetDenorm, fromTimestamp, targetTimestamp);
     }

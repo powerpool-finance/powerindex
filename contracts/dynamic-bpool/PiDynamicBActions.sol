@@ -22,7 +22,6 @@ contract PiDynamicBActions {
     struct TokenConfig {
         address token;
         uint256 balance;
-        uint256 fromDenorm;
         uint256 targetDenorm;
         uint256 fromTimestamp;
         uint256 targetTimestamp;
@@ -32,13 +31,14 @@ contract PiDynamicBActions {
         PiDynamicBFactoryInterface factory,
         string calldata name,
         string calldata symbol,
+        uint256 minWeightPerSecond,
         uint256 maxWeightPerSecond,
         TokenConfig[] calldata tokens,
         uint[4] calldata fees,
         address communityFeeReceiver,
         bool finalize
     ) external returns (PiDynamicBPoolInterface pool) {
-        pool = factory.newBPool(name, symbol, maxWeightPerSecond);
+        pool = factory.newBPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
         pool.setSwapFee(fees[0]);
         pool.setCommunityFeeAndReceiver(fees[1], fees[2], fees[3], communityFeeReceiver);
 
@@ -53,7 +53,6 @@ contract PiDynamicBActions {
             pool.bind(
                 tokenConfig.token,
                 tokenConfig.balance,
-                tokenConfig.fromDenorm,
                 tokenConfig.targetDenorm,
                 tokenConfig.fromTimestamp,
                 tokenConfig.targetTimestamp
