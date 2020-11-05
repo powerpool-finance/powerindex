@@ -23,10 +23,12 @@ contract WrappedPiErc20 is ERC20 {
 
     constructor(address _token, address _router, string memory _name, string memory _symbol) public ERC20(_name, _symbol) {
         token = IERC20(_token);
-        router = router;
+        router = _router;
     }
 
     function deposit(uint256 _amount) external {
+        require(_amount > 0, "WrappedPiErc20::deposit: Can't deposit 0");
+
         token.transferFrom(_msgSender(), address(this), _amount);
         _mint(_msgSender(), _amount);
 

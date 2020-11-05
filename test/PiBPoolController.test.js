@@ -1,4 +1,4 @@
-const { expectRevert, time, ether } = require('@openzeppelin/test-helpers');
+const { expectRevert, time, ether, expectEvent } = require('@openzeppelin/test-helpers');
 const BFactory = artifacts.require('BFactory');
 const BActions = artifacts.require('BActions');
 const BPool = artifacts.require('BPool');
@@ -9,10 +9,15 @@ const ExchangeProxy = artifacts.require('ExchangeProxy');
 const BPoolWrapper = artifacts.require('BPoolWrapper');
 const PiBPoolController = artifacts.require('PiBPoolController');
 const MockErc20Migrator = artifacts.require('MockErc20Migrator');
+const PiRouter = artifacts.require('PiRouter');
+const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 
 MockERC20.numberFormat = 'String';
 MockErc20Migrator.numberFormat = 'String';
 BPool.numberFormat = 'String';
+PiBPoolController.numberFormat = 'String';
+PiRouter.numberFormat = 'String';
+WrappedPiErc20.numberFormat = 'String';
 
 const {web3} = BFactory;
 const {toBN} = web3.utils;
@@ -83,8 +88,6 @@ describe('PiBPoolController', () => {
 
         poolWrapper = await BPoolWrapper.new(pool.address);
         controller = await PiBPoolController.new(pool.address);
-        console.log('!!!pool', pool.address);
-        console.log('!!!poolWrapper', poolWrapper.address);
 
         await pool.setWrapper(poolWrapper.address, true);
         await pool.setController(controller.address);
@@ -127,12 +130,19 @@ describe('PiBPoolController', () => {
         await this.token3.transfer(this.migrator.address, ether('1000000'));
         const migratorData = this.migrator.contract.methods.migrate(controller.address, amount).encodeABI();
 
-        await controller.replacePoolTokenWithNewVersion(
+        const res = await controller.replacePoolTokenWithNewVersion(
             this.token2.address,
             this.token3.address,
             this.migrator.address,
             migratorData
         );
+        expectEvent(res, 'ReplacePoolTokenWithNewVersion', {
+            oldToken: this.token2.address,
+            newToken: this.token3.address,
+            migrator: this.migrator.address,
+            balance: ether('20'),
+            denormalizedWeight: ether('25'),
+        });
 
         const price = (await pool.calcSpotPrice(
             addBN(balances[0], amountToSwap),
@@ -175,6 +185,70 @@ describe('PiBPoolController', () => {
         assert.equal(
             (await this.token3.balanceOf(alice)).toString(),
             addBN(token3AliceBalanceBefore, expectedSwapOut).toString()
+        );
+    });
+
+    it('should allow swapping a token with a new wrapped version', async () => {
+        const router = await PiRouter.new();
+
+        let res = await controller.replacePoolTokenWithWrapped(
+            this.token2.address,
+            router.address,
+            'WrappedTKN2',
+            'WTKN2'
+        );
+        const wToken2 = await WrappedPiErc20.at(res.logs[0].args.wrappedToken);
+        expectEvent(res, 'ReplacePoolTokenWithWrapped', {
+            existingToken: this.token2.address,
+            wrappedToken: wToken2.address,
+            router: router.address,
+            balance: ether('20'),
+            denormalizedWeight: ether('25'),
+            name: 'WrappedTKN2',
+            symbol: 'WTKN2',
+        });
+
+        const price = (await pool.calcSpotPrice(
+            addBN(balances[0], amountToSwap),
+            weights[0],
+            subBN(balances[1], expectedSwapOut),
+            weights[1],
+            swapFee
+        )).toString(10);
+
+        assert.equal((await this.token1.balanceOf(alice)).toString(), amountToSwap.toString());
+        const token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
+        const token2AliceBalanceBefore = (await wToken2.balanceOf(alice)).toString();
+
+        await this.token1.approve(poolWrapper.address, amountToSwap, {from: alice});
+        // TODO: A wrong message due probably the Buidler EVM bug
+        // await expectRevert(poolWrapper.swapExactAmountIn(
+        //     this.token1.address,
+        //     amountToSwap,
+        //     this.token2.address,
+        //     expectedSwapOut,
+        //     mulScalarBN(price, ether('1.05')),
+        //     {from: alice}
+        // ), 'NOT_BOUND');
+
+        await poolWrapper.swapExactAmountIn(
+            this.token1.address,
+            amountToSwap,
+            wToken2.address,
+            expectedSwapOut,
+            mulScalarBN(price, ether('1.05')),
+            {from: alice}
+        );
+
+        assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
+        assert.equal(
+            (await this.token1.balanceOf(pool.address)).toString(),
+            addBN(token1PoolBalanceBefore, amountAfterCommunitySwapFee)
+        );
+
+        assert.equal(
+            (await wToken2.balanceOf(alice)).toString(),
+            addBN(token2AliceBalanceBefore, expectedSwapOut).toString()
         );
     })
 });

@@ -12,6 +12,24 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract PiBPoolController is Ownable {
     using SafeMath for uint256;
 
+    event ReplacePoolTokenWithWrapped(
+        address indexed existingToken,
+        address indexed wrappedToken,
+        address indexed router,
+        uint256 balance,
+        uint256 denormalizedWeight,
+        string name,
+        string symbol
+    );
+
+    event ReplacePoolTokenWithNewVersion(
+        address indexed oldToken,
+        address indexed newToken,
+        address indexed migrator,
+        uint256 balance,
+        uint256 denormalizedWeight
+    );
+
     BPoolInterface public immutable bpool;
 
     event CallPool(bool indexed success, bytes4 indexed inputSig, bytes inputData, bytes outputData);
@@ -40,6 +58,8 @@ contract PiBPoolController is Ownable {
 
         wrappedToken.approve(address(bpool), balance);
         bpool.bind(address(wrappedToken), balance, denormalizedWeight);
+
+        emit ReplacePoolTokenWithWrapped(_token, address(wrappedToken), _router, balance, denormalizedWeight, _name, _symbol);
     }
 
     function replacePoolTokenWithNewVersion(
@@ -67,6 +87,8 @@ contract PiBPoolController is Ownable {
 
         IERC20(_newToken).approve(address(bpool), balance);
         bpool.bind(_newToken, balance, denormalizedWeight);
+
+        emit ReplacePoolTokenWithNewVersion(_oldToken, _newToken, _migrator, balance, denormalizedWeight);
     }
 
     function callPool(bytes4 signature, bytes calldata args, uint value) external onlyOwner {
