@@ -301,6 +301,8 @@ describe.only('PiDynamicBPool', () => {
             await expectRevert(pool.setDynamicWeight(tokens[0], ether('40'), '1', '2', { from: minter }), 'CANT_SET_PAST_TIMESTAMP');
             //TODO: figure out why MAX_WEIGHT_PER_SECOND require message not working in buidler
             await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('40'), fromTimestamps[0], addBN(fromTimestamps[0], '100'), { from: minter }));
+            //TODO: figure out why MIN_WEIGHT_PER_SECOND require message not working in buidler
+            await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], addBN(fromWeights[0], '10'), fromTimestamps[0], targetTimestamps[0], { from: minter }));
             //TODO: figure out why TIMESTAMP_NEGATIVE_DELTA require message not working in buidler
             await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('40'), targetTimestamps[0], fromTimestamps[0], { from: minter }));
             await expectRevert(pool.setDynamicWeight(tokens[0], ether('51'), fromTimestamps[0], targetTimestamps[0], { from: minter }), 'TARGET_WEIGHT_BOUNDS');
@@ -631,5 +633,4 @@ describe.only('PiDynamicBPool', () => {
         });
     });
     // TODO: test weight to 0
-    // TODO: minWeightPerSecond
 });

@@ -5,6 +5,7 @@ import "../balancer-core/BPool.sol";
 
 contract PiDynamicBPool is BPool {
 
+    /// @notice The event emitted when a dynamic weight set to token
     event SetDynamicWeight(
         address indexed token,
         uint fromDenorm,
@@ -13,6 +14,7 @@ contract PiDynamicBPool is BPool {
         uint targetTimestamp
     );
 
+    /// @notice The event emitted when weight per second bounds set
     event SetWeightPerSecondBounds(uint minWeightPerSecond, uint maxWeightPerSecond);
 
     struct DynamicWeight {
@@ -21,9 +23,12 @@ contract PiDynamicBPool is BPool {
         uint targetDenorm;
     }
 
+    /// @notice Mapping for storing dynamic weights settings. fromDenorm stored in _records mapping as denorm variable
     mapping(address => DynamicWeight) private _dynamicWeights;
 
+    /// @notice Min weight per second limit
     uint256 private _minWeightPerSecond;
+    /// @notice Max weight per second limit
     uint256 private _maxWeightPerSecond;
 
     constructor(string memory name, string memory symbol, uint minWeightPerSecond, uint maxWeightPerSecond)
@@ -34,6 +39,13 @@ contract PiDynamicBPool is BPool {
         _maxWeightPerSecond = maxWeightPerSecond;
     }
 
+    /*** Controller Interface ***/
+
+    /**
+    * @notice Set weight per second bounds by controller
+    * @param minWeightPerSecond Min weight per second
+    * @param maxWeightPerSecond Max weight per second
+    */
     function setWeightPerSecondBounds(uint minWeightPerSecond, uint maxWeightPerSecond)
         public
         _logs_
@@ -46,6 +58,13 @@ contract PiDynamicBPool is BPool {
         emit SetWeightPerSecondBounds(minWeightPerSecond, maxWeightPerSecond);
     }
 
+    /**
+    * @notice Set dynamic weight for token by controller
+    * @param token Token for change settings
+    * @param targetDenorm Target weight. fromDenorm will be fetch by current value of _getDenormWeight
+    * @param fromTimestamp From timestamp of dynamic weight
+    * @param targetTimestamp Target timestamp of dynamic weight
+    */
     function setDynamicWeight(
         address token,
         uint targetDenorm,
@@ -86,6 +105,14 @@ contract PiDynamicBPool is BPool {
         emit SetDynamicWeight(token, _records[token].denorm, targetDenorm, fromTimestamp, targetTimestamp);
     }
 
+    /**
+    * @notice Bind and setDynamicWeight at the same time
+    * @param token Token for bind
+    * @param balance Initial balance
+    * @param targetDenorm Target weight
+    * @param fromTimestamp From timestamp of dynamic weight
+    * @param targetTimestamp Target timestamp of dynamic weight
+    */
     function bind(address token, uint balance, uint targetDenorm, uint fromTimestamp, uint targetTimestamp)
         external
         _logs_
@@ -95,6 +122,20 @@ contract PiDynamicBPool is BPool {
 
         setDynamicWeight(token, targetDenorm, fromTimestamp, targetTimestamp);
     }
+
+    /*** View Functions ***/
+
+    function getDynamicWeightSettings(address token) external view returns (
+        uint fromTimestamp,
+        uint targetTimestamp,
+        uint fromDenorm,
+        uint targetDenorm
+    ) {
+        DynamicWeight storage dw = _dynamicWeights[token];
+        return (dw.fromTimestamp, dw.targetTimestamp, _records[token].denorm, dw.targetDenorm);
+    }
+
+    /*** Internal Functions ***/
 
     function _getDenormWeight(address token)
         internal view override
@@ -142,15 +183,5 @@ contract PiDynamicBPool is BPool {
             sum = badd(sum, _getDenormWeight(_tokens[i]));
         }
         return sum;
-    }
-
-    function getDynamicWeightSettings(address token) external view returns (
-        uint fromTimestamp,
-        uint targetTimestamp,
-        uint fromDenorm,
-        uint targetDenorm
-    ) {
-        DynamicWeight storage dw = _dynamicWeights[token];
-        return (dw.fromTimestamp, dw.targetTimestamp, _records[token].denorm, dw.targetDenorm);
     }
 }
