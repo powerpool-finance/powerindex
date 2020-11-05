@@ -392,7 +392,8 @@ contract BPool is BToken, BMath {
     }
 
     function unbind(address token)
-        external
+        public
+        virtual
         _logs_
         _lock_
     {

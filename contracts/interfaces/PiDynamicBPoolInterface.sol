@@ -4,4 +4,18 @@ import "./BPoolInterface.sol";
 
 abstract contract PiDynamicBPoolInterface is BPoolInterface {
     function bind(address, uint, uint, uint, uint) external virtual;
+
+    function setDynamicWeight(
+        address token,
+        uint targetDenorm,
+        uint fromTimestamp,
+        uint targetTimestamp
+    ) external virtual;
+
+    function getDynamicWeightSettings(address token) external virtual view returns (
+        uint fromTimestamp,
+        uint targetTimestamp,
+        uint fromDenorm,
+        uint targetDenorm
+    );
 }

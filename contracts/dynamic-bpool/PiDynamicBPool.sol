@@ -123,6 +123,10 @@ contract PiDynamicBPool is BPool {
         setDynamicWeight(token, targetDenorm, fromTimestamp, targetTimestamp);
     }
 
+    function unbind(address token) public override {
+        _totalWeight = _getTotalWeight(); // for compatibility with original BPool unbind
+        super.unbind(token);
+    }
     /*** View Functions ***/
 
     function getDynamicWeightSettings(address token) external view returns (

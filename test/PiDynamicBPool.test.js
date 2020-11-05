@@ -8,7 +8,7 @@ const MockVoting = artifacts.require('MockVoting');
 const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
-const PoolRestrictions = artifacts.require('PoolRestrictions');
+const PiDynamicBPoolController = artifacts.require('PiDynamicBPoolController');
 
 const _ = require('lodash');
 const pIteration = require('p-iteration');
@@ -37,7 +37,7 @@ function isBNHigher(bn1, bn2) {
     return toBN(bn1.toString(10)).gt(toBN(bn2.toString(10)));
 }
 
-function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
+function assertEqualWithAccuracy(bn1, bn2, accuracyWei = '30', message = '') {
     bn1 = toBN(bn1.toString(10));
     bn2 = toBN(bn2.toString(10));
     const bn1GreaterThenBn2 = bn1.gt(bn2);
@@ -50,7 +50,7 @@ async function getTimestamp(shift = 0) {
     return currentTimestamp + shift;
 }
 
-describe('PiDynamicBPool', () => {
+describe.only('PiDynamicBPool', () => {
     const name = 'My Pool';
     const symbol = 'MP';
     const balances = [ether('100'), ether('200')].map(w => w.toString());
@@ -184,7 +184,11 @@ describe('PiDynamicBPool', () => {
         this.exitswapExternAmountOut = async(_token, _amountOut) => {
             let poolAmountIn = await this.calcPoolInGivenSingleOut(_token.address, _amountOut);
 
-            await pool.transfer(alice, poolAmountIn);
+            console.log('exitswapExternAmountOut', web3.utils.fromWei(poolAmountIn, 'ether'), '=>', web3.utils.fromWei(_amountOut));
+
+            if(isBNHigher(poolAmountIn, await pool.balanceOf(alice))) {
+                await pool.transfer(alice, poolAmountIn);
+            }
             await pool.approve(pool.address, poolAmountIn, {from: alice});
             await pool.exitswapExternAmountOut(_token.address, _amountOut, poolAmountIn, {from: alice});
         };
@@ -331,8 +335,8 @@ describe('PiDynamicBPool', () => {
             it(`should correctly swap by multihopBatchSwapExactIn after ${sec} seconds pass`, async () => {
                 await time.increase(sec);
 
-                await assertEqualWithAccuracy(await getDenormWeight(tokens[0]), await pool.getDenormalizedWeight(tokens[0]), "Amount to swap restored to values before changing", ether('0.0000000001'));
-                await assertEqualWithAccuracy(await getDenormWeight(tokens[1]), await pool.getDenormalizedWeight(tokens[1]), "Amount to swap restored to values before changing", ether('0.0000000001'));
+                await assertEqualWithAccuracy(await getDenormWeight(tokens[0]), await pool.getDenormalizedWeight(tokens[0]), ether('0.0000000001'));
+                await assertEqualWithAccuracy(await getDenormWeight(tokens[1]), await pool.getDenormalizedWeight(tokens[1]), ether('0.0000000001'));
 
                 const etherWeights = await pIteration.map(tokens, async (t) => {
                     return web3.utils.fromWei(await pool.getDenormalizedWeight(t), 'ether');
@@ -400,7 +404,8 @@ describe('PiDynamicBPool', () => {
             await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
 
             const amountToSwapFixed = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
-            await assertEqualWithAccuracy(amountToSwapBefore, amountToSwapFixed, "Amount to swap restored to values before changing", ether('0.003'));        });
+            await assertEqualWithAccuracy(amountToSwapBefore, amountToSwapFixed, ether('0.003'));
+        });
 
         it('balances ratio should be restored by swapExactAmountIn', async () => {
             assert.equal(targetWeights[0], await pool.getDenormalizedWeight(tokens[0]));
@@ -412,7 +417,7 @@ describe('PiDynamicBPool', () => {
             await this.multihopBatchSwapExactIn(tokens[0], tokens[1], divScalarBN(token1BalanceNeedInWithFee, ether('4')));
 
             const amountToSwapFixed = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
-            await assertEqualWithAccuracy(amountToSwapBefore, amountToSwapFixed, "Amount to swap restored to values before changing", ether('0.003'));
+            await assertEqualWithAccuracy(amountToSwapBefore, amountToSwapFixed, ether('0.003'));
         });
     });
 
@@ -513,6 +518,7 @@ describe('PiDynamicBPool', () => {
             assert.equal(poolAmountOutAfterJoin, ether('0.000000002534253402'));
         });
 
+        //TODO: use accuracy in asserts for avoid buidler evm incorrect timestamps errors
         it('adding liquidity on 4 seconds spent after token adding', async () => {
             await time.increaseTo(fromTimestamp + 4);
             assert.equal(await pool.getDenormalizedWeight(this.token3.address),  ether('0.0022935789812844'));
@@ -631,6 +637,62 @@ describe('PiDynamicBPool', () => {
             const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
             assert.equal(poolAmountOutAfterJoin, ether('152.544804372061724031'));
         });
+
+        it.only('adding liquidity on 11000 seconds spent after token adding', async () => {
+            await time.increase(11000);
+            assert.equal(await pool.getDenormalizedWeight(this.token3.address), targetWeight);
+
+            const amountSwapOutBeforeJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutBeforeJoin, ether('93536.990954773869301382'));
+            const poolAmountOutBeforeJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, initialBalance);
+            assert.equal(poolAmountOutBeforeJoin, ether('258545.4312799397457545'));
+
+            await this.joinswapTo1Ether();
+
+            const amountSwapOutAfterJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutAfterJoin, ether('59.539396924809173113'));
+            const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
+            assert.equal(poolAmountOutAfterJoin, ether('152.544804372061724031'));
+
+            const controller = await PiDynamicBPoolController.new(pool.address);
+            await pool.setController(controller.address);
+            const fromTimestamp = await getTimestamp(100);
+            await controller.setDynamicWeightList([{
+                token: this.token3.address,
+                targetDenorm: await pool.MIN_WEIGHT(),
+                fromTimestamp: fromTimestamp,
+                targetTimestamp: await getTimestamp(11000),
+            }]);
+
+            assert.equal(await pool.getDenormalizedWeight(this.token3.address), targetWeight);
+
+            await expectRevert(controller.unbindNotActualToken(this.token3.address, {from: alice}), 'DENORM_MIN');
+
+            await time.increaseTo(fromTimestamp + 1004);
+
+            await this.exitswapExternAmountOut(this.token3, ether('1'));
+            await this.exitswapExternAmountOut(this.token3, ether('0.5'));
+            await this.exitswapExternAmountOut(this.token3, ether('0.5'));
+            await this.exitswapExternAmountOut(this.token3, ether('0.3'));
+            await this.exitswapExternAmountOut(this.token3, ether('0.2'));
+            await this.exitswapExternAmountOut(this.token3, ether('0.1'));
+            await this.exitswapExternAmountOut(this.token3, ether('0.05'));
+            await this.exitswapExternAmountOut(this.token3, ether('0.05'));
+
+            await expectRevert(controller.unbindNotActualToken(this.token3.address, {from: alice}), 'DENORM_MIN');
+
+            await time.increaseTo(fromTimestamp + 11004);
+
+            assert.equal(await pool.getDenormalizedWeight(this.token3.address), await pool.MIN_WEIGHT());
+            assert.equal(await pool.isBound(this.token3.address), true);
+            const tokenBalance = await pool.getBalance(this.token3.address);
+            const communityWalletBalanceBeforeUnbind = await this.token3.balanceOf(communityWallet);
+            await controller.unbindNotActualToken(this.token3.address, {from: alice});
+            assert.equal(await pool.isBound(this.token3.address), false);
+            assert.equal(await this.token3.balanceOf(communityWallet), addBN(
+                communityWalletBalanceBeforeUnbind,
+                tokenBalance
+            ))
+        });
     });
-    // TODO: test weight to 0
 });
