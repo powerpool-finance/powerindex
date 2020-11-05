@@ -42,7 +42,6 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
     bn2 = toBN(bn2.toString(10));
     const bn1GreaterThenBn2 = bn1.gt(bn2);
     let diff = bn1GreaterThenBn2 ? bn1.sub(bn2) : bn2.sub(bn1);
-    console.log('diff', diff.toString(), 'accuracyWei', accuracyWei.toString());
     assert.equal(diff.lte(toBN(accuracyWei)), true, message);
 }
 
@@ -157,11 +156,29 @@ describe.only('PiDynamicBPool', () => {
             const amountInFee = mulScalarBN(_amountIn, communitySwapFee);
             const amountInAfterFee = subBN(_amountIn, amountInFee);
             let poolAmountOut = await this.calcPoolOutGivenSingleIn(_token.address, amountInAfterFee);
-            console.log('joinswapExternAmountIn', web3.utils.fromWei(_amountIn, 'ether'), '=>', web3.utils.fromWei(poolAmountOut));
+            // console.log('joinswapExternAmountIn', web3.utils.fromWei(_amountIn, 'ether'), '=>', web3.utils.fromWei(poolAmountOut));
 
             await _token.transfer(alice, _amountIn);
             await _token.approve(pool.address, _amountIn, {from: alice});
             await pool.joinswapExternAmountIn(_token.address, _amountIn, poolAmountOut, {from: alice});
+        };
+
+        this.joinPool = async(tokens, _token1In) => {
+            const poolOutAmount = divScalarBN(
+                mulScalarBN(_token1In, await pool.totalSupply()),
+                await pool.getBalance(this.token1.address)
+            );
+            let ratio = divScalarBN(poolOutAmount, await pool.totalSupply());
+            const token1InAmount = mulScalarBN(mulScalarBN(ratio, await pool.getBalance(this.token1.address)), ether('1.001'));
+            const token2InAmount = mulScalarBN(mulScalarBN(ratio, await pool.getBalance(this.token2.address)),  ether('1.001'));
+            const poolOutAmountFee = mulScalarBN(poolOutAmount, communityJoinFee);
+
+            await this.token1.transfer(alice, token1InAmount);
+            await this.token1.approve(pool.address, token1InAmount, {from: alice});
+            await this.token2.transfer(alice, token2InAmount);
+            await this.token2.approve(pool.address, token2InAmount, {from: alice});
+
+            await pool.joinPool(poolOutAmount, [token1InAmount, token2InAmount], {from: alice});
         };
 
         this.exitswapExternAmountOut = async(_token, _amountOut) => {
@@ -180,7 +197,7 @@ describe.only('PiDynamicBPool', () => {
             (await MockERC20.at(_tokenFrom)).approve(this.bExchange.address, amountToSwap, {from: alice});
 
             const expectedSwapOut = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
-            console.log('expectedSwapOut', web3.utils.fromWei(expectedSwapOut, 'ether'));
+            // console.log('expectedSwapOut', web3.utils.fromWei(expectedSwapOut, 'ether'));
             const price = (await pool.calcSpotPrice(
                 addBN(await pool.getBalance(tokens[0]), amountToSwap),
                 await getDenormWeight(tokens[0], await getTimestamp(1)),
@@ -248,10 +265,8 @@ describe.only('PiDynamicBPool', () => {
             const dw = await pool.getDynamicWeightSettings(t);
             const balance = await pool.getBalance(t);
             tokenRatios[index] = divScalarBN(divScalarBN(dw.targetDenorm, totalTargetWeights), divScalarBN(dw.fromDenorm, totalFromWeights));
-            console.log('tokenRatio', web3.utils.fromWei(tokenRatios[index], 'ether'));
             tokenBalancesNeedIn[index] = mulScalarBN(balance, subBN(tokenRatios[index], ether('1')));
             tokenBalancesNeedInWithFee[index] = divScalarBN(tokenBalancesNeedIn[index], subBN(ether('1'), communityJoinFee));
-            console.log('tokenBalancesNeedIn[index]', web3.utils.fromWei(tokenBalancesNeedIn[index], 'ether'));
         });
         return tokenBalancesNeedInWithFee;
     }
@@ -281,8 +296,8 @@ describe.only('PiDynamicBPool', () => {
         assert.equal(_communityFeeReceiver, communityWallet);
     });
 
-    describe('test swap after time spent', async () => {
-        it(`should correctly swap by multihopBatchSwapExactIn after seconds pass`, async () => {
+    describe('setDynamicWeight', async () => {
+        it(`setDynamicWeight should revert for incorrect values`, async () => {
             await expectRevert(pool.setDynamicWeight(tokens[0], ether('40'), '1', '2', { from: minter }), 'CANT_SET_PAST_TIMESTAMP');
             //TODO: figure out why MAX_WEIGHT_PER_SECOND require message not working in buidler
             await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('40'), fromTimestamps[0], addBN(fromTimestamps[0], '100'), { from: minter }));
@@ -320,20 +335,14 @@ describe.only('PiDynamicBPool', () => {
                 const etherWeights = await pIteration.map(tokens, async (t) => {
                     return web3.utils.fromWei(await pool.getDenormalizedWeight(t), 'ether');
                 })
-                console.log('current weights', etherWeights.join(', '));
+                console.log('            current weights', etherWeights.join(', '));
 
                 await this.multihopBatchSwapExactIn(tokens[0], tokens[1], amountToSwap);
 
-                // assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
                 assert.equal(
                     (await this.token1.balanceOf(communityWallet)).toString(),
                     amountCommunitySwapFee.toString()
                 );
-                // assert.equal(
-                //     (await this.token1.balanceOf(pool.address)).toString(),
-                //     addBN(token1PoolBalanceBefore, amountAfterCommunitySwapFee)
-                // );
-                // assert.equal((await this.token2.balanceOf(alice)).toString(), addBN(token2AliceBalanceBefore, expectedSwapOut).toString());
             });
         }
     });
@@ -349,10 +358,17 @@ describe.only('PiDynamicBPool', () => {
             amountToSwapBefore = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
             poolAmountOutToken1Before = await this.calcPoolOutGivenSingleIn(tokens[0], ether('1'));
             poolAmountOutToken2Before = await this.calcPoolOutGivenSingleIn(tokens[1], ether('1'));
+            assert.equal(amountToSwapBefore, ether('0.1879232581756858'));
+            assert.equal(poolAmountOutToken1Before, ether('0.4962685874475485'));
+            assert.equal(poolAmountOutToken2Before, ether('0.248441384384303'));
+
             await time.increase(11000);
             amountToSwapAfter = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
             poolAmountOutToken1After = await this.calcPoolOutGivenSingleIn(tokens[0], ether('1'));
             poolAmountOutToken2After = await this.calcPoolOutGivenSingleIn(tokens[1], ether('1'));
+            assert.equal(amountToSwapAfter, ether('0.3131073224019748'));
+            assert.equal(poolAmountOutToken1After, ether('0.62149842727433'));
+            assert.equal(poolAmountOutToken2After, ether('0.1860395830487343'));
 
             await this.token1.transfer(alice, amountToSwap);
             await this.token2.transfer(alice, mulScalarBN(amountToSwap, ether('2')));
@@ -363,13 +379,6 @@ describe.only('PiDynamicBPool', () => {
             expectedSwapOut = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
             [token1BalanceNeedInWithFee, token2BalanceNeedInWithFee] = await needTokensBalanceIn(pool, tokens);
             token2BalanceNeedInWithFee = token2BalanceNeedInWithFee.replace('-', '');
-
-            console.log('amountToSwapBefore', web3.utils.fromWei(amountToSwapBefore, 'ether'));
-            console.log('amountToSwapAfter', web3.utils.fromWei(amountToSwapAfter, 'ether'));
-            console.log('poolAmountOutToken1Before', web3.utils.fromWei(poolAmountOutToken1Before, 'ether'));
-            console.log('poolAmountOutToken1After', web3.utils.fromWei(poolAmountOutToken1After, 'ether'));
-            console.log('poolAmountOutToken2Before', web3.utils.fromWei(poolAmountOutToken2Before, 'ether'));
-            console.log('poolAmountOutToken2After', web3.utils.fromWei(poolAmountOutToken2After, 'ether'));
         });
 
         it('balances ratio should be restored by joinswapExternAmountIn and exitswapExternAmountOut', async () => {
@@ -389,12 +398,6 @@ describe.only('PiDynamicBPool', () => {
             await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
 
             const amountToSwapFixed = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
-            const poolAmountOutToken1Fixed = await this.calcPoolOutGivenSingleIn(tokens[0], ether('1'));
-            const poolAmountOutToken2Fixed = await this.calcPoolOutGivenSingleIn(tokens[1], ether('1'));
-
-            console.log('amountToSwapFixed', web3.utils.fromWei(amountToSwapFixed, 'ether'));
-            console.log('poolAmountOutToken1Fixed', web3.utils.fromWei(poolAmountOutToken1Fixed, 'ether'));
-            console.log('poolAmountOutToken2Fixed', web3.utils.fromWei(poolAmountOutToken2Fixed, 'ether'));
             await assertEqualWithAccuracy(amountToSwapBefore, amountToSwapFixed, "Amount to swap restored to values before changing", ether('0.003'));        });
 
         it('balances ratio should be restored by swapExactAmountIn', async () => {
@@ -407,79 +410,226 @@ describe.only('PiDynamicBPool', () => {
             await this.multihopBatchSwapExactIn(tokens[0], tokens[1], divScalarBN(token1BalanceNeedInWithFee, ether('4')));
 
             const amountToSwapFixed = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
-            const poolAmountOutToken1Fixed = await this.calcPoolOutGivenSingleIn(tokens[0], ether('1'));
-            const poolAmountOutToken2Fixed = await this.calcPoolOutGivenSingleIn(tokens[1], ether('1'));
-
-            console.log('amountToSwapFixed', web3.utils.fromWei(amountToSwapFixed, 'ether'));
-            console.log('poolAmountOutToken1Fixed', web3.utils.fromWei(poolAmountOutToken1Fixed, 'ether'));
-            console.log('poolAmountOutToken2Fixed', web3.utils.fromWei(poolAmountOutToken2Fixed, 'ether'));
-
             await assertEqualWithAccuracy(amountToSwapBefore, amountToSwapFixed, "Amount to swap restored to values before changing", ether('0.003'));
         });
     });
 
-    describe.only('adding and removing token', () => {
-        let amountToSwapBefore, token1BalanceNeedInWithFee, token2BalanceNeedInWithFee, token3BalanceNeedInWithFee;
-        it('balances ratio should be restored by joinswapExternAmountIn and exitswapExternAmountOut', async () => {
+    describe('adding and removing token', () => {
+        this.joinswapTo1Ether = async () => {
+            await this.joinswapExternAmountIn(this.token3, ether('0.0005'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.0005'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.0005'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.001'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.001'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.002'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.002'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.002'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.005'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.005'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.005'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.01'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.01'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.02'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.02'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.02'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.05'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.05'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.05'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.1'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.1'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.2'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.3'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.3'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.5'));
+            await this.joinswapExternAmountIn(this.token3, ether('0.5'));
+            await this.joinswapExternAmountIn(this.token3, ether('1'));
+        };
+
+        const initialBalance = ether('0.001');
+        const targetWeight = ether('6.25');
+        let fromTimestamp, targetTimestamp;
+
+        beforeEach(async () => {
+            const newBalances = [ether('18.8').toString(), ether('0.617').toString()];
+            const newTargetWeights = [ether('6.25').toString(), ether('6.25').toString()];
+            await this.token1.approve(this.bActions.address, newBalances[0]);
+            await this.token2.approve(this.bActions.address, newBalances[1]);
+
+            const res = await this.bActions.create(
+                this.bFactory.address,
+                name,
+                symbol,
+                minWeightPerSecond,
+                maxWeightPerSecond,
+                tokens.map((t, i) => ({
+                    token: t,
+                    balance: newBalances[i],
+                    targetDenorm: newTargetWeights[i],
+                    fromTimestamp: fromTimestamps[i],
+                    targetTimestamp: targetTimestamps[i],
+                })),
+                [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
+                communityWallet,
+                true
+            );
+
+            const logNewPool = PiDynamicPoolBFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
+            pool = await PiDynamicBPool.at(logNewPool.args.pool);
+
             await time.increase(11000);
 
-            [token1BalanceNeedInWithFee, token2BalanceNeedInWithFee] = await needTokensBalanceIn(pool, tokens);
-            token2BalanceNeedInWithFee = token2BalanceNeedInWithFee.replace('-', '');
+            const token1BalanceNeedInWithFee = ether('188000');
+            const token2BalanceNeedInWithFee = ether('6170');
 
-            await this.joinswapExternAmountIn(this.token1, divScalarBN(token1BalanceNeedInWithFee, ether('5')));
-            await this.joinswapExternAmountIn(this.token1, divScalarBN(token1BalanceNeedInWithFee, ether('5')));
-            await this.joinswapExternAmountIn(this.token1, divScalarBN(token1BalanceNeedInWithFee, ether('5')));
-            await this.joinswapExternAmountIn(this.token1, divScalarBN(token1BalanceNeedInWithFee, ether('5')));
-            await this.joinswapExternAmountIn(this.token1, divScalarBN(token1BalanceNeedInWithFee, ether('5')));
+            await this.joinPool([this.token1, this.token2], token1BalanceNeedInWithFee);
 
-            await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
-            await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
-            await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
-            await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
-            await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
+            fromTimestamp = await getTimestamp(100);
+            targetTimestamp = await getTimestamp(11000);
 
-            const amountToSwap = ether('0.1').toString(10);
-            const amountCommunitySwapFee = mulScalarBN(amountToSwap, communitySwapFee);
-            const amountAfterCommunitySwapFee = subBN(amountToSwap, amountCommunitySwapFee);
-
-            const fromTimestamp = await getTimestamp(100);
-            const targetTimestamp = await getTimestamp(11000);
-
-            const initialBalance = ether('0.0001');
-            const targetWeight = ether('10');
             this.token3 = await MockERC20.new('My Token 3', 'MT3', ether('1000000'));
             await this.token3.approve(pool.address, initialBalance);
             await pool.bind(this.token3.address, initialBalance, targetWeight, fromTimestamp, targetTimestamp);
 
-            const amountToSwapBeforeIncrease = await this.calcOutGivenIn(this.token3.address, tokens[1], ether('0.0001'));
-            console.log('amountToSwapBeforeIncrease', web3.utils.fromWei(amountToSwapBeforeIncrease, 'ether'));
-            assert.equal(amountToSwapBeforeIncrease, ether('0.000000004905778873'));
-            const poolAmountOutBeforeIncrease = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
-            console.log('poolAmountOutBeforeIncrease', web3.utils.fromWei(poolAmountOutBeforeIncrease, 'ether'));
-            assert.equal(poolAmountOutBeforeIncrease, ether('0.00000000253789326'));
-            await time.increase(11000);
+            const amountSwapOutBeforeIncrease = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutBeforeIncrease, ether('0.000014965918562212'));
+            const poolAmountOutBeforeIncrease = await this.calcPoolOutGivenSingleIn(this.token3.address, initialBalance);
+            assert.equal(poolAmountOutBeforeIncrease, ether('0.00007920792'));
+        });
 
-            const amountToSwapBeforeJoin = await this.calcOutGivenIn(this.token3.address, tokens[1], ether('0.0001'));
-            console.log('amountToSwapBeforeJoin', web3.utils.fromWei(amountToSwapBeforeJoin, 'ether'));
-            const poolAmountOutAfterIncrease = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
-            console.log('poolAmountOutAfterIncrease', web3.utils.fromWei(poolAmountOutAfterIncrease, 'ether'));
+        it('adding liquidity right after token adding', async () => {
+            assert.equal(await pool.getDenormalizedWeight(this.token3.address), ether('0.000000001'));
+            const amountSwapOutBeforeJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutBeforeJoin, ether('0.000014965918562212'));
+            const poolAmountOutBeforeJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, initialBalance);
+            assert.equal(poolAmountOutBeforeJoin, ether('0.00007920792'));
 
-            await this.joinswapExternAmountIn(this.token3, ether('0.0001'));
-            await this.joinswapExternAmountIn(this.token3, ether('0.0001'));
-            await this.joinswapExternAmountIn(this.token3, ether('0.0001'));
-            await this.joinswapExternAmountIn(this.token3, ether('0.0001'));
-            await this.joinswapExternAmountIn(this.token3, ether('0.0001'));
-            await this.joinswapExternAmountIn(this.token3, ether('0.0001'));
-            await this.joinswapExternAmountIn(this.token3, ether('0.0001'));
-            await this.joinswapExternAmountIn(this.token3, ether('0.0001'));
-            await this.joinswapExternAmountIn(this.token3, ether('0.0001'));
-            await this.joinswapExternAmountIn(this.token3, ether('0.001'));
+            await this.joinswapTo1Ether();
+
+            const amountSwapOutAfterJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutAfterJoin, ether('0.00000000952634854'));
             const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
-            console.log('poolAmountOutAfterJoin', web3.utils.fromWei(poolAmountOutAfterJoin, 'ether'));
-            // console.log('amountToSwapFixed', web3.utils.fromWei(amountToSwapFixed, 'ether'));
+            assert.equal(poolAmountOutAfterJoin, ether('0.000000002534253402'));
+        });
+
+        it('adding liquidity on 4 seconds spent after token adding', async () => {
+            await time.increaseTo(fromTimestamp + 4);
+            assert.equal(await pool.getDenormalizedWeight(this.token3.address),  ether('0.0022935789812844'));
+
+            const amountSwapOutBeforeJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutBeforeJoin, ether('59.340295159811555919'));
+            const poolAmountOutBeforeJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, initialBalance);
+            assert.equal(poolAmountOutBeforeJoin, ether('126.2608414287197059'));
+
+            await this.joinswapTo1Ether();
+
+            const amountSwapOutAfterJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutAfterJoin, ether('0.469834196398395663'));
+            const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
+            assert.equal(poolAmountOutAfterJoin, ether('0.125149003262977482'));
+        });
+
+        it('adding liquidity on 104 seconds spent after token adding', async () => {
+            await time.increaseTo(fromTimestamp + 104);
+            assert.equal(await pool.getDenormalizedWeight(this.token3.address),  ether('0.0596330285133944'));
+
+            const amountSwapOutBeforeJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutBeforeJoin, ether('1242.220992324808182353'));
+            const poolAmountOutBeforeJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, initialBalance);
+            assert.equal(poolAmountOutBeforeJoin, ether('3273.0415634952126006'));
+
+            await this.joinswapTo1Ether();
+
+            const amountSwapOutAfterJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutAfterJoin, ether('1.016151542043268956'));
+            const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
+            assert.equal(poolAmountOutAfterJoin, ether('0.281174152972328109'));
+        });
+
+        it('adding liquidity on 204 seconds spent after token adding', async () => {
+            await time.increaseTo(fromTimestamp + 204);
+            assert.equal(await pool.getDenormalizedWeight(this.token3.address), ether('0.1169724780455044'));
+
+            const amountSwapOutBeforeJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutBeforeJoin, ether('2417.657497211382457888'));
+            const poolAmountOutBeforeJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, initialBalance);
+            assert.equal(poolAmountOutBeforeJoin, ether('6401.1934068687173564'));
+
+            await this.joinswapTo1Ether();
+
+            const amountSwapOutAfterJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutAfterJoin, ether('1.562467300275684877'));
+            const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
+            assert.equal(poolAmountOutAfterJoin, ether('0.447003407425055853'));
+        });
+
+        it('adding liquidity on 504 seconds spent after token adding', async () => {
+            await time.increaseTo(fromTimestamp + 504);
+            assert.equal(await pool.getDenormalizedWeight(this.token3.address), ether('0.2889908266418344'));
+
+            const amountSwapOutBeforeJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutBeforeJoin, ether('5899.768851799082289172'));
+            const poolAmountOutBeforeJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, initialBalance);
+            assert.equal(poolAmountOutBeforeJoin, ether('15675.3693888618190953'));
+
+            await this.joinswapTo1Ether();
+
+            const amountSwapOutAfterJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutAfterJoin, ether('3.201405050545569136'));
+            const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
+            assert.equal(poolAmountOutAfterJoin, ether('1.006536370552462335'));
+        });
+
+        it('adding liquidity on 1004 seconds spent after token adding', async () => {
+            await time.increaseTo(fromTimestamp + 1004);
+            assert.equal(await pool.getDenormalizedWeight(this.token3.address), ether('0.5756880743023844'));
+
+            const amountSwapOutBeforeJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutBeforeJoin, ether('11558.718885097058265985'));
+            const poolAmountOutBeforeJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, initialBalance);
+            assert.equal(poolAmountOutBeforeJoin, ether('30773.4872459462215729'));
+
+            await this.joinswapTo1Ether();
+
+            const amountSwapOutAfterJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutAfterJoin, ether('5.932936219845902735'));
+            const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
+            assert.equal(poolAmountOutAfterJoin, ether('2.165818933934686168'));
+        });
+
+        it('adding liquidity on 9004 seconds spent after token adding', async () => {
+            await time.increaseTo(fromTimestamp + 9004);
+            assert.equal(await pool.getDenormalizedWeight(this.token3.address), ether('5.1628440368711844'));
+
+            const amountSwapOutBeforeJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutBeforeJoin, ether('81529.79549770526208849'));
+            const poolAmountOutBeforeJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, initialBalance);
+            assert.equal(poolAmountOutBeforeJoin, ether('223344.9042523643384822'));
+
+            await this.joinswapTo1Ether();
+
+            const amountSwapOutAfterJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutAfterJoin, ether('49.632038259679560435'));
+            const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
+            assert.equal(poolAmountOutAfterJoin, ether('97.581391795363609114'));
+        });
+
+        it('adding liquidity on 11000 seconds spent after token adding', async () => {
+            await time.increase(11000);
+            assert.equal(await pool.getDenormalizedWeight(this.token3.address), targetWeight);
+
+            const amountSwapOutBeforeJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutBeforeJoin, ether('93536.990954773869301382'));
+            const poolAmountOutBeforeJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, initialBalance);
+            assert.equal(poolAmountOutBeforeJoin, ether('258545.4312799397457545'));
+
+            await this.joinswapTo1Ether();
+
+            const amountSwapOutAfterJoin = await this.calcOutGivenIn(this.token3.address, tokens[0], initialBalance);
+            assert.equal(amountSwapOutAfterJoin, ether('59.539396924809173113'));
+            const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
+            assert.equal(poolAmountOutAfterJoin, ether('152.544804372061724031'));
         });
     });
     // TODO: test weight to 0
     // TODO: minWeightPerSecond
-    // TODO: get tokens from mainnet(3 tokens)
 });

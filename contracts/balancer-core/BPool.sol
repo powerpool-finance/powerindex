@@ -680,7 +680,7 @@ contract BPool is BToken, BMath {
         _checkNotFinalized();
         _checkWrapper();
         _checkBound(tokenIn);
-//        require(tokenAmountIn <= bmul(_records[tokenIn].balance, MAX_IN_RATIO), "MAX_IN_RATIO");
+        require(tokenAmountIn <= bmul(_records[tokenIn].balance, MAX_IN_RATIO), "MAX_IN_RATIO");
 
         (uint tokenAmountInAfterFee, uint tokenAmountInFee) = calcAmountWithCommunityFee(
             tokenAmountIn,
