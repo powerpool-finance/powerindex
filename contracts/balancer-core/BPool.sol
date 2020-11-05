@@ -341,6 +341,7 @@ contract BPool is BToken, BMath {
 
     function bind(address token, uint balance, uint denorm)
         public
+        virtual
         _logs_
         // _lock_  Bind does not lock because it jumps to `rebind`, which does
     {
@@ -361,6 +362,7 @@ contract BPool is BToken, BMath {
 
     function rebind(address token, uint balance, uint denorm)
         public
+        virtual
         _logs_
         _lock_
     {

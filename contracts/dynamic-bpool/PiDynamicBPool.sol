@@ -76,6 +76,7 @@ contract PiDynamicBPool is BPool {
         _lock_
     {
         _checkController();
+        _checkBound(token);
 
         require(fromTimestamp > block.timestamp, "CANT_SET_PAST_TIMESTAMP");
         require(targetTimestamp >= fromTimestamp, "TIMESTAMP_NEGATIVE_DELTA");
@@ -126,7 +127,19 @@ contract PiDynamicBPool is BPool {
     function unbind(address token) public override {
         _totalWeight = _getTotalWeight(); // for compatibility with original BPool unbind
         super.unbind(token);
+
+        _dynamicWeights[token] = DynamicWeight(0, 0, 0);
     }
+
+    function bind(address token, uint balance, uint denorm) public override {
+        require(false, "DISABLED");
+    }
+
+    function rebind(address token, uint balance, uint denorm) public override {
+        require(denorm == MIN_WEIGHT && _dynamicWeights[token].fromTimestamp == 0, "ONLY_NEW_TOKENS_ALLOWED");
+        super.rebind(token, balance, denorm);
+    }
+
     /*** View Functions ***/
 
     function getDynamicWeightSettings(address token) external view returns (
@@ -137,6 +150,10 @@ contract PiDynamicBPool is BPool {
     ) {
         DynamicWeight storage dw = _dynamicWeights[token];
         return (dw.fromTimestamp, dw.targetTimestamp, _records[token].denorm, dw.targetDenorm);
+    }
+
+    function getWeightPerSecondBounds() external view returns(uint minWeightPerSecond, uint maxWeightPerSecond) {
+        return (_minWeightPerSecond, _maxWeightPerSecond);
     }
 
     /*** Internal Functions ***/

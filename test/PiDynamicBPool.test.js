@@ -50,7 +50,7 @@ async function getTimestamp(shift = 0) {
     return currentTimestamp + shift;
 }
 
-describe.only('PiDynamicBPool', () => {
+describe('PiDynamicBPool', () => {
     const name = 'My Pool';
     const symbol = 'MP';
     const balances = [ether('100'), ether('200')].map(w => w.toString());
@@ -68,17 +68,17 @@ describe.only('PiDynamicBPool', () => {
     let pool;
     let fromWeights;
 
-    let minter, bob, carol, alice, feeManager, feeReceiver, communityWallet;
+    let controller, bob, carol, alice, feeManager, feeReceiver, communityWallet;
     before(async function() {
-        [minter, bob, carol, alice, feeManager, feeReceiver, communityWallet] = await web3.eth.getAccounts();
+        [controller, bob, carol, alice, feeManager, feeReceiver, communityWallet] = await web3.eth.getAccounts();
     });
 
     beforeEach(async () => {
         this.weth = await WETH.new();
 
-        this.bFactory = await PiDynamicPoolBFactory.new({ from: minter });
-        this.bActions = await PiDynamicBActions.new({ from: minter });
-        this.bExchange = await ExchangeProxy.new(this.weth.address, { from: minter });
+        this.bFactory = await PiDynamicPoolBFactory.new({ from: controller });
+        this.bActions = await PiDynamicBActions.new({ from: controller });
+        this.bExchange = await ExchangeProxy.new(this.weth.address, { from: controller });
 
         this.token1 = await MockCvp.new();
         this.token2 = await MockERC20.new('My Token 2', 'MT2', ether('1000000'));
@@ -151,7 +151,6 @@ describe.only('PiDynamicBPool', () => {
                 swapFee
             )
         }
-
         this.joinswapExternAmountIn = async(_token, _amountIn) => {
             const amountInFee = mulScalarBN(_amountIn, communitySwapFee);
             const amountInAfterFee = subBN(_amountIn, amountInFee);
@@ -162,7 +161,6 @@ describe.only('PiDynamicBPool', () => {
             await _token.approve(pool.address, _amountIn, {from: alice});
             await pool.joinswapExternAmountIn(_token.address, _amountIn, poolAmountOut, {from: alice});
         };
-
         this.joinPool = async(tokens, _token1In) => {
             const poolOutAmount = divScalarBN(
                 mulScalarBN(_token1In, await pool.totalSupply()),
@@ -183,9 +181,7 @@ describe.only('PiDynamicBPool', () => {
 
         this.exitswapExternAmountOut = async(_token, _amountOut) => {
             let poolAmountIn = await this.calcPoolInGivenSingleOut(_token.address, _amountOut);
-
-            console.log('exitswapExternAmountOut', web3.utils.fromWei(poolAmountIn, 'ether'), '=>', web3.utils.fromWei(_amountOut));
-
+            // console.log('exitswapExternAmountOut', web3.utils.fromWei(poolAmountIn, 'ether'), '=>', web3.utils.fromWei(_amountOut));
             if(isBNHigher(poolAmountIn, await pool.balanceOf(alice))) {
                 await pool.transfer(alice, poolAmountIn);
             }
@@ -227,53 +223,6 @@ describe.only('PiDynamicBPool', () => {
             );
         };
     });
-    async function getDenormWeight(token, timestamp) {
-        if (!timestamp) {
-            timestamp = await getTimestamp();
-        }
-        const dynamicWeight = await pool.getDynamicWeightSettings(token);
-        if (dynamicWeight.fromTimestamp === '0' ||
-            dynamicWeight.fromDenorm === dynamicWeight.targetDenorm ||
-            isBNHigherOrEqual(dynamicWeight.fromTimestamp, timestamp)) {
-            return dynamicWeight.fromDenorm;
-        }
-        if (isBNHigherOrEqual(timestamp, dynamicWeight.targetTimestamp)) {
-            return dynamicWeight.targetDenorm;
-        }
-        const deltaTargetTime = subBN(dynamicWeight.targetTimestamp, dynamicWeight.fromTimestamp);
-        const deltaCurrentTime = subBN(timestamp, dynamicWeight.fromTimestamp);
-        let deltaWeight;
-        if(isBNHigher(dynamicWeight.targetDenorm, dynamicWeight.fromDenorm)) {
-            deltaWeight = subBN(dynamicWeight.targetDenorm, dynamicWeight.fromDenorm);
-            const weightPerSecond = divScalarBN(deltaWeight, deltaTargetTime);
-            return addBN(dynamicWeight.fromDenorm, mulScalarBN(deltaCurrentTime, weightPerSecond));
-        } else {
-            deltaWeight = subBN(dynamicWeight.fromDenorm, dynamicWeight.targetDenorm);
-            const weightPerSecond = divScalarBN(deltaWeight, deltaTargetTime);
-            return subBN(dynamicWeight.fromDenorm, mulScalarBN(deltaCurrentTime, weightPerSecond));
-        }
-    }
-
-    async function needTokensBalanceIn(pool, tokens) {
-        let totalFromWeights = '0';
-        let totalTargetWeights = '0';
-        await pIteration.forEachSeries(tokens, async (t, index) => {
-            const dw = await pool.getDynamicWeightSettings(t);
-            totalFromWeights = addBN(totalFromWeights, dw.fromDenorm);
-            totalTargetWeights = addBN(totalTargetWeights, dw.targetDenorm);
-        });
-        const tokenRatios = [];
-        const tokenBalancesNeedIn = [];
-        const tokenBalancesNeedInWithFee = [];
-        await pIteration.forEachSeries(tokens, async (t, index) => {
-            const dw = await pool.getDynamicWeightSettings(t);
-            const balance = await pool.getBalance(t);
-            tokenRatios[index] = divScalarBN(divScalarBN(dw.targetDenorm, totalTargetWeights), divScalarBN(dw.fromDenorm, totalFromWeights));
-            tokenBalancesNeedIn[index] = mulScalarBN(balance, subBN(tokenRatios[index], ether('1')));
-            tokenBalancesNeedInWithFee[index] = divScalarBN(tokenBalancesNeedIn[index], subBN(ether('1'), communityJoinFee));
-        });
-        return tokenBalancesNeedInWithFee;
-    }
 
     it('should set name and symbol for new pool', async () => {
         assert.equal(await pool.name(), name);
@@ -302,17 +251,45 @@ describe.only('PiDynamicBPool', () => {
 
     describe('setDynamicWeight', async () => {
         it(`setDynamicWeight should revert for incorrect values`, async () => {
-            await expectRevert(pool.setDynamicWeight(tokens[0], ether('40'), '1', '2', { from: minter }), 'CANT_SET_PAST_TIMESTAMP');
+            await expectRevert(pool.setDynamicWeight(tokens[0], ether('40'), '1', '2', { from: controller }), 'CANT_SET_PAST_TIMESTAMP');
             //TODO: figure out why MAX_WEIGHT_PER_SECOND require message not working in buidler
-            await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('40'), fromTimestamps[0], addBN(fromTimestamps[0], '100'), { from: minter }));
+            await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('40'), fromTimestamps[0], addBN(fromTimestamps[0], '100'), { from: controller }));
             //TODO: figure out why MIN_WEIGHT_PER_SECOND require message not working in buidler
-            await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], addBN(fromWeights[0], '10'), fromTimestamps[0], targetTimestamps[0], { from: minter }));
+            await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], addBN(fromWeights[0], '10'), fromTimestamps[0], targetTimestamps[0], { from: controller }));
             //TODO: figure out why TIMESTAMP_NEGATIVE_DELTA require message not working in buidler
-            await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('40'), targetTimestamps[0], fromTimestamps[0], { from: minter }));
-            await expectRevert(pool.setDynamicWeight(tokens[0], ether('51'), fromTimestamps[0], targetTimestamps[0], { from: minter }), 'TARGET_WEIGHT_BOUNDS');
-            await expectRevert(pool.setDynamicWeight(tokens[0], ether('45'), fromTimestamps[0], targetTimestamps[0], { from: minter }), 'MAX_TARGET_TOTAL_WEIGHT');
+            await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('40'), targetTimestamps[0], fromTimestamps[0], { from: controller }));
+            await expectRevert(pool.setDynamicWeight(tokens[0], ether('51'), fromTimestamps[0], targetTimestamps[0], { from: controller }), 'TARGET_WEIGHT_BOUNDS');
+            //TODO: figure out why MAX_TARGET_TOTAL_WEIGHT require message not working in buidler
+            await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('45'), fromTimestamps[0], targetTimestamps[0], { from: controller }));
             //TODO: figure out why NOT_CONTROLLER require message not working in buidler
             await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('10'), fromTimestamps[0], targetTimestamps[0], { from: alice }));
+        });
+    });
+
+    describe('disabled functions', async () => {
+        it('original bind should be disabled', async () => {
+            const newToken = await MockERC20.new('New Token', 'NT', ether('1000000'));
+            await newToken.approve(pool.address, ether('1'));
+            //TODO: figure out why DISABLED require message not working in buidler
+            await expectRevert.unspecified(pool.bind(newToken.address, ether('1'), ether('10')));
+        });
+        it('original rebind should be disabled', async () => {
+            await this.token1.approve(pool.address, ether('1'));
+            await expectRevert(pool.rebind(this.token1.address, ether('1'), ether('10'), { from: controller }), 'ONLY_NEW_TOKENS_ALLOWED');
+            await expectRevert(pool.rebind(this.token1.address, await pool.MIN_WEIGHT(), ether('10'), { from: controller }), 'ONLY_NEW_TOKENS_ALLOWED');
+        });
+    });
+
+    describe('setWeightPerSecondBounds', async () => {
+        it('should correctly set by controller', async () => {
+            await pool.setWeightPerSecondBounds(ether('0.00000002'), ether('0.2'), {from: controller});
+            assert.deepEqual(_.pick(await pool.getWeightPerSecondBounds(), ['minWeightPerSecond', 'maxWeightPerSecond']), {
+                minWeightPerSecond: ether('0.00000002').toString(),
+                maxWeightPerSecond: ether('0.2').toString(),
+            });
+        });
+        it('should revert for non-controller', async () => {
+            await expectRevert(pool.setWeightPerSecondBounds(ether('0.00000002'), ether('0.2'), {from: alice}), 'NOT_CONTROLLER');
         });
     });
 
@@ -638,7 +615,7 @@ describe.only('PiDynamicBPool', () => {
             assert.equal(poolAmountOutAfterJoin, ether('152.544804372061724031'));
         });
 
-        it.only('adding liquidity on 11000 seconds spent after token adding', async () => {
+        it('set taget dynamic weight to min and removing liquidity and then unbind', async () => {
             await time.increase(11000);
             assert.equal(await pool.getDenormalizedWeight(this.token3.address), targetWeight);
 
@@ -687,12 +664,62 @@ describe.only('PiDynamicBPool', () => {
             assert.equal(await pool.isBound(this.token3.address), true);
             const tokenBalance = await pool.getBalance(this.token3.address);
             const communityWalletBalanceBeforeUnbind = await this.token3.balanceOf(communityWallet);
+
             await controller.unbindNotActualToken(this.token3.address, {from: alice});
             assert.equal(await pool.isBound(this.token3.address), false);
             assert.equal(await this.token3.balanceOf(communityWallet), addBN(
                 communityWalletBalanceBeforeUnbind,
                 tokenBalance
-            ))
+            ));
         });
     });
+    //TODO: check disabled functions
+
+    async function getDenormWeight(token, timestamp) {
+        if (!timestamp) {
+            timestamp = await getTimestamp();
+        }
+        const dynamicWeight = await pool.getDynamicWeightSettings(token);
+        if (dynamicWeight.fromTimestamp === '0' ||
+            dynamicWeight.fromDenorm === dynamicWeight.targetDenorm ||
+            isBNHigherOrEqual(dynamicWeight.fromTimestamp, timestamp)) {
+            return dynamicWeight.fromDenorm;
+        }
+        if (isBNHigherOrEqual(timestamp, dynamicWeight.targetTimestamp)) {
+            return dynamicWeight.targetDenorm;
+        }
+        const deltaTargetTime = subBN(dynamicWeight.targetTimestamp, dynamicWeight.fromTimestamp);
+        const deltaCurrentTime = subBN(timestamp, dynamicWeight.fromTimestamp);
+        let deltaWeight;
+        if(isBNHigher(dynamicWeight.targetDenorm, dynamicWeight.fromDenorm)) {
+            deltaWeight = subBN(dynamicWeight.targetDenorm, dynamicWeight.fromDenorm);
+            const weightPerSecond = divScalarBN(deltaWeight, deltaTargetTime);
+            return addBN(dynamicWeight.fromDenorm, mulScalarBN(deltaCurrentTime, weightPerSecond));
+        } else {
+            deltaWeight = subBN(dynamicWeight.fromDenorm, dynamicWeight.targetDenorm);
+            const weightPerSecond = divScalarBN(deltaWeight, deltaTargetTime);
+            return subBN(dynamicWeight.fromDenorm, mulScalarBN(deltaCurrentTime, weightPerSecond));
+        }
+    }
+
+    async function needTokensBalanceIn(pool, tokens) {
+        let totalFromWeights = '0';
+        let totalTargetWeights = '0';
+        await pIteration.forEachSeries(tokens, async (t, index) => {
+            const dw = await pool.getDynamicWeightSettings(t);
+            totalFromWeights = addBN(totalFromWeights, dw.fromDenorm);
+            totalTargetWeights = addBN(totalTargetWeights, dw.targetDenorm);
+        });
+        const tokenRatios = [];
+        const tokenBalancesNeedIn = [];
+        const tokenBalancesNeedInWithFee = [];
+        await pIteration.forEachSeries(tokens, async (t, index) => {
+            const dw = await pool.getDynamicWeightSettings(t);
+            const balance = await pool.getBalance(t);
+            tokenRatios[index] = divScalarBN(divScalarBN(dw.targetDenorm, totalTargetWeights), divScalarBN(dw.fromDenorm, totalFromWeights));
+            tokenBalancesNeedIn[index] = mulScalarBN(balance, subBN(tokenRatios[index], ether('1')));
+            tokenBalancesNeedInWithFee[index] = divScalarBN(tokenBalancesNeedIn[index], subBN(ether('1'), communityJoinFee));
+        });
+        return tokenBalancesNeedInWithFee;
+    }
 });
