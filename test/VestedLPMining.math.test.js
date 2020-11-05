@@ -321,5 +321,41 @@ describe('VestedLPMining (internal math)', () => {
                 });
             });
         });
+
+        it('should properly compute vesting for this case', async () => {
+            const user = {
+                lptAmount: '11861236796824068318',
+                cvpAdjust: '85209598716746877357',
+                pendedCvp: '582708476878859476035',
+                vestingBlock: this.shiftBlock('402638'),
+                lastUpdateBlock: this.shiftBlock('0'),
+            };
+            const currentBlock = this.shiftBlock('175');
+            const accCvpPerLpt = '7362639340680';
+
+            const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale)
+                .sub(toBN(user.cvpAdjust))
+            const age = 1*currentBlock - 1*user.lastUpdateBlock;
+            const entitledVesting = expectedEntitled
+                .mul(toBN(`${age}`)).div(toBN(`${age + 1*vestPeriod}`));
+            const pendedVesting = toBN(user.pendedCvp);
+            const expectedVesting = entitledVesting.add(pendedVesting);
+
+            await time.advanceBlockTo(`${1*currentBlock - 1}`);
+            const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
+            const res = tx.receipt.logs[0].args;
+
+            assert.equal(res.lastUpdateBlock.toString(), currentBlock);
+            // new CVPs entitled
+            assert.equal(res.newlyEntitled.toString(), expectedEntitled.toString());
+            // a part of "new" CVPs and a part of "old" CVPs are vested
+            assert.equal(res.newlyVested.toString(), expectedVesting.toString());
+            // only newly entitled CVPs remain pended with the vesting block in vesting period from now
+            assert.equal(
+                res.pendedCvp.toString(),
+                toBN(user.pendedCvp).add(expectedEntitled).sub(expectedVesting).toString())
+            ;
+            assert.equal(res.vestingBlock.toString(), `${1*currentBlock + 1*vestPeriod}`);
+        });
     });
 });

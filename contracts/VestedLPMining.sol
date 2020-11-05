@@ -480,7 +480,7 @@ contract VestedLPMining is
 
         // Amount of CVP token pended (i.e. not yet vested) from now
         uint256 remainingPended = pended == 0 ? 0 : pended.sub(pendedToVest);
-        uint256 unreleasedNewly = newlyEntitled == 0 ? 0 : newlyEntitled.sub(newlyVested);
+        uint256 unreleasedNewly = newlyEntitled == 0 ? 0 : newlyEntitled.sub(newToVest);
         uint256 pending = remainingPended.add(unreleasedNewly);
 
         // Compute the vesting block (i.e. when the pended tokens to be all vested)
