@@ -50,7 +50,7 @@ async function getTimestamp(shift = 0) {
     return currentTimestamp + shift;
 }
 
-describe.only('PiDynamicBPool', () => {
+describe('PiDynamicBPool', () => {
     const name = 'My Pool';
     const symbol = 'MP';
     const balances = [ether('100'), ether('200')].map(w => w.toString());
