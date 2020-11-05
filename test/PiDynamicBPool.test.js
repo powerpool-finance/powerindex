@@ -67,6 +67,7 @@ describe.only('PiDynamicBPool', () => {
 
     let tokens;
     let pool;
+    let fromWeights;
 
     let minter, bob, carol, alice, feeManager, feeReceiver, communityWallet;
     before(async function() {
@@ -110,6 +111,7 @@ describe.only('PiDynamicBPool', () => {
 
         const logNewPool = PiDynamicPoolBFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
         pool = await PiDynamicBPool.at(logNewPool.args.pool);
+        fromWeights = [await pool.MIN_WEIGHT(), await pool.MIN_WEIGHT()];
 
         this.getTokensToJoinPoolAndApprove = async (_pool, amountToMint) => {
             const poolTotalSupply = (await _pool.totalSupply()).toString(10);
@@ -230,6 +232,33 @@ describe.only('PiDynamicBPool', () => {
         }
     }
 
+    async function needTokensBalanceIn(pool, tokens, basedOnBalance = false) {
+        let totalFromWeights = '0';
+        let totalTargetWeights = '0';
+        await pIteration.forEachSeries(tokens, async (t, index) => {
+            const dw = await pool.getDynamicWeightSettings(t);
+            totalFromWeights = addBN(totalFromWeights, dw.fromDenorm);
+            totalTargetWeights = addBN(totalTargetWeights, dw.targetDenorm);
+        });
+        const tokenRatios = [];
+        const tokenBalancesNeedIn = [];
+        const tokenBalancesNeedInWithFee = [];
+        await pIteration.forEachSeries(tokens, async (t, index) => {
+            const dw = await pool.getDynamicWeightSettings(t);
+            const balance = await pool.getBalance(t);
+            tokenRatios[index] = divScalarBN(divScalarBN(dw.targetDenorm, totalTargetWeights), divScalarBN(dw.fromDenorm, totalFromWeights));
+            console.log('tokenRatio', web3.utils.fromWei(tokenRatios[index], 'ether'));
+            if (basedOnBalance) {
+
+            } else {
+                tokenBalancesNeedIn[index] = mulScalarBN(balance, subBN(tokenRatios[index], ether('1')));
+                tokenBalancesNeedInWithFee[index] = divScalarBN(tokenBalancesNeedIn[index], subBN(ether('1'), communityJoinFee));
+                console.log('tokenBalancesNeedIn[index]', web3.utils.fromWei(tokenBalancesNeedIn[index], 'ether'));
+            }
+        });
+        return tokenBalancesNeedInWithFee;
+    }
+
     it('should set name and symbol for new pool', async () => {
         assert.equal(await pool.name(), name);
         assert.equal(await pool.symbol(), symbol);
@@ -335,21 +364,9 @@ describe.only('PiDynamicBPool', () => {
             await this.token2.approve(this.bActions.address, mulScalarBN(amountToSwap, ether('2')), {from: alice});
 
             expectedSwapOut = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
+            [token1BalanceNeedInWithFee, token2BalanceNeedInWithFee] = await needTokensBalanceIn(pool, tokens);
+            token2BalanceNeedInWithFee = token2BalanceNeedInWithFee.replace('-', '');
 
-            const fromWeights = [await pool.MIN_WEIGHT(), await pool.MIN_WEIGHT()];
-
-            const totalFromWeights = addBN(fromWeights[0], fromWeights[1]);
-            const totalTargetWeights = addBN(targetWeights[0], targetWeights[1]);
-
-            const token1Ratio = divScalarBN(divScalarBN(targetWeights[0], totalTargetWeights), divScalarBN(fromWeights[0], totalFromWeights));
-            const token2Ratio = divScalarBN(divScalarBN(targetWeights[1], totalTargetWeights), divScalarBN(fromWeights[1], totalFromWeights));
-            console.log('token1Ratio', web3.utils.fromWei(token1Ratio, 'ether'));
-            console.log('token2Ratio', web3.utils.fromWei(token2Ratio, 'ether'));
-
-            const token1BalanceNeedIn = mulScalarBN(balances[0], subBN(token1Ratio, ether('1')));
-            const token2BalanceNeedIn = mulScalarBN(balances[1], subBN(token2Ratio, ether('1'))).replace('-', '');
-            token1BalanceNeedInWithFee = divScalarBN(token1BalanceNeedIn, subBN(ether('1'), communityJoinFee));
-            token2BalanceNeedInWithFee = divScalarBN(token2BalanceNeedIn, subBN(ether('1'), communityJoinFee));
             console.log('amountToSwapBefore', web3.utils.fromWei(amountToSwapBefore, 'ether'));
             console.log('amountToSwapAfter', web3.utils.fromWei(amountToSwapAfter, 'ether'));
             console.log('poolAmountOutToken1Before', web3.utils.fromWei(poolAmountOutToken1Before, 'ether'));
@@ -403,8 +420,46 @@ describe.only('PiDynamicBPool', () => {
             await assertEqualWithAccuracy(amountToSwapBefore, amountToSwapFixed, "Amount to swap restored to values before changing", ether('0.003'));
         });
     });
+
+    describe.only('adding and removing token', () => {
+        let amountToSwapBefore, token1BalanceNeedInWithFee, token2BalanceNeedInWithFee, token3BalanceNeedInWithFee;
+        it('balances ratio should be restored by joinswapExternAmountIn and exitswapExternAmountOut', async () => {
+            await time.increase(11000);
+
+            [token1BalanceNeedInWithFee, token2BalanceNeedInWithFee] = await needTokensBalanceIn(pool, tokens);
+            token2BalanceNeedInWithFee = token2BalanceNeedInWithFee.replace('-', '');
+
+            await this.joinswapExternAmountIn(this.token1, divScalarBN(token1BalanceNeedInWithFee, ether('5')));
+            await this.joinswapExternAmountIn(this.token1, divScalarBN(token1BalanceNeedInWithFee, ether('5')));
+            await this.joinswapExternAmountIn(this.token1, divScalarBN(token1BalanceNeedInWithFee, ether('5')));
+            await this.joinswapExternAmountIn(this.token1, divScalarBN(token1BalanceNeedInWithFee, ether('5')));
+            await this.joinswapExternAmountIn(this.token1, divScalarBN(token1BalanceNeedInWithFee, ether('5')));
+
+            await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
+            await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
+            await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
+            await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
+            await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
+
+            const amountToSwap = ether('0.1').toString(10);
+            const amountCommunitySwapFee = mulScalarBN(amountToSwap, communitySwapFee);
+            const amountAfterCommunitySwapFee = subBN(amountToSwap, amountCommunitySwapFee);
+            amountToSwapBefore = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
+
+            const fromTimestamp = await getTimestamp(100);
+            const targetTimestamp = await getTimestamp(11000);
+
+            const initialBalance = ether('0.0001');
+            const targetWeight = ether('10');
+            this.token3 = await MockERC20.new('My Token 3', 'MT3', ether('1000000'));
+            await this.token3.approve(pool.address, initialBalance);
+            await pool.bind(this.token3.address, initialBalance, targetWeight, fromTimestamp, targetTimestamp);
+
+            [, , token3BalanceNeedInWithFee] = await needTokensBalanceIn(pool, tokens.concat([this.token3.address]));
+            console.log('token3BalanceNeedInWithFee', token3BalanceNeedInWithFee);
+        });
+    });
     // TODO: test weight to 0
     // TODO: minWeightPerSecond
-    // TODO: MIN_WEIGHT = 10 wei
     // TODO: get tokens from mainnet(3 tokens)
 });

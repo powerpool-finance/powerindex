@@ -346,7 +346,6 @@ contract BPool is BToken, BMath {
     {
         _checkController();
         require(!_records[token].bound, "IS_BOUND");
-        _checkFinalized();
 
         require(_tokens.length < MAX_BOUND_TOKENS, "MAX_TOKENS");
 
@@ -367,7 +366,6 @@ contract BPool is BToken, BMath {
     {
         _checkController();
         _checkBound(token);
-        _checkFinalized();
 
         require(denorm >= MIN_WEIGHT && denorm <= MAX_WEIGHT, "WEIGHT_BOUNDS");
         require(balance >= MIN_BALANCE, "MIN_BALANCE");
@@ -400,7 +398,6 @@ contract BPool is BToken, BMath {
     {
         _checkController();
         _checkBound(token);
-        _checkFinalized();
 
         uint tokenBalance = _records[token].balance;
 
