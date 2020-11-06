@@ -230,35 +230,35 @@ describe('VestedLPMining', () => {
             //assert.equal((await this.lpMining.cvpVestingPool()).toString(), '815');
 
             // Out of 1159, Alice should have:
-            // 252 vested, 907 pending, of the latest - 203 may be vested at block 360
+            // 252 vested, 907 pending, of the latest - 201 may be vested at block 360
             assert.equal(`${(await this.cvp.balanceOf.call(alice)).toString()}`, '252');
             assert.equal(`${(await this.lpMining.pendingCvp.call(0, alice)).toString()}`, '907');
-            assert.equal(`${(await this.lpMining.vestableCvp.call(0, alice)).toString()}`, '203');
+            assert.equal(`${(await this.lpMining.vestableCvp.call(0, alice)).toString()}`, '201');
             // Out of 1183, Bob should have:
-            // 285 vested, 898 pending, of the latest - 100 may be vested at block 360
+            // 285 vested, 898 pending, of the latest - 99 may be vested at block 360
             assert.equal(`${(await this.cvp.balanceOf.call(bob)).toString()}`, '285');
             assert.equal(`${(await this.lpMining.pendingCvp.call(0, bob)).toString()}`, '898');
-            assert.equal(`${(await this.lpMining.vestableCvp.call(0, bob)).toString()}`, '100');
+            assert.equal(`${(await this.lpMining.vestableCvp.call(0, bob)).toString()}`, '99');
             // Out of 2657, Carol should have:
             // 785 vested, 1872 pending, of the latest - nothing may be vested at block 360
             assert.equal(`${(await this.cvp.balanceOf.call(carol)).toString()}`, '785');
             assert.equal(`${(await this.lpMining.pendingCvp.call(0, carol)).toString()}`, '1872');
             assert.equal(`${(await this.lpMining.vestableCvp.call(0, carol)).toString()}`, '0');
 
-            // Alice withdraws 214 at block 361 (203 at block 360 + 11 newly released)
+            // Alice withdraws 214 at block 361 (201 at block 360 + 12 newly released)
             await this.lpMining.withdraw(0, '0', { from: alice }); // block 361
-            assert.equal(await this.cvpBalanceOf(alice), '466');
+            assert.equal(await this.cvpBalanceOf(alice), '463');
 
             // In 100 blocks after the withdrawal, the entire amount is vested.
             await time.advanceBlockTo(this.shiftBlock('439'))
             await this.lpMining.withdraw(0, '0', { from: alice });
-            assert.equal(await this.cvpBalanceOf(alice), '1373');
+            assert.equal(await this.cvpBalanceOf(alice), '1370');
             await time.advanceBlockTo(this.shiftBlock('449'))
             await this.lpMining.withdraw(0, '0', { from: bob });
             assert.equal(await this.cvpBalanceOf(bob), '1183');
             await time.advanceBlockTo(this.shiftBlock('459'))
             await this.lpMining.withdraw(0, '0', { from: carol });
-            assert.equal(await this.cvpBalanceOf(carol), '2444');
+            assert.equal(await this.cvpBalanceOf(carol), '2447');
             assert.equal((await this.lpMining.cvpVestingPool()).toString() * 1 <= 1, true);
         });
 
