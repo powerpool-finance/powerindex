@@ -36,6 +36,14 @@ function addBN(bn1, bn2) {
     return toBN(bn1.toString(10)).add(toBN(bn2.toString(10))).toString(10);
 }
 
+function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
+    bn1 = toBN(bn1.toString(10));
+    bn2 = toBN(bn2.toString(10));
+    const bn1GreaterThenBn2 = bn1.gt(bn2);
+    let diff = bn1GreaterThenBn2 ? bn1.sub(bn2) : bn2.sub(bn1);
+    assert.equal(diff.lte(toBN(accuracyWei)), true, message);
+}
+
 describe('PiBPoolController', () => {
     const name = 'My Pool';
     const symbol = 'MP';
@@ -253,4 +261,78 @@ describe('PiBPoolController', () => {
             addBN(token2AliceBalanceBefore, expectedSwapOut).toString()
         );
     })
+
+    it('should allow making a wrapped token join and exit', async () => {
+        const poolRestrictions = await PoolRestrictions.new();
+        const router = await PiRouter.new(poolRestrictions.address);
+
+        let res = await controller.replacePoolTokenWithWrapped(
+            this.token2.address,
+            router.address,
+            'WrappedTKN2',
+            'WTKN2'
+        );
+        const wToken2 = await WrappedPiErc20.at(res.logs[0].args.wrappedToken);
+        assert.equal(await wToken2.balanceOf(pool.address), ether('20'));
+
+        await this.token2.approve(wToken2.address, ether('0.2'), { from: alice });
+        await wToken2.deposit(ether('0.2'), { from: alice });
+
+        const poolOutAmount = divScalarBN(
+            mulScalarBN(amountToSwap, await pool.totalSupply()),
+            await pool.getBalance(this.token1.address)
+        );
+        let ratio = divScalarBN(poolOutAmount, await pool.totalSupply());
+        const token1InAmount = mulScalarBN(ratio, await pool.getBalance(this.token1.address));
+        const token2InAmount = mulScalarBN(ratio, await pool.getBalance(wToken2.address));
+
+        const poolOutAmountFee = mulScalarBN(poolOutAmount, communityJoinFee);
+        const poolOutAmountAfterFee = subBN(poolOutAmount, poolOutAmountFee);
+
+        await expectRevert(pool.joinPool(
+            poolOutAmount,
+            [token1InAmount, token2InAmount],
+            {from: alice}
+        ), 'ONLY_WRAPPER');
+
+        await wToken2.approve(poolWrapper.address, ether(token2InAmount), { from: alice });
+        await poolWrapper.joinPool(
+            poolOutAmount,
+            [token1InAmount, token2InAmount],
+            {from: alice}
+        );
+
+        assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
+        assert.equal((await wToken2.balanceOf(alice)).toString(), '0');
+        assert.equal(await this.token1.balanceOf(pool.address), addBN(token1InAmount, balances[0]));
+        assert.equal(await wToken2.balanceOf(pool.address), addBN(token2InAmount, balances[1]));
+        assert.equal((await pool.balanceOf(alice)).toString(), poolOutAmountAfterFee.toString());
+
+        const poolInAmountFee = mulScalarBN(poolOutAmountAfterFee, communityExitFee);
+        const poolInAmountAfterFee = subBN(poolOutAmountAfterFee, poolInAmountFee);
+
+        ratio = divScalarBN(poolInAmountAfterFee, await pool.totalSupply());
+        const token1OutAmount = mulScalarBN(ratio, await pool.getBalance(this.token1.address));
+        const token2OutAmount = mulScalarBN(ratio, await pool.getBalance(wToken2.address));
+
+        await pool.approve(poolWrapper.address, poolOutAmountAfterFee, {from: alice});
+
+        await expectRevert(pool.exitPool(
+            poolOutAmountAfterFee,
+            [token1OutAmount, token2OutAmount],
+            {from: alice}
+        ), 'ONLY_WRAPPER');
+
+        await poolWrapper.exitPool(
+            poolOutAmountAfterFee,
+            [token1OutAmount, token2OutAmount],
+            {from: alice}
+        );
+
+        assertEqualWithAccuracy((await pool.balanceOf(alice)).toString(), '0');
+        assertEqualWithAccuracy((await this.token1.balanceOf(alice)).toString(), token1OutAmount);
+        assertEqualWithAccuracy((await wToken2.balanceOf(alice)).toString(), token2OutAmount);
+        assertEqualWithAccuracy(await this.token1.balanceOf(pool.address), subBN(addBN(token1InAmount, balances[0]), token1OutAmount));
+        assertEqualWithAccuracy(await wToken2.balanceOf(pool.address), subBN(addBN(token2InAmount, balances[1]), token2OutAmount));
+    });
 });
