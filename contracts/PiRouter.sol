@@ -3,13 +3,12 @@ pragma solidity 0.6.12;
 
 import "./interfaces/WrappedPiErc20Interface.sol";
 import "./interfaces/YearnGovernanceInterface.sol";
-import "./interfaces/PiRouterInterface.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./IPoolRestrictions.sol";
+import "./PiSimpleRouter.sol";
 
 
-contract PiRouter is PiRouterInterface, Ownable {
+contract PiRouter is PiSimpleRouter {
     using SafeMath for uint256;
 
     bytes4 public constant STAKE_SIG = bytes4(keccak256(bytes('stake(uint256)')));
@@ -25,7 +24,7 @@ contract PiRouter is PiRouterInterface, Ownable {
 
     IPoolRestrictions public poolRestriction;
 
-    constructor(address _poolRestrictions) public {
+    constructor(address _poolRestrictions) public PiSimpleRouter() Ownable() {
         poolRestriction = IPoolRestrictions(_poolRestrictions);
     }
 
@@ -47,7 +46,7 @@ contract PiRouter is PiRouterInterface, Ownable {
         _callVoting(_wrappedToken, VOTE_AGAINST_SIG, abi.encode(_id));
     }
 
-    function setVotingForWrappedToken(address _wrappedToken, address _voting) external override onlyOwner {
+    function setVotingForWrappedToken(address _wrappedToken, address _voting) external onlyOwner {
         votingByWrapped[_wrappedToken] = _voting;
         emit SetVotingForWrappedToken(_wrappedToken, _voting);
     }
@@ -55,13 +54,6 @@ contract PiRouter is PiRouterInterface, Ownable {
     function setReserveRatioForWrappedToken(address _wrappedToken, uint _reserveRatio) external onlyOwner {
         reserveRatioByWrapped[_wrappedToken] = _reserveRatio;
         emit SetReserveRatioForWrappedToken(_wrappedToken, _reserveRatio);
-    }
-
-    function migrateWrappedTokensToNewRouter(address[] calldata _wrappedTokens, address _newRouter) external onlyOwner {
-        uint256 len = _wrappedTokens.length;
-        for(uint256 i = 0; i < len; i++) {
-            WrappedPiErc20Interface(_wrappedTokens[i]).changeRouter(_newRouter);
-        }
     }
 
     function wrapperCallback(uint256 _withdrawAmount) external override {
