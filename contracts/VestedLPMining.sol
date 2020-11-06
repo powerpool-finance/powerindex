@@ -485,10 +485,8 @@ contract VestedLPMining is
 
         // Compute the vesting block (i.e. when the pended tokens to be all vested)
         uint256 period = 0;
-        if (pending == 0) {
-            // `period` remains 0
-        } else if (remainingPended == 0) {
-            // only newly entitled CVPs remain pended
+        if (remainingPended == 0 || pending == 0) {
+            // newly entitled CVPs only or nothing remain pended
             period = cvpVestingPeriodInBlocks;
         } else {
             // "old" CVPs and, perhaps, "new" CVPs are pending - the weighted average applied

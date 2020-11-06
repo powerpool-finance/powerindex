@@ -235,7 +235,7 @@ describe('VestedLPMining (internal math)', () => {
                     // but pended CVPs all get vested
                     assert.equal(res.newlyVested.toString(), `${2e6}`);
                     assert.equal(res.pendedCvp.toString(), '0');
-                    assert.equal(res.vestingBlock.toString(), currentBlock);
+                    assert.equal(res.vestingBlock.toString(), 1 * currentBlock + 1 * vestPeriod);
                 });
             });
 
