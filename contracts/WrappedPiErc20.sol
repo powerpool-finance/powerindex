@@ -29,6 +29,10 @@ contract WrappedPiErc20 is ERC20 {
         router = _router;
     }
 
+    function pokeRouter(uint256 _amount) external {
+        PiRouterInterface(router).wrapperCallback(0);
+    }
+
     function deposit(uint256 _amount) external {
         require(_amount > 0, "WrappedPiErc20::deposit: Can't deposit 0");
 
