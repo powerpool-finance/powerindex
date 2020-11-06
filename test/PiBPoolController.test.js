@@ -166,15 +166,15 @@ describe('PiBPoolController', () => {
         const token3AliceBalanceBefore = (await this.token3.balanceOf(alice)).toString();
 
         await this.token1.approve(poolWrapper.address, amountToSwap, {from: alice});
-        // TODO: A wrong message due probably the Buidler EVM bug
-        // await expectRevert(poolWrapper.swapExactAmountIn(
-        //     this.token1.address,
-        //     amountToSwap,
-        //     this.token2.address,
-        //     expectedSwapOut,
-        //     mulScalarBN(price, ether('1.05')),
-        //     {from: alice}
-        // ), 'NOT_BOUND');
+        // TODO: A wrong error message due probably the Buidler EVM bug
+        await expectRevert.unspecified(poolWrapper.swapExactAmountIn(
+            this.token1.address,
+            amountToSwap,
+            this.token2.address,
+            expectedSwapOut,
+            mulScalarBN(price, ether('1.05')),
+            {from: alice}
+        ), 'NOT_BOUND');
 
         await poolWrapper.swapExactAmountIn(
             this.token1.address,
@@ -231,15 +231,15 @@ describe('PiBPoolController', () => {
         const token2AliceBalanceBefore = (await wToken2.balanceOf(alice)).toString();
 
         await this.token1.approve(poolWrapper.address, amountToSwap, {from: alice});
-        // TODO: A wrong message due probably the Buidler EVM bug
-        // await expectRevert(poolWrapper.swapExactAmountIn(
-        //     this.token1.address,
-        //     amountToSwap,
-        //     this.token2.address,
-        //     expectedSwapOut,
-        //     mulScalarBN(price, ether('1.05')),
-        //     {from: alice}
-        // ), 'NOT_BOUND');
+        // TODO: A wrong error message due probably the Buidler EVM bug
+        await expectRevert.unspecified(poolWrapper.swapExactAmountIn(
+            this.token1.address,
+            amountToSwap,
+            this.token2.address,
+            expectedSwapOut,
+            mulScalarBN(price, ether('1.05')),
+            {from: alice}
+        ));
 
         await poolWrapper.swapExactAmountIn(
             this.token1.address,
