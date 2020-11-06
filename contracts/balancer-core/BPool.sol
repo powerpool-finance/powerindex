@@ -135,7 +135,7 @@ contract BPool is BToken, BMath {
 
     function getNumTokens()
         external view
-        returns (uint) 
+        returns (uint)
     {
         return _tokens.length;
     }
@@ -379,7 +379,7 @@ contract BPool is BToken, BMath {
             require(_totalWeight <= MAX_TOTAL_WEIGHT, "MAX_TOTAL_WEIGHT");
         } else if (denorm < oldWeight) {
             _totalWeight = bsub(_totalWeight, bsub(oldWeight, denorm));
-        }        
+        }
         _records[token].denorm = denorm;
 
         // Adjust the balance record and actual token balance
@@ -608,7 +608,7 @@ contract BPool is BToken, BMath {
     )
         external
         _logs_
-        _lock_ 
+        _lock_
         returns (uint tokenAmountIn, uint spotPriceAfter)
     {
         _checkWrapper();
@@ -782,7 +782,7 @@ contract BPool is BToken, BMath {
                         );
 
         require(tokenAmountOut >= minAmountOut, "LIMIT_OUT");
-        
+
         require(tokenAmountOut <= bmul(_records[tokenOut].balance, MAX_OUT_RATIO), "OUT_RATIO");
 
         outRecord.balance = bsub(outRecord.balance, tokenAmountOut);

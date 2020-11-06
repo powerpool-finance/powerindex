@@ -3,12 +3,12 @@ pragma solidity 0.6.12;
 
 import "./interfaces/WrappedPiErc20Interface.sol";
 import "./interfaces/YearnGovernanceInterface.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./IPoolRestrictions.sol";
+import "./PiSimpleRouter.sol";
 
 
-contract PiRouter is Ownable {
+contract PiRouter is PiSimpleRouter {
     using SafeMath for uint256;
 
     bytes4 public constant STAKE_SIG = bytes4(keccak256(bytes('stake(uint256)')));
@@ -24,7 +24,7 @@ contract PiRouter is Ownable {
 
     IPoolRestrictions public poolRestriction;
 
-    constructor(address _poolRestrictions) public {
+    constructor(address _poolRestrictions) public PiSimpleRouter() Ownable() {
         poolRestriction = IPoolRestrictions(_poolRestrictions);
     }
 
@@ -56,15 +56,15 @@ contract PiRouter is Ownable {
         emit SetReserveRatioForWrappedToken(_wrappedToken, _reserveRatio);
     }
 
-    function migrateWrappedTokensToNewRouter(address[] calldata _wrappedTokens, address _newRouter) external onlyOwner {
-        uint256 len = _wrappedTokens.length;
-        for(uint256 i = 0; i < len; i++) {
-            WrappedPiErc20Interface(_wrappedTokens[i]).changeRouter(_newRouter);
-        }
-    }
-
-    function wrapperCallback(uint256 _withdrawAmount) external {
+    function wrapperCallback(uint256 _withdrawAmount) external override {
         address _wrappedToken = msg.sender;
+        address votingAddress = votingByWrapped[_wrappedToken];
+
+        // Ignore the tokens without a voting assigned
+        if (votingByWrapped[_wrappedToken] == address(0)) {
+            return;
+        }
+
         YearnGovernanceInterface voting = YearnGovernanceInterface(votingByWrapped[_wrappedToken]);
 
         uint stakedBalance = voting.balanceOf(_wrappedToken);

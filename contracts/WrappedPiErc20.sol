@@ -13,6 +13,9 @@ contract WrappedPiErc20 is ERC20 {
     IERC20 public immutable token;
     address public router;
 
+    event Deposit(address indexed account, uint256 amount);
+    event Withdraw(address indexed account, uint256 amount);
+    event Approve(address indexed to, uint256 amount);
     event ChangeRouter(address indexed newRouter);
     event CallVoting(address indexed voting, bool indexed success, bytes4 indexed inputSig, bytes inputData, bytes outputData);
 
@@ -23,10 +26,18 @@ contract WrappedPiErc20 is ERC20 {
 
     constructor(address _token, address _router, string memory _name, string memory _symbol) public ERC20(_name, _symbol) {
         token = IERC20(_token);
-        router = router;
+        router = _router;
+    }
+
+    function pokeRouter(uint256 _amount) external {
+        PiRouterInterface(router).wrapperCallback(0);
     }
 
     function deposit(uint256 _amount) external {
+        require(_amount > 0, "WrappedPiErc20::deposit: Can't deposit 0");
+
+        emit Deposit(_msgSender(), _amount);
+
         token.transferFrom(_msgSender(), address(this), _amount);
         _mint(_msgSender(), _amount);
 
@@ -34,11 +45,15 @@ contract WrappedPiErc20 is ERC20 {
     }
 
     function withdraw(uint256 _amount) external {
+        require(_amount > 0, "WrappedPiErc20::withdraw: Can't withdraw 0");
+
+        emit Withdraw(_msgSender(), _amount);
+
         PiRouterInterface(router).wrapperCallback(_amount);
 
         ERC20(address(this)).transferFrom(_msgSender(), address(this), _amount);
         _burn(address(this), _amount);
-        token.transfer(address(this), _amount);
+        token.transfer(_msgSender(), _amount);
     }
 
     function changeRouter(address _newRouter) external onlyRouter {
@@ -47,7 +62,8 @@ contract WrappedPiErc20 is ERC20 {
     }
 
     function approveToken(address _to, uint256 _amount) external onlyRouter {
-        token.approve(address(this), _amount);
+        token.approve(_to, _amount);
+        emit Approve(_to, _amount);
     }
 
     function callVoting(address voting, bytes4 signature, bytes calldata args, uint value) external onlyRouter {

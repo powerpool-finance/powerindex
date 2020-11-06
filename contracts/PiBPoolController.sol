@@ -3,16 +3,33 @@ pragma solidity 0.6.12;
 
 import "./PiBPoolAbstractController.sol";
 import "./WrappedPiErc20.sol";
-import "@nomiclabs/buidler/console.sol";
-
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract PiBPoolController is PiBPoolAbstractController {
+
+    event ReplacePoolTokenWithWrapped(
+        address indexed existingToken,
+        address indexed wrappedToken,
+        address indexed router,
+        uint256 balance,
+        uint256 denormalizedWeight,
+        string name,
+        string symbol
+    );
+
+    event ReplacePoolTokenWithNewVersion(
+        address indexed oldToken,
+        address indexed newToken,
+        address indexed migrator,
+        uint256 balance,
+        uint256 denormalizedWeight
+    );
 
     constructor(address _bpool) public PiBPoolAbstractController(_bpool) {
 
     }
 
-    function replacePoolTokenByWrapped(
+    function replacePoolTokenWithWrapped(
         address _token,
         address _router,
         string calldata _name,
@@ -32,9 +49,11 @@ contract PiBPoolController is PiBPoolAbstractController {
 
         wrappedToken.approve(address(bpool), balance);
         bpool.bind(address(wrappedToken), balance, denormalizedWeight);
+
+        emit ReplacePoolTokenWithWrapped(_token, address(wrappedToken), _router, balance, denormalizedWeight, _name, _symbol);
     }
 
-    function replacePoolTokenByNewVersion(
+    function replacePoolTokenWithNewVersion(
         address _oldToken,
         address _newToken,
         address _migrator,
@@ -52,7 +71,14 @@ contract PiBPoolController is PiBPoolAbstractController {
         (bool success, bytes memory data) = _migrator.call(_migratorData);
         require(success, "NOT_SUCCESS");
 
+        require(
+            IERC20(_newToken).balanceOf(address(this)) >= balance,
+            "PiBPoolController:newVersion: insufficient newToken balance"
+        );
+
         IERC20(_newToken).approve(address(bpool), balance);
         bpool.bind(_newToken, balance, denormalizedWeight);
+
+        emit ReplacePoolTokenWithNewVersion(_oldToken, _newToken, _migrator, balance, denormalizedWeight);
     }
 }
