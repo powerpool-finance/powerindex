@@ -96,9 +96,9 @@ contract BPool is BToken, BMath {
     address private _communityFeeReceiver;
     bool private _finalized;
 
-    address[] private _tokens;
-    mapping(address => Record) private _records;
-    uint private _totalWeight;
+    address[] internal _tokens;
+    mapping(address => Record) internal _records;
+    uint internal _totalWeight;
 
     constructor(string memory name, string memory symbol) public {
         _name = name;
@@ -163,7 +163,7 @@ contract BPool is BToken, BMath {
     {
 
         _checkBound(token);
-        return _records[token].denorm;
+        return _getDenormWeight(token);
     }
 
     function getTotalDenormalizedWeight()
@@ -171,7 +171,7 @@ contract BPool is BToken, BMath {
         _viewlock_
         returns (uint)
     {
-        return _totalWeight;
+        return _getTotalWeight();
     }
 
     function getNormalizedWeight(address token)
@@ -181,7 +181,7 @@ contract BPool is BToken, BMath {
     {
 
         _checkBound(token);
-        return bdiv(_records[token].denorm, _totalWeight);
+        return bdiv(_getDenormWeight(token), _getTotalWeight());
     }
 
     function getBalance(address token)
@@ -326,7 +326,7 @@ contract BPool is BToken, BMath {
         _pushPoolShare(msg.sender, INIT_POOL_SUPPLY);
     }
 
-    function callVoting(address voting, bytes4 signature, bytes calldata args, uint value)
+    function callVoting(address voting, bytes4 signature, bytes calldata args, uint256 value)
         external
         _logs_
         _lock_
@@ -340,7 +340,8 @@ contract BPool is BToken, BMath {
     }
 
     function bind(address token, uint balance, uint denorm)
-        external
+        public
+        virtual
         _logs_
         // _lock_  Bind does not lock because it jumps to `rebind`, which does
     {
@@ -361,6 +362,7 @@ contract BPool is BToken, BMath {
 
     function rebind(address token, uint balance, uint denorm)
         public
+        virtual
         _logs_
         _lock_
     {
@@ -392,7 +394,8 @@ contract BPool is BToken, BMath {
     }
 
     function unbind(address token)
-        external
+        public
+        virtual
         _logs_
         _lock_
     {
@@ -438,7 +441,7 @@ contract BPool is BToken, BMath {
         require(_records[tokenIn].bound && _records[tokenOut].bound, "NOT_BOUND");
         Record storage inRecord = _records[tokenIn];
         Record storage outRecord = _records[tokenOut];
-        return calcSpotPrice(inRecord.balance, inRecord.denorm, outRecord.balance, outRecord.denorm, _swapFee);
+        return calcSpotPrice(inRecord.balance, _getDenormWeight(tokenIn), outRecord.balance, _getDenormWeight(tokenOut), _swapFee);
     }
 
     function getSpotPriceSansFee(address tokenIn, address tokenOut)
@@ -450,7 +453,7 @@ contract BPool is BToken, BMath {
         _checkBound(tokenOut);
         Record storage inRecord = _records[tokenIn];
         Record storage outRecord = _records[tokenOut];
-        return calcSpotPrice(inRecord.balance, inRecord.denorm, outRecord.balance, outRecord.denorm, 0);
+        return calcSpotPrice(inRecord.balance, _getDenormWeight(tokenIn), outRecord.balance, _getDenormWeight(tokenOut), 0);
     }
 
     function joinPool(uint poolAmountOut, uint[] calldata maxAmountsIn)
@@ -545,9 +548,9 @@ contract BPool is BToken, BMath {
 
         uint spotPriceBefore = calcSpotPrice(
                                     inRecord.balance,
-                                    inRecord.denorm,
+                                    _getDenormWeight(tokenIn),
                                     outRecord.balance,
-                                    outRecord.denorm,
+                                    _getDenormWeight(tokenOut),
                                     _swapFee
                                 );
         require(spotPriceBefore <= maxPrice, "LIMIT_PRICE");
@@ -562,9 +565,9 @@ contract BPool is BToken, BMath {
 
         tokenAmountOut = calcOutGivenIn(
                             inRecord.balance,
-                            inRecord.denorm,
+                            _getDenormWeight(tokenIn),
                             outRecord.balance,
-                            outRecord.denorm,
+                            _getDenormWeight(tokenOut),
                             tokenAmountInAfterFee,
                             _swapFee
                         );
@@ -575,9 +578,9 @@ contract BPool is BToken, BMath {
 
         spotPriceAfter = calcSpotPrice(
                                 inRecord.balance,
-                                inRecord.denorm,
+                                _getDenormWeight(tokenIn),
                                 outRecord.balance,
-                                outRecord.denorm,
+                                _getDenormWeight(tokenOut),
                                 _swapFee
                             );
         require(
@@ -620,9 +623,9 @@ contract BPool is BToken, BMath {
 
         uint spotPriceBefore = calcSpotPrice(
                                     inRecord.balance,
-                                    inRecord.denorm,
+                                    _getDenormWeight(tokenIn),
                                     outRecord.balance,
-                                    outRecord.denorm,
+                                    _getDenormWeight(tokenOut),
                                     _swapFee
                                 );
         require(spotPriceBefore <= maxPrice, "LIMIT_PRICE");
@@ -635,9 +638,9 @@ contract BPool is BToken, BMath {
 
         tokenAmountIn = calcInGivenOut(
                             inRecord.balance,
-                            inRecord.denorm,
+                            _getDenormWeight(tokenIn),
                             outRecord.balance,
-                            outRecord.denorm,
+                            _getDenormWeight(tokenOut),
                             tokenAmountOut,
                             _swapFee
                         );
@@ -648,9 +651,9 @@ contract BPool is BToken, BMath {
 
         spotPriceAfter = calcSpotPrice(
                                 inRecord.balance,
-                                inRecord.denorm,
+                                _getDenormWeight(tokenIn),
                                 outRecord.balance,
-                                outRecord.denorm,
+                                _getDenormWeight(tokenOut),
                                 _swapFee
                             );
         require(
@@ -692,9 +695,9 @@ contract BPool is BToken, BMath {
 
         poolAmountOut = calcPoolOutGivenSingleIn(
                             inRecord.balance,
-                            inRecord.denorm,
+                            _getDenormWeight(tokenIn),
                             _totalSupply,
-                            _totalWeight,
+                            _getTotalWeight(),
                             tokenAmountInAfterFee,
                             _swapFee
                         );
@@ -733,9 +736,9 @@ contract BPool is BToken, BMath {
 
         tokenAmountIn = calcSingleInGivenPoolOut(
                             inRecord.balance,
-                            inRecord.denorm,
+                            _getDenormWeight(tokenIn),
                             _totalSupply,
-                            _totalWeight,
+                            _getTotalWeight(),
                             poolAmountOut,
                             _swapFee
                         );
@@ -771,9 +774,9 @@ contract BPool is BToken, BMath {
 
         tokenAmountOut = calcSingleOutGivenPoolIn(
                             outRecord.balance,
-                            outRecord.denorm,
+                            _getDenormWeight(tokenOut),
                             _totalSupply,
-                            _totalWeight,
+                            _getTotalWeight(),
                             poolAmountIn,
                             _swapFee
                         );
@@ -821,9 +824,9 @@ contract BPool is BToken, BMath {
 
         poolAmountIn = calcPoolInGivenSingleOut(
                             outRecord.balance,
-                            outRecord.denorm,
+                            _getDenormWeight(tokenOut),
                             _totalSupply,
-                            _totalWeight,
+                            _getTotalWeight(),
                             tokenAmountOut,
                             _swapFee
                         );
@@ -943,6 +946,20 @@ contract BPool is BToken, BMath {
         internal view
     {
         require(!_wrapperMode || msg.sender == _wrapper, "ONLY_WRAPPER");
+    }
+
+    function _getDenormWeight(address token)
+        internal view virtual
+        returns (uint)
+    {
+        return _records[token].denorm;
+    }
+
+    function _getTotalWeight()
+        internal view virtual
+        returns (uint)
+    {
+        return _totalWeight;
     }
 
     function calcAmountWithCommunityFee(

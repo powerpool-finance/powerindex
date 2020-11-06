@@ -6,15 +6,16 @@ import "./interfaces/YearnGovernanceInterface.sol";
 import "./interfaces/PiRouterInterface.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "./IPoolRestrictions.sol";
 
 
 contract PiRouter is PiRouterInterface, Ownable {
     using SafeMath for uint256;
 
-    bytes4 private constant STAKE_SIG = bytes4(keccak256(bytes('stake(uint256)')));
-    bytes4 private constant WITHDRAW_SIG = bytes4(keccak256(bytes('withdraw(uint256)')));
-    bytes4 private constant VOTE_FOR_SIG = bytes4(keccak256(bytes('voteFor(uint256)')));
-    bytes4 private constant VOTE_AGAINST_SIG = bytes4(keccak256(bytes('voteAgainst(uint256)')));
+    bytes4 public constant STAKE_SIG = bytes4(keccak256(bytes('stake(uint256)')));
+    bytes4 public constant WITHDRAW_SIG = bytes4(keccak256(bytes('withdraw(uint256)')));
+    bytes4 public constant VOTE_FOR_SIG = bytes4(keccak256(bytes('voteFor(uint256)')));
+    bytes4 public constant VOTE_AGAINST_SIG = bytes4(keccak256(bytes('voteAgainst(uint256)')));
 
     event SetVotingForWrappedToken(address indexed wrappedToken, address indexed voting);
     event SetReserveRatioForWrappedToken(address indexed wrappedToken, uint ratio);
@@ -22,7 +23,11 @@ contract PiRouter is PiRouterInterface, Ownable {
     mapping(address => uint) public reserveRatioByWrapped;
     mapping(address => address) public votingByWrapped;
 
-    constructor() public {}
+    IPoolRestrictions public poolRestriction;
+
+    constructor(address _poolRestrictions) public {
+        poolRestriction = IPoolRestrictions(_poolRestrictions);
+    }
 
     function stakeWrappedToVoting(address _wrappedToken, uint256 _amount) external onlyOwner {
         _stakeWrappedToVoting(_wrappedToken, _amount);
@@ -32,11 +37,13 @@ contract PiRouter is PiRouterInterface, Ownable {
         _withdrawWrappedFromVoting(_wrappedToken, _amount);
     }
 
-    function voteWrappedFor(address _wrappedToken, uint256 _id) external onlyOwner {
+    function voteWrappedFor(address _wrappedToken, uint256 _id) external {
+        _checkVotingSenderAllowed(_wrappedToken);
         _callVoting(_wrappedToken, VOTE_FOR_SIG, abi.encode(_id));
     }
 
-    function voteWrappedAgainst(address _wrappedToken, uint256 _id) external onlyOwner {
+    function voteWrappedAgainst(address _wrappedToken, uint256 _id) external {
+        _checkVotingSenderAllowed(_wrappedToken);
         _callVoting(_wrappedToken, VOTE_AGAINST_SIG, abi.encode(_id));
     }
 
@@ -98,5 +105,10 @@ contract PiRouter is PiRouterInterface, Ownable {
 
     function _callVoting(address _wrappedToken, bytes4 _sig, bytes memory _data) internal {
         WrappedPiErc20Interface(_wrappedToken).callVoting(votingByWrapped[_wrappedToken], _sig, _data, 0);
+    }
+
+    function _checkVotingSenderAllowed(address _wrappedToken) internal {
+        address voting = votingByWrapped[_wrappedToken];
+        require(poolRestriction.isVotingSenderAllowed(voting, msg.sender), "SENDER_NOT_ALLOWED");
     }
 }

@@ -25,12 +25,19 @@ abstract contract BPoolInterface {
     function calcAmountWithCommunityFee(uint, uint, address) external view virtual returns (uint, uint);
     function getRestrictions() external view virtual returns (address);
 
+    function isBound(address t) external view virtual returns (bool);
     function getCurrentTokens() external view virtual returns (address[] memory tokens);
     function getFinalTokens() external view virtual returns (address[] memory tokens);
 
-    function getController() external view virtual returns (address);
+    function setSwapFee(uint) external virtual;
+    function setCommunityFeeAndReceiver(uint, uint, uint, address) external virtual;
     function setController(address) external virtual;
-
+    function setPublicSwap(bool) external virtual;
+    function finalize() external virtual;
     function bind(address, uint, uint) external virtual;
+    function rebind(address, uint, uint) external virtual;
     function unbind(address) external virtual;
+    function callVoting(address voting, bytes4 signature, bytes calldata args, uint256 value) external virtual;
+
+    function MIN_WEIGHT() external view virtual returns (uint);
 }
