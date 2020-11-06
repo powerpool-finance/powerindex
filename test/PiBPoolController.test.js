@@ -11,6 +11,7 @@ const PiBPoolController = artifacts.require('PiBPoolController');
 const MockErc20Migrator = artifacts.require('MockErc20Migrator');
 const PiRouter = artifacts.require('PiRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
+const PoolRestrictions = artifacts.require('PoolRestrictions');
 
 MockERC20.numberFormat = 'String';
 MockErc20Migrator.numberFormat = 'String';
@@ -189,7 +190,8 @@ describe('PiBPoolController', () => {
     });
 
     it('should allow swapping a token with a new wrapped version', async () => {
-        const router = await PiRouter.new();
+        const poolRestrictions = await PoolRestrictions.new();
+        const router = await PiRouter.new(poolRestrictions.address);
 
         let res = await controller.replacePoolTokenWithWrapped(
             this.token2.address,
