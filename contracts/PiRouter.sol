@@ -80,7 +80,7 @@ contract PiRouter is PiSimpleRouter {
                 _withdrawWrappedFromVoting(_wrappedToken, reserveAmount.sub(wrappedBalance));
             }
         } else if(wrappedBalance > reserveAmount) {
-            _stakeWrappedToVoting(msg.sender, wrappedBalance.sub(wrappedBalance));
+            _stakeWrappedToVoting(msg.sender, wrappedBalance.sub(reserveAmount));
         }
     }
 
