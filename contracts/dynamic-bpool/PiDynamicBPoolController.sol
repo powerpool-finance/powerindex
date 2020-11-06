@@ -18,8 +18,11 @@ contract PiDynamicBPoolController is PiBPoolAbstractController {
 
     }
 
+    /**
+    * @notice Call setDynamicWeight for several tokens
+    * @param _dynamicWeights Tokens dynamic weights configs
+    */
     function setDynamicWeightList(DynamicWeightInput[] memory _dynamicWeights) external onlyOwner {
-
         uint256 len = _dynamicWeights.length;
         for (uint256 i = 0; i < len; i++) {
             bpool.setDynamicWeight(
@@ -31,6 +34,10 @@ contract PiDynamicBPoolController is PiBPoolAbstractController {
         }
     }
 
+    /**
+    * @notice Permissionless function for unbind tokens which has reached MIN_WEIGHT
+    * @param _token Token to unbind
+    */
     function unbindNotActualToken(address _token) external {
         require(bpool.getDenormalizedWeight(_token) == bpool.MIN_WEIGHT(), "DENORM_MIN");
         (, uint256 targetTimestamp, , ) = bpool.getDynamicWeightSettings(_token);
