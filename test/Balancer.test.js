@@ -656,6 +656,13 @@ describe('Balancer', () => {
                 'SENDER_NOT_ALLOWED'
             );
 
+            const callVotingSig = pool.contract._jsonInterface.filter(item => item.name === 'callVoting')[0].signature;
+            const callVotingArgs = web3.eth.abi.encodeParameters(
+                ['address', 'bytes4', 'bytes', 'uint256'],
+                [this.token1.address, delegateSig, '0x' + delegateData.slice(10), '0']
+            );
+            await expectRevert(poolController.callPool(callVotingSig, callVotingArgs, '0', {from: minter}), "SIGNATURE_NOT_ALLOWED");
+
             await poolRestrictions.setVotingAllowedForSenders(this.token1.address, [minter], [true], { from: minter });
 
             await expectRevert(

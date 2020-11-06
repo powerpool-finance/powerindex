@@ -278,6 +278,25 @@ describe('PiDynamicBPool', () => {
             await expectRevert(pool.rebind(this.token1.address, ether('1'), ether('10'), { from: controller }), 'ONLY_NEW_TOKENS_ALLOWED');
             await expectRevert(pool.rebind(this.token1.address, await pool.MIN_WEIGHT(), ether('10'), { from: controller }), 'ONLY_NEW_TOKENS_ALLOWED');
         });
+        it('original bind should be disabled in controller', async () => {
+            const poolController = await PiDynamicBPoolController.new(pool.address);
+            await pool.setController(poolController.address);
+
+            const bindSig = pool.contract._jsonInterface.filter(item => item.name === 'bind' && item.inputs.length === 5)[0].signature;
+            const bindArgs = web3.eth.abi.encodeParameters(
+                ['address', 'uint', 'uint', 'uint', 'uint'],
+                [this.token1.address, balances[0], targetWeights[0], fromTimestamps[0], targetWeights[0]]
+            );
+            await expectRevert(poolController.callPool(bindSig, bindArgs, '0', {from: controller}), "SIGNATURE_NOT_ALLOWED");
+        });
+        it('original unbind should be disabled in controller', async () => {
+            const poolController = await PiDynamicBPoolController.new(pool.address);
+            await pool.setController(poolController.address);
+
+            const unbindSig = pool.contract._jsonInterface.filter(item => item.name === 'unbind')[0].signature;
+            const unbindArgs = web3.eth.abi.encodeParameters(['address'], [this.token1.address]);
+            await expectRevert(poolController.callPool(unbindSig, unbindArgs, '0', {from: controller}), "SIGNATURE_NOT_ALLOWED");
+        });
     });
 
     describe('setWeightPerSecondBounds', async () => {
@@ -615,7 +634,7 @@ describe('PiDynamicBPool', () => {
             assert.equal(poolAmountOutAfterJoin, ether('152.544804372061724031'));
         });
 
-        it('set taget dynamic weight to min and removing liquidity and then unbind', async () => {
+        it('set target dynamic weight to min and removing liquidity and then unbind', async () => {
             await time.increase(11000);
             assert.equal(await pool.getDenormalizedWeight(this.token3.address), targetWeight);
 
@@ -631,10 +650,10 @@ describe('PiDynamicBPool', () => {
             const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
             assert.equal(poolAmountOutAfterJoin, ether('152.544804372061724031'));
 
-            const controller = await PiDynamicBPoolController.new(pool.address);
-            await pool.setController(controller.address);
+            const poolController = await PiDynamicBPoolController.new(pool.address);
+            await pool.setController(poolController.address);
             const fromTimestamp = await getTimestamp(100);
-            await controller.setDynamicWeightList([{
+            await poolController.setDynamicWeightList([{
                 token: this.token3.address,
                 targetDenorm: await pool.MIN_WEIGHT(),
                 fromTimestamp: fromTimestamp,
@@ -643,7 +662,7 @@ describe('PiDynamicBPool', () => {
 
             assert.equal(await pool.getDenormalizedWeight(this.token3.address), targetWeight);
 
-            await expectRevert(controller.unbindNotActualToken(this.token3.address, {from: alice}), 'DENORM_MIN');
+            await expectRevert(poolController.unbindNotActualToken(this.token3.address, {from: alice}), 'DENORM_MIN');
 
             await time.increaseTo(fromTimestamp + 1004);
 
@@ -656,7 +675,7 @@ describe('PiDynamicBPool', () => {
             await this.exitswapExternAmountOut(this.token3, ether('0.05'));
             await this.exitswapExternAmountOut(this.token3, ether('0.05'));
 
-            await expectRevert(controller.unbindNotActualToken(this.token3.address, {from: alice}), 'DENORM_MIN');
+            await expectRevert(poolController.unbindNotActualToken(this.token3.address, {from: alice}), 'DENORM_MIN');
 
             await time.increaseTo(fromTimestamp + 11004);
 
@@ -665,15 +684,30 @@ describe('PiDynamicBPool', () => {
             const tokenBalance = await pool.getBalance(this.token3.address);
             const communityWalletBalanceBeforeUnbind = await this.token3.balanceOf(communityWallet);
 
-            await controller.unbindNotActualToken(this.token3.address, {from: alice});
+            // unbind by permissionless function
+            await poolController.unbindNotActualToken(this.token3.address, {from: alice});
             assert.equal(await pool.isBound(this.token3.address), false);
             assert.equal(await this.token3.balanceOf(communityWallet), addBN(
                 communityWalletBalanceBeforeUnbind,
                 tokenBalance
             ));
+
+            // bind again by controller
+            const newFromTimestamp = await getTimestamp(100);
+            const newTargetTimestamp = await getTimestamp(11000);
+
+            await this.token3.approve(poolController.address, initialBalance);
+            await poolController.bind(this.token3.address, initialBalance, targetWeight, newFromTimestamp, newTargetTimestamp);
+            assert.equal(await pool.isBound(this.token3.address), true);
+
+            assert.deepEqual(_.pick(await pool.getDynamicWeightSettings(this.token3.address), ['fromTimestamp', 'targetTimestamp', 'fromDenorm', 'targetDenorm']), {
+                fromTimestamp: newFromTimestamp.toString(),
+                targetTimestamp: newTargetTimestamp.toString(),
+                fromDenorm: await pool.MIN_WEIGHT(),
+                targetDenorm: targetWeight.toString()
+            });
         });
     });
-    //TODO: check disabled functions
 
     async function getDenormWeight(token, timestamp) {
         if (!timestamp) {

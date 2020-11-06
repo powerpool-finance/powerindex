@@ -326,7 +326,7 @@ contract BPool is BToken, BMath {
         _pushPoolShare(msg.sender, INIT_POOL_SUPPLY);
     }
 
-    function callVoting(address voting, bytes4 signature, bytes calldata args, uint value)
+    function callVoting(address voting, bytes4 signature, bytes calldata args, uint256 value)
         external
         _logs_
         _lock_

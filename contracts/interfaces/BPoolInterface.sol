@@ -37,7 +37,7 @@ abstract contract BPoolInterface {
     function bind(address, uint, uint) external virtual;
     function rebind(address, uint, uint) external virtual;
     function unbind(address) external virtual;
-    function callVoting(address voting, bytes4 signature, bytes calldata args, uint value) external virtual;
+    function callVoting(address voting, bytes4 signature, bytes calldata args, uint256 value) external virtual;
 
     function MIN_WEIGHT() external view virtual returns (uint);
 }

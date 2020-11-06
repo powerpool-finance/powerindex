@@ -10,8 +10,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract PiBPoolAbstractController is Ownable {
     using SafeMath for uint256;
 
-    bytes4 public constant UNBIND_SIG = bytes4(keccak256(bytes('unbind(address)')));
-    bytes4 public constant CALL_VOTING_SIG = bytes4(keccak256(bytes('callVoting(address,bytes4,bytes,uint)')));
+    bytes4 public constant CALL_VOTING_SIG = bytes4(keccak256(bytes('callVoting(address,bytes4,bytes,uint256)')));
 
     event CallPool(bool indexed success, bytes4 indexed inputSig, bytes inputData, bytes outputData);
 
@@ -28,7 +27,7 @@ contract PiBPoolAbstractController is Ownable {
     * @param value Send value to pool
     */
     function callPool(bytes4 signature, bytes calldata args, uint value) external onlyOwner {
-        require(signature != UNBIND_SIG && signature != CALL_VOTING_SIG, "SIGNATURE_NOT_ALLOWED");
+        _checkSignature(signature);
         (bool success, bytes memory data) = address(bpool).call{ value: value }(abi.encodePacked(signature, args));
         require(success, "NOT_SUCCESS");
         emit CallPool(success, signature, args, data);
@@ -60,5 +59,9 @@ contract PiBPoolAbstractController is Ownable {
 
     function _restrictions() internal returns(IPoolRestrictions) {
         return IPoolRestrictions(bpool.getRestrictions());
+    }
+
+    function _checkSignature(bytes4 signature) internal virtual {
+        require(signature != CALL_VOTING_SIG, "SIGNATURE_NOT_ALLOWED");
     }
 }

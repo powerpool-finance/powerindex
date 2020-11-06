@@ -7,6 +7,9 @@ import "../PiBPoolAbstractController.sol";
 
 contract PiDynamicBPoolController is PiBPoolAbstractController {
 
+    bytes4 public constant BIND_SIG = bytes4(keccak256(bytes("bind(address,uint256,uint256,uint256,uint256)")));
+    bytes4 public constant UNBIND_SIG = bytes4(keccak256(bytes('unbind(address)')));
+
     struct DynamicWeightInput {
         address token;
         uint targetDenorm;
@@ -16,6 +19,22 @@ contract PiDynamicBPoolController is PiBPoolAbstractController {
 
     constructor(address _bpool) public PiBPoolAbstractController(_bpool) {
 
+    }
+
+    /**
+    * @notice Call bind of pool
+    * @param token Token for bind
+    * @param balance Initial balance
+    * @param targetDenorm Target weight
+    * @param fromTimestamp From timestamp of dynamic weight
+    * @param targetTimestamp Target timestamp of dynamic weight
+    */
+    function bind(address token, uint balance, uint targetDenorm, uint fromTimestamp, uint targetTimestamp)
+        external
+    {
+        IERC20(token).transferFrom(msg.sender, address(this), balance);
+        IERC20(token).approve(address(bpool), balance);
+        bpool.bind(token, balance, targetDenorm, fromTimestamp, targetTimestamp);
     }
 
     /**
@@ -48,5 +67,9 @@ contract PiDynamicBPoolController is PiBPoolAbstractController {
         bpool.unbind(_token);
         (, , , address communityWallet) = bpool.getCommunityFee();
         IERC20(_token).transfer(communityWallet, tokenBalance);
+    }
+
+    function _checkSignature(bytes4 signature) internal override {
+        require(signature != BIND_SIG && signature != UNBIND_SIG && signature != CALL_VOTING_SIG, "SIGNATURE_NOT_ALLOWED");
     }
 }
