@@ -21,6 +21,12 @@ contract PiBPoolAbstractController is Ownable {
         bpool = PiDynamicBPoolInterface(_bpool);
     }
 
+    /**
+    * @notice Call any function from pool, except prohibited signatures
+    * @param signature Method signature
+    * @param args Encoded method inputs
+    * @param value Send value to pool
+    */
     function callPool(bytes4 signature, bytes calldata args, uint value) external onlyOwner {
         require(signature != UNBIND_SIG && signature != CALL_VOTING_SIG, "SIGNATURE_NOT_ALLOWED");
         (bool success, bytes memory data) = address(bpool).call{ value: value }(abi.encodePacked(signature, args));
@@ -28,15 +34,27 @@ contract PiBPoolAbstractController is Ownable {
         emit CallPool(success, signature, args, data);
     }
 
+    /**
+    * @notice Call voting by pool
+    * @param voting Voting address
+    * @param signature Method signature
+    * @param args Encoded method inputs
+    * @param value Send value to pool
+    */
     function callVotingByPool(address voting, bytes4 signature, bytes calldata args, uint value) external {
         require(_restrictions().isVotingSenderAllowed(voting, msg.sender), "SENDER_NOT_ALLOWED");
         bpool.callVoting(voting, signature, args, value);
     }
 
-    function migrateController(address _newController, address[] calldata _addressesToMigrate) external onlyOwner {
-        uint len = _addressesToMigrate.length;
+    /**
+    * @notice Migrate several contracts with setController method to new controller address
+    * @param newController New controller to migrate
+    * @param addressesToMigrate Address to call setController method
+    */
+    function migrateController(address newController, address[] calldata addressesToMigrate) external onlyOwner {
+        uint len = addressesToMigrate.length;
         for (uint256 i = 0; i < len; i++) {
-            PiDynamicBPoolInterface(_addressesToMigrate[i]).setController(_newController);
+            PiDynamicBPoolInterface(addressesToMigrate[i]).setController(newController);
         }
     }
 

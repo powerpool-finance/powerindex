@@ -124,6 +124,10 @@ contract PiDynamicBPool is BPool {
         setDynamicWeight(token, targetDenorm, fromTimestamp, targetTimestamp);
     }
 
+    /**
+    * @notice Override parent unbind function
+    * @param token Token for unbind
+    */
     function unbind(address token) public override {
         _totalWeight = _getTotalWeight(); // for compatibility with original BPool unbind
         super.unbind(token);
@@ -131,10 +135,19 @@ contract PiDynamicBPool is BPool {
         _dynamicWeights[token] = DynamicWeight(0, 0, 0);
     }
 
+    /**
+    * @notice Override parent bind function and disable.
+    */
     function bind(address token, uint balance, uint denorm) public override {
-        require(false, "DISABLED");
+        require(false, "DISABLED"); // Only new bind function is allowed
     }
 
+    /**
+    * @notice Override parent rebind function. Allowed only for calling from bind function
+    * @param token Token for rebind
+    * @param balance Balance for rebind
+    * @param denorm Weight for rebind
+    */
     function rebind(address token, uint balance, uint denorm) public override {
         require(denorm == MIN_WEIGHT && _dynamicWeights[token].fromTimestamp == 0, "ONLY_NEW_TOKENS_ALLOWED");
         super.rebind(token, balance, denorm);
