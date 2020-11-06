@@ -13,35 +13,9 @@
 
 pragma solidity 0.6.12;
 
-abstract contract ERC20 {
-    function balanceOf(address whom) external view virtual returns (uint);
-    function allowance(address, address) external view virtual returns (uint);
-    function approve(address spender, uint amount) external virtual returns (bool);
-    function transfer(address dst, uint amt) external virtual returns (bool);
-    function transferFrom(address sender, address recipient, uint amount) external virtual returns (bool);
-}
-
-abstract contract BPool is ERC20 {
-    function isBound(address t) external view virtual returns (bool);
-    function getFinalTokens() external view virtual returns(address[] memory);
-    function getBalance(address token) external view virtual returns (uint);
-    function setSwapFee(uint swapFee) external virtual;
-    function setCommunityFeeAndReceiver(uint swapFee, uint joinFee, uint exitFee, address swapFeeReceiver) external virtual;
-    function setController(address controller) external virtual;
-    function setPublicSwap(bool public_) external virtual;
-    function finalize() external virtual;
-    function bind(address token, uint balance, uint denorm) external virtual;
-    function rebind(address token, uint balance, uint denorm) external virtual;
-    function unbind(address token) external virtual;
-    function joinPool(uint poolAmountOut, uint[] calldata maxAmountsIn) external virtual;
-    function joinswapExternAmountIn(
-        address tokenIn, uint tokenAmountIn, uint minPoolAmountOut
-    ) external virtual returns (uint poolAmountOut);
-}
-
-abstract contract BFactory {
-    function newBPool(string calldata name, string calldata symbol) external virtual returns (BPool);
-}
+import "../interfaces/BPoolInterface.sol";
+import "../interfaces/BFactoryInterface.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /********************************** WARNING **********************************/
 //                                                                           //
@@ -51,9 +25,8 @@ abstract contract BFactory {
 /********************************** WARNING **********************************/
 
 contract BActions {
-
     function create(
-        BFactory factory,
+        BFactoryInterface factory,
         string calldata name,
         string calldata symbol,
         address[] calldata tokens,
@@ -62,7 +35,7 @@ contract BActions {
         uint[4] calldata fees,
         address communityFeeReceiver,
         bool finalize
-    ) external returns (BPool pool) {
+    ) external returns (BPoolInterface pool) {
         require(tokens.length == balances.length, "ERR_LENGTH_MISMATCH");
         require(tokens.length == denorms.length, "ERR_LENGTH_MISMATCH");
 
@@ -71,7 +44,7 @@ contract BActions {
         pool.setCommunityFeeAndReceiver(fees[1], fees[2], fees[3], communityFeeReceiver);
 
         for (uint i = 0; i < tokens.length; i++) {
-            ERC20 token = ERC20(tokens[i]);
+            IERC20 token = IERC20(tokens[i]);
             require(token.transferFrom(msg.sender, address(this), balances[i]), "ERR_TRANSFER_FAILED");
             if (token.allowance(address(this), address(pool)) > 0) {
                 token.approve(address(pool), 0);
@@ -91,7 +64,7 @@ contract BActions {
     }
 
     function setTokens(
-        BPool pool,
+        BPoolInterface pool,
         address[] calldata tokens,
         uint[] calldata balances,
         uint[] calldata denorms
@@ -100,7 +73,7 @@ contract BActions {
         require(tokens.length == denorms.length, "ERR_LENGTH_MISMATCH");
 
         for (uint i = 0; i < tokens.length; i++) {
-            ERC20 token = ERC20(tokens[i]);
+            IERC20 token = IERC20(tokens[i]);
             if (pool.isBound(tokens[i])) {
                 if (balances[i] > pool.getBalance(tokens[i])) {
                     require(
@@ -134,25 +107,25 @@ contract BActions {
         }
     }
 
-    function setPublicSwap(BPool pool, bool publicSwap) external {
+    function setPublicSwap(BPoolInterface pool, bool publicSwap) external {
         pool.setPublicSwap(publicSwap);
     }
 
-    function setSwapFee(BPool pool, uint newFee) external {
+    function setSwapFee(BPoolInterface pool, uint newFee) external {
         pool.setSwapFee(newFee);
     }
 
-    function setController(BPool pool, address newController) external {
+    function setController(BPoolInterface pool, address newController) external {
         pool.setController(newController);
     }
 
-    function finalize(BPool pool) external {
+    function finalize(BPoolInterface pool) external {
         pool.finalize();
         require(pool.transfer(msg.sender, pool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
     }
 
     function joinPool(
-        BPool pool,
+        BPoolInterface pool,
         uint poolAmountOut,
         uint[] calldata maxAmountsIn
     ) external {
@@ -160,7 +133,7 @@ contract BActions {
         require(maxAmountsIn.length == tokens.length, "ERR_LENGTH_MISMATCH");
 
         for (uint i = 0; i < tokens.length; i++) {
-            ERC20 token = ERC20(tokens[i]);
+            IERC20 token = IERC20(tokens[i]);
             require(token.transferFrom(msg.sender, address(this), maxAmountsIn[i]), "ERR_TRANSFER_FAILED");
             if (token.allowance(address(this), address(pool)) > 0) {
                 token.approve(address(pool), 0);
@@ -169,7 +142,7 @@ contract BActions {
         }
         pool.joinPool(poolAmountOut, maxAmountsIn);
         for (uint i = 0; i < tokens.length; i++) {
-            ERC20 token = ERC20(tokens[i]);
+            IERC20 token = IERC20(tokens[i]);
             if (token.balanceOf(address(this)) > 0) {
                 require(token.transfer(msg.sender, token.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
             }
@@ -178,12 +151,12 @@ contract BActions {
     }
 
     function joinswapExternAmountIn(
-        BPool pool,
+        BPoolInterface pool,
         address tokenIn,
         uint tokenAmountIn,
         uint minPoolAmountOut
     ) external {
-        ERC20 token = ERC20(tokenIn);
+        IERC20 token = IERC20(tokenIn);
         require(token.transferFrom(msg.sender, address(this), tokenAmountIn), "ERR_TRANSFER_FAILED");
         if (token.allowance(address(this), address(pool)) > 0) {
             token.approve(address(pool), 0);

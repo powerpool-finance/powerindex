@@ -8,7 +8,10 @@ const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
+const PiBPoolController = artifacts.require('PiBPoolAbstractController');
 const PermanentVotingPowerV1 = artifacts.require('PermanentVotingPowerV1');
+
+BPool.numberFormat = 'String';
 
 const {web3} = BFactory;
 const {toBN} = web3.utils;
@@ -615,5 +618,82 @@ describe('Balancer', () => {
             pool.callVoting(voting.address, castVoteSig, '0x' + newCastVoteData.slice(10), '0', { from: minter }),
             'NOT_SUCCESS'
         );
+    });
+
+    describe('PoolController', () => {
+        let poolController;
+        beforeEach(async () => {
+            poolController = await PiBPoolController.new(pool.address);
+            await pool.setController(poolController.address);
+        });
+
+        it('should be able to callPool by controller owner', async () => {
+            const setSwapFeeSig = pool.contract._jsonInterface.filter(item => item.name === 'setSwapFee')[0].signature;
+            const setSwapFeeArgs = web3.eth.abi.encodeParameters(['uint256'], [ether('0.005').toString()]);
+            await expectRevert(poolController.callPool(setSwapFeeSig, setSwapFeeArgs, '0', {from: alice}), "Ownable: caller is not the owner");
+
+            const setSwapFeeArgsIncorrect = web3.eth.abi.encodeParameters(['uint256'], [ether('5').toString()]);
+            await expectRevert(poolController.callPool(setSwapFeeSig, setSwapFeeArgsIncorrect, '0', {from: minter}), "NOT_SUCCESS");
+
+            await poolController.callPool(setSwapFeeSig, setSwapFeeArgs, '0', {from: minter});
+            assert.equal(await pool.getSwapFee(), ether('0.005').toString());
+        });
+
+        it('callVotingByPool should work properly', async () => {
+            const poolRestrictions = await PoolRestrictions.new();
+
+            const setRestrictionsSig = pool.contract._jsonInterface.filter(item => item.name === 'setRestrictions')[0].signature;
+            const setRestrictionsArgs = web3.eth.abi.encodeParameters(['address'], [poolRestrictions.address]);
+            await poolController.callPool(setRestrictionsSig, setRestrictionsArgs, '0', {from: minter});
+            assert.equal(await pool.getController(), poolController.address);
+
+            assert.equal(await this.token1.delegated(pool.address, pool.address), '0');
+
+            const delegateData = this.token1.contract.methods.delegate(pool.address).encodeABI();
+            const delegateSig = delegateData.slice(0, 10);
+            await expectRevert(
+                poolController.callVotingByPool(this.token1.address, delegateSig, '0x' + delegateData.slice(10), '0', { from: minter }),
+                'SENDER_NOT_ALLOWED'
+            );
+
+            const callVotingSig = pool.contract._jsonInterface.filter(item => item.name === 'callVoting')[0].signature;
+            const callVotingArgs = web3.eth.abi.encodeParameters(
+                ['address', 'bytes4', 'bytes', 'uint256'],
+                [this.token1.address, delegateSig, '0x' + delegateData.slice(10), '0']
+            );
+            await expectRevert(poolController.callPool(callVotingSig, callVotingArgs, '0', {from: minter}), "SIGNATURE_NOT_ALLOWED");
+
+            await poolRestrictions.setVotingAllowedForSenders(this.token1.address, [minter], [true], { from: minter });
+
+            await expectRevert(
+                poolController.callVotingByPool(this.token1.address, delegateSig, '0x' + delegateData.slice(10), '0', { from: minter }),
+                'NOT_ALLOWED_SIG'
+            );
+
+            await poolRestrictions.setVotingSignaturesForAddress(this.token1.address, true, [delegateSig], [true], { from: minter });
+
+            await expectRevert(
+                poolController.callVotingByPool(this.token1.address, delegateSig, '0x' + delegateData.slice(10), '0', { from: alice }),
+                'SENDER_NOT_ALLOWED'
+            );
+
+            await poolController.callVotingByPool(this.token1.address, delegateSig, '0x' + delegateData.slice(10), '0', { from: minter });
+
+            assert.equal(
+                (await this.token1.delegated(pool.address, pool.address)).toString(10),
+                (await this.token1.balanceOf(pool.address)).toString(10)
+            );
+        });
+
+        it('migrateController should work properly', async () => {
+            assert.equal(await pool.getController(), poolController.address);
+
+            await expectRevert(poolController.migrateController(minter, [pool.address], {from: alice}), "Ownable: caller is not the owner");
+            await poolController.migrateController(minter, [pool.address], {from: minter});
+
+            assert.equal(await pool.getController(), minter);
+
+            await expectRevert(poolController.migrateController(minter, [pool.address], {from: minter}), "NOT_CONTROLLER");
+        });
     });
 });

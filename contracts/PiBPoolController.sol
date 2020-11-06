@@ -1,24 +1,15 @@
 
 pragma solidity 0.6.12;
 
-import "./interfaces/BPoolInterface.sol";
+import "./PiBPoolAbstractController.sol";
 import "./WrappedPiErc20.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@nomiclabs/buidler/console.sol";
 
 
-contract PiBPoolController is Ownable {
-    using SafeMath for uint256;
+contract PiBPoolController is PiBPoolAbstractController {
 
-    BPoolInterface public immutable bpool;
+    constructor(address _bpool) public PiBPoolAbstractController(_bpool) {
 
-    event CallPool(bool indexed success, bytes4 indexed inputSig, bytes inputData, bytes outputData);
-
-    constructor(address _bpool) public {
-        bpool = BPoolInterface(_bpool);
     }
 
     function replacePoolTokenByWrapped(
@@ -63,15 +54,5 @@ contract PiBPoolController is Ownable {
 
         IERC20(_newToken).approve(address(bpool), balance);
         bpool.bind(_newToken, balance, denormalizedWeight);
-    }
-
-    function callPool(bytes4 signature, bytes calldata args, uint value) external onlyOwner {
-        (bool success, bytes memory data) = address(bpool).call{ value: value }(abi.encodePacked(signature, args));
-        require(success, "NOT_SUCCESS");
-        emit CallPool(success, signature, args, data);
-    }
-
-    function migratePoolController(address _newController) external onlyOwner {
-        bpool.setController(_newController);
     }
 }

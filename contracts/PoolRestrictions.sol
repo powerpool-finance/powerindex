@@ -9,6 +9,7 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
   event SetTotalRestrictions(address indexed token, uint256 maxTotalSupply);
   event SetSignatureAllowed(bytes4 indexed signature, bool allowed);
   event SetSignatureAllowedForAddress(address indexed voting, bytes4 indexed signature, bool allowed, bool overrideAllowed);
+  event SetVotingSenderAllowed(address indexed voting, address indexed sender, bool allowed);
   event SetWithoutFee(address indexed addr, bool withoutFee);
 
   struct TotalRestrictions {
@@ -26,6 +27,8 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
   }
   // votingAddress => signature => data
   mapping(address => mapping(bytes4 => VotingSignature)) public votingSignatures;
+  // votingAddress => sender => boolean
+  mapping(address => mapping(address => bool)) public votingSenderAllowed;
 
   mapping(address => bool) public withoutFeeAddresses;
 
@@ -41,6 +44,15 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
 
   function setVotingSignaturesForAddress(address _votingAddress, bool _override, bytes4[] calldata _signatures, bool[] calldata _allowed) external onlyOwner {
     _setVotingSignaturesForAddress(_votingAddress, _override, _signatures, _allowed);
+  }
+
+  function setVotingAllowedForSenders(address _votingAddress, address[] calldata _senders, bool[] calldata _allowed) external onlyOwner {
+    uint256 len = _senders.length;
+    require(len == _allowed.length , "Arrays lengths are not equals");
+    for (uint i = 0; i < len; i++) {
+      votingSenderAllowed[_votingAddress][_senders[i]] = _allowed[i];
+      emit SetVotingSenderAllowed(_votingAddress, _senders[i], _allowed[i]);
+    }
   }
 
   function setWithoutFee(address[] calldata _addresses, bool _withoutFee) external onlyOwner {
@@ -61,6 +73,10 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
     } else {
       return signaturesAllowed[_signature];
     }
+  }
+
+  function isVotingSenderAllowed(address _votingAddress, address _sender) external override view returns(bool) {
+    return votingSenderAllowed[_votingAddress][_sender];
   }
 
   function isWithoutFee(address _address) external override view returns(bool) {
