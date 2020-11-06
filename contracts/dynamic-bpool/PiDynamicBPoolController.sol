@@ -3,9 +3,9 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../PiBPoolAbstractController.sol";
+import "../PiBPoolController.sol";
 
-contract PiDynamicBPoolController is PiBPoolAbstractController {
+contract PiDynamicBPoolController is PiBPoolController {
 
     bytes4 public constant BIND_SIG = bytes4(keccak256(bytes("bind(address,uint256,uint256,uint256,uint256)")));
     bytes4 public constant UNBIND_SIG = bytes4(keccak256(bytes('unbind(address)')));
@@ -17,7 +17,7 @@ contract PiDynamicBPoolController is PiBPoolAbstractController {
         uint targetTimestamp;
     }
 
-    constructor(address _bpool) public PiBPoolAbstractController(_bpool) {
+    constructor(address _bpool) public PiBPoolController(_bpool) {
 
     }
 
