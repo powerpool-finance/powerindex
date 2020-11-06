@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity 0.6.12;
 
 
@@ -12,13 +14,13 @@ library DelegatableCheckpoints {
 
     /// @dev A set of checkpoints and a 'delegatee'
     struct Record {
-        /// @dev new slot
+        /// new slot
         uint32 numCheckpoints;
         uint32 lastCheckpointBlock;
         address delegatee;
         // uint32 __reserved;
 
-        /// @dev new slot
+        /// new slot
         // Checkpoints by IDs
         mapping (uint32 => Checkpoint) checkpoints;
         // @dev Checkpoint IDs get counted from 1 (but not from 0) -

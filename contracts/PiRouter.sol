@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
 
@@ -61,11 +62,11 @@ contract PiRouter is PiSimpleRouter {
         address votingAddress = votingByWrapped[_wrappedToken];
 
         // Ignore the tokens without a voting assigned
-        if (votingByWrapped[_wrappedToken] == address(0)) {
+        if (votingAddress == address(0)) {
             return;
         }
 
-        YearnGovernanceInterface voting = YearnGovernanceInterface(votingByWrapped[_wrappedToken]);
+        YearnGovernanceInterface voting = YearnGovernanceInterface(votingAddress);
 
         uint stakedBalance = voting.balanceOf(_wrappedToken);
         uint wrappedBalance = WrappedPiErc20Interface(_wrappedToken).getWrappedBalance();
@@ -99,7 +100,7 @@ contract PiRouter is PiSimpleRouter {
         WrappedPiErc20Interface(_wrappedToken).callVoting(votingByWrapped[_wrappedToken], _sig, _data, 0);
     }
 
-    function _checkVotingSenderAllowed(address _wrappedToken) internal {
+    function _checkVotingSenderAllowed(address _wrappedToken) internal view {
         address voting = votingByWrapped[_wrappedToken];
         require(poolRestriction.isVotingSenderAllowed(voting, msg.sender), "SENDER_NOT_ALLOWED");
     }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
 
@@ -57,11 +58,11 @@ contract PiBPoolAbstractController is Ownable {
         }
     }
 
-    function _restrictions() internal returns(IPoolRestrictions) {
+    function _restrictions() internal view returns(IPoolRestrictions) {
         return IPoolRestrictions(bpool.getRestrictions());
     }
 
-    function _checkSignature(bytes4 signature) internal virtual {
+    function _checkSignature(bytes4 signature) internal pure virtual {
         require(signature != CALL_VOTING_SIG, "SIGNATURE_NOT_ALLOWED");
     }
 }

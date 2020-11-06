@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity 0.6.12;
 
 contract Checkpoints {
-    /// @notice Official record of token balances for each account
+    /// @dev Official record of token balances for each account
     mapping (address => uint96) internal balances;
 
     /// @notice A checkpoint for marking number of votes from a given block

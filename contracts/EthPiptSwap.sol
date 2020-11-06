@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity 0.6.12;
 
 import "./interfaces/BPoolInterface.sol";
@@ -182,7 +184,6 @@ contract EthPiptSwap is Ownable {
 
         uint256 len = oddTokens.length;
 
-        uint256 totalEthSwap = 0;
         for(uint256 i = 0; i < len; i++) {
             uint256 tokenBalance = TokenInterface(oddTokens[i]).balanceOf(address(this));
             IUniswapV2Pair tokenPair = uniswapPairFor(oddTokens[i]);
