@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -925,13 +926,13 @@ contract BPool is BToken, BMath {
     }
 
     function _checkFeeInBounds(uint256 _fee)
-        internal view
+        internal pure
     {
         require(_fee >= MIN_FEE && _fee <= MAX_FEE, "FEE_BOUNDS");
     }
 
     function _checkMathApprox(uint256 _value)
-        internal view
+        internal pure
     {
         require(_value != 0, "MATH_APPROX");
     }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0
 
 pragma solidity 0.6.12;
 
@@ -23,12 +24,12 @@ contract PiDynamicBPool is BPool {
         uint targetDenorm;
     }
 
-    /// @notice Mapping for storing dynamic weights settings. fromDenorm stored in _records mapping as denorm variable
+    /// @dev Mapping for storing dynamic weights settings. fromDenorm stored in _records mapping as denorm variable
     mapping(address => DynamicWeight) private _dynamicWeights;
 
-    /// @notice Min weight per second limit
+    /// @dev Min weight per second limit
     uint256 private _minWeightPerSecond;
-    /// @notice Max weight per second limit
+    /// @dev Max weight per second limit
     uint256 private _maxWeightPerSecond;
 
     constructor(string memory name, string memory symbol, uint minWeightPerSecond, uint maxWeightPerSecond)
@@ -138,7 +139,7 @@ contract PiDynamicBPool is BPool {
     /**
     * @notice Override parent bind function and disable.
     */
-    function bind(address token, uint balance, uint denorm) public override {
+    function bind(address, uint, uint) public override {
         require(false, "DISABLED"); // Only new bind function is allowed
     }
 
@@ -202,7 +203,7 @@ contract PiDynamicBPool is BPool {
         uint256 targetDenorm,
         uint256 fromTimestamp,
         uint256 targetTimestamp
-    ) internal view returns (uint) {
+    ) internal pure returns (uint) {
         uint256 delta = targetDenorm > fromDenorm ? bsub(targetDenorm, fromDenorm) : bsub(fromDenorm, targetDenorm);
         return delta / bsub(targetTimestamp, fromTimestamp);
     }

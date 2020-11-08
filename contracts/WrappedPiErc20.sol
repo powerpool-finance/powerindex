@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
 
@@ -29,7 +30,7 @@ contract WrappedPiErc20 is ERC20 {
         router = _router;
     }
 
-    function pokeRouter(uint256 _amount) external {
+    function pokeRouter() external {
         PiRouterInterface(router).wrapperCallback(0);
     }
 

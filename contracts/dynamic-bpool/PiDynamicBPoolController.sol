@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0
 
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
@@ -69,7 +70,7 @@ contract PiDynamicBPoolController is PiBPoolController {
         IERC20(_token).transfer(communityWallet, tokenBalance);
     }
 
-    function _checkSignature(bytes4 signature) internal override {
+    function _checkSignature(bytes4 signature) internal pure override {
         require(signature != BIND_SIG && signature != UNBIND_SIG && signature != CALL_VOTING_SIG, "SIGNATURE_NOT_ALLOWED");
     }
 }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -130,7 +131,7 @@ contract BMath is BConst, BNum {
         // That proportion is (1- weightTokenIn)
         // tokenAiAfterFee = tAi * (1 - (1-weightTi) * poolFee);
         uint normalizedWeight = bdiv(tokenWeightIn, totalWeight);
-        uint zaz = bmul(bsub(BONE, normalizedWeight), swapFee); 
+        uint zaz = bmul(bsub(BONE, normalizedWeight), swapFee);
         uint tokenAmountInAfterFee = bmul(tokenAmountIn, bsub(BONE, zaz));
 
         uint newTokenBalanceIn = badd(tokenBalanceIn, tokenAmountInAfterFee);
@@ -167,13 +168,13 @@ contract BMath is BConst, BNum {
         uint normalizedWeight = bdiv(tokenWeightIn, totalWeight);
         uint newPoolSupply = badd(poolSupply, poolAmountOut);
         uint poolRatio = bdiv(newPoolSupply, poolSupply);
-      
+
         //uint newBalTi = poolRatio^(1/weightTi) * balTi;
-        uint boo = bdiv(BONE, normalizedWeight); 
+        uint boo = bdiv(BONE, normalizedWeight);
         uint tokenInRatio = bpow(poolRatio, boo);
         uint newTokenBalanceIn = bmul(tokenInRatio, tokenBalanceIn);
         uint tokenAmountInAfterFee = bsub(newTokenBalanceIn, tokenBalanceIn);
-        // Do reverse order of fees charged in joinswap_ExternAmountIn, this way 
+        // Do reverse order of fees charged in joinswap_ExternAmountIn, this way
         //     ``` pAo == joinswap_ExternAmountIn(Ti, joinswap_PoolAmountOut(pAo, Ti)) ```
         //uint tAi = tAiAfterFee / (1 - (1-weightTi) * swapFee) ;
         uint zar = bmul(bsub(BONE, normalizedWeight), swapFee);
@@ -206,16 +207,16 @@ contract BMath is BConst, BNum {
         uint normalizedWeight = bdiv(tokenWeightOut, totalWeight);
         uint newPoolSupply = bsub(poolSupply, poolAmountIn);
         uint poolRatio = bdiv(newPoolSupply, poolSupply);
-     
+
         // newBalTo = poolRatio^(1/weightTo) * balTo;
         uint tokenOutRatio = bpow(poolRatio, bdiv(BONE, normalizedWeight));
         uint newTokenBalanceOut = bmul(tokenOutRatio, tokenBalanceOut);
 
         uint tokenAmountOutBeforeSwapFee = bsub(tokenBalanceOut, newTokenBalanceOut);
 
-        // charge swap fee on the output token side 
+        // charge swap fee on the output token side
         //uint tAo = tAoBeforeSwapFee * (1 - (1-weightTo) * swapFee)
-        uint zaz = bmul(bsub(BONE, normalizedWeight), swapFee); 
+        uint zaz = bmul(bsub(BONE, normalizedWeight), swapFee);
         tokenAmountOut = bmul(tokenAmountOutBeforeSwapFee, bsub(BONE, zaz));
         return tokenAmountOut;
     }
@@ -242,11 +243,11 @@ contract BMath is BConst, BNum {
         returns (uint poolAmountIn)
     {
 
-        // charge swap fee on the output token side 
+        // charge swap fee on the output token side
         uint normalizedWeight = bdiv(tokenWeightOut, totalWeight);
         //uint tAoBeforeSwapFee = tAo / (1 - (1-weightTo) * swapFee) ;
         uint zoo = bsub(BONE, normalizedWeight);
-        uint zar = bmul(zoo, swapFee); 
+        uint zar = bmul(zoo, swapFee);
         uint tokenAmountOutBeforeSwapFee = bdiv(tokenAmountOut, bsub(BONE, zar));
 
         uint newTokenBalanceOut = bsub(tokenBalanceOut, tokenAmountOutBeforeSwapFee);

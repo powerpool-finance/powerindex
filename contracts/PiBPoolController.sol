@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
 
@@ -68,7 +69,7 @@ contract PiBPoolController is PiBPoolAbstractController {
         bpool.unbind(_oldToken);
 
         IERC20(_oldToken).approve(_migrator, balance);
-        (bool success, bytes memory data) = _migrator.call(_migratorData);
+        (bool success,) = _migrator.call(_migratorData);
         require(success, "NOT_SUCCESS");
 
         require(
