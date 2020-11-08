@@ -134,7 +134,7 @@ contract BPoolWrapper {
             token.approve(address(bpool), 0);
         }
         token.approve(address(bpool), tokenAmountIn);
-        uint poolAmountOut = bpool.joinswapExternAmountIn(tokenIn, tokenAmountIn, minPoolAmountOut);
+        poolAmountOut = bpool.joinswapExternAmountIn(tokenIn, tokenAmountIn, minPoolAmountOut);
         require(bpool.transfer(msg.sender, bpool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
         return poolAmountOut;
     }
@@ -153,7 +153,7 @@ contract BPoolWrapper {
             token.approve(address(bpool), 0);
         }
         token.approve(address(bpool), maxAmountIn);
-        uint tokenAmountIn = bpool.joinswapPoolAmountOut(tokenIn, poolAmountOut, maxAmountIn);
+        tokenAmountIn = bpool.joinswapPoolAmountOut(tokenIn, poolAmountOut, maxAmountIn);
         require(token.transfer(msg.sender, maxAmountIn.sub(tokenAmountIn)), "ERR_TRANSFER_FAILED");
         require(bpool.transfer(msg.sender, bpool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
         return tokenAmountIn;
@@ -169,7 +169,7 @@ contract BPoolWrapper {
     {
         require(bpool.transferFrom(msg.sender, address(this), poolAmountIn), "ERR_TRANSFER_FAILED");
         bpool.approve(address(bpool), poolAmountIn);
-        uint tokenAmountOut = bpool.exitswapPoolAmountIn(tokenOut, poolAmountIn, minAmountOut);
+        tokenAmountOut = bpool.exitswapPoolAmountIn(tokenOut, poolAmountIn, minAmountOut);
         require(IERC20(tokenOut).transfer(msg.sender, IERC20(tokenOut).balanceOf(address(this))), "ERR_TRANSFER_FAILED");
         return tokenAmountOut;
     }
@@ -184,7 +184,7 @@ contract BPoolWrapper {
     {
         require(bpool.transferFrom(msg.sender, address(this), maxPoolAmountIn), "ERR_TRANSFER_FAILED");
         bpool.approve(address(bpool), maxPoolAmountIn);
-        uint poolAmountIn = bpool.exitswapExternAmountOut(tokenOut, tokenAmountOut, maxPoolAmountIn);
+        poolAmountIn = bpool.exitswapExternAmountOut(tokenOut, tokenAmountOut, maxPoolAmountIn);
         require(IERC20(tokenOut).transfer(msg.sender, tokenAmountOut), "ERR_TRANSFER_FAILED");
         require(bpool.transfer(msg.sender, maxPoolAmountIn.sub(poolAmountIn)), "ERR_TRANSFER_FAILED");
         return poolAmountIn;
