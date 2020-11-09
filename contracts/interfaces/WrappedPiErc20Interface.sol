@@ -14,4 +14,8 @@ interface WrappedPiErc20Interface {
     function callVoting(address voting, bytes4 signature, bytes calldata args, uint value) external;
 
     function getWrappedBalance() external returns(uint);
+
+    function balanceOf(address account) external view returns (uint256);
+
+    function approve(address spender, uint256 amount) external returns (bool);
 }
