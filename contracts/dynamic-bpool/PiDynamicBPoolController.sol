@@ -18,7 +18,7 @@ contract PiDynamicBPoolController is PiBPoolController {
         uint targetTimestamp;
     }
 
-    constructor(address _bpool) public PiBPoolController(_bpool) {
+    constructor(address _bpool, address _bpoolWrapper) public PiBPoolController(_bpool, _bpoolWrapper) {
 
     }
 

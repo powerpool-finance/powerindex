@@ -51,6 +51,7 @@ async function getTimestamp(shift = 0) {
 }
 
 describe('PiDynamicBPool', () => {
+    const zeroAddress = '0x0000000000000000000000000000000000000000';
     const name = 'My Pool';
     const symbol = 'MP';
     const balances = [ether('100'), ether('200')].map(w => w.toString());
@@ -279,7 +280,7 @@ describe('PiDynamicBPool', () => {
             await expectRevert(pool.rebind(this.token1.address, await pool.MIN_WEIGHT(), ether('10'), { from: controller }), 'ONLY_NEW_TOKENS_ALLOWED');
         });
         it('original bind should be disabled in controller', async () => {
-            const poolController = await PiDynamicBPoolController.new(pool.address);
+            const poolController = await PiDynamicBPoolController.new(pool.address, zeroAddress);
             await pool.setController(poolController.address);
 
             const bindSig = pool.contract._jsonInterface.filter(item => item.name === 'bind' && item.inputs.length === 5)[0].signature;
@@ -290,7 +291,7 @@ describe('PiDynamicBPool', () => {
             await expectRevert(poolController.callPool(bindSig, bindArgs, '0', {from: controller}), "SIGNATURE_NOT_ALLOWED");
         });
         it('original unbind should be disabled in controller', async () => {
-            const poolController = await PiDynamicBPoolController.new(pool.address);
+            const poolController = await PiDynamicBPoolController.new(pool.address, zeroAddress);
             await pool.setController(poolController.address);
 
             const unbindSig = pool.contract._jsonInterface.filter(item => item.name === 'unbind')[0].signature;
@@ -650,7 +651,7 @@ describe('PiDynamicBPool', () => {
             const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
             assert.equal(poolAmountOutAfterJoin, ether('152.544804372061724031').toString());
 
-            const poolController = await PiDynamicBPoolController.new(pool.address);
+            const poolController = await PiDynamicBPoolController.new(pool.address, zeroAddress);
             await pool.setController(poolController.address);
             const fromTimestamp = await getTimestamp(100);
             await poolController.setDynamicWeightList([{

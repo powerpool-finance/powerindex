@@ -8,7 +8,7 @@ const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
-const PiBPoolController = artifacts.require('PiBPoolAbstractController');
+const PiBPoolController = artifacts.require('PiBPoolController');
 const PermanentVotingPowerV1 = artifacts.require('PermanentVotingPowerV1');
 
 BPool.numberFormat = 'String';
@@ -38,6 +38,7 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
 }
 
 describe('Balancer', () => {
+    const zeroAddress = '0x0000000000000000000000000000000000000000';
     const name = 'My Pool';
     const symbol = 'MP';
     const balances = [ether('10'), ether('20')];
@@ -623,7 +624,7 @@ describe('Balancer', () => {
     describe('PoolController', () => {
         let poolController;
         beforeEach(async () => {
-            poolController = await PiBPoolController.new(pool.address);
+            poolController = await PiBPoolController.new(pool.address, zeroAddress);
             await pool.setController(poolController.address);
         });
 

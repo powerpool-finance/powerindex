@@ -6,10 +6,11 @@ import "./interfaces/BPoolInterface.sol";
 import "./interfaces/WrappedPiErc20Interface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "./lib/ControllerOwnable.sol";
+import "./interfaces/BPoolWrapperInterface.sol";
 
 
-contract BPoolWrapper is Ownable {
+contract BPoolWrapper is ControllerOwnable, BPoolWrapperInterface {
     using SafeMath for uint256;
 
     event SetWrapper(address indexed token, address indexed wrapper);
@@ -19,21 +20,21 @@ contract BPoolWrapper is Ownable {
     mapping(address => address) public wrapperByToken;
     mapping(address => address) public tokenByWrapper;
 
-    constructor(address _bpool) public Ownable() {
+    constructor(address _bpool) public ControllerOwnable() {
         bpool = BPoolInterface(_bpool);
     }
 
-    function setWrappers(address[] calldata _tokens, address[] calldata _wrappers) external onlyOwner {
+    function setTokenWrapperList(address[] calldata _tokens, address[] calldata _wrappers) external override onlyController {
         uint len = _tokens.length;
         require(len == _wrappers.length, "LENGTH_DONT_MATCH");
 
         for (uint i = 0; i < len; i++) {
-            wrapperByToken[_tokens[i]] = _wrappers[i];
-            if (_wrappers[i] != address(0)) {
-                tokenByWrapper[_wrappers[i]] = _tokens[i];
-            }
-            emit SetWrapper(_tokens[i], _wrappers[i]);
+            _setTokenWrapper(_tokens[i], _wrappers[i]);
         }
+    }
+
+    function setTokenWrapper(address _token, address _wrapper) external override onlyController {
+        _setTokenWrapper(_token, _wrapper);
     }
 
     function swapExactAmountOut(
@@ -290,5 +291,13 @@ contract BPoolWrapper is Ownable {
         } else {
             return wrapper;
         }
+    }
+
+    function _setTokenWrapper(address token, address wrapper) internal {
+        wrapperByToken[token] = wrapper;
+        if (wrapper != address(0)) {
+            tokenByWrapper[wrapper] = token;
+        }
+        emit SetWrapper(token, wrapper);
     }
 }
