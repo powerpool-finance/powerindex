@@ -62,7 +62,7 @@ contract PiBPoolController is PiBPoolAbstractController {
         bpool.bind(address(wrappedToken), balance, denormalizedWeight);
 
         if (address(bpoolWrapper) != address(0)) {
-            bpoolWrapper.setTokenWrapper(address(wrappedToken), _token);
+            bpoolWrapper.setTokenWrapper(_token, address(wrappedToken));
         }
 
         emit ReplacePoolTokenWithWrapped(_token, address(wrappedToken), _router, balance, denormalizedWeight, _name, _symbol);

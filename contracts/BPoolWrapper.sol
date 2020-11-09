@@ -48,11 +48,12 @@ contract BPoolWrapper is ControllerOwnable, BPoolWrapperInterface {
         returns (uint tokenAmountIn, uint spotPriceAfter)
     {
         address factTokenIn = _processTokenIn(tokenIn, maxAmountIn);
+        address factTokenOut = _getFactToken(tokenOut);
 
         (tokenAmountIn, spotPriceAfter) = bpool.swapExactAmountOut(
             factTokenIn,
             maxAmountIn,
-            tokenOut,
+            factTokenOut,
             tokenAmountOut,
             maxPrice
         );
@@ -74,11 +75,12 @@ contract BPoolWrapper is ControllerOwnable, BPoolWrapperInterface {
         returns (uint tokenAmountOut, uint spotPriceAfter)
     {
         address factTokenIn = _processTokenIn(tokenIn, tokenAmountIn);
+        address factTokenOut = _getFactToken(tokenOut);
 
         (tokenAmountOut, spotPriceAfter) = bpool.swapExactAmountIn(
             factTokenIn,
             tokenAmountIn,
-            tokenOut,
+            factTokenOut,
             minAmountOut,
             maxPrice
         );

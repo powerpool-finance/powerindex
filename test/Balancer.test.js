@@ -10,6 +10,7 @@ const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const PiBPoolController = artifacts.require('PiBPoolController');
 const PermanentVotingPowerV1 = artifacts.require('PermanentVotingPowerV1');
+const BPoolWrapper = artifacts.require('BPoolWrapper');
 
 BPool.numberFormat = 'String';
 
@@ -687,14 +688,24 @@ describe('Balancer', () => {
         });
 
         it('migrateController should work properly', async () => {
+            const bPoolWrapper = await BPoolWrapper.new(pool.address);
+            await bPoolWrapper.setController(poolController.address);
+
+            assert.equal(await bPoolWrapper.getController(), poolController.address);
             assert.equal(await pool.getController(), poolController.address);
 
-            await expectRevert(poolController.migrateController(minter, [pool.address], {from: alice}), "Ownable: caller is not the owner");
-            await poolController.migrateController(minter, [pool.address], {from: minter});
+            await expectRevert(poolController.migrateController(minter, [
+                pool.address,
+                bPoolWrapper.address
+            ], {from: alice}), "Ownable: caller is not the owner");
 
+            await poolController.migrateController(minter, [pool.address, bPoolWrapper.address], {from: minter});
+
+            assert.equal(await bPoolWrapper.getController(), minter);
             assert.equal(await pool.getController(), minter);
 
             await expectRevert(poolController.migrateController(minter, [pool.address], {from: minter}), "NOT_CONTROLLER");
+            await expectRevert(poolController.migrateController(minter, [bPoolWrapper.address], {from: minter}), "NOT_CONTROLLER");
         });
     });
 });
