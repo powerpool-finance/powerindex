@@ -4,7 +4,7 @@ pragma solidity 0.6.12;
 
 import "../balancer-core/BPool.sol";
 
-contract PiDynamicBPool is BPool {
+contract PiDynamicPool is BPool {
 
     /// @notice The event emitted when a dynamic weight set to token
     event SetDynamicWeight(

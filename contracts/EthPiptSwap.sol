@@ -5,8 +5,8 @@ pragma solidity 0.6.12;
 import "./interfaces/BPoolInterface.sol";
 import "./interfaces/TokenInterface.sol";
 import "./IPoolRestrictions.sol";
-import "./uniswapv2/interfaces/IUniswapV2Pair.sol";
-import "./uniswapv2/libraries/UniswapV2Library.sol";
+import "./interfaces/IUniswapV2Pair.sol";
+import "./lib/UniswapV2Library.sol";
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";

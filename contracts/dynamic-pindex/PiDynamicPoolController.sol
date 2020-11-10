@@ -6,7 +6,7 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../PiBPoolController.sol";
 
-contract PiDynamicBPoolController is PiBPoolController {
+contract PiDynamicPoolController is PiBPoolController {
 
     bytes4 public constant BIND_SIG = bytes4(keccak256(bytes("bind(address,uint256,uint256,uint256,uint256)")));
     bytes4 public constant UNBIND_SIG = bytes4(keccak256(bytes('unbind(address)')));
@@ -18,7 +18,7 @@ contract PiDynamicBPoolController is PiBPoolController {
         uint targetTimestamp;
     }
 
-    constructor(address _bpool) public PiBPoolController(_bpool) {
+    constructor(address _bpool, address _bpoolWrapper) public PiBPoolController(_bpool, _bpoolWrapper) {
 
     }
 

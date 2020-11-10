@@ -5,6 +5,7 @@ pragma solidity 0.6.12;
 import "./PiBPoolAbstractController.sol";
 import "./WrappedPiErc20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./interfaces/BPoolWrapperInterface.sol";
 
 contract PiBPoolController is PiBPoolAbstractController {
 
@@ -26,8 +27,17 @@ contract PiBPoolController is PiBPoolAbstractController {
         uint256 denormalizedWeight
     );
 
-    constructor(address _bpool) public PiBPoolAbstractController(_bpool) {
+    event SetBPoolWrapper(address indexed bpoolWrapper);
 
+    BPoolWrapperInterface public bpoolWrapper;
+
+    constructor(address _bpool, address _bpoolWrapper) public PiBPoolAbstractController(_bpool) {
+        bpoolWrapper = BPoolWrapperInterface(_bpoolWrapper);
+    }
+
+    function setBPoolWrapper(address _bpoolWrapper) external onlyOwner {
+        bpoolWrapper = BPoolWrapperInterface(_bpoolWrapper);
+        emit SetBPoolWrapper(_bpoolWrapper);
     }
 
     function replacePoolTokenWithWrapped(
@@ -50,6 +60,10 @@ contract PiBPoolController is PiBPoolAbstractController {
 
         wrappedToken.approve(address(bpool), balance);
         bpool.bind(address(wrappedToken), balance, denormalizedWeight);
+
+        if (address(bpoolWrapper) != address(0)) {
+            bpoolWrapper.setTokenWrapper(_token, address(wrappedToken));
+        }
 
         emit ReplacePoolTokenWithWrapped(_token, address(wrappedToken), _router, balance, denormalizedWeight, _name, _symbol);
     }

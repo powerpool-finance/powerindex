@@ -45,6 +45,7 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
 }
 
 describe('PiBPoolController', () => {
+    const zeroAddress = '0x0000000000000000000000000000000000000000';
     const name = 'My Pool';
     const symbol = 'MP';
     const balances = [ether('10'), ether('20')];
@@ -96,7 +97,7 @@ describe('PiBPoolController', () => {
         pool = await BPool.at(logNewPool.args.pool);
 
         poolWrapper = await BPoolWrapper.new(pool.address);
-        controller = await PiBPoolController.new(pool.address);
+        controller = await PiBPoolController.new(pool.address, zeroAddress);
 
         await pool.setWrapper(poolWrapper.address, true);
         await pool.setController(controller.address);

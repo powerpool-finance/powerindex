@@ -2,7 +2,7 @@
 
 pragma solidity =0.6.12;
 
-import './libraries/SafeMath.sol';
+import '../../lib/SafeMathUniswap.sol';
 
 contract UniswapV2ERC20 {
     using SafeMathUniswap for uint;

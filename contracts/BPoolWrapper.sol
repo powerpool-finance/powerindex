@@ -3,18 +3,38 @@
 pragma solidity 0.6.12;
 
 import "./interfaces/BPoolInterface.sol";
+import "./interfaces/WrappedPiErc20Interface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@nomiclabs/buidler/console.sol";
+import "./lib/ControllerOwnable.sol";
+import "./interfaces/BPoolWrapperInterface.sol";
 
 
-contract BPoolWrapper {
+contract BPoolWrapper is ControllerOwnable, BPoolWrapperInterface {
     using SafeMath for uint256;
+
+    event SetWrapper(address indexed token, address indexed wrapper);
 
     BPoolInterface public immutable bpool;
 
-    constructor(address _bpool) public {
+    mapping(address => address) public wrapperByToken;
+    mapping(address => address) public tokenByWrapper;
+
+    constructor(address _bpool) public ControllerOwnable() {
         bpool = BPoolInterface(_bpool);
+    }
+
+    function setTokenWrapperList(address[] calldata _tokens, address[] calldata _wrappers) external override onlyController {
+        uint len = _tokens.length;
+        require(len == _wrappers.length, "LENGTH_DONT_MATCH");
+
+        for (uint i = 0; i < len; i++) {
+            _setTokenWrapper(_tokens[i], _wrappers[i]);
+        }
+    }
+
+    function setTokenWrapper(address _token, address _wrapper) external override onlyController {
+        _setTokenWrapper(_token, _wrapper);
     }
 
     function swapExactAmountOut(
@@ -27,22 +47,19 @@ contract BPoolWrapper {
         external
         returns (uint tokenAmountIn, uint spotPriceAfter)
     {
-        require(IERC20(tokenIn).transferFrom(msg.sender, address(this), maxAmountIn), "ERR_TRANSFER_FAILED");
-        if (IERC20(tokenIn).allowance(address(this), address(bpool)) > 0) {
-            IERC20(tokenIn).approve(address(bpool), 0);
-        }
-        IERC20(tokenIn).approve(address(bpool), maxAmountIn);
+        address factTokenIn = _processTokenIn(tokenIn, maxAmountIn);
+        address factTokenOut = _getFactToken(tokenOut);
 
         (tokenAmountIn, spotPriceAfter) = bpool.swapExactAmountOut(
-            tokenIn,
+            factTokenIn,
             maxAmountIn,
-            tokenOut,
+            factTokenOut,
             tokenAmountOut,
             maxPrice
         );
 
-        require(IERC20(tokenIn).transfer(msg.sender, maxAmountIn.sub(tokenAmountIn)), "ERR_TRANSFER_FAILED");
-        require(IERC20(tokenOut).transfer(msg.sender, IERC20(tokenOut).balanceOf(address(this))), "ERR_TRANSFER_FAILED");
+        _processTokenOut(tokenIn, maxAmountIn.sub(tokenAmountIn));
+        _processTokenOutBalance(tokenOut);
 
         return (tokenAmountIn, spotPriceAfter);
     }
@@ -57,21 +74,18 @@ contract BPoolWrapper {
         external
         returns (uint tokenAmountOut, uint spotPriceAfter)
     {
-        require(IERC20(tokenIn).transferFrom(msg.sender, address(this), tokenAmountIn), "ERR_TRANSFER_FAILED");
-        if (IERC20(tokenIn).allowance(address(this), address(bpool)) > 0) {
-            IERC20(tokenIn).approve(address(bpool), 0);
-        }
-        IERC20(tokenIn).approve(address(bpool), tokenAmountIn);
+        address factTokenIn = _processTokenIn(tokenIn, tokenAmountIn);
+        address factTokenOut = _getFactToken(tokenOut);
 
         (tokenAmountOut, spotPriceAfter) = bpool.swapExactAmountIn(
-            tokenIn,
+            factTokenIn,
             tokenAmountIn,
-            tokenOut,
+            factTokenOut,
             minAmountOut,
             maxPrice
         );
 
-        require(IERC20(tokenOut).transfer(msg.sender, IERC20(tokenOut).balanceOf(address(this))), "ERR_TRANSFER_FAILED");
+        _processTokenOutBalance(tokenOut);
 
         return (tokenAmountOut, spotPriceAfter);
     }
@@ -84,19 +98,11 @@ contract BPoolWrapper {
         require(maxAmountsIn.length == tokens.length, "ERR_LENGTH_MISMATCH");
 
         for (uint i = 0; i < tokens.length; i++) {
-            IERC20 token = IERC20(tokens[i]);
-            require(token.transferFrom(msg.sender, address(this), maxAmountsIn[i]), "ERR_TRANSFER_FAILED");
-            if (token.allowance(address(this), address(bpool)) > 0) {
-                token.approve(address(bpool), 0);
-            }
-            token.approve(address(bpool), maxAmountsIn[i]);
+            _processTokenOrWrapperIn(tokens[i], maxAmountsIn[i]);
         }
         bpool.joinPool(poolAmountOut, maxAmountsIn);
         for (uint i = 0; i < tokens.length; i++) {
-            IERC20 token = IERC20(tokens[i]);
-            if (token.balanceOf(address(this)) > 0) {
-                require(token.transfer(msg.sender, token.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
-            }
+            _processTokenOrWrapperOutBalance(tokens[i]);
         }
         require(bpool.transfer(msg.sender, bpool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
     }
@@ -113,10 +119,7 @@ contract BPoolWrapper {
         bpool.exitPool(poolAmountIn, minAmountsOut);
 
         for (uint i = 0; i < tokens.length; i++) {
-            IERC20 token = IERC20(tokens[i]);
-            if (token.balanceOf(address(this)) > 0) {
-                require(token.transfer(msg.sender, token.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
-            }
+            _processTokenOrWrapperOutBalance(tokens[i]);
         }
     }
 
@@ -128,13 +131,8 @@ contract BPoolWrapper {
         external
         returns (uint poolAmountOut)
     {
-        IERC20 token = IERC20(tokenIn);
-        require(token.transferFrom(msg.sender, address(this), tokenAmountIn), "ERR_TRANSFER_FAILED");
-        if (token.allowance(address(this), address(bpool)) > 0) {
-            token.approve(address(bpool), 0);
-        }
-        token.approve(address(bpool), tokenAmountIn);
-        poolAmountOut = bpool.joinswapExternAmountIn(tokenIn, tokenAmountIn, minPoolAmountOut);
+        address factTokenIn = _processTokenIn(tokenIn, tokenAmountIn);
+        poolAmountOut = bpool.joinswapExternAmountIn(factTokenIn, tokenAmountIn, minPoolAmountOut);
         require(bpool.transfer(msg.sender, bpool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
         return poolAmountOut;
     }
@@ -147,14 +145,9 @@ contract BPoolWrapper {
         external
         returns (uint tokenAmountIn)
     {
-        IERC20 token = IERC20(tokenIn);
-        require(token.transferFrom(msg.sender, address(this), maxAmountIn), "ERR_TRANSFER_FAILED");
-        if (token.allowance(address(this), address(bpool)) > 0) {
-            token.approve(address(bpool), 0);
-        }
-        token.approve(address(bpool), maxAmountIn);
-        tokenAmountIn = bpool.joinswapPoolAmountOut(tokenIn, poolAmountOut, maxAmountIn);
-        require(token.transfer(msg.sender, maxAmountIn.sub(tokenAmountIn)), "ERR_TRANSFER_FAILED");
+        address factTokenIn = _processTokenIn(tokenIn, maxAmountIn);
+        tokenAmountIn = bpool.joinswapPoolAmountOut(factTokenIn, poolAmountOut, maxAmountIn);
+        _processTokenOut(tokenIn, maxAmountIn.sub(tokenAmountIn));
         require(bpool.transfer(msg.sender, bpool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
         return tokenAmountIn;
     }
@@ -169,8 +162,10 @@ contract BPoolWrapper {
     {
         require(bpool.transferFrom(msg.sender, address(this), poolAmountIn), "ERR_TRANSFER_FAILED");
         bpool.approve(address(bpool), poolAmountIn);
-        tokenAmountOut = bpool.exitswapPoolAmountIn(tokenOut, poolAmountIn, minAmountOut);
-        require(IERC20(tokenOut).transfer(msg.sender, IERC20(tokenOut).balanceOf(address(this))), "ERR_TRANSFER_FAILED");
+
+        address factTokenOut = _getFactToken(tokenOut);
+        tokenAmountOut = bpool.exitswapPoolAmountIn(factTokenOut, poolAmountIn, minAmountOut);
+        _processTokenOutBalance(tokenOut);
         return tokenAmountOut;
     }
 
@@ -184,8 +179,10 @@ contract BPoolWrapper {
     {
         require(bpool.transferFrom(msg.sender, address(this), maxPoolAmountIn), "ERR_TRANSFER_FAILED");
         bpool.approve(address(bpool), maxPoolAmountIn);
-        poolAmountIn = bpool.exitswapExternAmountOut(tokenOut, tokenAmountOut, maxPoolAmountIn);
-        require(IERC20(tokenOut).transfer(msg.sender, tokenAmountOut), "ERR_TRANSFER_FAILED");
+
+        address factTokenOut = _getFactToken(tokenOut);
+        poolAmountIn = bpool.exitswapExternAmountOut(factTokenOut, tokenAmountOut, maxPoolAmountIn);
+        _processTokenOut(tokenOut, tokenAmountOut);
         require(bpool.transfer(msg.sender, maxPoolAmountIn.sub(poolAmountIn)), "ERR_TRANSFER_FAILED");
         return poolAmountIn;
     }
@@ -222,5 +219,87 @@ contract BPoolWrapper {
 
     function getSwapFee() external view returns (uint) {
         return bpool.getSwapFee();
+    }
+
+    function _processTokenIn(address token, uint amount) internal returns(address factToken) {
+        if (amount == 0) {
+            return token;
+        }
+        require(IERC20(token).transferFrom(msg.sender, address(this), amount), "ERR_TRANSFER_FAILED");
+
+        address wrapper = wrapperByToken[token];
+        if (wrapper == address(0)) {
+            if (IERC20(token).allowance(address(this), address(bpool)) > 0) {
+                IERC20(token).approve(address(bpool), 0);
+            }
+            IERC20(token).approve(address(bpool), amount);
+            return token;
+        }
+
+        if (IERC20(token).allowance(address(this), wrapper) > 0) {
+            IERC20(token).approve(wrapper, 0);
+        }
+        IERC20(token).approve(wrapper, amount);
+        WrappedPiErc20Interface(wrapper).deposit(amount);
+        WrappedPiErc20Interface(wrapper).approve(address(bpool), amount);
+        return wrapper;
+    }
+
+    function _processTokenOrWrapperIn(address tokenOrWrapper, uint amount) internal returns(address factToken) {
+        address tokenByWrapper = tokenByWrapper[tokenOrWrapper];
+        if (tokenByWrapper == address(0)) {
+            return _processTokenIn(tokenOrWrapper, amount);
+        } else {
+            return _processTokenIn(tokenByWrapper, amount);
+        }
+    }
+
+    function _processTokenOut(address token, uint amount) internal {
+        if (amount == 0) {
+            return;
+        }
+        address wrapper = wrapperByToken[token];
+
+        if (wrapper != address(0)) {
+            WrappedPiErc20Interface(wrapper).approve(wrapper, amount);
+            WrappedPiErc20Interface(wrapper).withdraw(amount);
+        }
+
+        require(IERC20(token).transfer(msg.sender, amount), "ERR_TRANSFER_FAILED");
+    }
+
+    function _processTokenOutBalance(address token) internal {
+        address wrapper = wrapperByToken[token];
+        if (wrapper == address(0)) {
+            _processTokenOut(token, IERC20(token).balanceOf(address(this)));
+        } else {
+            _processTokenOut(token, WrappedPiErc20Interface(wrapper).balanceOf(address(this)));
+        }
+    }
+
+    function _processTokenOrWrapperOutBalance(address tokenOrWrapper) internal {
+        address tokenByWrapper = tokenByWrapper[tokenOrWrapper];
+        if (tokenByWrapper == address(0)) {
+            _processTokenOut(tokenOrWrapper, IERC20(tokenOrWrapper).balanceOf(address(this)));
+        } else {
+            _processTokenOut(tokenByWrapper, WrappedPiErc20Interface(tokenOrWrapper).balanceOf(address(this)));
+        }
+    }
+
+    function _getFactToken(address token) internal returns(address) {
+        address wrapper = wrapperByToken[token];
+        if (wrapper == address(0)) {
+            return token;
+        } else {
+            return wrapper;
+        }
+    }
+
+    function _setTokenWrapper(address token, address wrapper) internal {
+        wrapperByToken[token] = wrapper;
+        if (wrapper != address(0)) {
+            tokenByWrapper[wrapper] = token;
+        }
+        emit SetWrapper(token, wrapper);
     }
 }
