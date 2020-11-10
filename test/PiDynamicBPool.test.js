@@ -8,7 +8,7 @@ const MockVoting = artifacts.require('MockVoting');
 const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
-const PiDynamicPoolController = artifacts.require('PiDynamicPoolController');
+const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 
 const _ = require('lodash');
 const pIteration = require('p-iteration');
@@ -280,7 +280,7 @@ describe('PiDynamicPool', () => {
             await expectRevert(pool.rebind(this.token1.address, await pool.MIN_WEIGHT(), ether('10'), { from: controller }), 'ONLY_NEW_TOKENS_ALLOWED');
         });
         it('original bind should be disabled in controller', async () => {
-            const poolController = await PiDynamicPoolController.new(pool.address, zeroAddress);
+            const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
             await pool.setController(poolController.address);
 
             const bindSig = pool.contract._jsonInterface.filter(item => item.name === 'bind' && item.inputs.length === 5)[0].signature;
@@ -291,7 +291,7 @@ describe('PiDynamicPool', () => {
             await expectRevert(poolController.callPool(bindSig, bindArgs, '0', {from: controller}), "SIGNATURE_NOT_ALLOWED");
         });
         it('original unbind should be disabled in controller', async () => {
-            const poolController = await PiDynamicPoolController.new(pool.address, zeroAddress);
+            const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
             await pool.setController(poolController.address);
 
             const unbindSig = pool.contract._jsonInterface.filter(item => item.name === 'unbind')[0].signature;
@@ -651,7 +651,7 @@ describe('PiDynamicPool', () => {
             const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
             assert.equal(poolAmountOutAfterJoin, ether('152.544804372061724031').toString());
 
-            const poolController = await PiDynamicPoolController.new(pool.address, zeroAddress);
+            const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
             await pool.setController(poolController.address);
             const fromTimestamp = await getTimestamp(100);
             await poolController.setDynamicWeightList([{

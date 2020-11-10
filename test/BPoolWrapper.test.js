@@ -8,8 +8,8 @@ const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
 const BPoolWrapper = artifacts.require('BPoolWrapper');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
-const PiBPoolController = artifacts.require('PiBPoolController');
-const PiSimpleRouter = artifacts.require('PiSimpleRouter');
+const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
+const PowerIndexSimpleRouter = artifacts.require('PowerIndexSimpleRouter');
 
 const {web3} = BFactory;
 const {toBN} = web3.utils;
@@ -82,8 +82,8 @@ describe('BPoolWrapper', () => {
         pool = await BPool.at(logNewPool.args.pool);
 
         poolWrapper = await BPoolWrapper.new(pool.address);
-        poolController = await PiBPoolController.new(pool.address, poolWrapper.address);
-        poolRouter = await PiSimpleRouter.new();
+        poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address);
+        poolRouter = await PowerIndexSimpleRouter.new();
 
         await pool.setWrapper(poolWrapper.address, true);
 

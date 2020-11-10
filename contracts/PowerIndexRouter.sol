@@ -6,10 +6,10 @@ import "./interfaces/WrappedPiErc20Interface.sol";
 import "./interfaces/YearnGovernanceInterface.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./IPoolRestrictions.sol";
-import "./PiSimpleRouter.sol";
+import "./PowerIndexSimpleRouter.sol";
 
 
-contract PiRouter is PiSimpleRouter {
+contract PowerIndexRouter is PowerIndexSimpleRouter {
     using SafeMath for uint256;
 
     bytes4 public constant STAKE_SIG = bytes4(keccak256(bytes('stake(uint256)')));
@@ -25,7 +25,7 @@ contract PiRouter is PiSimpleRouter {
 
     IPoolRestrictions public poolRestriction;
 
-    constructor(address _poolRestrictions) public PiSimpleRouter() Ownable() {
+    constructor(address _poolRestrictions) public PowerIndexSimpleRouter() Ownable() {
         poolRestriction = IPoolRestrictions(_poolRestrictions);
     }
 

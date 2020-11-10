@@ -2,23 +2,23 @@
 
 pragma solidity 0.6.12;
 
-import "./interfaces/PiDynamicPoolInterface.sol";
+import "./interfaces/PowerIndexPoolInterface.sol";
 import "./IPoolRestrictions.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 
-contract PiBPoolAbstractController is Ownable {
+contract PowerIndexAbstractController is Ownable {
     using SafeMath for uint256;
 
     bytes4 public constant CALL_VOTING_SIG = bytes4(keccak256(bytes('callVoting(address,bytes4,bytes,uint256)')));
 
     event CallPool(bool indexed success, bytes4 indexed inputSig, bytes inputData, bytes outputData);
 
-    PiDynamicPoolInterface public immutable bpool;
+    PowerIndexPoolInterface public immutable bpool;
 
     constructor(address _bpool) public {
-        bpool = PiDynamicPoolInterface(_bpool);
+        bpool = PowerIndexPoolInterface(_bpool);
     }
 
     /**
@@ -54,7 +54,7 @@ contract PiBPoolAbstractController is Ownable {
     function migrateController(address newController, address[] calldata addressesToMigrate) external onlyOwner {
         uint len = addressesToMigrate.length;
         for (uint256 i = 0; i < len; i++) {
-            PiDynamicPoolInterface(addressesToMigrate[i]).setController(newController);
+            PowerIndexPoolInterface(addressesToMigrate[i]).setController(newController);
         }
     }
 

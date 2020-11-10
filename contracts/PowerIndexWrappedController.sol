@@ -2,12 +2,12 @@
 
 pragma solidity 0.6.12;
 
-import "./PiBPoolAbstractController.sol";
+import "./PowerIndexAbstractController.sol";
 import "./WrappedPiErc20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/PowerIndexWrapperInterface.sol";
 
-contract PiBPoolController is PiBPoolAbstractController {
+contract PowerIndexWrappedController is PowerIndexAbstractController {
 
     event ReplacePoolTokenWithWrapped(
         address indexed existingToken,
@@ -31,7 +31,7 @@ contract PiBPoolController is PiBPoolAbstractController {
 
     PowerIndexWrapperInterface public bpoolWrapper;
 
-    constructor(address _bpool, address _bpoolWrapper) public PiBPoolAbstractController(_bpool) {
+    constructor(address _bpool, address _bpoolWrapper) public PowerIndexAbstractController(_bpool) {
         bpoolWrapper = PowerIndexWrapperInterface(_bpoolWrapper);
     }
 

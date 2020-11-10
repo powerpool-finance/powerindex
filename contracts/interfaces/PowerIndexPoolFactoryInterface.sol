@@ -2,13 +2,13 @@
 
 pragma solidity 0.6.12;
 
-import "./PiDynamicPoolInterface.sol";
+import "./PowerIndexPoolInterface.sol";
 
-abstract contract PiDynamicPoolFactoryInterface {
+abstract contract PowerIndexPoolFactoryInterface {
     function newBPool(
         string calldata name,
         string calldata symbol,
         uint256 minWeightPerSecond,
         uint256 maxWeightPerSecond
-    ) external virtual returns (PiDynamicPoolInterface);
+    ) external virtual returns (PowerIndexPoolInterface);
 }

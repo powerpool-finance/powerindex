@@ -4,7 +4,7 @@ pragma solidity 0.6.12;
 
 import "./BPoolInterface.sol";
 
-abstract contract PiDynamicPoolInterface is BPoolInterface {
+abstract contract PowerIndexPoolInterface is BPoolInterface {
     function bind(address, uint, uint, uint, uint) external virtual;
 
     function setDynamicWeight(

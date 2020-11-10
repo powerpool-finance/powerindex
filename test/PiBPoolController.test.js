@@ -9,7 +9,7 @@ const ExchangeProxy = artifacts.require('ExchangeProxy');
 const BPoolWrapper = artifacts.require('BPoolWrapper');
 const PiBPoolController = artifacts.require('PiBPoolController');
 const MockErc20Migrator = artifacts.require('MockErc20Migrator');
-const PiRouter = artifacts.require('PiRouter');
+const PowerIndexRouter = artifacts.require('PowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 
@@ -17,7 +17,7 @@ MockERC20.numberFormat = 'String';
 MockErc20Migrator.numberFormat = 'String';
 BPool.numberFormat = 'String';
 PiBPoolController.numberFormat = 'String';
-PiRouter.numberFormat = 'String';
+PowerIndexRouter.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 
 const {web3} = BFactory;
@@ -200,7 +200,7 @@ describe('PiBPoolController', () => {
 
     it('should allow swapping a token with a new wrapped version', async () => {
         const poolRestrictions = await PoolRestrictions.new();
-        const router = await PiRouter.new(poolRestrictions.address);
+        const router = await PowerIndexRouter.new(poolRestrictions.address);
 
         let res = await controller.replacePoolTokenWithWrapped(
             this.token2.address,
@@ -265,7 +265,7 @@ describe('PiBPoolController', () => {
 
     it('should allow making a wrapped token join and exit', async () => {
         const poolRestrictions = await PoolRestrictions.new();
-        const router = await PiRouter.new(poolRestrictions.address);
+        const router = await PowerIndexRouter.new(poolRestrictions.address);
 
         let res = await controller.replacePoolTokenWithWrapped(
             this.token2.address,
