@@ -2,10 +2,10 @@
 
 pragma solidity 0.6.12;
 
-import "./interfaces/PowerIndexPoolInterface.sol";
-import "./IPoolRestrictions.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./interfaces/PowerIndexPoolInterface.sol";
+import "./interfaces/IPoolRestrictions.sol";
 
 
 contract PowerIndexAbstractController is Ownable {
@@ -15,10 +15,10 @@ contract PowerIndexAbstractController is Ownable {
 
     event CallPool(bool indexed success, bytes4 indexed inputSig, bytes inputData, bytes outputData);
 
-    PowerIndexPoolInterface public immutable bpool;
+    PowerIndexPoolInterface public immutable pool;
 
-    constructor(address _bpool) public {
-        bpool = PowerIndexPoolInterface(_bpool);
+    constructor(address _pool) public {
+        pool = PowerIndexPoolInterface(_pool);
     }
 
     /**
@@ -29,7 +29,7 @@ contract PowerIndexAbstractController is Ownable {
     */
     function callPool(bytes4 signature, bytes calldata args, uint value) external onlyOwner {
         _checkSignature(signature);
-        (bool success, bytes memory data) = address(bpool).call{ value: value }(abi.encodePacked(signature, args));
+        (bool success, bytes memory data) = address(pool).call{ value: value }(abi.encodePacked(signature, args));
         require(success, "NOT_SUCCESS");
         emit CallPool(success, signature, args, data);
     }
@@ -43,7 +43,7 @@ contract PowerIndexAbstractController is Ownable {
     */
     function callVotingByPool(address voting, bytes4 signature, bytes calldata args, uint value) external {
         require(_restrictions().isVotingSenderAllowed(voting, msg.sender), "SENDER_NOT_ALLOWED");
-        bpool.callVoting(voting, signature, args, value);
+        pool.callVoting(voting, signature, args, value);
     }
 
     /**
@@ -59,7 +59,7 @@ contract PowerIndexAbstractController is Ownable {
     }
 
     function _restrictions() internal view returns(IPoolRestrictions) {
-        return IPoolRestrictions(bpool.getRestrictions());
+        return IPoolRestrictions(pool.getRestrictions());
     }
 
     function _checkSignature(bytes4 signature) internal pure virtual {

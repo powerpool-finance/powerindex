@@ -2,7 +2,8 @@
 
 pragma solidity 0.6.12;
 
-import "../balancer-core/BPool.sol";
+import "./balancer-core/BPool.sol";
+import "./interfaces/PowerIndexPoolInterface.sol";
 
 contract PowerIndexPool is BPool {
 

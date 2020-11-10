@@ -4,7 +4,7 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 
-import "../VestedLPMining.sol";
+import "../powerindex-mining/VestedLPMining.sol";
 
 
 contract MockVestedLPMiningMath is VestedLPMining {

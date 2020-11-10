@@ -5,7 +5,7 @@ pragma solidity 0.6.12;
 import "./PowerIndexPoolInterface.sol";
 
 abstract contract PowerIndexPoolFactoryInterface {
-    function newBPool(
+    function newPool(
         string calldata name,
         string calldata symbol,
         uint256 minWeightPerSecond,

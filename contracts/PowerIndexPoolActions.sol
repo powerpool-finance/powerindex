@@ -15,9 +15,9 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "../interfaces/PowerIndexPoolInterface.sol";
-import "../interfaces/PowerIndexPoolFactoryInterface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./interfaces/PowerIndexPoolInterface.sol";
+import "./interfaces/PowerIndexPoolFactoryInterface.sol";
 
 contract PowerIndexPoolActions {
     struct TokenConfig {
@@ -39,7 +39,7 @@ contract PowerIndexPoolActions {
         address communityFeeReceiver,
         bool finalize
     ) external returns (PowerIndexPoolInterface pool) {
-        pool = factory.newBPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
+        pool = factory.newPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
         pool.setSwapFee(fees[0]);
         pool.setCommunityFeeAndReceiver(fees[1], fees[2], fees[3], communityFeeReceiver);
 

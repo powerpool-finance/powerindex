@@ -17,8 +17,9 @@ pragma solidity 0.6.12;
 // Builds new Power Index Pools, logging their addresses and providing `isPowerIndexPool(address) -> (bool)`
 
 import "./PowerIndexPool.sol";
+import "./interfaces/PowerIndexPoolFactoryInterface.sol";
 
-contract PowerIndexPoolFactory {
+contract PowerIndexPoolFactory is PowerIndexPoolFactoryInterface {
     event LOG_NEW_POOL(
         address indexed caller,
         address indexed pool
@@ -35,12 +36,13 @@ contract PowerIndexPoolFactory {
         uint256 maxWeightPerSecond
     )
     external
-    returns (PowerIndexPool)
+    override
+    returns (PowerIndexPoolInterface)
     {
         PowerIndexPool pool = new PowerIndexPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
         isPowerIndexPool[address(pool)] = true;
         emit LOG_NEW_POOL(msg.sender, address(pool));
         pool.setController(msg.sender);
-        return pool;
+        return PowerIndexPoolInterface(address(pool));
     }
 }

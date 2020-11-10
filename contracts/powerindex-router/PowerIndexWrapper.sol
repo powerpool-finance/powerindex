@@ -2,12 +2,12 @@
 
 pragma solidity 0.6.12;
 
-import "./interfaces/BPoolInterface.sol";
-import "./interfaces/WrappedPiErc20Interface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./lib/ControllerOwnable.sol";
-import "./interfaces/PowerIndexWrapperInterface.sol";
+import "../interfaces/BPoolInterface.sol";
+import "../interfaces/WrappedPiErc20Interface.sol";
+import "../interfaces/PowerIndexWrapperInterface.sol";
+import "../lib/ControllerOwnable.sol";
 
 
 contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {

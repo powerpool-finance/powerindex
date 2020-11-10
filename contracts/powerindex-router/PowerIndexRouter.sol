@@ -2,10 +2,10 @@
 
 pragma solidity 0.6.12;
 
-import "./interfaces/WrappedPiErc20Interface.sol";
-import "./interfaces/YearnGovernanceInterface.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./IPoolRestrictions.sol";
+import "../interfaces/WrappedPiErc20Interface.sol";
+import "../interfaces/YearnGovernanceInterface.sol";
+import "../interfaces/IPoolRestrictions.sol";
 import "./PowerIndexSimpleRouter.sol";
 
 
