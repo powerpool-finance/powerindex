@@ -2,7 +2,7 @@
 
 pragma solidity 0.6.12;
 
-import "./interfaces/PiDynamicBPoolInterface.sol";
+import "./interfaces/PiDynamicPoolInterface.sol";
 import "./IPoolRestrictions.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -15,10 +15,10 @@ contract PiBPoolAbstractController is Ownable {
 
     event CallPool(bool indexed success, bytes4 indexed inputSig, bytes inputData, bytes outputData);
 
-    PiDynamicBPoolInterface public immutable bpool;
+    PiDynamicPoolInterface public immutable bpool;
 
     constructor(address _bpool) public {
-        bpool = PiDynamicBPoolInterface(_bpool);
+        bpool = PiDynamicPoolInterface(_bpool);
     }
 
     /**
@@ -54,7 +54,7 @@ contract PiBPoolAbstractController is Ownable {
     function migrateController(address newController, address[] calldata addressesToMigrate) external onlyOwner {
         uint len = addressesToMigrate.length;
         for (uint256 i = 0; i < len; i++) {
-            PiDynamicBPoolInterface(addressesToMigrate[i]).setController(newController);
+            PiDynamicPoolInterface(addressesToMigrate[i]).setController(newController);
         }
     }
 

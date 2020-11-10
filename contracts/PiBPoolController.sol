@@ -5,7 +5,7 @@ pragma solidity 0.6.12;
 import "./PiBPoolAbstractController.sol";
 import "./WrappedPiErc20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./interfaces/BPoolWrapperInterface.sol";
+import "./interfaces/PowerIndexWrapperInterface.sol";
 
 contract PiBPoolController is PiBPoolAbstractController {
 
@@ -29,14 +29,14 @@ contract PiBPoolController is PiBPoolAbstractController {
 
     event SetBPoolWrapper(address indexed bpoolWrapper);
 
-    BPoolWrapperInterface public bpoolWrapper;
+    PowerIndexWrapperInterface public bpoolWrapper;
 
     constructor(address _bpool, address _bpoolWrapper) public PiBPoolAbstractController(_bpool) {
-        bpoolWrapper = BPoolWrapperInterface(_bpoolWrapper);
+        bpoolWrapper = PowerIndexWrapperInterface(_bpoolWrapper);
     }
 
     function setBPoolWrapper(address _bpoolWrapper) external onlyOwner {
-        bpoolWrapper = BPoolWrapperInterface(_bpoolWrapper);
+        bpoolWrapper = PowerIndexWrapperInterface(_bpoolWrapper);
         emit SetBPoolWrapper(_bpoolWrapper);
     }
 

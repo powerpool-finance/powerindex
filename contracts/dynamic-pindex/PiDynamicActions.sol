@@ -15,8 +15,8 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "../interfaces/PiDynamicBPoolInterface.sol";
-import "../interfaces/PiDynamicBFactoryInterface.sol";
+import "../interfaces/PiDynamicPoolInterface.sol";
+import "../interfaces/PiDynamicPoolFactoryInterface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract PiDynamicActions {
@@ -29,7 +29,7 @@ contract PiDynamicActions {
     }
 
     function create(
-        PiDynamicBFactoryInterface factory,
+        PiDynamicPoolFactoryInterface factory,
         string calldata name,
         string calldata symbol,
         uint256 minWeightPerSecond,
@@ -38,7 +38,7 @@ contract PiDynamicActions {
         uint[4] calldata fees,
         address communityFeeReceiver,
         bool finalize
-    ) external returns (PiDynamicBPoolInterface pool) {
+    ) external returns (PiDynamicPoolInterface pool) {
         pool = factory.newBPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
         pool.setSwapFee(fees[0]);
         pool.setCommunityFeeAndReceiver(fees[1], fees[2], fees[3], communityFeeReceiver);
