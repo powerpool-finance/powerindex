@@ -3,11 +3,11 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./interfaces/WrappedPiErc20Interface.sol";
-import "./interfaces/PiRouterInterface.sol";
+import "../interfaces/WrappedPiErc20Interface.sol";
+import "../interfaces/PiRouterInterface.sol";
 
 
-contract PiSimpleRouter is PiRouterInterface, Ownable {
+contract PowerIndexSimpleRouter is PiRouterInterface, Ownable {
     constructor() public {
     }
 

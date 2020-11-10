@@ -2,7 +2,7 @@ usePlugin('@nomiclabs/buidler-truffle5');
 
 const pIteration = require('p-iteration');
 
-task('deploy-vested-lp-mining', 'Deploy VestedLpMining')
+task('deploy-vested-lp-powerindex-mining', 'Deploy VestedLpMining')
     .setAction(async () => {
         const VestedLPMining = await artifacts.require("VestedLPMining");
 

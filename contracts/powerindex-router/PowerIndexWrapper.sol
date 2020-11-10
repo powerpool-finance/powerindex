@@ -2,15 +2,15 @@
 
 pragma solidity 0.6.12;
 
-import "./interfaces/BPoolInterface.sol";
-import "./interfaces/WrappedPiErc20Interface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./lib/ControllerOwnable.sol";
-import "./interfaces/BPoolWrapperInterface.sol";
+import "../interfaces/BPoolInterface.sol";
+import "../interfaces/WrappedPiErc20Interface.sol";
+import "../interfaces/PowerIndexWrapperInterface.sol";
+import "../lib/ControllerOwnable.sol";
 
 
-contract BPoolWrapper is ControllerOwnable, BPoolWrapperInterface {
+contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     using SafeMath for uint256;
 
     event SetWrapper(address indexed token, address indexed wrapper);
@@ -44,8 +44,8 @@ contract BPoolWrapper is ControllerOwnable, BPoolWrapperInterface {
         uint tokenAmountOut,
         uint maxPrice
     )
-        external
-        returns (uint tokenAmountIn, uint spotPriceAfter)
+    external
+    returns (uint tokenAmountIn, uint spotPriceAfter)
     {
         address factTokenIn = _processTokenIn(tokenIn, maxAmountIn);
         address factTokenOut = _getFactToken(tokenOut);
@@ -71,8 +71,8 @@ contract BPoolWrapper is ControllerOwnable, BPoolWrapperInterface {
         uint minAmountOut,
         uint maxPrice
     )
-        external
-        returns (uint tokenAmountOut, uint spotPriceAfter)
+    external
+    returns (uint tokenAmountOut, uint spotPriceAfter)
     {
         address factTokenIn = _processTokenIn(tokenIn, tokenAmountIn);
         address factTokenOut = _getFactToken(tokenOut);
@@ -128,8 +128,8 @@ contract BPoolWrapper is ControllerOwnable, BPoolWrapperInterface {
         uint tokenAmountIn,
         uint minPoolAmountOut
     )
-        external
-        returns (uint poolAmountOut)
+    external
+    returns (uint poolAmountOut)
     {
         address factTokenIn = _processTokenIn(tokenIn, tokenAmountIn);
         poolAmountOut = bpool.joinswapExternAmountIn(factTokenIn, tokenAmountIn, minPoolAmountOut);
@@ -142,8 +142,8 @@ contract BPoolWrapper is ControllerOwnable, BPoolWrapperInterface {
         uint poolAmountOut,
         uint maxAmountIn
     )
-        external
-        returns (uint tokenAmountIn)
+    external
+    returns (uint tokenAmountIn)
     {
         address factTokenIn = _processTokenIn(tokenIn, maxAmountIn);
         tokenAmountIn = bpool.joinswapPoolAmountOut(factTokenIn, poolAmountOut, maxAmountIn);
@@ -157,8 +157,8 @@ contract BPoolWrapper is ControllerOwnable, BPoolWrapperInterface {
         uint poolAmountIn,
         uint minAmountOut
     )
-        external
-        returns (uint tokenAmountOut)
+    external
+    returns (uint tokenAmountOut)
     {
         require(bpool.transferFrom(msg.sender, address(this), poolAmountIn), "ERR_TRANSFER_FAILED");
         bpool.approve(address(bpool), poolAmountIn);
@@ -174,8 +174,8 @@ contract BPoolWrapper is ControllerOwnable, BPoolWrapperInterface {
         uint tokenAmountOut,
         uint maxPoolAmountIn
     )
-        external
-        returns (uint poolAmountIn)
+    external
+    returns (uint poolAmountIn)
     {
         require(bpool.transferFrom(msg.sender, address(this), maxPoolAmountIn), "ERR_TRANSFER_FAILED");
         bpool.approve(address(bpool), maxPoolAmountIn);
@@ -195,9 +195,9 @@ contract BPoolWrapper is ControllerOwnable, BPoolWrapperInterface {
         uint tokenAmountOut,
         uint swapFee
     )
-        public
-        view
-        returns (uint tokenAmountIn)
+    public
+    view
+    returns (uint tokenAmountIn)
     {
         return bpool.calcInGivenOut(
             tokenBalanceIn,

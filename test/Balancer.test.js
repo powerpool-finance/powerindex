@@ -8,9 +8,9 @@ const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
-const PiBPoolController = artifacts.require('PiBPoolController');
+const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const PermanentVotingPowerV1 = artifacts.require('PermanentVotingPowerV1');
-const BPoolWrapper = artifacts.require('BPoolWrapper');
+const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 
 BPool.numberFormat = 'String';
 
@@ -625,7 +625,7 @@ describe('Balancer', () => {
     describe('PoolController', () => {
         let poolController;
         beforeEach(async () => {
-            poolController = await PiBPoolController.new(pool.address, zeroAddress);
+            poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
             await pool.setController(poolController.address);
         });
 
@@ -688,7 +688,7 @@ describe('Balancer', () => {
         });
 
         it('migrateController should work properly', async () => {
-            const bPoolWrapper = await BPoolWrapper.new(pool.address);
+            const bPoolWrapper = await PowerIndexWrapper.new(pool.address);
             await bPoolWrapper.setController(poolController.address);
 
             assert.equal(await bPoolWrapper.getController(), poolController.address);

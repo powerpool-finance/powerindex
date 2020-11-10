@@ -2,8 +2,8 @@
 
 pragma solidity 0.6.12;
 
-import "./lib/DelegatableCheckpoints.sol";
-import "./lib/SafeMath96.sol";
+import "../lib/DelegatableCheckpoints.sol";
+import "../lib/SafeMath96.sol";
 
 abstract contract DelegatableVotes {
     using SafeMath96 for uint96;

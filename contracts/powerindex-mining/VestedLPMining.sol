@@ -8,10 +8,10 @@ import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/utils/ReentrancyGuard.sol";
-import "./interfaces/IVestedLPMining.sol";
-import "./lib/ReservedSlots.sol";
-import "./lib/SafeMath96.sol";
-import "./lib/SafeMath32.sol";
+import "../interfaces/IVestedLPMining.sol";
+import "../lib/ReservedSlots.sol";
+import "../lib/SafeMath96.sol";
+import "../lib/SafeMath32.sol";
 import "./DelegatableVotes.sol";
 
 contract VestedLPMining is
@@ -79,7 +79,7 @@ contract VestedLPMining is
     address public reservoir;
     // Vesting duration in blocks
     uint32 public cvpVestingPeriodInBlocks;
-    // The block number when CVP mining starts
+    // The block number when CVP powerindex-mining starts
     uint32 public startBlock;
     // The amount of CVP tokens rewarded to all pools every block
     uint96 public cvpPerBlock;

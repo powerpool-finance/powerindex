@@ -6,18 +6,18 @@ const MockERC20 = artifacts.require('MockERC20');
 const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
-const BPoolWrapper = artifacts.require('BPoolWrapper');
-const PiBPoolController = artifacts.require('PiBPoolController');
+const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
+const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const MockErc20Migrator = artifacts.require('MockErc20Migrator');
-const PiRouter = artifacts.require('PiRouter');
+const PowerIndexRouter = artifacts.require('PowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 
 MockERC20.numberFormat = 'String';
 MockErc20Migrator.numberFormat = 'String';
 BPool.numberFormat = 'String';
-PiBPoolController.numberFormat = 'String';
-PiRouter.numberFormat = 'String';
+PowerIndexPoolController.numberFormat = 'String';
+PowerIndexRouter.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 
 const {web3} = BFactory;
@@ -44,7 +44,7 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
     assert.equal(diff.lte(toBN(accuracyWei)), true, message);
 }
 
-describe('PiBPoolController', () => {
+describe('PowerIndexPoolController', () => {
     const zeroAddress = '0x0000000000000000000000000000000000000000';
     const name = 'My Pool';
     const symbol = 'MP';
@@ -96,8 +96,8 @@ describe('PiBPoolController', () => {
         const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
         pool = await BPool.at(logNewPool.args.pool);
 
-        poolWrapper = await BPoolWrapper.new(pool.address);
-        controller = await PiBPoolController.new(pool.address, zeroAddress);
+        poolWrapper = await PowerIndexWrapper.new(pool.address);
+        controller = await PowerIndexPoolController.new(pool.address, zeroAddress);
 
         await pool.setWrapper(poolWrapper.address, true);
         await pool.setController(controller.address);
@@ -200,7 +200,7 @@ describe('PiBPoolController', () => {
 
     it('should allow swapping a token with a new wrapped version', async () => {
         const poolRestrictions = await PoolRestrictions.new();
-        const router = await PiRouter.new(poolRestrictions.address);
+        const router = await PowerIndexRouter.new(poolRestrictions.address);
 
         let res = await controller.replacePoolTokenWithWrapped(
             this.token2.address,
@@ -265,7 +265,7 @@ describe('PiBPoolController', () => {
 
     it('should allow making a wrapped token join and exit', async () => {
         const poolRestrictions = await PoolRestrictions.new();
-        const router = await PiRouter.new(poolRestrictions.address);
+        const router = await PowerIndexRouter.new(poolRestrictions.address);
 
         let res = await controller.replacePoolTokenWithWrapped(
             this.token2.address,

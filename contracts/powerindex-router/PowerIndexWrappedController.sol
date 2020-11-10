@@ -2,12 +2,12 @@
 
 pragma solidity 0.6.12;
 
-import "./PiBPoolAbstractController.sol";
-import "./WrappedPiErc20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./interfaces/BPoolWrapperInterface.sol";
+import "../PowerIndexAbstractController.sol";
+import "../interfaces/PowerIndexWrapperInterface.sol";
+import "./WrappedPiErc20.sol";
 
-contract PiBPoolController is PiBPoolAbstractController {
+contract PowerIndexWrappedController is PowerIndexAbstractController {
 
     event ReplacePoolTokenWithWrapped(
         address indexed existingToken,
@@ -27,17 +27,17 @@ contract PiBPoolController is PiBPoolAbstractController {
         uint256 denormalizedWeight
     );
 
-    event SetBPoolWrapper(address indexed bpoolWrapper);
+    event SetPoolWrapper(address indexed bpoolWrapper);
 
-    BPoolWrapperInterface public bpoolWrapper;
+    PowerIndexWrapperInterface public poolWrapper;
 
-    constructor(address _bpool, address _bpoolWrapper) public PiBPoolAbstractController(_bpool) {
-        bpoolWrapper = BPoolWrapperInterface(_bpoolWrapper);
+    constructor(address _pool, address _poolWrapper) public PowerIndexAbstractController(_pool) {
+        poolWrapper = PowerIndexWrapperInterface(_poolWrapper);
     }
 
-    function setBPoolWrapper(address _bpoolWrapper) external onlyOwner {
-        bpoolWrapper = BPoolWrapperInterface(_bpoolWrapper);
-        emit SetBPoolWrapper(_bpoolWrapper);
+    function setPoolWrapper(address _poolWrapper) external onlyOwner {
+        poolWrapper = PowerIndexWrapperInterface(_poolWrapper);
+        emit SetPoolWrapper(_poolWrapper);
     }
 
     function replacePoolTokenWithWrapped(
@@ -50,19 +50,19 @@ contract PiBPoolController is PiBPoolAbstractController {
         onlyOwner
     {
         WrappedPiErc20 wrappedToken = new WrappedPiErc20(_token, _router, _name, _symbol);
-        uint256 denormalizedWeight = bpool.getDenormalizedWeight(_token);
-        uint256 balance = bpool.getBalance(_token);
+        uint256 denormalizedWeight = pool.getDenormalizedWeight(_token);
+        uint256 balance = pool.getBalance(_token);
 
-        bpool.unbind(_token);
+        pool.unbind(_token);
 
         IERC20(_token).approve(address(wrappedToken), balance);
         wrappedToken.deposit(balance);
 
-        wrappedToken.approve(address(bpool), balance);
-        bpool.bind(address(wrappedToken), balance, denormalizedWeight);
+        wrappedToken.approve(address(pool), balance);
+        pool.bind(address(wrappedToken), balance, denormalizedWeight);
 
-        if (address(bpoolWrapper) != address(0)) {
-            bpoolWrapper.setTokenWrapper(_token, address(wrappedToken));
+        if (address(poolWrapper) != address(0)) {
+            poolWrapper.setTokenWrapper(_token, address(wrappedToken));
         }
 
         emit ReplacePoolTokenWithWrapped(_token, address(wrappedToken), _router, balance, denormalizedWeight, _name, _symbol);
@@ -77,10 +77,10 @@ contract PiBPoolController is PiBPoolAbstractController {
         external
         onlyOwner
     {
-        uint256 denormalizedWeight = bpool.getDenormalizedWeight(_oldToken);
-        uint256 balance = bpool.getBalance(_oldToken);
+        uint256 denormalizedWeight = pool.getDenormalizedWeight(_oldToken);
+        uint256 balance = pool.getBalance(_oldToken);
 
-        bpool.unbind(_oldToken);
+        pool.unbind(_oldToken);
 
         IERC20(_oldToken).approve(_migrator, balance);
         (bool success,) = _migrator.call(_migratorData);
@@ -91,8 +91,8 @@ contract PiBPoolController is PiBPoolAbstractController {
             "PiBPoolController:newVersion: insufficient newToken balance"
         );
 
-        IERC20(_newToken).approve(address(bpool), balance);
-        bpool.bind(_newToken, balance, denormalizedWeight);
+        IERC20(_newToken).approve(address(pool), balance);
+        pool.bind(_newToken, balance, denormalizedWeight);
 
         emit ReplacePoolTokenWithNewVersion(_oldToken, _newToken, _migrator, balance, denormalizedWeight);
     }

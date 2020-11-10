@@ -2,7 +2,7 @@
 
 pragma solidity 0.6.12;
 
-import "../DelegatableVotes.sol";
+import "../powerindex-mining/DelegatableVotes.sol";
 
 contract MockDelegatableVotes is DelegatableVotes {
 

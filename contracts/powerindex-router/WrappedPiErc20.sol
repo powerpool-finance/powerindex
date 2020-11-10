@@ -2,10 +2,10 @@
 
 pragma solidity 0.6.12;
 
-import "./interfaces/PiRouterInterface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "../interfaces/PiRouterInterface.sol";
 
 
 contract WrappedPiErc20 is ERC20 {

@@ -3,7 +3,7 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./IPoolRestrictions.sol";
+import "./interfaces/IPoolRestrictions.sol";
 
 
 contract PoolRestrictions is IPoolRestrictions, Ownable {

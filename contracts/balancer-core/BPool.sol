@@ -16,7 +16,7 @@ pragma solidity 0.6.12;
 
 import "./BToken.sol";
 import "./BMath.sol";
-import "../IPoolRestrictions.sol";
+import "../interfaces/IPoolRestrictions.sol";
 
 contract BPool is BToken, BMath {
 
