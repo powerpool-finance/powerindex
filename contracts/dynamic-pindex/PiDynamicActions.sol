@@ -19,7 +19,7 @@ import "../interfaces/PiDynamicBPoolInterface.sol";
 import "../interfaces/PiDynamicBFactoryInterface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract PiDynamicBActions {
+contract PiDynamicActions {
     struct TokenConfig {
         address token;
         uint256 balance;

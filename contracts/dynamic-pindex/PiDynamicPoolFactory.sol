@@ -16,9 +16,9 @@ pragma solidity 0.6.12;
 
 // Builds new BPools, logging their addresses and providing `isBPool(address) -> (bool)`
 
-import "./PiDynamicBPool.sol";
+import "./PiDynamicPool.sol";
 
-contract PiDynamicPoolBFactory {
+contract PiDynamicPoolFactory {
     event LOG_NEW_POOL(
         address indexed caller,
         address indexed pool
@@ -35,9 +35,9 @@ contract PiDynamicPoolBFactory {
         uint256 maxWeightPerSecond
     )
         external
-        returns (PiDynamicBPool)
+        returns (PiDynamicPool)
     {
-        PiDynamicBPool bpool = new PiDynamicBPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
+        PiDynamicPool bpool = new PiDynamicPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
         isBPool[address(bpool)] = true;
         emit LOG_NEW_POOL(msg.sender, address(bpool));
         bpool.setController(msg.sender);

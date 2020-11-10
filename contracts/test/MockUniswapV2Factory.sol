@@ -2,8 +2,8 @@
 
 pragma solidity =0.6.12;
 
-import '../uniswapv2/UniswapV2Pair.sol';
-import "../uniswapv2/UniswapV2Factory.sol";
+import './uniswapv2/UniswapV2Pair.sol';
+import "./uniswapv2/UniswapV2Factory.sol";
 
 contract MockUniswapV2Factory is UniswapV2Factory {
     constructor(address _feeToSetter) public UniswapV2Factory(_feeToSetter) {

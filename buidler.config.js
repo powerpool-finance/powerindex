@@ -12,8 +12,12 @@ const fs = require('fs');
 const homeDir = require('os').homedir();
 const _ = require('lodash');
 
-function getKey(network) {
-    return _.trim('0x' + fs.readFileSync(homeDir + '/.ethereum/' + network, {encoding: 'utf8'}));
+function getAccounts(network) {
+    const path = homeDir + '/.ethereum/' + network;
+    if (!fs.existsSync(path)) {
+        return [];
+    }
+    return [_.trim('0x' + fs.readFileSync(path, {encoding: 'utf8'}))];
 }
 
 const ethers = require('ethers');
@@ -48,7 +52,7 @@ const config = {
         },
         mainnet: {
             url: 'https://mainnet-eth.compound.finance',
-            accounts: [getKey("mainnet")],
+            accounts: getAccounts("mainnet"),
             gasPrice: 30000000000,
             gasMultiplier: 2
         },
@@ -57,7 +61,7 @@ const config = {
         },
         kovan: {
             url: 'https://kovan-eth.compound.finance',
-            accounts: [getKey("kovan")],
+            accounts: getAccounts("kovan"),
             gasPrice: 1000000000,
             gasMultiplier: 2
         },
