@@ -1,8 +1,8 @@
 const { expectRevert, time, ether } = require('@openzeppelin/test-helpers');
 
-const PiDynamicPoolFactory = artifacts.require('PiDynamicPoolFactory');
-const PiDynamicActions = artifacts.require('PiDynamicActions');
-const PiDynamicPool = artifacts.require('PiDynamicPool');
+const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
+const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
+const PowerIndexPool = artifacts.require('PowerIndexPool');
 const MockERC20 = artifacts.require('MockERC20');
 const MockVoting = artifacts.require('MockVoting');
 const MockCvp = artifacts.require('MockCvp');
@@ -13,9 +13,9 @@ const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const _ = require('lodash');
 const pIteration = require('p-iteration');
 
-PiDynamicPool.numberFormat = 'String';
+PowerIndexPool.numberFormat = 'String';
 
-const {web3} = PiDynamicPoolFactory;
+const {web3} = PowerIndexPoolFactory;
 const {toBN} = web3.utils;
 
 function mulScalarBN(bn1, bn2) {
@@ -50,7 +50,7 @@ async function getTimestamp(shift = 0) {
     return currentTimestamp + shift;
 }
 
-describe('PiDynamicPool', () => {
+describe('PowerIndexPool', () => {
     const zeroAddress = '0x0000000000000000000000000000000000000000';
     const name = 'My Pool';
     const symbol = 'MP';
@@ -77,8 +77,8 @@ describe('PiDynamicPool', () => {
     beforeEach(async () => {
         this.weth = await WETH.new();
 
-        this.bFactory = await PiDynamicPoolFactory.new({ from: controller });
-        this.bActions = await PiDynamicActions.new({ from: controller });
+        this.bFactory = await PowerIndexPoolFactory.new({ from: controller });
+        this.bActions = await PowerIndexPoolActions.new({ from: controller });
         this.bExchange = await ExchangeProxy.new(this.weth.address, { from: controller });
 
         this.token1 = await MockCvp.new();
@@ -109,8 +109,8 @@ describe('PiDynamicPool', () => {
             true
         );
 
-        const logNewPool = PiDynamicPoolFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
-        pool = await PiDynamicPool.at(logNewPool.args.pool);
+        const logNewPool = PowerIndexPoolFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
+        pool = await PowerIndexPool.at(logNewPool.args.pool);
         fromWeights = [await pool.MIN_WEIGHT(), await pool.MIN_WEIGHT()];
 
         this.getTokensToJoinPoolAndApprove = async (_pool, amountToMint) => {
@@ -477,8 +477,8 @@ describe('PiDynamicPool', () => {
                 true
             );
 
-            const logNewPool = PiDynamicPoolFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
-            pool = await PiDynamicPool.at(logNewPool.args.pool);
+            const logNewPool = PowerIndexPoolFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
+            pool = await PowerIndexPool.at(logNewPool.args.pool);
 
             await time.increase(11000);
 

@@ -6,7 +6,7 @@ const MockERC20 = artifacts.require('MockERC20');
 const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
-const BPoolWrapper = artifacts.require('BPoolWrapper');
+const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const PowerIndexSimpleRouter = artifacts.require('PowerIndexSimpleRouter');
@@ -35,7 +35,7 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
     assert.equal(diff.lte(toBN(accuracyWei)), true, message);
 }
 
-describe('BPoolWrapper', () => {
+describe('PowerIndexWrapper', () => {
     const name = 'My Pool';
     const symbol = 'MP';
     const balances = [ether('10'), ether('20')];
@@ -81,7 +81,7 @@ describe('BPoolWrapper', () => {
         const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
         pool = await BPool.at(logNewPool.args.pool);
 
-        poolWrapper = await BPoolWrapper.new(pool.address);
+        poolWrapper = await PowerIndexWrapper.new(pool.address);
         poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address);
         poolRouter = await PowerIndexSimpleRouter.new();
 

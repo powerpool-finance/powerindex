@@ -10,7 +10,7 @@ const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const PermanentVotingPowerV1 = artifacts.require('PermanentVotingPowerV1');
-const BPoolWrapper = artifacts.require('BPoolWrapper');
+const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 
 BPool.numberFormat = 'String';
 
@@ -688,7 +688,7 @@ describe('Balancer', () => {
         });
 
         it('migrateController should work properly', async () => {
-            const bPoolWrapper = await BPoolWrapper.new(pool.address);
+            const bPoolWrapper = await PowerIndexWrapper.new(pool.address);
             await bPoolWrapper.setController(poolController.address);
 
             assert.equal(await bPoolWrapper.getController(), poolController.address);
