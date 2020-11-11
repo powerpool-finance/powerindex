@@ -12,6 +12,9 @@ import "./PiSimpleRouter.sol";
 contract PiRouter is PiSimpleRouter {
     using SafeMath for uint256;
 
+    bytes4 public constant REGISTER_SIG = bytes4(keccak256(bytes('register()')));
+    bytes4 public constant EXIT_SIG = bytes4(keccak256(bytes('exit()')));
+    bytes4 public constant PROPOSE_SIG = bytes4(keccak256(bytes('propose(address,string)')));
     bytes4 public constant STAKE_SIG = bytes4(keccak256(bytes('stake(uint256)')));
     bytes4 public constant WITHDRAW_SIG = bytes4(keccak256(bytes('withdraw(uint256)')));
     bytes4 public constant VOTE_FOR_SIG = bytes4(keccak256(bytes('voteFor(uint256)')));
@@ -29,6 +32,35 @@ contract PiRouter is PiSimpleRouter {
         poolRestriction = IPoolRestrictions(_poolRestrictions);
     }
 
+    /*** THE PROXIED METHOD EXECUTORS ***/
+
+    function executeRegister(address _wrappedToken) external {
+        _checkVotingSenderAllowed(_wrappedToken);
+        _callVoting(_wrappedToken, REGISTER_SIG, "");
+    }
+
+    function executeExit(address _wrappedToken) external {
+        _checkVotingSenderAllowed(_wrappedToken);
+        _callVoting(_wrappedToken, EXIT_SIG, "");
+    }
+
+    function executePropose(address _wrappedToken, address _executor, string calldata _hash) external {
+        _checkVotingSenderAllowed(_wrappedToken);
+        _callVoting(_wrappedToken, PROPOSE_SIG, abi.encode(_executor, _hash));
+    }
+
+    function executeVoteFor(address _wrappedToken, uint256 _id) external {
+        _checkVotingSenderAllowed(_wrappedToken);
+        _callVoting(_wrappedToken, VOTE_FOR_SIG, abi.encode(_id));
+    }
+
+    function executeVoteAgainst(address _wrappedToken, uint256 _id) external {
+        _checkVotingSenderAllowed(_wrappedToken);
+        _callVoting(_wrappedToken, VOTE_AGAINST_SIG, abi.encode(_id));
+    }
+
+    /*** OWNER METHODS ***/
+
     function stakeWrappedToVoting(address _wrappedToken, uint256 _amount) external onlyOwner {
         _stakeWrappedToVoting(_wrappedToken, _amount);
     }
@@ -37,25 +69,18 @@ contract PiRouter is PiSimpleRouter {
         _withdrawWrappedFromVoting(_wrappedToken, _amount);
     }
 
-    function voteWrappedFor(address _wrappedToken, uint256 _id) external {
-        _checkVotingSenderAllowed(_wrappedToken);
-        _callVoting(_wrappedToken, VOTE_FOR_SIG, abi.encode(_id));
-    }
-
-    function voteWrappedAgainst(address _wrappedToken, uint256 _id) external {
-        _checkVotingSenderAllowed(_wrappedToken);
-        _callVoting(_wrappedToken, VOTE_AGAINST_SIG, abi.encode(_id));
-    }
-
     function setVotingForWrappedToken(address _wrappedToken, address _voting) external onlyOwner {
         votingByWrapped[_wrappedToken] = _voting;
         emit SetVotingForWrappedToken(_wrappedToken, _voting);
     }
 
     function setReserveRatioForWrappedToken(address _wrappedToken, uint _reserveRatio) external onlyOwner {
+        require(_reserveRatio <= 1 ether, "GREATER_THAN_100_PCT");
         reserveRatioByWrapped[_wrappedToken] = _reserveRatio;
         emit SetReserveRatioForWrappedToken(_wrappedToken, _reserveRatio);
     }
+
+    /*** WRAPPED TOKEN CALLBACK ***/
 
     function wrapperCallback(uint256 _withdrawAmount) external override {
         address _wrappedToken = msg.sender;
@@ -85,14 +110,17 @@ contract PiRouter is PiSimpleRouter {
         }
     }
 
+    /*** INTERNALS ***/
+
     function _stakeWrappedToVoting(address _wrappedToken, uint256 _amount) internal {
+        require(_amount > 0, "CANT_STAKE_0");
         WrappedPiErc20Interface wrappedPi = WrappedPiErc20Interface(_wrappedToken);
-        wrappedPi.approveToken(votingByWrapped[_wrappedToken], 0);
         wrappedPi.approveToken(votingByWrapped[_wrappedToken], _amount);
         _callVoting(_wrappedToken, STAKE_SIG, abi.encode(_amount));
     }
 
     function _withdrawWrappedFromVoting(address _wrappedToken, uint256 _amount) internal {
+        require(_amount > 0, "CANT_WITHDRAW_0");
         _callVoting(_wrappedToken, WITHDRAW_SIG, abi.encode(_amount));
     }
 

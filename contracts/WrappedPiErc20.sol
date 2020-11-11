@@ -21,7 +21,7 @@ contract WrappedPiErc20 is ERC20 {
     event CallVoting(address indexed voting, bool indexed success, bytes4 indexed inputSig, bytes inputData, bytes outputData);
 
     modifier onlyRouter() {
-        require(router == msg.sender, "WrappedPiErc20: caller is not the router");
+        require(router == msg.sender, "ONLY_ROUTER");
         _;
     }
 
@@ -35,7 +35,7 @@ contract WrappedPiErc20 is ERC20 {
     }
 
     function deposit(uint256 _amount) external {
-        require(_amount > 0, "WrappedPiErc20::deposit: Can't deposit 0");
+        require(_amount > 0, "ZERO_DEPOSIT");
 
         emit Deposit(_msgSender(), _amount);
 
@@ -46,7 +46,7 @@ contract WrappedPiErc20 is ERC20 {
     }
 
     function withdraw(uint256 _amount) external {
-        require(_amount > 0, "WrappedPiErc20::withdraw: Can't withdraw 0");
+        require(_amount > 0, "ZERO_WITHDRAWAL");
 
         emit Withdraw(_msgSender(), _amount);
 
@@ -69,7 +69,8 @@ contract WrappedPiErc20 is ERC20 {
 
     function callVoting(address voting, bytes4 signature, bytes calldata args, uint value) external onlyRouter {
         (bool success, bytes memory data) = voting.call{ value: value }(abi.encodePacked(signature, args));
-        require(success, "NOT_SUCCESS");
+        require(success, "CALL_VOTING_REVERTED");
+
         emit CallVoting(voting, success, signature, args, data);
     }
 

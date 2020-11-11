@@ -18,7 +18,7 @@ WrappedPiErc20.numberFormat = 'String';
 
 const {web3} = BFactory;
 
-describe('PiBPoolController', () => {
+describe('PiSimpleRouter Tests', () => {
     let minter, bob, carol, alice, feeManager, feeReceiver, communityWallet, newCommunityWallet;
 
     before(async function() {
