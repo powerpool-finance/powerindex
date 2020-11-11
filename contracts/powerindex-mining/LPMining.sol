@@ -2,13 +2,12 @@
 
 pragma solidity 0.6.12;
 
-
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./IMigrator.sol";
+import "../interfaces/IMigrator.sol";
 import "./Checkpoints.sol";
 
 
@@ -63,7 +62,7 @@ contract LPMining is Ownable, Checkpoints {
     mapping (uint256 => mapping (address => UserInfo)) public userInfo;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
-    // The block number when CVP mining starts.
+    // The block number when CVP powerindex-mining starts.
     uint256 public startBlock;
 
     event AddLpToken(address indexed lpToken, uint256 indexed pid, uint256 allocPoint);

@@ -3,11 +3,11 @@
 pragma solidity =0.6.12;
 
 
-import './libraries/UniswapV2Library.sol';
-import './libraries/SafeMath.sol';
+import '../../lib/UniswapV2Library.sol';
+import '../../lib/SafeMathUniswap.sol';
+import '../../interfaces/IUniswapV2Factory.sol';
 import './libraries/TransferHelper.sol';
 import './interfaces/IUniswapV2Router02.sol';
-import './interfaces/IUniswapV2Factory.sol';
 import './interfaces/IERC20.sol';
 import './interfaces/IWETH.sol';
 

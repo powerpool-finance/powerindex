@@ -2,23 +2,23 @@
 
 pragma solidity 0.6.12;
 
-import "./interfaces/PiDynamicBPoolInterface.sol";
-import "./IPoolRestrictions.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./interfaces/PowerIndexPoolInterface.sol";
+import "./interfaces/IPoolRestrictions.sol";
 
 
-contract PiBPoolAbstractController is Ownable {
+contract PowerIndexAbstractController is Ownable {
     using SafeMath for uint256;
 
     bytes4 public constant CALL_VOTING_SIG = bytes4(keccak256(bytes('callVoting(address,bytes4,bytes,uint256)')));
 
     event CallPool(bool indexed success, bytes4 indexed inputSig, bytes inputData, bytes outputData);
 
-    PiDynamicBPoolInterface public immutable bpool;
+    PowerIndexPoolInterface public immutable pool;
 
-    constructor(address _bpool) public {
-        bpool = PiDynamicBPoolInterface(_bpool);
+    constructor(address _pool) public {
+        pool = PowerIndexPoolInterface(_pool);
     }
 
     /**
@@ -29,7 +29,7 @@ contract PiBPoolAbstractController is Ownable {
     */
     function callPool(bytes4 signature, bytes calldata args, uint value) external onlyOwner {
         _checkSignature(signature);
-        (bool success, bytes memory data) = address(bpool).call{ value: value }(abi.encodePacked(signature, args));
+        (bool success, bytes memory data) = address(pool).call{ value: value }(abi.encodePacked(signature, args));
         require(success, "NOT_SUCCESS");
         emit CallPool(success, signature, args, data);
     }
@@ -43,7 +43,7 @@ contract PiBPoolAbstractController is Ownable {
     */
     function callVotingByPool(address voting, bytes4 signature, bytes calldata args, uint value) external {
         require(_restrictions().isVotingSenderAllowed(voting, msg.sender), "SENDER_NOT_ALLOWED");
-        bpool.callVoting(voting, signature, args, value);
+        pool.callVoting(voting, signature, args, value);
     }
 
     /**
@@ -54,12 +54,12 @@ contract PiBPoolAbstractController is Ownable {
     function migrateController(address newController, address[] calldata addressesToMigrate) external onlyOwner {
         uint len = addressesToMigrate.length;
         for (uint256 i = 0; i < len; i++) {
-            PiDynamicBPoolInterface(addressesToMigrate[i]).setController(newController);
+            PowerIndexPoolInterface(addressesToMigrate[i]).setController(newController);
         }
     }
 
     function _restrictions() internal view returns(IPoolRestrictions) {
-        return IPoolRestrictions(bpool.getRestrictions());
+        return IPoolRestrictions(pool.getRestrictions());
     }
 
     function _checkSignature(bytes4 signature) internal pure virtual {

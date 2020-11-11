@@ -2,8 +2,8 @@
 
 pragma solidity 0.6.12;
 
-import "./lib/DelegatableCheckpoints.sol";
-import "./lib/SafeMath96.sol";
+import "../lib/DelegatableCheckpoints.sol";
+import "../lib/SafeMath96.sol";
 
 abstract contract DelegatableVotes {
     using SafeMath96 for uint96;
@@ -36,11 +36,11 @@ abstract contract DelegatableVotes {
 
     /**
      * @notice Delegate votes from `msg.sender` to `delegatee`
-     * @param delegatee The address to delegate votes to
+     * @param delegatee_ The address to delegate votes to
      */
-    function delegate(address delegatee) public {
-        require(delegatee != address(this), "delegate: can't delegate to contract address");
-        return _delegate(msg.sender, delegatee);
+    function delegate(address delegatee_) public {
+        require(delegatee_ != address(this), "delegate: can't delegate to the contract address");
+        return _delegate(msg.sender, delegatee_);
     }
 
     /**
@@ -114,8 +114,8 @@ abstract contract DelegatableVotes {
 
     function _writeUserData(address account, uint192 data) internal {
         DelegatableCheckpoints.Record storage src = book[account];
-        address delegatee = src.delegatee;
-        DelegatableCheckpoints.Record storage dst = delegatee == address(0) ? src : book[delegatee];
+        address _delegatee = src.delegatee;
+        DelegatableCheckpoints.Record storage dst = _delegatee == address(0) ? src : book[_delegatee];
 
         dst.writeCheckpoint(
            // keep in mind voices which others could have delegated
@@ -151,13 +151,13 @@ abstract contract DelegatableVotes {
         if (dstPrevData != dstData) dst.writeCheckpoint(dstData);
     }
 
-    function _delegate(address delegator, address delegatee) internal {
+    function _delegate(address delegator, address delegatee_) internal {
         address currentDelegate = book[delegator].delegatee;
-        book[delegator].delegatee = delegatee;
+        book[delegator].delegatee = delegatee_;
 
-        emit DelegateChanged(delegator, currentDelegate, delegatee);
+        emit DelegateChanged(delegator, currentDelegate, delegatee_);
 
-        _moveUserData(delegator, currentDelegate, delegatee);
+        _moveUserData(delegator, currentDelegate, delegatee_);
     }
 
     function _computeUserVotes(uint192 userData, uint192 sharedData) internal pure virtual returns (uint96 votes);

@@ -14,33 +14,35 @@
 
 pragma solidity 0.6.12;
 
-// Builds new BPools, logging their addresses and providing `isBPool(address) -> (bool)`
+// Builds new Power Index Pools, logging their addresses and providing `isPowerIndexPool(address) -> (bool)`
 
-import "./PiDynamicBPool.sol";
+import "./PowerIndexPool.sol";
+import "./interfaces/PowerIndexPoolFactoryInterface.sol";
 
-contract PiDynamicPoolBFactory {
+contract PowerIndexPoolFactory is PowerIndexPoolFactoryInterface {
     event LOG_NEW_POOL(
         address indexed caller,
         address indexed pool
     );
 
-    mapping(address => bool) public isBPool;
+    mapping(address => bool) public isPowerIndexPool;
 
     constructor() public { }
 
-    function newBPool(
+    function newPool(
         string calldata name,
         string calldata symbol,
         uint256 minWeightPerSecond,
         uint256 maxWeightPerSecond
     )
-        external
-        returns (PiDynamicBPool)
+    external
+    override
+    returns (PowerIndexPoolInterface)
     {
-        PiDynamicBPool bpool = new PiDynamicBPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
-        isBPool[address(bpool)] = true;
-        emit LOG_NEW_POOL(msg.sender, address(bpool));
-        bpool.setController(msg.sender);
-        return bpool;
+        PowerIndexPool pool = new PowerIndexPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
+        isPowerIndexPool[address(pool)] = true;
+        emit LOG_NEW_POOL(msg.sender, address(pool));
+        pool.setController(msg.sender);
+        return PowerIndexPoolInterface(address(pool));
     }
 }

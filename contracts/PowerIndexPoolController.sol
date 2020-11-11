@@ -4,9 +4,9 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../PiBPoolController.sol";
+import "./powerindex-router/PowerIndexWrappedController.sol";
 
-contract PiDynamicBPoolController is PiBPoolController {
+contract PowerIndexPoolController is PowerIndexWrappedController {
 
     bytes4 public constant BIND_SIG = bytes4(keccak256(bytes("bind(address,uint256,uint256,uint256,uint256)")));
     bytes4 public constant UNBIND_SIG = bytes4(keccak256(bytes('unbind(address)')));
@@ -18,7 +18,7 @@ contract PiDynamicBPoolController is PiBPoolController {
         uint targetTimestamp;
     }
 
-    constructor(address _bpool) public PiBPoolController(_bpool) {
+    constructor(address _pool, address _poolWrapper) public PowerIndexWrappedController(_pool, _poolWrapper) {
 
     }
 
@@ -34,8 +34,8 @@ contract PiDynamicBPoolController is PiBPoolController {
         external
     {
         IERC20(token).transferFrom(msg.sender, address(this), balance);
-        IERC20(token).approve(address(bpool), balance);
-        bpool.bind(token, balance, targetDenorm, fromTimestamp, targetTimestamp);
+        IERC20(token).approve(address(pool), balance);
+        pool.bind(token, balance, targetDenorm, fromTimestamp, targetTimestamp);
     }
 
     /**
@@ -45,7 +45,7 @@ contract PiDynamicBPoolController is PiBPoolController {
     function setDynamicWeightList(DynamicWeightInput[] memory _dynamicWeights) external onlyOwner {
         uint256 len = _dynamicWeights.length;
         for (uint256 i = 0; i < len; i++) {
-            bpool.setDynamicWeight(
+            pool.setDynamicWeight(
                 _dynamicWeights[i].token,
                 _dynamicWeights[i].targetDenorm,
                 _dynamicWeights[i].fromTimestamp,
@@ -59,14 +59,14 @@ contract PiDynamicBPoolController is PiBPoolController {
     * @param _token Token to unbind
     */
     function unbindNotActualToken(address _token) external {
-        require(bpool.getDenormalizedWeight(_token) == bpool.MIN_WEIGHT(), "DENORM_MIN");
-        (, uint256 targetTimestamp, , ) = bpool.getDynamicWeightSettings(_token);
+        require(pool.getDenormalizedWeight(_token) == pool.MIN_WEIGHT(), "DENORM_MIN");
+        (, uint256 targetTimestamp, , ) = pool.getDynamicWeightSettings(_token);
         require(block.timestamp > targetTimestamp, "TIMESTAMP_MORE_THEN_TARGET");
 
-        uint256 tokenBalance = bpool.getBalance(_token);
+        uint256 tokenBalance = pool.getBalance(_token);
 
-        bpool.unbind(_token);
-        (, , , address communityWallet) = bpool.getCommunityFee();
+        pool.unbind(_token);
+        (, , , address communityWallet) = pool.getCommunityFee();
         IERC20(_token).transfer(communityWallet, tokenBalance);
     }
 
