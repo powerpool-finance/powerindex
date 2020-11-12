@@ -32,6 +32,7 @@ jobs:
           restore-keys: |
             ${{ matrix.os }}-yarn-
       - run: yarn
+      - run: yarn compile
       - run: yarn test
 
   coverage:
@@ -60,4 +61,5 @@ jobs:
             ${{ matrix.os }}-yarn-
       - run: yarn
       - run: yarn coverage
+        continue-on-error: true
       - uses: codecov/codecov-action@v1
