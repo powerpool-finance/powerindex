@@ -32,16 +32,15 @@ contract PowerIndexPoolActions {
         PowerIndexPoolFactoryInterface factory,
         string calldata name,
         string calldata symbol,
-        uint256 minWeightPerSecond,
-        uint256 maxWeightPerSecond,
+        // 0 - minWeightPerSecond, 1 - maxWeightPerSecond, 2..5 - fees
+        uint256[] calldata weightsAndFees,
         TokenConfig[] calldata tokens,
-        uint[4] calldata fees,
         address communityFeeReceiver,
         bool finalize
     ) external returns (PowerIndexPoolInterface pool) {
-        pool = factory.newPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
-        pool.setSwapFee(fees[0]);
-        pool.setCommunityFeeAndReceiver(fees[1], fees[2], fees[3], communityFeeReceiver);
+        pool = factory.newPool(name, symbol, weightsAndFees[0], weightsAndFees[1]);
+        pool.setSwapFee(weightsAndFees[2]);
+        pool.setCommunityFeeAndReceiver(weightsAndFees[3], weightsAndFees[4], weightsAndFees[5], communityFeeReceiver);
 
         for (uint i = 0; i < tokens.length; i++) {
             TokenConfig memory tokenConfig = tokens[i];

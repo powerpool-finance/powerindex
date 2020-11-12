@@ -95,8 +95,7 @@ describe('PowerIndexPool', () => {
             this.bFactory.address,
             name,
             symbol,
-            minWeightPerSecond,
-            maxWeightPerSecond,
+            [minWeightPerSecond, maxWeightPerSecond, swapFee, communitySwapFee, communityJoinFee, communityExitFee],
             tokens.map((t, i) => ({
                 token: t,
                 balance: balances[i],
@@ -104,7 +103,6 @@ describe('PowerIndexPool', () => {
                 fromTimestamp: fromTimestamps[i],
                 targetTimestamp: targetTimestamps[i],
             })),
-            [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
             communityWallet,
             true
         );
@@ -463,8 +461,7 @@ describe('PowerIndexPool', () => {
                 this.bFactory.address,
                 name,
                 symbol,
-                minWeightPerSecond,
-                maxWeightPerSecond,
+                [minWeightPerSecond, maxWeightPerSecond, swapFee, communitySwapFee, communityJoinFee, communityExitFee],
                 tokens.map((t, i) => ({
                     token: t,
                     balance: newBalances[i],
@@ -472,7 +469,6 @@ describe('PowerIndexPool', () => {
                     fromTimestamp: fromTimestamps[i],
                     targetTimestamp: targetTimestamps[i],
                 })),
-                [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
                 communityWallet,
                 true
             );
