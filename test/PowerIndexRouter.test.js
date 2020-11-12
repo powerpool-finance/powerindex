@@ -18,7 +18,7 @@ WrappedPiErc20.numberFormat = 'String';
 
 const {web3} = BFactory;
 
-describe('PowerIndexPoolController', () => {
+describe('PowerIndex Router Test', () => {
     let minter, bob, carol, alice, feeManager, feeReceiver, communityWallet, newCommunityWallet;
 
     before(async function() {
