@@ -178,26 +178,26 @@ contract PowerIndexPool is BPool {
         returns (uint)
     {
         DynamicWeight memory dw = _dynamicWeights[token];
-        uint256 recordsDenorm = _records[token].denorm;
+        uint256 fromDenorm = _records[token].denorm;
 
-        if (dw.fromTimestamp == 0 || dw.targetDenorm == recordsDenorm || block.timestamp <= dw.fromTimestamp) {
-            return recordsDenorm;
+        if (dw.fromTimestamp == 0 || dw.targetDenorm == fromDenorm || block.timestamp <= dw.fromTimestamp) {
+            return fromDenorm;
         }
         if (block.timestamp >= dw.targetTimestamp) {
             return dw.targetDenorm;
         }
 
         uint256 weightPerSecond = _getWeightPerSecond(
-            recordsDenorm,
+            fromDenorm,
             dw.targetDenorm,
             dw.fromTimestamp,
             dw.targetTimestamp
         );
         uint256 deltaCurrentTime = bsub(block.timestamp, dw.fromTimestamp);
-        if (dw.targetDenorm > recordsDenorm) {
-            return badd(recordsDenorm, deltaCurrentTime * weightPerSecond);
+        if (dw.targetDenorm > fromDenorm) {
+            return badd(fromDenorm, deltaCurrentTime * weightPerSecond);
         } else {
-            return bsub(recordsDenorm, deltaCurrentTime * weightPerSecond);
+            return bsub(fromDenorm, deltaCurrentTime * weightPerSecond);
         }
     }
 
