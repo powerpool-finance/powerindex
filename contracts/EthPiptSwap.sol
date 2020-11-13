@@ -109,7 +109,7 @@ contract EthPiptSwap is Ownable {
     }
 
     require(msg.value > 0, "ETH required");
-    weth.deposit.value(msg.value)();
+    weth.deposit{ value: msg.value }();
 
     (uint256 feeAmount, uint256 swapAmount) = calcEthFee(msg.value);
 
