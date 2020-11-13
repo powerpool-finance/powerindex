@@ -1,0 +1,14 @@
+# folders
+.yarn/
+build/
+dist/
+node_modules/
+contracts/exchange-proxy/
+contracts/balancer-core/
+contracts/bactions-proxy/
+contracts/lib/
+contracts/interfaces/IUniswapV2Factory.sol
+contracts/interfaces/IUniswapV2Pair.sol
+contracts/test/uniswapv2/
+contracts/test/MockWETH.sol
+contracts/test/MockYearnGovernance.sol

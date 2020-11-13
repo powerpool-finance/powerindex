@@ -4,11 +4,11 @@ module.exports = {
   istanbulReporter: ['html'],
   providerOptions: {
     total_accounts: 30,
-    default_balance_ether: BigInt(1e30).toString()
+    default_balance_ether: BigInt(1e30).toString(),
   },
   mocha: {
     delay: false,
-    timeout: 50000
+    timeout: 50000,
   },
   onCompileComplete: async function (_config) {
     // await run("typechain");

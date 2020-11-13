@@ -1,0 +1,19 @@
+# folders
+artifacts/
+build/
+cache/
+coverage/
+dist/
+lib/
+node_modules/
+typechain/
+contracts/exchange-proxy/
+contracts/balancer-core/
+contracts/bactions-proxy/
+contracts/lib/
+contracts/test/uniswapv2/
+contracts/test/MockWETH.sol
+contracts/test/MockYearnGovernance.sol
+
+# files
+coverage.json

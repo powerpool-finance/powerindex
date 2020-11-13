@@ -20,60 +20,65 @@ import "./interfaces/PowerIndexPoolInterface.sol";
 import "./interfaces/PowerIndexPoolFactoryInterface.sol";
 
 contract PowerIndexPoolActions {
-    struct Args {
-        uint256 minWeightPerSecond;
-        uint256 maxWeightPerSecond;
-        uint256 swapFee;
-        uint256 communitySwapFee;
-        uint256 communityJoinFee;
-        uint256 communityExitFee;
-        address communityFeeReceiver;
-        bool finalize;
+  struct Args {
+    uint256 minWeightPerSecond;
+    uint256 maxWeightPerSecond;
+    uint256 swapFee;
+    uint256 communitySwapFee;
+    uint256 communityJoinFee;
+    uint256 communityExitFee;
+    address communityFeeReceiver;
+    bool finalize;
+  }
+
+  struct TokenConfig {
+    address token;
+    uint256 balance;
+    uint256 targetDenorm;
+    uint256 fromTimestamp;
+    uint256 targetTimestamp;
+  }
+
+  function create(
+    PowerIndexPoolFactoryInterface factory,
+    string calldata name,
+    string calldata symbol,
+    Args calldata args,
+    TokenConfig[] calldata tokens
+  ) external returns (PowerIndexPoolInterface pool) {
+    pool = factory.newPool(name, symbol, args.minWeightPerSecond, args.maxWeightPerSecond);
+    pool.setSwapFee(args.swapFee);
+    pool.setCommunityFeeAndReceiver(
+      args.communitySwapFee,
+      args.communityJoinFee,
+      args.communityExitFee,
+      args.communityFeeReceiver
+    );
+
+    for (uint256 i = 0; i < tokens.length; i++) {
+      TokenConfig memory tokenConfig = tokens[i];
+      IERC20 token = IERC20(tokenConfig.token);
+      require(token.transferFrom(msg.sender, address(this), tokenConfig.balance), "ERR_TRANSFER_FAILED");
+      if (token.allowance(address(this), address(pool)) > 0) {
+        token.approve(address(pool), 0);
+      }
+      token.approve(address(pool), tokenConfig.balance);
+      pool.bind(
+        tokenConfig.token,
+        tokenConfig.balance,
+        tokenConfig.targetDenorm,
+        tokenConfig.fromTimestamp,
+        tokenConfig.targetTimestamp
+      );
     }
 
-    struct TokenConfig {
-        address token;
-        uint256 balance;
-        uint256 targetDenorm;
-        uint256 fromTimestamp;
-        uint256 targetTimestamp;
+    if (args.finalize) {
+      pool.finalize();
+      require(pool.transfer(msg.sender, pool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
+    } else {
+      pool.setPublicSwap(true);
     }
 
-    function create(
-        PowerIndexPoolFactoryInterface factory,
-        string calldata name,
-        string calldata symbol,
-        Args calldata args,
-        TokenConfig[] calldata tokens
-    ) external returns (PowerIndexPoolInterface pool) {
-        pool = factory.newPool(name, symbol, args.minWeightPerSecond, args.maxWeightPerSecond);
-        pool.setSwapFee(args.swapFee);
-        pool.setCommunityFeeAndReceiver(args.communitySwapFee, args.communityJoinFee, args.communityExitFee, args.communityFeeReceiver);
-
-        for (uint i = 0; i < tokens.length; i++) {
-            TokenConfig memory tokenConfig = tokens[i];
-            IERC20 token = IERC20(tokenConfig.token);
-            require(token.transferFrom(msg.sender, address(this), tokenConfig.balance), "ERR_TRANSFER_FAILED");
-            if (token.allowance(address(this), address(pool)) > 0) {
-                token.approve(address(pool), 0);
-            }
-            token.approve(address(pool), tokenConfig.balance);
-            pool.bind(
-                tokenConfig.token,
-                tokenConfig.balance,
-                tokenConfig.targetDenorm,
-                tokenConfig.fromTimestamp,
-                tokenConfig.targetTimestamp
-            );
-        }
-
-        if (args.finalize) {
-            pool.finalize();
-            require(pool.transfer(msg.sender, pool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
-        } else {
-            pool.setPublicSwap(true);
-        }
-
-        pool.setController(msg.sender);
-    }
+    pool.setController(msg.sender);
+  }
 }

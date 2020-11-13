@@ -32,6 +32,8 @@ jobs:
           restore-keys: |
             ${{ matrix.os }}-yarn-
       - run: yarn
+      - run: yarn run lint:sol
+      - run: yarn run lint:js
       - run: yarn compile
       - run: yarn test
 

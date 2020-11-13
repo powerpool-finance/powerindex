@@ -1,0 +1,6 @@
+{
+  "globals": {
+    "usePlugin": true,
+    "task": true
+  }
+}
