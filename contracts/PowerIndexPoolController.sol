@@ -59,7 +59,7 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     * @param _token Token to unbind
     */
     function unbindNotActualToken(address _token) external {
-        require(pool.getDenormalizedWeight(_token) == pool.MIN_WEIGHT(), "DENORM_MIN");
+        require(pool.getDenormalizedWeight(_token) == pool.getMinWeight(), "DENORM_MIN");
         (, uint256 targetTimestamp, , ) = pool.getDynamicWeightSettings(_token);
         require(block.timestamp > targetTimestamp, "TIMESTAMP_MORE_THEN_TARGET");
 
