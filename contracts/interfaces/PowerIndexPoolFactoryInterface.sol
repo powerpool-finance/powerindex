@@ -10,5 +10,5 @@ interface PowerIndexPoolFactoryInterface {
     string calldata symbol,
     uint256 minWeightPerSecond,
     uint256 maxWeightPerSecond
-  ) external virtual returns (PowerIndexPoolInterface);
+  ) external returns (PowerIndexPoolInterface);
 }

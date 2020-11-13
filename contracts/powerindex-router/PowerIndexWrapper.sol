@@ -215,11 +215,11 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
   }
 
   function _processTokenOrWrapperIn(address tokenOrWrapper, uint256 amount) internal returns (address factToken) {
-    address tokenByWrapper = tokenByWrapper[tokenOrWrapper];
-    if (tokenByWrapper == address(0)) {
+    address token = tokenByWrapper[tokenOrWrapper];
+    if (token == address(0)) {
       return _processTokenIn(tokenOrWrapper, amount);
     } else {
-      return _processTokenIn(tokenByWrapper, amount);
+      return _processTokenIn(token, amount);
     }
   }
 
@@ -247,15 +247,15 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
   }
 
   function _processTokenOrWrapperOutBalance(address tokenOrWrapper) internal {
-    address tokenByWrapper = tokenByWrapper[tokenOrWrapper];
-    if (tokenByWrapper == address(0)) {
+    address token = tokenByWrapper[tokenOrWrapper];
+    if (token == address(0)) {
       _processTokenOut(tokenOrWrapper, IERC20(tokenOrWrapper).balanceOf(address(this)));
     } else {
-      _processTokenOut(tokenByWrapper, WrappedPiErc20Interface(tokenOrWrapper).balanceOf(address(this)));
+      _processTokenOut(token, WrappedPiErc20Interface(tokenOrWrapper).balanceOf(address(this)));
     }
   }
 
-  function _getFactToken(address token) internal returns (address) {
+  function _getFactToken(address token) internal view returns (address) {
     address wrapper = wrapperByToken[token];
     if (wrapper == address(0)) {
       return token;

@@ -11,19 +11,18 @@ interface PowerIndexPoolInterface is BPoolInterface {
     uint256,
     uint256,
     uint256
-  ) external virtual;
+  ) external;
 
   function setDynamicWeight(
     address token,
     uint256 targetDenorm,
     uint256 fromTimestamp,
     uint256 targetTimestamp
-  ) external virtual;
+  ) external;
 
   function getDynamicWeightSettings(address token)
     external
     view
-    virtual
     returns (
       uint256 fromTimestamp,
       uint256 targetTimestamp,
