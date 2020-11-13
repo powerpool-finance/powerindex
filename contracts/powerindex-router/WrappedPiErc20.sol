@@ -2,12 +2,12 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../interfaces/PiRouterInterface.sol";
+import "../interfaces/WrappedPiErc20Interface.sol";
 
-contract WrappedPiErc20 is ERC20 {
+contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
   using SafeMath for uint256;
 
   IERC20 public immutable token;
@@ -44,7 +44,7 @@ contract WrappedPiErc20 is ERC20 {
     PiRouterInterface(router).wrapperCallback(0);
   }
 
-  function deposit(uint256 _amount) external {
+  function deposit(uint256 _amount) external override {
     require(_amount > 0, "ZERO_DEPOSIT");
 
     emit Deposit(_msgSender(), _amount);
@@ -55,7 +55,7 @@ contract WrappedPiErc20 is ERC20 {
     PiRouterInterface(router).wrapperCallback(0);
   }
 
-  function withdraw(uint256 _amount) external {
+  function withdraw(uint256 _amount) external override {
     require(_amount > 0, "ZERO_WITHDRAWAL");
 
     emit Withdraw(_msgSender(), _amount);
@@ -67,12 +67,12 @@ contract WrappedPiErc20 is ERC20 {
     token.transfer(_msgSender(), _amount);
   }
 
-  function changeRouter(address _newRouter) external onlyRouter {
+  function changeRouter(address _newRouter) external override onlyRouter {
     router = _newRouter;
     emit ChangeRouter(router);
   }
 
-  function approveToken(address _to, uint256 _amount) external onlyRouter {
+  function approveToken(address _to, uint256 _amount) external override onlyRouter {
     token.approve(_to, _amount);
     emit Approve(_to, _amount);
   }
@@ -82,14 +82,14 @@ contract WrappedPiErc20 is ERC20 {
     bytes4 signature,
     bytes calldata args,
     uint256 value
-  ) external onlyRouter {
+  ) external override onlyRouter {
     (bool success, bytes memory data) = voting.call{ value: value }(abi.encodePacked(signature, args));
     require(success, "CALL_VOTING_REVERTED");
 
     emit CallVoting(voting, success, signature, args, data);
   }
 
-  function getWrappedBalance() external view returns (uint256) {
+  function getWrappedBalance() external view override returns (uint256) {
     return token.balanceOf(address(this));
   }
 }
