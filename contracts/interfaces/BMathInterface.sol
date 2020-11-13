@@ -2,16 +2,13 @@
 
 pragma solidity 0.6.12;
 
-
 interface BMathInterface {
-    function calcInGivenOut(
-        uint tokenBalanceIn,
-        uint tokenWeightIn,
-        uint tokenBalanceOut,
-        uint tokenWeightOut,
-        uint tokenAmountOut,
-        uint swapFee
-    )
-    external pure
-    returns (uint tokenAmountIn);
+  function calcInGivenOut(
+    uint256 tokenBalanceIn,
+    uint256 tokenWeightIn,
+    uint256 tokenBalanceOut,
+    uint256 tokenWeightOut,
+    uint256 tokenAmountOut,
+    uint256 swapFee
+  ) external pure returns (uint256 tokenAmountIn);
 }

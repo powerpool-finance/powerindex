@@ -6,220 +6,219 @@ import "./balancer-core/BPool.sol";
 import "./interfaces/PowerIndexPoolInterface.sol";
 
 contract PowerIndexPool is BPool {
+  /// @notice The event emitted when a dynamic weight set to token
+  event SetDynamicWeight(
+    address indexed token,
+    uint256 fromDenorm,
+    uint256 targetDenorm,
+    uint256 fromTimestamp,
+    uint256 targetTimestamp
+  );
 
-    /// @notice The event emitted when a dynamic weight set to token
-    event SetDynamicWeight(
-        address indexed token,
-        uint fromDenorm,
-        uint targetDenorm,
-        uint fromTimestamp,
-        uint targetTimestamp
-    );
+  /// @notice The event emitted when weight per second bounds set
+  event SetWeightPerSecondBounds(uint256 minWeightPerSecond, uint256 maxWeightPerSecond);
 
-    /// @notice The event emitted when weight per second bounds set
-    event SetWeightPerSecondBounds(uint minWeightPerSecond, uint maxWeightPerSecond);
+  struct DynamicWeight {
+    uint256 fromTimestamp;
+    uint256 targetTimestamp;
+    uint256 targetDenorm;
+  }
 
-    struct DynamicWeight {
-        uint fromTimestamp;
-        uint targetTimestamp;
-        uint targetDenorm;
+  /// @dev Mapping for storing dynamic weights settings. fromDenorm stored in _records mapping as denorm variable
+  mapping(address => DynamicWeight) private _dynamicWeights;
+
+  /// @dev Min weight per second limit
+  uint256 private _minWeightPerSecond;
+  /// @dev Max weight per second limit
+  uint256 private _maxWeightPerSecond;
+
+  constructor(
+    string memory name,
+    string memory symbol,
+    uint256 minWeightPerSecond,
+    uint256 maxWeightPerSecond
+  ) public BPool(name, symbol) {
+    _minWeightPerSecond = minWeightPerSecond;
+    _maxWeightPerSecond = maxWeightPerSecond;
+  }
+
+  /*** Controller Interface ***/
+
+  /**
+   * @notice Set weight per second bounds by controller
+   * @param minWeightPerSecond Min weight per second
+   * @param maxWeightPerSecond Max weight per second
+   */
+  function setWeightPerSecondBounds(uint256 minWeightPerSecond, uint256 maxWeightPerSecond) public _logs_ _lock_ {
+    _checkController();
+    _minWeightPerSecond = minWeightPerSecond;
+    _maxWeightPerSecond = maxWeightPerSecond;
+
+    emit SetWeightPerSecondBounds(minWeightPerSecond, maxWeightPerSecond);
+  }
+
+  /**
+   * @notice Set dynamic weight for token by controller
+   * @param token Token for change settings
+   * @param targetDenorm Target weight. fromDenorm will be fetch by current value of _getDenormWeight
+   * @param fromTimestamp From timestamp of dynamic weight
+   * @param targetTimestamp Target timestamp of dynamic weight
+   */
+  function setDynamicWeight(
+    address token,
+    uint256 targetDenorm,
+    uint256 fromTimestamp,
+    uint256 targetTimestamp
+  ) public _logs_ _lock_ {
+    _checkController();
+    _checkBound(token);
+
+    require(fromTimestamp > block.timestamp, "CANT_SET_PAST_TIMESTAMP");
+    require(targetTimestamp > fromTimestamp, "TIMESTAMP_INCORRECT_DELTA");
+    require(targetDenorm >= MIN_WEIGHT && targetDenorm <= MAX_WEIGHT, "TARGET_WEIGHT_BOUNDS");
+
+    uint256 fromDenorm = _getDenormWeight(token);
+    uint256 weightPerSecond = _getWeightPerSecond(fromDenorm, targetDenorm, fromTimestamp, targetTimestamp);
+    require(weightPerSecond <= _maxWeightPerSecond, "MAX_WEIGHT_PER_SECOND");
+    require(weightPerSecond >= _minWeightPerSecond, "MIN_WEIGHT_PER_SECOND");
+
+    _records[token].denorm = fromDenorm;
+
+    _dynamicWeights[token] = DynamicWeight({
+      fromTimestamp: fromTimestamp,
+      targetTimestamp: targetTimestamp,
+      targetDenorm: targetDenorm
+    });
+
+    uint256 denormSum = 0;
+    uint256 len = _tokens.length;
+    for (uint256 i = 0; i < len; i++) {
+      denormSum = badd(denormSum, _dynamicWeights[_tokens[i]].targetDenorm);
     }
 
-    /// @dev Mapping for storing dynamic weights settings. fromDenorm stored in _records mapping as denorm variable
-    mapping(address => DynamicWeight) private _dynamicWeights;
+    require(denormSum <= MAX_TOTAL_WEIGHT, "MAX_TARGET_TOTAL_WEIGHT");
 
-    /// @dev Min weight per second limit
-    uint256 private _minWeightPerSecond;
-    /// @dev Max weight per second limit
-    uint256 private _maxWeightPerSecond;
+    emit SetDynamicWeight(token, _records[token].denorm, targetDenorm, fromTimestamp, targetTimestamp);
+  }
 
-    constructor(string memory name, string memory symbol, uint minWeightPerSecond, uint maxWeightPerSecond)
-        public
-        BPool(name, symbol)
-    {
-        _minWeightPerSecond = minWeightPerSecond;
-        _maxWeightPerSecond = maxWeightPerSecond;
-    }
+  /**
+   * @notice Bind and setDynamicWeight at the same time
+   * @param token Token for bind
+   * @param balance Initial balance
+   * @param targetDenorm Target weight
+   * @param fromTimestamp From timestamp of dynamic weight
+   * @param targetTimestamp Target timestamp of dynamic weight
+   */
+  function bind(
+    address token,
+    uint256 balance,
+    uint256 targetDenorm,
+    uint256 fromTimestamp,
+    uint256 targetTimestamp
+  )
+    external
+    _logs_ // _lock_  Bind does not lock because it jumps to `rebind` and `setDynamicWeight`, which does
+  {
+    super.bind(token, balance, MIN_WEIGHT);
 
-    /*** Controller Interface ***/
+    setDynamicWeight(token, targetDenorm, fromTimestamp, targetTimestamp);
+  }
 
-    /**
-    * @notice Set weight per second bounds by controller
-    * @param minWeightPerSecond Min weight per second
-    * @param maxWeightPerSecond Max weight per second
-    */
-    function setWeightPerSecondBounds(uint minWeightPerSecond, uint maxWeightPerSecond)
-        public
-        _logs_
-        _lock_
-    {
-        _checkController();
-        _minWeightPerSecond = minWeightPerSecond;
-        _maxWeightPerSecond = maxWeightPerSecond;
+  /**
+   * @notice Override parent unbind function
+   * @param token Token for unbind
+   */
+  function unbind(address token) public override {
+    _totalWeight = _getTotalWeight(); // for compatibility with original BPool unbind
+    super.unbind(token);
 
-        emit SetWeightPerSecondBounds(minWeightPerSecond, maxWeightPerSecond);
-    }
+    _dynamicWeights[token] = DynamicWeight(0, 0, 0);
+  }
 
-    /**
-    * @notice Set dynamic weight for token by controller
-    * @param token Token for change settings
-    * @param targetDenorm Target weight. fromDenorm will be fetch by current value of _getDenormWeight
-    * @param fromTimestamp From timestamp of dynamic weight
-    * @param targetTimestamp Target timestamp of dynamic weight
-    */
-    function setDynamicWeight(
-        address token,
-        uint targetDenorm,
-        uint fromTimestamp,
-        uint targetTimestamp
+  /**
+   * @notice Override parent bind function and disable.
+   */
+  function bind(
+    address,
+    uint256,
+    uint256
+  ) public override {
+    require(false, "DISABLED"); // Only new bind function is allowed
+  }
+
+  /**
+   * @notice Override parent rebind function. Allowed only for calling from bind function
+   * @param token Token for rebind
+   * @param balance Balance for rebind
+   * @param denorm Weight for rebind
+   */
+  function rebind(
+    address token,
+    uint256 balance,
+    uint256 denorm
+  ) public override {
+    require(denorm == MIN_WEIGHT && _dynamicWeights[token].fromTimestamp == 0, "ONLY_NEW_TOKENS_ALLOWED");
+    super.rebind(token, balance, denorm);
+  }
+
+  /*** View Functions ***/
+
+  function getDynamicWeightSettings(address token)
+    external
+    view
+    returns (
+      uint256 fromTimestamp,
+      uint256 targetTimestamp,
+      uint256 fromDenorm,
+      uint256 targetDenorm
     )
-        public
-        _logs_
-        _lock_
-    {
-        _checkController();
-        _checkBound(token);
+  {
+    DynamicWeight storage dw = _dynamicWeights[token];
+    return (dw.fromTimestamp, dw.targetTimestamp, _records[token].denorm, dw.targetDenorm);
+  }
 
-        require(fromTimestamp > block.timestamp, "CANT_SET_PAST_TIMESTAMP");
-        require(targetTimestamp > fromTimestamp, "TIMESTAMP_INCORRECT_DELTA");
-        require(targetDenorm >= MIN_WEIGHT && targetDenorm <= MAX_WEIGHT, "TARGET_WEIGHT_BOUNDS");
+  function getWeightPerSecondBounds() external view returns (uint256 minWeightPerSecond, uint256 maxWeightPerSecond) {
+    return (_minWeightPerSecond, _maxWeightPerSecond);
+  }
 
-        uint256 fromDenorm = _getDenormWeight(token);
-        uint256 weightPerSecond = _getWeightPerSecond(fromDenorm, targetDenorm, fromTimestamp, targetTimestamp);
-        require(weightPerSecond <= _maxWeightPerSecond, "MAX_WEIGHT_PER_SECOND");
-        require(weightPerSecond >= _minWeightPerSecond, "MIN_WEIGHT_PER_SECOND");
+  /*** Internal Functions ***/
 
-        _records[token].denorm = fromDenorm;
+  function _getDenormWeight(address token) internal view override returns (uint256) {
+    DynamicWeight memory dw = _dynamicWeights[token];
+    uint256 fromDenorm = _records[token].denorm;
 
-        _dynamicWeights[token] = DynamicWeight({
-            fromTimestamp: fromTimestamp,
-            targetTimestamp: targetTimestamp,
-            targetDenorm: targetDenorm
-        });
-
-        uint256 denormSum = 0;
-        uint256 len = _tokens.length;
-        for (uint256 i = 0; i < len; i++) {
-            denormSum = badd(denormSum, _dynamicWeights[_tokens[i]].targetDenorm);
-        }
-
-        require(denormSum <= MAX_TOTAL_WEIGHT, "MAX_TARGET_TOTAL_WEIGHT");
-
-        emit SetDynamicWeight(token, _records[token].denorm, targetDenorm, fromTimestamp, targetTimestamp);
+    if (dw.fromTimestamp == 0 || dw.targetDenorm == fromDenorm || block.timestamp <= dw.fromTimestamp) {
+      return fromDenorm;
+    }
+    if (block.timestamp >= dw.targetTimestamp) {
+      return dw.targetDenorm;
     }
 
-    /**
-    * @notice Bind and setDynamicWeight at the same time
-    * @param token Token for bind
-    * @param balance Initial balance
-    * @param targetDenorm Target weight
-    * @param fromTimestamp From timestamp of dynamic weight
-    * @param targetTimestamp Target timestamp of dynamic weight
-    */
-    function bind(address token, uint balance, uint targetDenorm, uint fromTimestamp, uint targetTimestamp)
-        external
-        _logs_
-        // _lock_  Bind does not lock because it jumps to `rebind` and `setDynamicWeight`, which does
-    {
-        super.bind(token, balance, MIN_WEIGHT);
-
-        setDynamicWeight(token, targetDenorm, fromTimestamp, targetTimestamp);
+    uint256 weightPerSecond = _getWeightPerSecond(fromDenorm, dw.targetDenorm, dw.fromTimestamp, dw.targetTimestamp);
+    uint256 deltaCurrentTime = bsub(block.timestamp, dw.fromTimestamp);
+    if (dw.targetDenorm > fromDenorm) {
+      return badd(fromDenorm, deltaCurrentTime * weightPerSecond);
+    } else {
+      return bsub(fromDenorm, deltaCurrentTime * weightPerSecond);
     }
+  }
 
-    /**
-    * @notice Override parent unbind function
-    * @param token Token for unbind
-    */
-    function unbind(address token) public override {
-        _totalWeight = _getTotalWeight(); // for compatibility with original BPool unbind
-        super.unbind(token);
+  function _getWeightPerSecond(
+    uint256 fromDenorm,
+    uint256 targetDenorm,
+    uint256 fromTimestamp,
+    uint256 targetTimestamp
+  ) internal pure returns (uint256) {
+    uint256 delta = targetDenorm > fromDenorm ? bsub(targetDenorm, fromDenorm) : bsub(fromDenorm, targetDenorm);
+    return delta / bsub(targetTimestamp, fromTimestamp);
+  }
 
-        _dynamicWeights[token] = DynamicWeight(0, 0, 0);
+  function _getTotalWeight() internal view override returns (uint256) {
+    uint256 sum = 0;
+    uint256 len = _tokens.length;
+    for (uint256 i = 0; i < len; i++) {
+      sum = badd(sum, _getDenormWeight(_tokens[i]));
     }
-
-    /**
-    * @notice Override parent bind function and disable.
-    */
-    function bind(address, uint, uint) public override {
-        require(false, "DISABLED"); // Only new bind function is allowed
-    }
-
-    /**
-    * @notice Override parent rebind function. Allowed only for calling from bind function
-    * @param token Token for rebind
-    * @param balance Balance for rebind
-    * @param denorm Weight for rebind
-    */
-    function rebind(address token, uint balance, uint denorm) public override {
-        require(denorm == MIN_WEIGHT && _dynamicWeights[token].fromTimestamp == 0, "ONLY_NEW_TOKENS_ALLOWED");
-        super.rebind(token, balance, denorm);
-    }
-
-    /*** View Functions ***/
-
-    function getDynamicWeightSettings(address token) external view returns (
-        uint fromTimestamp,
-        uint targetTimestamp,
-        uint fromDenorm,
-        uint targetDenorm
-    ) {
-        DynamicWeight storage dw = _dynamicWeights[token];
-        return (dw.fromTimestamp, dw.targetTimestamp, _records[token].denorm, dw.targetDenorm);
-    }
-
-    function getWeightPerSecondBounds() external view returns(uint minWeightPerSecond, uint maxWeightPerSecond) {
-        return (_minWeightPerSecond, _maxWeightPerSecond);
-    }
-
-    /*** Internal Functions ***/
-
-    function _getDenormWeight(address token)
-        internal view override
-        returns (uint)
-    {
-        DynamicWeight memory dw = _dynamicWeights[token];
-        uint256 fromDenorm = _records[token].denorm;
-
-        if (dw.fromTimestamp == 0 || dw.targetDenorm == fromDenorm || block.timestamp <= dw.fromTimestamp) {
-            return fromDenorm;
-        }
-        if (block.timestamp >= dw.targetTimestamp) {
-            return dw.targetDenorm;
-        }
-
-        uint256 weightPerSecond = _getWeightPerSecond(
-            fromDenorm,
-            dw.targetDenorm,
-            dw.fromTimestamp,
-            dw.targetTimestamp
-        );
-        uint256 deltaCurrentTime = bsub(block.timestamp, dw.fromTimestamp);
-        if (dw.targetDenorm > fromDenorm) {
-            return badd(fromDenorm, deltaCurrentTime * weightPerSecond);
-        } else {
-            return bsub(fromDenorm, deltaCurrentTime * weightPerSecond);
-        }
-    }
-
-    function _getWeightPerSecond(
-        uint256 fromDenorm,
-        uint256 targetDenorm,
-        uint256 fromTimestamp,
-        uint256 targetTimestamp
-    ) internal pure returns (uint) {
-        uint256 delta = targetDenorm > fromDenorm ? bsub(targetDenorm, fromDenorm) : bsub(fromDenorm, targetDenorm);
-        return delta / bsub(targetTimestamp, fromTimestamp);
-    }
-
-    function _getTotalWeight()
-        internal view override
-        returns (uint)
-    {
-        uint256 sum = 0;
-        uint256 len = _tokens.length;
-        for (uint256 i = 0; i < len; i++) {
-            sum = badd(sum, _getDenormWeight(_tokens[i]));
-        }
-        return sum;
-    }
+    return sum;
+  }
 }
