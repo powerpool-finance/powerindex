@@ -1,82 +1,82 @@
 [
- {
-  "tokenAddress": "0x80fB784B7eD66730e8b1DBd9820aFD29931aab03",
-  "tokenSymbol": "LEND",
-  "balancerBalance": 183277.82826995128,
-  "uniswapPair": {
-   "address": "0xaB3F9bF1D81ddb224a2014e98B238638824bCf20",
-   "tokenReserve": 2802188.266621945,
-   "ethReserve": 2554.72532699901
+  {
+    "tokenAddress": "0x80fB784B7eD66730e8b1DBd9820aFD29931aab03",
+    "tokenSymbol": "LEND",
+    "balancerBalance": 183277.82826995128,
+    "uniswapPair": {
+      "address": "0xaB3F9bF1D81ddb224a2014e98B238638824bCf20",
+      "tokenReserve": 2802188.266621945,
+      "ethReserve": 2554.72532699901
+    }
+  },
+  {
+    "tokenAddress": "0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e",
+    "tokenSymbol": "YFI",
+    "balancerBalance": 4.782531821234806,
+    "uniswapPair": {
+      "address": "0x2fDbAdf3C4D5A8666Bc06645B8358ab803996E28",
+      "tokenReserve": 417.0741505297207,
+      "ethReserve": 14471.987525871662
+    }
+  },
+  {
+    "tokenAddress": "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F",
+    "tokenSymbol": "SNX",
+    "balancerBalance": 17672.207859828817,
+    "uniswapPair": {
+      "address": "0x43AE24960e5534731Fc831386c07755A2dc33D47",
+      "tokenReserve": 418483.7383855132,
+      "ethReserve": 3987.7523557588506
+    }
+  },
+  {
+    "tokenAddress": "0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1",
+    "tokenSymbol": "CVP",
+    "balancerBalance": 42230.08989265705,
+    "uniswapPair": {
+      "address": "0x12D4444f96C644385D8ab355F6DDf801315b6254",
+      "tokenReserve": 570183.0600218237,
+      "ethReserve": 2257.4204268307262
+    }
+  },
+  {
+    "tokenAddress": "0xc00e94Cb662C3520282E6f5717214004A7f26888",
+    "tokenSymbol": "COMP",
+    "balancerBalance": 665.7880788656614,
+    "uniswapPair": {
+      "address": "0xCFfDdeD873554F362Ac02f8Fb1f02E5ada10516f",
+      "tokenReserve": 7962.420856070089,
+      "ethReserve": 2018.3575765173127
+    }
+  },
+  {
+    "tokenAddress": "0x0d438F3b5175Bebc262bF23753C1E53d03432bDE",
+    "tokenSymbol": "wNXM",
+    "balancerBalance": 2459.2824095519336,
+    "uniswapPair": {
+      "address": "0x23bFf8ca20AAc06EFDf23cEe3B8ae296A30Dfd27",
+      "tokenReserve": 39951.561181093784,
+      "ethReserve": 2704.795785272123
+    }
+  },
+  {
+    "tokenAddress": "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2",
+    "tokenSymbol": "MKR",
+    "balancerBalance": 110.6480185704023,
+    "uniswapPair": {
+      "address": "0xC2aDdA861F89bBB333c90c492cB837741916A225",
+      "tokenReserve": 5326.771092846547,
+      "ethReserve": 8020.625768452451
+    }
+  },
+  {
+    "tokenAddress": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+    "tokenSymbol": "UNI",
+    "balancerBalance": 21464.91628471451,
+    "uniswapPair": {
+      "address": "0xd3d2E2692501A5c9Ca623199D38826e513033a17",
+      "tokenReserve": 7821694.501102348,
+      "ethReserve": 60286.034868891875
+    }
   }
- },
- {
-  "tokenAddress": "0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e",
-  "tokenSymbol": "YFI",
-  "balancerBalance": 4.782531821234806,
-  "uniswapPair": {
-   "address": "0x2fDbAdf3C4D5A8666Bc06645B8358ab803996E28",
-   "tokenReserve": 417.0741505297207,
-   "ethReserve": 14471.987525871662
-  }
- },
- {
-  "tokenAddress": "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F",
-  "tokenSymbol": "SNX",
-  "balancerBalance": 17672.207859828817,
-  "uniswapPair": {
-   "address": "0x43AE24960e5534731Fc831386c07755A2dc33D47",
-   "tokenReserve": 418483.7383855132,
-   "ethReserve": 3987.7523557588506
-  }
- },
- {
-  "tokenAddress": "0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1",
-  "tokenSymbol": "CVP",
-  "balancerBalance": 42230.08989265705,
-  "uniswapPair": {
-   "address": "0x12D4444f96C644385D8ab355F6DDf801315b6254",
-   "tokenReserve": 570183.0600218237,
-   "ethReserve": 2257.4204268307262
-  }
- },
- {
-  "tokenAddress": "0xc00e94Cb662C3520282E6f5717214004A7f26888",
-  "tokenSymbol": "COMP",
-  "balancerBalance": 665.7880788656614,
-  "uniswapPair": {
-   "address": "0xCFfDdeD873554F362Ac02f8Fb1f02E5ada10516f",
-   "tokenReserve": 7962.420856070089,
-   "ethReserve": 2018.3575765173127
-  }
- },
- {
-  "tokenAddress": "0x0d438F3b5175Bebc262bF23753C1E53d03432bDE",
-  "tokenSymbol": "wNXM",
-  "balancerBalance": 2459.2824095519336,
-  "uniswapPair": {
-   "address": "0x23bFf8ca20AAc06EFDf23cEe3B8ae296A30Dfd27",
-   "tokenReserve": 39951.561181093784,
-   "ethReserve": 2704.795785272123
-  }
- },
- {
-  "tokenAddress": "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2",
-  "tokenSymbol": "MKR",
-  "balancerBalance": 110.6480185704023,
-  "uniswapPair": {
-   "address": "0xC2aDdA861F89bBB333c90c492cB837741916A225",
-   "tokenReserve": 5326.771092846547,
-   "ethReserve": 8020.625768452451
-  }
- },
- {
-  "tokenAddress": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
-  "tokenSymbol": "UNI",
-  "balancerBalance": 21464.91628471451,
-  "uniswapPair": {
-   "address": "0xd3d2E2692501A5c9Ca623199D38826e513033a17",
-   "tokenReserve": 7821694.501102348,
-   "ethReserve": 60286.034868891875
-  }
- }
 ]
