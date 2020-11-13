@@ -978,7 +978,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         }
         uint adjustedIn = bsub(BONE, communityFee);
         tokenAmountInAfterFee = bmul(tokenAmountIn, adjustedIn);
-        uint tokenAmountFee = bsub(tokenAmountIn, tokenAmountInAfterFee);
+        tokenAmountFee = bsub(tokenAmountIn, tokenAmountInAfterFee);
         return (tokenAmountInAfterFee, tokenAmountFee);
     }
 
