@@ -20,6 +20,17 @@ import "./interfaces/PowerIndexPoolInterface.sol";
 import "./interfaces/PowerIndexPoolFactoryInterface.sol";
 
 contract PowerIndexPoolActions {
+    struct Args {
+        uint256 minWeightPerSecond;
+        uint256 maxWeightPerSecond;
+        uint256 swapFee;
+        uint256 communitySwapFee;
+        uint256 communityJoinFee;
+        uint256 communityExitFee;
+        address communityFeeReceiver;
+        bool finalize;
+    }
+
     struct TokenConfig {
         address token;
         uint256 balance;
@@ -32,16 +43,12 @@ contract PowerIndexPoolActions {
         PowerIndexPoolFactoryInterface factory,
         string calldata name,
         string calldata symbol,
-        uint256 minWeightPerSecond,
-        uint256 maxWeightPerSecond,
-        TokenConfig[] calldata tokens,
-        uint[4] calldata fees,
-        address communityFeeReceiver,
-        bool finalize
+        Args calldata args,
+        TokenConfig[] calldata tokens
     ) external returns (PowerIndexPoolInterface pool) {
-        pool = factory.newPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
-        pool.setSwapFee(fees[0]);
-        pool.setCommunityFeeAndReceiver(fees[1], fees[2], fees[3], communityFeeReceiver);
+        pool = factory.newPool(name, symbol, args.minWeightPerSecond, args.maxWeightPerSecond);
+        pool.setSwapFee(args.swapFee);
+        pool.setCommunityFeeAndReceiver(args.communitySwapFee, args.communityJoinFee, args.communityExitFee, args.communityFeeReceiver);
 
         for (uint i = 0; i < tokens.length; i++) {
             TokenConfig memory tokenConfig = tokens[i];
@@ -60,7 +67,7 @@ contract PowerIndexPoolActions {
             );
         }
 
-        if (finalize) {
+        if (args.finalize) {
             pool.finalize();
             require(pool.transfer(msg.sender, pool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
         } else {

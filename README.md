@@ -1,4 +1,8 @@
 # PowerIndex
+
+![CI](https://github.com/powerpool-finance/powerindex/workflows/CI/badge.svg)
+[![codecov](https://codecov.io/gh/powerpool-finance/powerindex/branch/master/graph/badge.svg)](https://codecov.io/gh/powerpool-finance/powerindex)
+
 This repository contains PowerIndex smart contracs. PowerIndex is an ecosystem product of PowerPool. The main feature of PowerIndex is a possibility to create special pools, not available in Balancer with unique governance and pool design.
 
 🚨 Security review status: **partially audited**

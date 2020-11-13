@@ -8325,7 +8325,7 @@ solidity-ast@^0.4.4:
   resolved "https://registry.yarnpkg.com/solidity-ast/-/solidity-ast-0.4.12.tgz#a3b4dabc73231f9c895d8a22c07f176355952382"
   integrity sha512-D+Q16dABMDB9KgwU1XmBqWWdE9e4X4oPbquQ1N/bnmthGI7PCcckwXCXS+5rkXp+4ZITXk7e5XjI6fhODdk+yg==
 
-solidity-coverage@^0.7.9:
+solidity-coverage@^0.7.11:
   version "0.7.11"
   resolved "https://registry.yarnpkg.com/solidity-coverage/-/solidity-coverage-0.7.11.tgz#36539b4a834d374a5c595d23d293f0cf87d9ff4c"
   integrity sha512-HtBhXNTK2pO6hj82lf3txZ8afoyIGSmduJHJSoeZ71RjiuNzjGFj4duEZY/kfqxYSq1yARERC6jOTZGfIAeRyA==

@@ -1,4 +1,4 @@
-const { expectRevert, time, ether } = require('@openzeppelin/test-helpers');
+const { expectRevert, time, ether: ozEther } = require('@openzeppelin/test-helpers');
 
 const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
 const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
@@ -50,6 +50,10 @@ async function getTimestamp(shift = 0) {
     return currentTimestamp + shift;
 }
 
+function ether(v) {
+    return ozEther(v).toString(10);
+}
+
 describe('PowerIndexPool', () => {
     const zeroAddress = '0x0000000000000000000000000000000000000000';
     const name = 'My Pool';
@@ -95,18 +99,23 @@ describe('PowerIndexPool', () => {
             this.bFactory.address,
             name,
             symbol,
-            minWeightPerSecond,
-            maxWeightPerSecond,
+            {
+                minWeightPerSecond,
+                maxWeightPerSecond,
+                swapFee,
+                communitySwapFee,
+                communityJoinFee,
+                communityExitFee,
+                communityFeeReceiver: communityWallet,
+                finalize: true
+            },
             tokens.map((t, i) => ({
                 token: t,
                 balance: balances[i],
                 targetDenorm: targetWeights[i],
                 fromTimestamp: fromTimestamps[i],
                 targetTimestamp: targetTimestamps[i],
-            })),
-            [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
-            communityWallet,
-            true
+            }))
         );
 
         const logNewPool = PowerIndexPoolFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
@@ -463,8 +472,16 @@ describe('PowerIndexPool', () => {
                 this.bFactory.address,
                 name,
                 symbol,
-                minWeightPerSecond,
-                maxWeightPerSecond,
+                {
+                    minWeightPerSecond,
+                    maxWeightPerSecond,
+                    swapFee,
+                    communitySwapFee,
+                    communityJoinFee,
+                    communityExitFee,
+                    communityFeeReceiver: communityWallet,
+                    finalize: true
+                },
                 tokens.map((t, i) => ({
                     token: t,
                     balance: newBalances[i],
@@ -472,9 +489,6 @@ describe('PowerIndexPool', () => {
                     fromTimestamp: fromTimestamps[i],
                     targetTimestamp: targetTimestamps[i],
                 })),
-                [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
-                communityWallet,
-                true
             );
 
             const logNewPool = PowerIndexPoolFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];

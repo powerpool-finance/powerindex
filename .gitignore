@@ -1,3 +1,9 @@
 /node_modules/
 /build/
+/cache
+/coverage
+/artifacts
+
+coverage.json
 .idea
+*.log
