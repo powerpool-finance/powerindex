@@ -15,8 +15,9 @@
 pragma solidity 0.6.12;
 
 import "./BNum.sol";
+import "../interfaces/BMathInterface.sol";
 
-contract BMath is BConst, BNum {
+contract BMath is BConst, BNum, BMathInterface {
     /**********************************************************************************************
     // calcSpotPrice                                                                             //
     // sP = spotPrice                                                                            //
@@ -92,7 +93,7 @@ contract BMath is BConst, BNum {
         uint tokenAmountOut,
         uint swapFee
     )
-        public pure
+        public pure override
         returns (uint tokenAmountIn)
     {
         uint weightRatio = bdiv(tokenWeightOut, tokenWeightIn);

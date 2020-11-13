@@ -4,7 +4,7 @@ pragma solidity 0.6.12;
 
 import "./PowerIndexPoolInterface.sol";
 
-abstract contract PowerIndexPoolFactoryInterface {
+interface PowerIndexPoolFactoryInterface {
     function newPool(
         string calldata name,
         string calldata symbol,

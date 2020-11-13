@@ -17,8 +17,9 @@ pragma solidity 0.6.12;
 import "./BToken.sol";
 import "./BMath.sol";
 import "../interfaces/IPoolRestrictions.sol";
+import "../interfaces/BPoolInterface.sol";
 
-contract BPool is BToken, BMath {
+contract BPool is BToken, BMath, BPoolInterface {
 
     struct Record {
         bool bound;   // is token bound to pool
@@ -128,7 +129,7 @@ contract BPool is BToken, BMath {
     }
 
     function isBound(address t)
-        external view
+        external view override
         returns (bool)
     {
         return _records[t].bound;
@@ -142,14 +143,15 @@ contract BPool is BToken, BMath {
     }
 
     function getCurrentTokens()
-        external view _viewlock_
+        external view override
+        _viewlock_
         returns (address[] memory tokens)
     {
         return _tokens;
     }
 
     function getFinalTokens()
-        external view
+        external view override
         _viewlock_
         returns (address[] memory tokens)
     {
@@ -158,7 +160,7 @@ contract BPool is BToken, BMath {
     }
 
     function getDenormalizedWeight(address token)
-        external view
+        external view override
         _viewlock_
         returns (uint)
     {
@@ -168,7 +170,7 @@ contract BPool is BToken, BMath {
     }
 
     function getTotalDenormalizedWeight()
-        external view
+        external view override
         _viewlock_
         returns (uint)
     {
@@ -186,7 +188,7 @@ contract BPool is BToken, BMath {
     }
 
     function getBalance(address token)
-        external view
+        external view override
         _viewlock_
         returns (uint)
     {
@@ -196,7 +198,7 @@ contract BPool is BToken, BMath {
     }
 
     function getSwapFee()
-        external view
+        external view override
         _viewlock_
         returns (uint)
     {
@@ -204,7 +206,7 @@ contract BPool is BToken, BMath {
     }
 
     function getCommunityFee()
-        external view
+        external view override
         _viewlock_
         returns (uint communitySwapFee, uint communityJoinFee, uint communityExitFee, address communityFeeReceiver)
     {
@@ -236,7 +238,7 @@ contract BPool is BToken, BMath {
     }
 
     function getRestrictions()
-        external view
+        external view override
         _viewlock_
         returns (address)
     {
@@ -244,7 +246,7 @@ contract BPool is BToken, BMath {
     }
 
     function setSwapFee(uint swapFee)
-        external
+        external override
         _logs_
         _lock_
     {
@@ -259,7 +261,7 @@ contract BPool is BToken, BMath {
         uint communityExitFee,
         address communityFeeReceiver
     )
-        external
+        external override
         _logs_
         _lock_
     {
@@ -283,7 +285,7 @@ contract BPool is BToken, BMath {
     }
 
     function setController(address manager)
-        external
+        external override
         _logs_
         _lock_
     {
@@ -292,7 +294,7 @@ contract BPool is BToken, BMath {
     }
 
     function setPublicSwap(bool public_)
-        external
+        external override
         _logs_
         _lock_
     {
@@ -312,7 +314,7 @@ contract BPool is BToken, BMath {
     }
 
     function finalize()
-        external
+        external override
         _logs_
         _lock_
     {
@@ -328,7 +330,7 @@ contract BPool is BToken, BMath {
     }
 
     function callVoting(address voting, bytes4 signature, bytes calldata args, uint256 value)
-        external
+        external override
         _logs_
         _lock_
     {
@@ -341,7 +343,7 @@ contract BPool is BToken, BMath {
     }
 
     function bind(address token, uint balance, uint denorm)
-        public
+        public override
         virtual
         _logs_
         // _lock_  Bind does not lock because it jumps to `rebind`, which does
@@ -362,7 +364,7 @@ contract BPool is BToken, BMath {
     }
 
     function rebind(address token, uint balance, uint denorm)
-        public
+        public override
         virtual
         _logs_
         _lock_
@@ -395,7 +397,7 @@ contract BPool is BToken, BMath {
     }
 
     function unbind(address token)
-        public
+        public override
         virtual
         _logs_
         _lock_
@@ -458,7 +460,7 @@ contract BPool is BToken, BMath {
     }
 
     function joinPool(uint poolAmountOut, uint[] calldata maxAmountsIn)
-        external
+        external override
         _logs_
         _lock_
     {
@@ -492,7 +494,7 @@ contract BPool is BToken, BMath {
     }
 
     function exitPool(uint poolAmountIn, uint[] calldata minAmountsOut)
-        external
+        external override
         _logs_
         _lock_
     {
@@ -534,7 +536,7 @@ contract BPool is BToken, BMath {
         uint minAmountOut,
         uint maxPrice
     )
-        external
+        external override
         _logs_
         _lock_
         returns (uint tokenAmountOut, uint spotPriceAfter)
@@ -607,7 +609,7 @@ contract BPool is BToken, BMath {
         uint tokenAmountOut,
         uint maxPrice
     )
-        external
+        external override
         _logs_
         _lock_
         returns (uint tokenAmountIn, uint spotPriceAfter)
@@ -675,7 +677,7 @@ contract BPool is BToken, BMath {
 
 
     function joinswapExternAmountIn(address tokenIn, uint tokenAmountIn, uint minPoolAmountOut)
-        external
+        external override
         _logs_
         _lock_
         returns (uint poolAmountOut)
@@ -718,7 +720,7 @@ contract BPool is BToken, BMath {
     }
 
     function joinswapPoolAmountOut(address tokenIn, uint poolAmountOut, uint maxAmountIn)
-        external
+        external override
         _logs_
         _lock_
         returns (uint tokenAmountIn)
@@ -762,7 +764,7 @@ contract BPool is BToken, BMath {
     }
 
     function exitswapPoolAmountIn(address tokenOut, uint poolAmountIn, uint minAmountOut)
-        external
+        external override
         _logs_
         _lock_
         returns (uint tokenAmountOut)
@@ -805,7 +807,7 @@ contract BPool is BToken, BMath {
     }
 
     function exitswapExternAmountOut(address tokenOut, uint tokenAmountOut, uint maxPoolAmountIn)
-        external
+        external override
         _logs_
         _lock_
         returns (uint poolAmountIn)
@@ -968,7 +970,7 @@ contract BPool is BToken, BMath {
         uint communityFee,
         address operator
     )
-        public view
+        public view override
         returns (uint tokenAmountInAfterFee, uint tokenAmountFee)
     {
         if (address(_restrictions) != address(0) && _restrictions.isWithoutFee(operator)) {
@@ -978,5 +980,12 @@ contract BPool is BToken, BMath {
         tokenAmountInAfterFee = bmul(tokenAmountIn, adjustedIn);
         uint tokenAmountFee = bsub(tokenAmountIn, tokenAmountInAfterFee);
         return (tokenAmountInAfterFee, tokenAmountFee);
+    }
+
+    function getMinWeight()
+        external view override
+        returns (uint)
+    {
+        return MIN_WEIGHT;
     }
 }

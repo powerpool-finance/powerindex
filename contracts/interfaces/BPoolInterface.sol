@@ -2,11 +2,10 @@
 
 pragma solidity 0.6.12;
 
-interface BPoolInterface {
-    function approve(address spender, uint256 amount) external returns (bool);
-    function transfer(address recipient, uint256 amount) external returns (bool);
-    function transferFrom(address spender, address recipient, uint256 amount) external returns (bool);
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./BMathInterface.sol";
 
+interface BPoolInterface is IERC20, BMathInterface {
     function joinPool(uint poolAmountOut, uint[] calldata maxAmountsIn) external;
     function exitPool(uint poolAmountIn, uint[] calldata minAmountsOut) external;
     function swapExactAmountIn(address, uint, address, uint, uint) external returns (uint, uint);
@@ -15,12 +14,9 @@ interface BPoolInterface {
     function joinswapPoolAmountOut(address, uint, uint) external returns (uint);
     function exitswapPoolAmountIn(address, uint, uint) external returns (uint);
     function exitswapExternAmountOut(address, uint, uint) external returns (uint);
-    function calcInGivenOut(uint, uint, uint, uint, uint, uint) external pure returns (uint);
     function getDenormalizedWeight(address) external view returns (uint);
     function getBalance(address) external view returns (uint);
     function getSwapFee() external view returns (uint);
-    function totalSupply() external view returns (uint);
-    function balanceOf(address) external view returns (uint);
     function getTotalDenormalizedWeight() external view returns (uint);
 
     function getCommunityFee() external view returns (uint, uint, uint, address);
@@ -41,5 +37,5 @@ interface BPoolInterface {
     function unbind(address) external;
     function callVoting(address voting, bytes4 signature, bytes calldata args, uint256 value) external;
 
-    function MIN_WEIGHT() external view returns (uint);
+    function getMinWeight() external view returns (uint);
 }
