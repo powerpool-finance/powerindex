@@ -2,19 +2,18 @@ const { time, ether: rEther } = require('@openzeppelin/test-helpers');
 const BFactory = artifacts.require('BFactory');
 const BPool = artifacts.require('BPool');
 const MockERC20 = artifacts.require('MockERC20');
-const PiBPoolController = artifacts.require('PiBPoolController');
+const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const MockErc20Migrator = artifacts.require('MockErc20Migrator');
-const PiRouter = artifacts.require('PiRouter');
+const PowerIndexRouter = artifacts.require('PowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
-const PiSimpleRouter = artifacts.require('PiSimpleRouter');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const MockYearnGovernance = artifacts.require('MockYearnGovernance');
 
 MockERC20.numberFormat = 'String';
 MockErc20Migrator.numberFormat = 'String';
 BPool.numberFormat = 'String';
-PiBPoolController.numberFormat = 'String';
-PiRouter.numberFormat = 'String';
+PowerIndexPoolController.numberFormat = 'String';
+PowerIndexRouter.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 MockYearnGovernance.numberFormat = 'String';
 
@@ -24,7 +23,7 @@ function ether(value) {
     return rEther(value.toString()).toString(10);
 }
 
-describe('PiRouter Tests', () => {
+describe('PowerIndexRouter Tests', () => {
     let minter, bob, carol, alice, feeManager, feeReceiver, communityWallet, newCommunityWallet, yearnOwner;
 
     before(async function() {
@@ -36,7 +35,7 @@ describe('PiRouter Tests', () => {
         const yearnGovernance = await MockYearnGovernance.new();
 
         const poolRestrictions = await PoolRestrictions.new();
-        const router = await PiRouter.new(poolRestrictions.address);
+        const router = await PowerIndexRouter.new(poolRestrictions.address);
         const yfiWrapper = await WrappedPiErc20.new(yfi.address, router.address, 'wrapped.yearn.finance', 'WYFI');
 
         await yearnGovernance.initialize(0, yearnOwner, yfi.address)

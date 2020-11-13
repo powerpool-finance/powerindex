@@ -81,7 +81,7 @@ contract PowerIndexPool is BPool {
         _checkBound(token);
 
         require(fromTimestamp > block.timestamp, "CANT_SET_PAST_TIMESTAMP");
-        require(targetTimestamp >= fromTimestamp, "TIMESTAMP_NEGATIVE_DELTA");
+        require(targetTimestamp > fromTimestamp, "TIMESTAMP_INCORRECT_DELTA");
         require(targetDenorm >= MIN_WEIGHT && targetDenorm <= MAX_WEIGHT, "TARGET_WEIGHT_BOUNDS");
 
         uint256 fromDenorm = _getDenormWeight(token);

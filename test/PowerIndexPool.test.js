@@ -266,8 +266,9 @@ describe('PowerIndexPool', () => {
             await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('40'), fromTimestamps[0], addBN(fromTimestamps[0], '100'), { from: controller }));
             //TODO: figure out why MIN_WEIGHT_PER_SECOND require message not working in buidler
             await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], addBN(fromWeights[0], '10'), fromTimestamps[0], targetTimestamps[0], { from: controller }));
-            //TODO: figure out why TIMESTAMP_NEGATIVE_DELTA require message not working in buidler
+            //TODO: figure out why TIMESTAMP_INCORRECT_DELTA require message not working in buidler
             await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('40'), targetTimestamps[0], fromTimestamps[0], { from: controller }));
+            await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('40'), targetTimestamps[0], targetTimestamps[0], { from: controller }));
             await expectRevert(pool.setDynamicWeight(tokens[0], ether('51'), fromTimestamps[0], targetTimestamps[0], { from: controller }), 'TARGET_WEIGHT_BOUNDS');
             //TODO: figure out why MAX_TARGET_TOTAL_WEIGHT require message not working in buidler
             await expectRevert.unspecified(pool.setDynamicWeight(tokens[0], ether('45'), fromTimestamps[0], targetTimestamps[0], { from: controller }));
