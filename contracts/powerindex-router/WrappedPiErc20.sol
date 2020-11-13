@@ -89,7 +89,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
     emit CallVoting(voting, success, signature, args, data);
   }
 
-  function getWrappedBalance() external override view returns (uint256) {
+  function getWrappedBalance() external view override returns (uint256) {
     return token.balanceOf(address(this));
   }
 }
