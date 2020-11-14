@@ -4,11 +4,13 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "../interfaces/PiRouterInterface.sol";
 import "../interfaces/WrappedPiErc20Interface.sol";
 
 contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
   using SafeMath for uint256;
+  using SafeERC20 for IERC20;
 
   IERC20 public immutable token;
   address public router;
@@ -49,7 +51,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
 
     emit Deposit(_msgSender(), _amount);
 
-    token.transferFrom(_msgSender(), address(this), _amount);
+    token.safeTransferFrom(_msgSender(), address(this), _amount);
     _mint(_msgSender(), _amount);
 
     PiRouterInterface(router).wrapperCallback(0);
@@ -64,7 +66,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
 
     ERC20(address(this)).transferFrom(_msgSender(), address(this), _amount);
     _burn(address(this), _amount);
-    token.transfer(_msgSender(), _amount);
+    token.safeTransfer(_msgSender(), _amount);
   }
 
   function changeRouter(address _newRouter) external override onlyRouter {
