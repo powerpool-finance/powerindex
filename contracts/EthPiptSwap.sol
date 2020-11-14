@@ -177,7 +177,7 @@ contract EthPiptSwap is Ownable {
 
     for (uint256 i = 0; i < len; i++) {
       IUniswapV2Pair tokenPair = uniswapPairFor(tokens[i]);
-      TokenInterface(tokens[i]).transfer(address(tokenPair), tokensOutPipt[i]);
+      TokenInterface(tokens[i]).safeTransfer(address(tokenPair), tokensOutPipt[i]);
       tokenPair.swap(uint256(0), ethOutUniswap[i], address(this), new bytes(0));
     }
 
@@ -201,7 +201,7 @@ contract EthPiptSwap is Ownable {
       (uint256 tokenReserve, uint256 ethReserve, ) = tokenPair.getReserves();
       uint256 wethOut = UniswapV2Library.getAmountOut(tokenBalance, tokenReserve, ethReserve);
 
-      TokenInterface(oddTokens[i]).transfer(address(tokenPair), tokenBalance);
+      TokenInterface(oddTokens[i]).safeTransfer(address(tokenPair), tokenBalance);
 
       tokenPair.swap(uint256(0), wethOut, address(this), new bytes(0));
     }
