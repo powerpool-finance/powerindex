@@ -97,6 +97,8 @@ contract VestedLPMining is
   // Sum of allocation points for all pools
   uint256 public totalAllocPoint = 0;
 
+  mapping(address => address) public cvpPoolByMetaPool;
+
   /// @inheritdoc IVestedLPMining
   function initialize(
     IERC20 _cvp,
@@ -188,6 +190,13 @@ contract VestedLPMining is
     );
 
     emit SetCvpVestingPeriodInBlocks(_cvpVestingPeriodInBlocks);
+  }
+
+  /// @inheritdoc IVestedLPMining
+  function setCvpPoolByMetaPool(address _metaPool, address _cvpPool) public override onlyOwner {
+    cvpPoolByMetaPool[_metaPool] = _cvpPool;
+
+    emit SetCvpPoolByMetaPool(_metaPool, _cvpPool);
   }
 
   /// @inheritdoc IVestedLPMining
@@ -355,12 +364,19 @@ contract VestedLPMining is
       userPendedCvp = userPendedCvp.add(users[pid][_user].pendedCvp);
 
       Pool storage pool = pools[pid];
-      uint96 lpCvp =
-        SafeMath96.fromUint(
-          cvp.balanceOf(address(pool.lpToken)),
-          // this and similar error messages are not intended for end-users
-          "VLPMining::_doCheckpointVotes:1"
-        );
+      uint96 lpCvp;
+      address lpToken = address(pool.lpToken);
+      address cvpPoolByMeta = cvpPoolByMetaPool[lpToken];
+      if (cvpPoolByMeta == address(0)) {
+        lpCvp = SafeMath96.fromUint(cvp.balanceOf(lpToken), "VLPMining::_doCheckpointVotes:1");
+      } else {
+        uint256 poolTotalSupply = IERC20(cvpPoolByMeta).totalSupply();
+        uint256 poolBalance = IERC20(cvpPoolByMeta).balanceOf(lpToken);
+        uint256 lpShare = uint256(poolBalance).mul(SCALE).div(poolTotalSupply);
+        uint256 metaPoolCvp = cvp.balanceOf(cvpPoolByMeta);
+        lpCvp = SafeMath96.fromUint(metaPoolCvp.mul(lpShare).div(SCALE), "VLPMining::_doCheckpointVotes:1");
+      }
+
       totalLpCvp = totalLpCvp.add(lpCvp);
 
       if (!pool.votesEnabled) {
