@@ -143,7 +143,7 @@ contract PowerIndexPool is BPool {
     uint256,
     uint256
   ) public override {
-    require(false, "DISABLED"); // Only new bind function is allowed
+    revert("DISABLED"); // Only new bind function is allowed
   }
 
   /**
