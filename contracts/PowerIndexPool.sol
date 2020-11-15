@@ -50,7 +50,7 @@ contract PowerIndexPool is BPool {
    * @param maxWeightPerSecond Max weight per second
    */
   function setWeightPerSecondBounds(uint256 minWeightPerSecond, uint256 maxWeightPerSecond) public _logs_ _lock_ {
-    _checkController();
+    _onlyController();
     _minWeightPerSecond = minWeightPerSecond;
     _maxWeightPerSecond = maxWeightPerSecond;
 
@@ -70,8 +70,8 @@ contract PowerIndexPool is BPool {
     uint256 fromTimestamp,
     uint256 targetTimestamp
   ) public _logs_ _lock_ {
-    _checkController();
-    _checkBound(token);
+    _onlyController();
+    _requireTokenIsBound(token);
 
     require(fromTimestamp > block.timestamp, "CANT_SET_PAST_TIMESTAMP");
     require(targetTimestamp > fromTimestamp, "TIMESTAMP_INCORRECT_DELTA");

@@ -68,14 +68,14 @@ contract BPool is BToken, BMath, BPoolInterface {
     }
 
     modifier _lock_() {
-        _checkReentry();
+        _preventReentrancy();
         _mutex = true;
         _;
         _mutex = false;
     }
 
     modifier _viewlock_() {
-        _checkReentry();
+        _preventReentrancy();
         _;
     }
 
@@ -155,7 +155,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _viewlock_
         returns (address[] memory tokens)
     {
-        _checkNotFinalized();
+        _requireContractIsFinalized();
         return _tokens;
     }
 
@@ -165,7 +165,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         returns (uint)
     {
 
-        _checkBound(token);
+        _requireTokenIsBound(token);
         return _getDenormWeight(token);
     }
 
@@ -183,7 +183,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         returns (uint)
     {
 
-        _checkBound(token);
+        _requireTokenIsBound(token);
         return bdiv(_getDenormWeight(token), _getTotalWeight());
     }
 
@@ -193,7 +193,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         returns (uint)
     {
 
-        _checkBound(token);
+        _requireTokenIsBound(token);
         return _records[token].balance;
     }
 
@@ -250,8 +250,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _checkController();
-        _checkFeeInBounds(swapFee);
+        _onlyController();
+        _requireFeeInBounds(swapFee);
         _swapFee = swapFee;
     }
 
@@ -265,10 +265,10 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _checkController();
-        _checkFeeInBounds(communitySwapFee);
-        _checkFeeInBounds(communityJoinFee);
-        _checkFeeInBounds(communityExitFee);
+        _onlyController();
+        _requireFeeInBounds(communitySwapFee);
+        _requireFeeInBounds(communityJoinFee);
+        _requireFeeInBounds(communityExitFee);
         _communitySwapFee = communitySwapFee;
         _communityJoinFee = communityJoinFee;
         _communityExitFee = communityExitFee;
@@ -280,7 +280,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _checkController();
+        _onlyController();
         _restrictions = restrictions;
     }
 
@@ -289,7 +289,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _checkController();
+        _onlyController();
         _controller = manager;
     }
 
@@ -298,8 +298,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _checkFinalized();
-        _checkController();
+        _requireContractIsNotFinalized();
+        _onlyController();
         _publicSwap = public_;
     }
 
@@ -308,7 +308,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _checkController();
+        _onlyController();
         _wrapper = wrapper;
         _wrapperMode = wrapperMode;
     }
@@ -318,8 +318,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _checkController();
-        _checkFinalized();
+        _onlyController();
+        _requireContractIsNotFinalized();
         require(_tokens.length >= MIN_BOUND_TOKENS, "MIN_TOKENS");
 
         _finalized = true;
@@ -335,7 +335,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
     {
         require(_restrictions.isVotingSignatureAllowed(voting, signature), "NOT_ALLOWED_SIG");
-        _checkController();
+        _onlyController();
 
         (bool success, bytes memory data) = voting.call{ value: value }(abi.encodePacked(signature, args));
         require(success, "NOT_SUCCESS");
@@ -348,7 +348,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         // _lock_  Bind does not lock because it jumps to `rebind`, which does
     {
-        _checkController();
+        _onlyController();
         require(!_records[token].bound, "IS_BOUND");
 
         require(_tokens.length < MAX_BOUND_TOKENS, "MAX_TOKENS");
@@ -369,8 +369,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _checkController();
-        _checkBound(token);
+        _onlyController();
+        _requireTokenIsBound(token);
 
         require(denorm >= MIN_WEIGHT && denorm <= MAX_WEIGHT, "WEIGHT_BOUNDS");
         require(balance >= MIN_BALANCE, "MIN_BALANCE");
@@ -402,8 +402,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _checkController();
-        _checkBound(token);
+        _onlyController();
+        _requireTokenIsBound(token);
 
         uint tokenBalance = _records[token].balance;
 
@@ -432,7 +432,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _checkBound(token);
+        _requireTokenIsBound(token);
         _records[token].balance = IERC20(token).balanceOf(address(this));
     }
 
@@ -452,8 +452,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _viewlock_
         returns (uint spotPrice)
     {
-        _checkBound(tokenIn);
-        _checkBound(tokenOut);
+        _requireTokenIsBound(tokenIn);
+        _requireTokenIsBound(tokenOut);
         Record storage inRecord = _records[tokenIn];
         Record storage outRecord = _records[tokenOut];
         return calcSpotPrice(inRecord.balance, _getDenormWeight(tokenIn), outRecord.balance, _getDenormWeight(tokenOut), 0);
@@ -464,18 +464,18 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _checkWrapper();
-        _checkNotFinalized();
+        _onlyWrapperOrNotWrapperMode();
+        _requireContractIsFinalized();
 
         uint poolTotal = totalSupply();
         uint ratio = bdiv(poolAmountOut, poolTotal);
-        _checkMathApprox(ratio);
+        _requireMathApprox(ratio);
 
         for (uint i = 0; i < _tokens.length; i++) {
             address t = _tokens[i];
             uint bal = _records[t].balance;
             uint tokenAmountIn = bmul(ratio, bal);
-            _checkMathApprox(tokenAmountIn);
+            _requireMathApprox(tokenAmountIn);
             require(tokenAmountIn <= maxAmountsIn[i], "LIMIT_IN");
             _records[t].balance = badd(_records[t].balance, tokenAmountIn);
             emit LOG_JOIN(msg.sender, t, tokenAmountIn);
@@ -498,8 +498,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _checkWrapper();
-        _checkNotFinalized();
+        _onlyWrapperOrNotWrapperMode();
+        _requireContractIsFinalized();
 
         (uint poolAmountInAfterFee, uint poolAmountInFee) = calcAmountWithCommunityFee(
             poolAmountIn,
@@ -509,7 +509,7 @@ contract BPool is BToken, BMath, BPoolInterface {
 
         uint poolTotal = totalSupply();
         uint ratio = bdiv(poolAmountInAfterFee, poolTotal);
-        _checkMathApprox(ratio);
+        _requireMathApprox(ratio);
 
         _pullPoolShare(msg.sender, poolAmountIn);
         _pushPoolShare(_communityFeeReceiver, poolAmountInFee);
@@ -519,7 +519,7 @@ contract BPool is BToken, BMath, BPoolInterface {
             address t = _tokens[i];
             uint bal = _records[t].balance;
             uint tokenAmountOut = bmul(ratio, bal);
-            _checkMathApprox(tokenAmountOut);
+            _requireMathApprox(tokenAmountOut);
             require(tokenAmountOut >= minAmountsOut[i], "LIMIT_OUT");
             _records[t].balance = bsub(_records[t].balance, tokenAmountOut);
             emit LOG_EXIT(msg.sender, t, tokenAmountOut);
@@ -541,9 +541,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint tokenAmountOut, uint spotPriceAfter)
     {
-        _checkWrapper();
-        _checkBound(tokenIn);
-        _checkBound(tokenOut);
+        _onlyWrapperOrNotWrapperMode();
+        _requireTokenIsBound(tokenIn);
+        _requireTokenIsBound(tokenOut);
         require(_publicSwap, "NOT_PUBLIC");
 
         Record storage inRecord = _records[address(tokenIn)];
@@ -614,9 +614,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint tokenAmountIn, uint spotPriceAfter)
     {
-        _checkWrapper();
-        _checkBound(tokenIn);
-        _checkBound(tokenOut);
+        _onlyWrapperOrNotWrapperMode();
+        _requireTokenIsBound(tokenIn);
+        _requireTokenIsBound(tokenOut);
         require(_publicSwap, "NOT_PUBLIC");
 
         Record storage inRecord = _records[address(tokenIn)];
@@ -683,9 +683,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         returns (uint poolAmountOut)
 
     {
-        _checkNotFinalized();
-        _checkWrapper();
-        _checkBound(tokenIn);
+        _requireContractIsFinalized();
+        _onlyWrapperOrNotWrapperMode();
+        _requireTokenIsBound(tokenIn);
         require(tokenAmountIn <= bmul(_records[tokenIn].balance, MAX_IN_RATIO), "MAX_IN_RATIO");
 
         (uint tokenAmountInAfterFee, uint tokenAmountInFee) = calcAmountWithCommunityFee(
@@ -725,9 +725,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint tokenAmountIn)
     {
-        _checkNotFinalized();
-        _checkWrapper();
-        _checkBound(tokenIn);
+        _requireContractIsFinalized();
+        _onlyWrapperOrNotWrapperMode();
+        _requireTokenIsBound(tokenIn);
 
         Record storage inRecord = _records[tokenIn];
 
@@ -746,7 +746,7 @@ contract BPool is BToken, BMath, BPoolInterface {
                             _swapFee
                         );
 
-        _checkMathApprox(tokenAmountIn);
+        _requireMathApprox(tokenAmountIn);
         require(tokenAmountIn <= maxAmountIn, "LIMIT_IN");
 
         require(tokenAmountIn <= bmul(_records[tokenIn].balance, MAX_IN_RATIO), "MAX_IN_RATIO");
@@ -769,9 +769,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint tokenAmountOut)
     {
-        _checkNotFinalized();
-        _checkWrapper();
-        _checkBound(tokenOut);
+        _requireContractIsFinalized();
+        _onlyWrapperOrNotWrapperMode();
+        _requireTokenIsBound(tokenOut);
 
         Record storage outRecord = _records[tokenOut];
 
@@ -812,9 +812,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint poolAmountIn)
     {
-        _checkNotFinalized();
-        _checkWrapper();
-        _checkBound(tokenOut);
+        _requireContractIsFinalized();
+        _onlyWrapperOrNotWrapperMode();
+        _requireTokenIsBound(tokenOut);
         require(tokenAmountOut <= bmul(_records[tokenOut].balance, MAX_OUT_RATIO), "OUT_RATIO");
 
         Record storage outRecord = _records[tokenOut];
@@ -834,7 +834,7 @@ contract BPool is BToken, BMath, BPoolInterface {
                             _swapFee
                         );
 
-        _checkMathApprox(poolAmountIn);
+        _requireMathApprox(poolAmountIn);
         require(poolAmountIn <= maxPoolAmountIn, "LIMIT_IN");
 
         outRecord.balance = bsub(outRecord.balance, tokenAmountOut);
@@ -903,49 +903,49 @@ contract BPool is BToken, BMath, BPoolInterface {
         _burn(amount);
     }
 
-    function _checkBound(address token)
+    function _requireTokenIsBound(address token)
         internal view
     {
         require(_records[token].bound, "NOT_BOUND");
     }
 
-    function _checkController()
+    function _onlyController()
         internal view
     {
         require(msg.sender == _controller, "NOT_CONTROLLER");
     }
 
-    function _checkFinalized()
+    function _requireContractIsNotFinalized()
         internal view
     {
         require(!_finalized, "IS_FINALIZED");
     }
 
-    function _checkNotFinalized()
+    function _requireContractIsFinalized()
         internal view
     {
         require(_finalized, "NOT_FINALIZED");
     }
 
-    function _checkFeeInBounds(uint256 _fee)
+    function _requireFeeInBounds(uint256 _fee)
         internal pure
     {
         require(_fee >= MIN_FEE && _fee <= MAX_FEE, "FEE_BOUNDS");
     }
 
-    function _checkMathApprox(uint256 _value)
+    function _requireMathApprox(uint256 _value)
         internal pure
     {
         require(_value != 0, "MATH_APPROX");
     }
 
-    function _checkReentry()
+    function _preventReentrancy()
         internal view
     {
         require(!_mutex, "REENTRY");
     }
 
-    function _checkWrapper()
+    function _onlyWrapperOrNotWrapperMode()
         internal view
     {
         require(!_wrapperMode || msg.sender == _wrapper, "ONLY_WRAPPER");
