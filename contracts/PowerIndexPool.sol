@@ -98,7 +98,7 @@ contract PowerIndexPool is BPool {
 
     require(denormSum <= MAX_TOTAL_WEIGHT, "MAX_TARGET_TOTAL_WEIGHT");
 
-    emit SetDynamicWeight(token, _records[token].denorm, targetDenorm, fromTimestamp, targetTimestamp);
+    emit SetDynamicWeight(token, fromDenorm, targetDenorm, fromTimestamp, targetTimestamp);
   }
 
   /**
@@ -143,7 +143,7 @@ contract PowerIndexPool is BPool {
     uint256,
     uint256
   ) public override {
-    require(false, "DISABLED"); // Only new bind function is allowed
+    revert("DISABLED"); // Only new bind function is allowed
   }
 
   /**
