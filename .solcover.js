@@ -18,5 +18,5 @@ module.exports = {
     shell.rm('-rf', './artifacts');
     shell.rm('-rf', './typechain');
   },
-  skipFiles: ['mocks', 'test', 'balancer-core/test', 'Migrations.sol'],
+  skipFiles: ['mocks', 'test', 'balancer-core/test', 'Migrations.sol', 'lib/UniswapV2Library.sol'],
 };
