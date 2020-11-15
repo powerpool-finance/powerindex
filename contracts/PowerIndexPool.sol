@@ -129,7 +129,6 @@ contract PowerIndexPool is BPool {
    * @param token Token for unbind
    */
   function unbind(address token) public override {
-    _totalWeight = _getTotalWeight(); // for compatibility with original BPool unbind
     super.unbind(token);
 
     _dynamicWeights[token] = DynamicWeight(0, 0, 0);
@@ -220,5 +219,13 @@ contract PowerIndexPool is BPool {
       sum = badd(sum, _getDenormWeight(_tokens[i]));
     }
     return sum;
+  }
+
+  function _addTotalWeight(uint _amount) internal virtual override {
+    // storage total weight don't change, it's calculated only by _getTotalWeight()
+  }
+
+  function _subTotalWeight(uint _amount) internal virtual override {
+    // storage total weight don't change, it's calculated only by _getTotalWeight()
   }
 }

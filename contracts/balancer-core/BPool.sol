@@ -378,10 +378,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         // Adjust the denorm and totalWeight
         uint oldWeight = _records[token].denorm;
         if (denorm > oldWeight) {
-            _totalWeight = badd(_totalWeight, bsub(denorm, oldWeight));
-            require(_totalWeight <= MAX_TOTAL_WEIGHT, "MAX_TOTAL_WEIGHT");
+            _addTotalWeight(bsub(denorm, oldWeight));
         } else if (denorm < oldWeight) {
-            _totalWeight = bsub(_totalWeight, bsub(oldWeight, denorm));
+            _subTotalWeight(bsub(oldWeight, denorm));
         }
         _records[token].denorm = denorm;
 
@@ -407,7 +406,7 @@ contract BPool is BToken, BMath, BPoolInterface {
 
         uint tokenBalance = _records[token].balance;
 
-        _totalWeight = bsub(_totalWeight, _records[token].denorm);
+        _subTotalWeight(_records[token].denorm);
 
         // Swap the token-to-unbind with the last token,
         // then delete the last token
@@ -963,6 +962,15 @@ contract BPool is BToken, BMath, BPoolInterface {
         returns (uint)
     {
         return _totalWeight;
+    }
+
+    function _addTotalWeight(uint _amount) internal virtual {
+        _totalWeight = badd(_totalWeight, _amount);
+        require(_totalWeight <= MAX_TOTAL_WEIGHT, "MAX_TOTAL_WEIGHT");
+    }
+
+    function _subTotalWeight(uint _amount) internal virtual {
+        _totalWeight = bsub(_totalWeight, _amount);
     }
 
     function calcAmountWithCommunityFee(
