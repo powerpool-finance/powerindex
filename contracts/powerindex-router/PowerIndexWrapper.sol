@@ -8,6 +8,7 @@ import "../interfaces/BPoolInterface.sol";
 import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/PowerIndexWrapperInterface.sol";
 import "../lib/ControllerOwnable.sol";
+import "@nomiclabs/buidler/console.sol";
 
 contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
   using SafeMath for uint256;
@@ -161,7 +162,7 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
 
     address factTokenOut = _getFactToken(tokenOut);
     poolAmountIn = bpool.exitswapExternAmountOut(factTokenOut, tokenAmountOut, maxPoolAmountIn);
-    _processTokenOut(tokenOut, tokenAmountOut);
+    _processTokenOutBalance(tokenOut);
     require(bpool.transfer(msg.sender, maxPoolAmountIn.sub(poolAmountIn)), "ERR_TRANSFER_FAILED");
     return poolAmountIn;
   }
@@ -234,6 +235,9 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
       WrappedPiErc20Interface(wrapper).withdraw(amount);
     }
 
+    console.log("wrapper", wrapper);
+    console.log("IERC20(token).balanceOf(address(this))", IERC20(token).balanceOf(address(this)));
+    console.log("amount", amount);
     require(IERC20(token).transfer(msg.sender, amount), "ERR_TRANSFER_FAILED");
   }
 
