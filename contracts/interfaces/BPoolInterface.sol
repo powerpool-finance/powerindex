@@ -76,6 +76,10 @@ interface BPoolInterface is IERC20, BMathInterface {
 
   function getRestrictions() external view returns (address);
 
+  function isPublicSwap() external view returns (bool);
+
+  function isFinalized() external view returns (bool);
+
   function isBound(address t) external view returns (bool);
 
   function getCurrentTokens() external view returns (address[] memory tokens);

@@ -81,7 +81,6 @@ describe('PowerIndexPool', () => {
 
   let tokens;
   let pool;
-  let fromWeights;
 
   let controller, alice, communityWallet;
   before(async function () {
@@ -130,7 +129,6 @@ describe('PowerIndexPool', () => {
 
     const logNewPool = PowerIndexPoolFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
     pool = await PowerIndexPool.at(logNewPool.args.pool);
-    fromWeights = [await pool.MIN_WEIGHT(), await pool.MIN_WEIGHT()];
 
     this.getTokensToJoinPoolAndApprove = async (_pool, amountToMint) => {
       const poolTotalSupply = (await _pool.totalSupply()).toString(10);
@@ -253,141 +251,6 @@ describe('PowerIndexPool', () => {
         { from: alice },
       );
     };
-  });
-
-  it('should set name and symbol for new pool', async () => {
-    assert.equal(await pool.name(), name);
-    assert.equal(await pool.symbol(), symbol);
-    assert.sameMembers(await pool.getCurrentTokens(), tokens);
-    assert.deepEqual(
-      _.pick(await pool.getDynamicWeightSettings(tokens[0]), [
-        'fromTimestamp',
-        'targetTimestamp',
-        'fromDenorm',
-        'targetDenorm',
-      ]),
-      {
-        fromTimestamp: fromTimestamps[0],
-        targetTimestamp: targetTimestamps[0],
-        fromDenorm: await pool.MIN_WEIGHT(),
-        targetDenorm: targetWeights[0],
-      },
-    );
-    assert.equal((await pool.getDenormalizedWeight(tokens[0])).toString(), await pool.MIN_WEIGHT());
-    assert.equal((await pool.getDenormalizedWeight(tokens[1])).toString(), await pool.MIN_WEIGHT());
-    assert.equal((await pool.getSwapFee()).toString(), swapFee.toString());
-    const {
-      communitySwapFee: _communitySwapFee,
-      communityJoinFee: _communityJoinFee,
-      communityExitFee: _communityExitFee,
-      communityFeeReceiver: _communityFeeReceiver,
-    } = await pool.getCommunityFee();
-    assert.equal(_communitySwapFee.toString(), communitySwapFee.toString());
-    assert.equal(_communityJoinFee.toString(), communityJoinFee.toString());
-    assert.equal(_communityExitFee.toString(), communityExitFee.toString());
-    assert.equal(_communityFeeReceiver, communityWallet);
-  });
-
-  describe('setDynamicWeight', async () => {
-    it('setDynamicWeight should revert for incorrect values', async () => {
-      await expectRevert(
-        pool.setDynamicWeight(tokens[0], ether('40'), '1', '2', { from: controller }),
-        'CANT_SET_PAST_TIMESTAMP',
-      );
-      //TODO: figure out why MAX_WEIGHT_PER_SECOND require message not working in buidler
-      await expectRevert.unspecified(
-        pool.setDynamicWeight(tokens[0], ether('40'), fromTimestamps[0], addBN(fromTimestamps[0], '100'), {
-          from: controller,
-        }),
-      );
-      //TODO: figure out why MIN_WEIGHT_PER_SECOND require message not working in buidler
-      await expectRevert.unspecified(
-        pool.setDynamicWeight(tokens[0], addBN(fromWeights[0], '10'), fromTimestamps[0], targetTimestamps[0], {
-          from: controller,
-        }),
-      );
-      //TODO: figure out why TIMESTAMP_INCORRECT_DELTA require message not working in buidler
-      await expectRevert.unspecified(
-        pool.setDynamicWeight(tokens[0], ether('40'), targetTimestamps[0], fromTimestamps[0], { from: controller }),
-      );
-      await expectRevert.unspecified(
-        pool.setDynamicWeight(tokens[0], ether('40'), targetTimestamps[0], targetTimestamps[0], { from: controller }),
-      );
-      await expectRevert(
-        pool.setDynamicWeight(tokens[0], ether('51'), fromTimestamps[0], targetTimestamps[0], { from: controller }),
-        'TARGET_WEIGHT_BOUNDS',
-      );
-      //TODO: figure out why MAX_TARGET_TOTAL_WEIGHT require message not working in buidler
-      await expectRevert.unspecified(
-        pool.setDynamicWeight(tokens[0], ether('45'), fromTimestamps[0], targetTimestamps[0], { from: controller }),
-      );
-      //TODO: figure out why NOT_CONTROLLER require message not working in buidler
-      await expectRevert.unspecified(
-        pool.setDynamicWeight(tokens[0], ether('10'), fromTimestamps[0], targetTimestamps[0], { from: alice }),
-      );
-    });
-  });
-
-  describe('disabled functions', async () => {
-    it('original bind should be disabled', async () => {
-      const newToken = await MockERC20.new('New Token', 'NT', ether('1000000'));
-      await newToken.approve(pool.address, ether('1'));
-      //TODO: figure out why DISABLED require message not working in buidler
-      await expectRevert.unspecified(pool.bind(newToken.address, ether('1'), ether('10')));
-    });
-    it('original rebind should be disabled', async () => {
-      await this.token1.approve(pool.address, ether('1'));
-      await expectRevert(
-        pool.rebind(this.token1.address, ether('1'), ether('10'), { from: controller }),
-        'ONLY_NEW_TOKENS_ALLOWED',
-      );
-      await expectRevert(
-        pool.rebind(this.token1.address, await pool.MIN_WEIGHT(), ether('10'), { from: controller }),
-        'ONLY_NEW_TOKENS_ALLOWED',
-      );
-    });
-    it('original bind should be disabled in controller', async () => {
-      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
-      await pool.setController(poolController.address);
-
-      const bindSig = pool.contract._jsonInterface.filter(item => item.name === 'bind' && item.inputs.length === 5)[0]
-        .signature;
-      const bindArgs = web3.eth.abi.encodeParameters(
-        ['address', 'uint', 'uint', 'uint', 'uint'],
-        [this.token1.address, balances[0], targetWeights[0], fromTimestamps[0], targetWeights[0]],
-      );
-      await expectRevert(
-        poolController.callPool(bindSig, bindArgs, '0', { from: controller }),
-        'SIGNATURE_NOT_ALLOWED',
-      );
-    });
-    it('original unbind should be disabled in controller', async () => {
-      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
-      await pool.setController(poolController.address);
-
-      const unbindSig = pool.contract._jsonInterface.filter(item => item.name === 'unbind')[0].signature;
-      const unbindArgs = web3.eth.abi.encodeParameters(['address'], [this.token1.address]);
-      await expectRevert(
-        poolController.callPool(unbindSig, unbindArgs, '0', { from: controller }),
-        'SIGNATURE_NOT_ALLOWED',
-      );
-    });
-  });
-
-  describe('setWeightPerSecondBounds', async () => {
-    it('should correctly set by controller', async () => {
-      await pool.setWeightPerSecondBounds(ether('0.00000002'), ether('0.2'), { from: controller });
-      assert.deepEqual(_.pick(await pool.getWeightPerSecondBounds(), ['minWeightPerSecond', 'maxWeightPerSecond']), {
-        minWeightPerSecond: ether('0.00000002').toString(),
-        maxWeightPerSecond: ether('0.2').toString(),
-      });
-    });
-    it('should revert for non-controller', async () => {
-      await expectRevert(
-        pool.setWeightPerSecondBounds(ether('0.00000002'), ether('0.2'), { from: alice }),
-        'NOT_CONTROLLER',
-      );
-    });
   });
 
   describe('test swap after time spent', async () => {

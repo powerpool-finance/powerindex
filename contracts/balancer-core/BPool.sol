@@ -115,14 +115,14 @@ contract BPool is BToken, BMath, BPoolInterface {
     }
 
     function isPublicSwap()
-        external view
+        external view override
         returns (bool)
     {
         return _publicSwap;
     }
 
     function isFinalized()
-        external view
+        external view override
         returns (bool)
     {
         return _finalized;

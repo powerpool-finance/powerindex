@@ -2,6 +2,7 @@
 /build/
 /cache
 /coverage
+/coverage-remote
 /artifacts
 
 coverage.json
