@@ -3,6 +3,7 @@ artifacts/
 build/
 cache/
 coverage/
+coverage-remote/
 dist/
 lib/
 node_modules/
