@@ -1,4 +1,4 @@
-const { expectRevert, time } = require('@openzeppelin/test-helpers');
+const { expectRevert, time, ether } = require('@openzeppelin/test-helpers');
 const { createSnapshot, revertToSnapshot } = require('./helpers/blockchain');
 const assert = require('chai').assert;
 const CvpToken = artifacts.require('MockCvp');
@@ -637,5 +637,42 @@ describe('VestedLPMining', () => {
       await this.lpMining.deposit(0, '100', { from: bob });
       assert.equal((await this.lp.balanceOf(bob)).toString(), '900');
     });
+  });
+
+  it('should correctly calculate votes of meta pools', async () => {
+    // 100 per block farming rate starting at block 2000
+    await time.advanceBlockTo(this.shiftBlock('1999'));
+    const lpMining = await VestedLPMining.new({from: minter});
+    await lpMining.initialize(this.cvp.address, this.reservoir.address, ether('1'), this.shiftBlock('2000'), '100', {
+      from: minter,
+    });
+    await this.prepareReservoir();
+
+    const lp = await MockERC20.new('LPToken', 'LP', ether('1000'), { from: minter });
+
+    await this.cvp.transfer(lp.address, ether('50000'), {from: minter});
+
+    const metaLp = await MockERC20.new('LPToken', 'LP', ether('200'), { from: minter });
+    await lp.transfer(metaLp.address, ether('100'), { from: minter });
+
+    await lpMining.add('1', metaLp.address, '1', true, {from: minter});
+    await lpMining.setCvpPoolByMetaPool(metaLp.address, lp.address, {from: minter});
+
+    // Alice deposits 10 LPs at block #2090
+    await metaLp.transfer(alice, ether('50'), {from: minter});
+    await metaLp.approve(lpMining.address, ether('50'), {from: alice});
+    await time.advanceBlockTo(this.shiftBlock('2089'));
+    await lpMining.deposit('0', ether('50'), {from: alice});
+    // console.log('logs', logs.map(e => e.args));
+    const firstBlockNumber = await web3.eth.getBlockNumber(); // block #2090
+    await time.advanceBlock();
+    assert.equal(await lpMining.getCurrentVotes(alice), ether('1250').toString());
+    assert.equal((await lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), ether('1250').toString());
+    await time.advanceBlockTo(this.shiftBlock('2105'));
+    assert.equal((await lpMining.pendingCvp(0, alice)).toString(), ether('15').toString());
+
+    assert.equal(await lpMining.getCurrentVotes(alice), ether('1250').toString());
+    await lpMining.deposit('0', '0', {from: alice});
+    assert.equal(await lpMining.getCurrentVotes(alice), ether('1263.793103448275862069').toString());
   });
 });
