@@ -53,9 +53,6 @@ interface IVestedLPMining {
   /// @notice Migrate LP token to another LP contract
   function migrate(uint256 _pid) external;
 
-  /// @notice Return reward multiplier over the given _from to _to block
-  function getMultiplier(uint256 _from, uint256 _to) external pure returns (uint256);
-
   /// @notice Return the amount of pending CVPs entitled to the given user of the pool
   function pendingCvp(uint256 _pid, address _user) external view returns (uint256);
 
