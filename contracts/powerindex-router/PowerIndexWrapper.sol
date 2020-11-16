@@ -161,7 +161,7 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
 
     address factTokenOut = _getFactToken(tokenOut);
     poolAmountIn = bpool.exitswapExternAmountOut(factTokenOut, tokenAmountOut, maxPoolAmountIn);
-    _processTokenOut(tokenOut, tokenAmountOut);
+    _processTokenOutBalance(tokenOut);
     require(bpool.transfer(msg.sender, maxPoolAmountIn.sub(poolAmountIn)), "ERR_TRANSFER_FAILED");
     return poolAmountIn;
   }

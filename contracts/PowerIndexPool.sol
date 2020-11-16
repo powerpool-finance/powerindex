@@ -50,7 +50,7 @@ contract PowerIndexPool is BPool {
    * @param maxWeightPerSecond Max weight per second
    */
   function setWeightPerSecondBounds(uint256 minWeightPerSecond, uint256 maxWeightPerSecond) public _logs_ _lock_ {
-    _checkController();
+    _onlyController();
     _minWeightPerSecond = minWeightPerSecond;
     _maxWeightPerSecond = maxWeightPerSecond;
 
@@ -70,8 +70,8 @@ contract PowerIndexPool is BPool {
     uint256 fromTimestamp,
     uint256 targetTimestamp
   ) public _logs_ _lock_ {
-    _checkController();
-    _checkBound(token);
+    _onlyController();
+    _requireTokenIsBound(token);
 
     require(fromTimestamp > block.timestamp, "CANT_SET_PAST_TIMESTAMP");
     require(targetTimestamp > fromTimestamp, "TIMESTAMP_INCORRECT_DELTA");
@@ -129,7 +129,6 @@ contract PowerIndexPool is BPool {
    * @param token Token for unbind
    */
   function unbind(address token) public override {
-    _totalWeight = _getTotalWeight(); // for compatibility with original BPool unbind
     super.unbind(token);
 
     _dynamicWeights[token] = DynamicWeight(0, 0, 0);
@@ -220,5 +219,13 @@ contract PowerIndexPool is BPool {
       sum = badd(sum, _getDenormWeight(_tokens[i]));
     }
     return sum;
+  }
+
+  function _addTotalWeight(uint256 _amount) internal virtual override {
+    // storage total weight don't change, it's calculated only by _getTotalWeight()
+  }
+
+  function _subTotalWeight(uint256 _amount) internal virtual override {
+    // storage total weight don't change, it's calculated only by _getTotalWeight()
   }
 }
