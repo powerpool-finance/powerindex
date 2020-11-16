@@ -221,11 +221,11 @@ contract PowerIndexPool is BPool {
     return sum;
   }
 
-  function _addTotalWeight(uint _amount) internal virtual override {
+  function _addTotalWeight(uint256 _amount) internal virtual override {
     // storage total weight don't change, it's calculated only by _getTotalWeight()
   }
 
-  function _subTotalWeight(uint _amount) internal virtual override {
+  function _subTotalWeight(uint256 _amount) internal virtual override {
     // storage total weight don't change, it's calculated only by _getTotalWeight()
   }
 }
