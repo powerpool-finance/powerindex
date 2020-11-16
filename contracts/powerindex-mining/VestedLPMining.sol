@@ -218,11 +218,6 @@ contract VestedLPMining is
   }
 
   /// @inheritdoc IVestedLPMining
-  function getMultiplier(uint256 _from, uint256 _to) public pure override returns (uint256) {
-    return _to.sub(_from, "VLPMining: _to exceeds _from");
-  }
-
-  /// @inheritdoc IVestedLPMining
   function pendingCvp(uint256 _pid, address _user) external view override returns (uint256) {
     if (_pid >= pools.length) return 0;
 
