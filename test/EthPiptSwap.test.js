@@ -295,13 +295,13 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         this.uniswapFactory.address,
         tokens.map(t => t.address),
         { from: bob },
-      ), "FACTORY_NOT_ALLOWED");
+      ), 'FACTORY_NOT_ALLOWED');
 
       await expectRevert(erc20PiptSwap.setUniswapFactoryAllowed(
         [this.uniswapFactory.address],
         [true],
         { from: bob },
-      ), "Ownable: caller is not the owner");
+      ), 'Ownable: caller is not the owner');
 
       await erc20PiptSwap.setUniswapFactoryAllowed(
         [this.uniswapFactory.address],

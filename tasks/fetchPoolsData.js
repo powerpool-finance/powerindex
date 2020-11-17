@@ -10,8 +10,6 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
   const BPool = artifacts.require('BPool');
   const MockERC20 = artifacts.require('MockERC20');
 
-  const { web3 } = BPool;
-
   const pool = await BPool.at(balancerPoolAddress);
   const tokensAddresses = await callContract(pool, 'getCurrentTokens');
 
