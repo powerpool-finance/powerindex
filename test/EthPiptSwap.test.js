@@ -290,12 +290,32 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         from: feeManager,
       });
 
-      await erc20PiptSwap.setTokensSettings(
+      assert.equal(await erc20PiptSwap.uniswapFactoryAllowed(this.uniswapFactory.address), false);
+      await expectRevert(erc20PiptSwap.fetchUnswapPairsFromFactory(
+        this.uniswapFactory.address,
         tokens.map(t => t.address),
-        pairs.map(p => p.address),
-        pairs.map(() => true),
+        { from: bob },
+      ), "FACTORY_NOT_ALLOWED");
+
+      await expectRevert(erc20PiptSwap.setUniswapFactoryAllowed(
+        [this.uniswapFactory.address],
+        [true],
+        { from: bob },
+      ), "Ownable: caller is not the owner");
+
+      await erc20PiptSwap.setUniswapFactoryAllowed(
+        [this.uniswapFactory.address],
+        [true],
         { from: minter },
       );
+      assert.equal(await erc20PiptSwap.uniswapFactoryAllowed(this.uniswapFactory.address), true);
+
+      await erc20PiptSwap.fetchUnswapPairsFromFactory(
+        this.uniswapFactory.address,
+        tokens.map(t => t.address),
+        { from: bob },
+      )
+
       const {token: usdcToken, pair: usdcPair} = tokenBySymbol['USDC'];
 
       const tokenAddress = usdcToken.address;

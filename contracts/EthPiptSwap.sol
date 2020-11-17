@@ -11,6 +11,7 @@ import "./interfaces/BPoolInterface.sol";
 import "./interfaces/TokenInterface.sol";
 import "./interfaces/IPoolRestrictions.sol";
 import "./interfaces/IUniswapV2Pair.sol";
+import "./interfaces/IUniswapV2Factory.sol";
 import "./lib/UniswapV2Library.sol";
 
 contract EthPiptSwap is Ownable {
@@ -28,6 +29,7 @@ contract EthPiptSwap is Ownable {
   address public feePayout;
   address public feeManager;
 
+  mapping(address => bool) public uniswapFactoryAllowed;
   mapping(address => address) public uniswapEthPairByTokenAddress;
   mapping(address => bool) public reApproveTokens;
   uint256 public defaultSlippage;
@@ -39,7 +41,8 @@ contract EthPiptSwap is Ownable {
     uint256 ethReserve;
   }
 
-  event SetTokenSetting(address indexed token, bool reApprove, address uniswapPair);
+  event SetUniswapFactoryAllowed(address indexed factory, bool indexed allowed);
+  event SetTokenSetting(address indexed token, bool indexed reApprove, address indexed uniswapPair);
   event SetDefaultSlippage(uint256 newDefaultSlippage);
   event SetFees(
     address indexed sender,
@@ -117,7 +120,7 @@ contract EthPiptSwap is Ownable {
   }
 
   function convertOddToCvpAndSendToPayout(address[] memory oddTokens) external {
-    require(msg.sender == tx.origin && !Address.isContract(msg.sender), "Call from contract not allowed");
+    require(msg.sender == tx.origin && !Address.isContract(msg.sender), "CONTRACT_NOT_ALLOWED");
 
     uint256 len = oddTokens.length;
 
@@ -169,11 +172,30 @@ contract EthPiptSwap is Ownable {
     bool[] memory _reapprove
   ) external onlyOwner {
     uint256 len = _tokens.length;
-    require(len == _pairs.length && len == _reapprove.length, "Lengths are not equal");
+    require(len == _pairs.length && len == _reapprove.length, "LENGTHS_NOT_EQUAL");
     for (uint256 i = 0; i < _tokens.length; i++) {
       uniswapEthPairByTokenAddress[_tokens[i]] = _pairs[i];
       reApproveTokens[_tokens[i]] = _reapprove[i];
       emit SetTokenSetting(_tokens[i], _reapprove[i], _pairs[i]);
+    }
+  }
+
+  function setUniswapFactoryAllowed(address[] memory _factories, bool[] memory _allowed) external onlyOwner {
+    uint256 len = _factories.length;
+    require(len == _allowed.length, "LENGTHS_NOT_EQUAL");
+    for (uint256 i = 0; i < _factories.length; i++) {
+      uniswapFactoryAllowed[_factories[i]] = _allowed[i];
+      emit SetUniswapFactoryAllowed(_factories[i], _allowed[i]);
+    }
+  }
+
+  function fetchUnswapPairsFromFactory(address _factory, address[] calldata _tokens) external {
+    require(uniswapFactoryAllowed[_factory], "FACTORY_NOT_ALLOWED");
+
+    uint256 len = _tokens.length;
+    for (uint256 i = 0; i < _tokens.length; i++) {
+      require(uniswapEthPairByTokenAddress[_tokens[i]] == address(0), "ALREADY_SET");
+      uniswapEthPairByTokenAddress[_tokens[i]] = IUniswapV2Factory(_factory).getPair(_tokens[i], address(weth));
     }
   }
 
@@ -293,7 +315,7 @@ contract EthPiptSwap is Ownable {
   }
 
   function _swapWethToPiptByPoolOut(uint256 _wethAmount, uint256 _poolAmountOut) internal {
-    require(_wethAmount > 0, "ETH required");
+    require(_wethAmount > 0, "ETH_REQUIRED");
 
     {
       address poolRestrictions = pipt.getRestrictions();
