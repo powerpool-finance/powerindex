@@ -71,7 +71,7 @@ describe('PowerIndexWrapper', () => {
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: minter });
 
     this.token1 = await MockCvp.new();
-    this.token2 = await MockERC20.new('My Token 2', 'MT2', ether('1000000'));
+    this.token2 = await MockERC20.new('My Token 2', 'MT2', '18', ether('1000000'));
     tokens = [this.token1.address, this.token2.address];
 
     await this.token1.approve(this.bActions.address, balances[0]);

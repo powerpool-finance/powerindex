@@ -13,7 +13,12 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
   const { web3 } = BPool;
 
   const pool = await BPool.at(balancerPoolAddress);
-  const tokensAddresses = await pool.getCurrentTokens();
+  const tokensAddresses = await callContract(pool, 'getCurrentTokens');
+
+  tokensAddresses.push('0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'); // USDC
+  tokensAddresses.push('0x6b175474e89094c44da98b954eedeac495271d0f'); // DAI
+  tokensAddresses.push('0xdac17f958d2ee523a2206206994597c13d831ec7'); // USDT
+  tokensAddresses.push('0x4Fabb145d64652a948d72533023f6E7A623C7C53'); // BUSD
 
   const UniswapV2Factory = artifacts.require('UniswapV2Factory');
   const UniswapV2Pair = artifacts.require('UniswapV2Pair');
@@ -23,24 +28,30 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
   const factory = await UniswapV2Factory.at(uniswapFactoryAddress);
   for (let i = 0; i < tokensAddresses.length; i++) {
     const token = await MockERC20.at(tokensAddresses[i]);
-    const pairAddress = await factory.getPair(tokensAddresses[i], wethAddress);
+    const pairAddress = await callContract(factory, 'getPair', [tokensAddresses[i], wethAddress]);
     const pair = await UniswapV2Pair.at(pairAddress);
-    const { _reserve0: tokenReserve, _reserve1: ethReserve } = await pair.getReserves();
-    const balancerBalance = await pool.getBalance(tokensAddresses[i]);
+    const { _reserve0: tokenReserve, _reserve1: ethReserve } = await callContract(pair, 'getReserves');
+    const balancerBalance = await callContract(pool, 'getBalance', [tokensAddresses[i]]).catch(() => '0');
 
     tokens.push({
       tokenAddress: tokensAddresses[i],
-      tokenSymbol: await token.symbol().catch(() => 'MKR'),
-      balancerBalance: parseFloat(web3.utils.fromWei(balancerBalance, 'ether')),
+      tokenSymbol: await callContract(token, 'symbol').catch(() => 'MKR'),
+      tokenDecimals: await callContract(token, 'decimals').catch(() => '18'),
+      balancerBalance,
       uniswapPair: {
         address: pairAddress,
-        tokenReserve: parseFloat(web3.utils.fromWei(tokenReserve, 'ether')),
-        ethReserve: parseFloat(web3.utils.fromWei(ethReserve, 'ether')),
+        tokenReserve,
+        ethReserve,
       },
     });
   }
 
   fs.writeFileSync('./data/poolsData.json', JSON.stringify(tokens, null, ' '));
 });
+
+function callContract(contract, method, args = []) {
+  console.log(method, args);
+  return contract.contract.methods[method].apply(contract.contract, args).call();
+}
 
 module.exports = {};

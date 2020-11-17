@@ -96,7 +96,7 @@ describe('PowerIndexPool', () => {
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: controller });
 
     this.token1 = await MockCvp.new();
-    this.token2 = await MockERC20.new('My Token 2', 'MT2', ether('1000000'));
+    this.token2 = await MockERC20.new('My Token 2', 'MT2', '18', ether('1000000'));
     tokens = [this.token1.address, this.token2.address];
 
     fromTimestamps = [await getTimestamp(100), await getTimestamp(100)].map(w => w.toString());
@@ -330,7 +330,7 @@ describe('PowerIndexPool', () => {
 
   describe('disabled functions', async () => {
     it('original bind should be disabled', async () => {
-      const newToken = await MockERC20.new('New Token', 'NT', ether('1000000'));
+      const newToken = await MockERC20.new('New Token', 'NT', '18', ether('1000000'));
       await newToken.approve(pool.address, ether('1'));
       //TODO: figure out why DISABLED require message not working in buidler
       await expectRevert.unspecified(pool.bind(newToken.address, ether('1'), ether('10')));
@@ -585,7 +585,7 @@ describe('PowerIndexPool', () => {
       fromTimestamp = await getTimestamp(100);
       targetTimestamp = await getTimestamp(11000);
 
-      this.token3 = await MockERC20.new('My Token 3', 'MT3', ether('1000000'));
+      this.token3 = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
       await this.token3.approve(pool.address, initialBalance);
       await pool.bind(this.token3.address, initialBalance, targetWeight, fromTimestamp, targetTimestamp);
 

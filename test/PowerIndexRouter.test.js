@@ -27,7 +27,7 @@ describe('PowerIndex Router Test', () => {
   });
 
   it('should allow swapping a token with a new version', async () => {
-    const token = await MockERC20.new('My Token 3', 'MT3', ether('1000000'));
+    const token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
     const router = await PowerIndexSimpleRouter.new();
     const wrapper = await WrappedPiErc20.new(token.address, router.address, 'WToken', 'WTKN');
     const poolRestrictions = await PoolRestrictions.new();

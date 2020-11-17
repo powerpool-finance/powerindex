@@ -7,7 +7,7 @@ import "./MockERC20.sol";
 contract MockCvp is MockERC20 {
   mapping(address => mapping(address => uint256)) public delegated;
 
-  constructor() public MockERC20("TCVP", "Test Concentrated Voting Power", 100000000e18) {}
+  constructor() public MockERC20("TCVP", "Test Concentrated Voting Power", 18, 100000000e18) {}
 
   function getPriorVotes(address _addr) external view returns (uint96) {
     return uint96(balanceOf(_addr));

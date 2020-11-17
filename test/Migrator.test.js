@@ -19,8 +19,8 @@ describe('Migrator', () => {
     this.factory1 = await UniswapV2Factory.new(alice, { from: alice });
     this.factory2 = await UniswapV2Factory.new(alice, { from: alice });
     this.cvp = await CvpToken.new({ from: alice });
-    this.weth = await MockERC20.new('WETH', 'WETH', '100000000', { from: minter });
-    this.token = await MockERC20.new('TOKEN', 'TOKEN', '100000000', { from: minter });
+    this.weth = await MockERC20.new('WETH', 'WETH', '18', '100000000', { from: minter });
+    this.token = await MockERC20.new('TOKEN', 'TOKEN', '18', '100000000', { from: minter });
     this.lp1 = await UniswapV2Pair.at(
       (await this.factory1.createPair(this.weth.address, this.token.address)).logs[0].args.pair,
     );
@@ -70,7 +70,7 @@ describe('Migrator', () => {
 
   it('should allow first minting from public only after migrator is gone', async () => {
     await this.factory2.setMigrator(this.migrator.address, { from: alice });
-    this.tokenx = await MockERC20.new('TOKENX', 'TOKENX', '100000000', { from: minter });
+    this.tokenx = await MockERC20.new('TOKENX', 'TOKENX', '18', '100000000', { from: minter });
     this.lpx = await UniswapV2Pair.at(
       (await this.factory2.createPair(this.weth.address, this.tokenx.address)).logs[0].args.pair,
     );
@@ -82,7 +82,7 @@ describe('Migrator', () => {
   });
 
   it('should reject migration for not the Uniswap poolType', async () => {
-    this.token2 = await MockERC20.new('TOKEN2', 'TOKEN2', '100000000', { from: minter });
+    this.token2 = await MockERC20.new('TOKEN2', 'TOKEN2', '18', '100000000', { from: minter });
     this.lp3 = await UniswapV2Pair.at(
       (await this.factory1.createPair(this.weth.address, this.token2.address)).logs[0].args.pair,
     );

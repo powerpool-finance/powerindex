@@ -15,7 +15,9 @@ import "./lib/UniswapV2Library.sol";
 
 contract EthPiptSwap is Ownable {
   using SafeMath for uint256;
+  using SafeERC20 for IERC20;
   using SafeERC20 for TokenInterface;
+  using SafeERC20 for BPoolInterface;
 
   TokenInterface public weth;
   TokenInterface public cvp;
@@ -49,18 +51,18 @@ contract EthPiptSwap is Ownable {
 
   event EthToPiptSwap(
     address indexed user,
-    uint256 ethSwapAmount,
-    uint256 ethFeeAmount,
-    uint256 piptAmount,
-    uint256 piptCommunityFee
+    uint256 ethInAmount,
+    uint256 ethSwapFee,
+    uint256 poolOutAmount,
+    uint256 poolCommunityFee
   );
   event OddEth(address indexed user, uint256 amount);
   event PiptToEthSwap(
     address indexed user,
-    uint256 piptSwapAmount,
-    uint256 piptCommunityFee,
+    uint256 poolInAmount,
+    uint256 poolCommunityFee,
     uint256 ethOutAmount,
-    uint256 ethFeeAmount
+    uint256 ethSwapFee
   );
   event PayoutCVP(address indexed receiver, uint256 wethAmount, uint256 cvpAmount);
 
@@ -96,128 +98,53 @@ contract EthPiptSwap is Ownable {
 
     (, , uint256 poolAmountOut) = calcSwapEthToPiptInputs(swapAmount, tokens, _slippage);
 
-    swapEthToPiptByPoolOut(poolAmountOut);
-  }
-
-  function swapEthToPiptByPoolOut(uint256 _poolAmountOut) public payable {
-    {
-      address poolRestrictions = pipt.getRestrictions();
-      if (address(poolRestrictions) != address(0)) {
-        uint256 maxTotalSupply = IPoolRestrictions(poolRestrictions).getMaxTotalSupply(address(pipt));
-        require(pipt.totalSupply().add(_poolAmountOut) <= maxTotalSupply, "PIPT_MAX_SUPPLY");
-      }
-    }
-
-    require(msg.value > 0, "ETH required");
     weth.deposit{ value: msg.value }();
 
-    (uint256 feeAmount, uint256 swapAmount) = calcEthFee(msg.value);
-
-    uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(10);
-
-    address[] memory tokens = pipt.getCurrentTokens();
-    uint256 len = tokens.length;
-
-    CalculationStruct[] memory calculations = new CalculationStruct[](tokens.length);
-    uint256[] memory tokensInPipt = new uint256[](tokens.length);
-
-    uint256 totalEthSwap = 0;
-    for (uint256 i = 0; i < len; i++) {
-      IUniswapV2Pair tokenPair = uniswapPairFor(tokens[i]);
-
-      (calculations[i].tokenReserve, calculations[i].ethReserve, ) = tokenPair.getReserves();
-      tokensInPipt[i] = ratio.mul(pipt.getBalance(tokens[i])).div(1 ether);
-      calculations[i].ethAmount = UniswapV2Library.getAmountIn(
-        tokensInPipt[i],
-        calculations[i].ethReserve,
-        calculations[i].tokenReserve
-      );
-
-      weth.transfer(address(tokenPair), calculations[i].ethAmount);
-
-      tokenPair.swap(tokensInPipt[i], uint256(0), address(this), new bytes(0));
-      totalEthSwap = totalEthSwap.add(calculations[i].ethAmount);
-
-      if (reApproveTokens[tokens[i]]) {
-        TokenInterface(tokens[i]).approve(address(pipt), 0);
-      }
-
-      TokenInterface(tokens[i]).approve(address(pipt), tokensInPipt[i]);
-    }
-
-    (, uint256 communityJoinFee, , ) = pipt.getCommunityFee();
-    (uint256 poolAmountOutAfterFee, uint256 poolAmountOutFee) =
-      pipt.calcAmountWithCommunityFee(_poolAmountOut, communityJoinFee, address(this));
-
-    emit EthToPiptSwap(msg.sender, swapAmount, feeAmount, _poolAmountOut, poolAmountOutFee);
-
-    pipt.joinPool(_poolAmountOut, tokensInPipt);
-    pipt.transfer(msg.sender, poolAmountOutAfterFee);
-
-    uint256 ethDiff = swapAmount.sub(totalEthSwap);
-    if (ethDiff > 0) {
-      weth.withdraw(ethDiff);
-      msg.sender.transfer(ethDiff);
-      emit OddEth(msg.sender, ethDiff);
-    }
+    _swapWethToPiptByPoolOut(msg.value, poolAmountOut);
   }
 
-  function swapPiptToEth(uint256 _poolAmountIn) public {
-    address[] memory tokens = pipt.getCurrentTokens();
-    uint256 len = tokens.length;
+  function swapEthToPiptByPoolOut(uint256 _poolAmountOut) external payable {
+    weth.deposit{ value: msg.value }();
 
-    (uint256[] memory tokensOutPipt, uint256[] memory ethOutUniswap, uint256 totalEthOut, uint256 poolAmountFee) =
-      calcSwapPiptToEthInputs(_poolAmountIn, tokens);
+    _swapWethToPiptByPoolOut(msg.value, _poolAmountOut);
+  }
 
-    pipt.transferFrom(msg.sender, address(this), _poolAmountIn);
-
-    pipt.approve(address(pipt), _poolAmountIn);
-
-    pipt.exitPool(_poolAmountIn, tokensOutPipt);
-
-    for (uint256 i = 0; i < len; i++) {
-      IUniswapV2Pair tokenPair = uniswapPairFor(tokens[i]);
-      TokenInterface(tokens[i]).transfer(address(tokenPair), tokensOutPipt[i]);
-      tokenPair.swap(uint256(0), ethOutUniswap[i], address(this), new bytes(0));
-    }
-
-    (uint256 ethFeeAmount, uint256 ethOutAmount) = calcEthFee(totalEthOut);
+  function swapPiptToEth(uint256 _poolAmountIn) external {
+    uint256 ethOutAmount = _swapPiptToWeth(_poolAmountIn);
 
     weth.withdraw(ethOutAmount);
     msg.sender.transfer(ethOutAmount);
-
-    emit PiptToEthSwap(msg.sender, _poolAmountIn, poolAmountFee, ethOutAmount, ethFeeAmount);
   }
 
-  function convertOddToCvpAndSendToPayout(address[] memory oddTokens) public {
+  function convertOddToCvpAndSendToPayout(address[] memory oddTokens) external {
     require(msg.sender == tx.origin && !Address.isContract(msg.sender), "Call from contract not allowed");
 
     uint256 len = oddTokens.length;
 
     for (uint256 i = 0; i < len; i++) {
       uint256 tokenBalance = TokenInterface(oddTokens[i]).balanceOf(address(this));
-      IUniswapV2Pair tokenPair = uniswapPairFor(oddTokens[i]);
+      IUniswapV2Pair tokenPair = _uniswapPairFor(oddTokens[i]);
 
       (uint256 tokenReserve, uint256 ethReserve, ) = tokenPair.getReserves();
       uint256 wethOut = UniswapV2Library.getAmountOut(tokenBalance, tokenReserve, ethReserve);
 
-      TokenInterface(oddTokens[i]).transfer(address(tokenPair), tokenBalance);
+      TokenInterface(oddTokens[i]).safeTransfer(address(tokenPair), tokenBalance);
 
       tokenPair.swap(uint256(0), wethOut, address(this), new bytes(0));
     }
 
     uint256 wethBalance = weth.balanceOf(address(this));
 
-    IUniswapV2Pair cvpPair = uniswapPairFor(address(cvp));
+    IUniswapV2Pair cvpPair = _uniswapPairFor(address(cvp));
 
     (uint256 cvpReserve, uint256 ethReserve, ) = cvpPair.getReserves();
     uint256 cvpOut = UniswapV2Library.getAmountOut(wethBalance, ethReserve, cvpReserve);
 
-    weth.transfer(address(cvpPair), wethBalance);
+    weth.safeTransfer(address(cvpPair), wethBalance);
 
     cvpPair.swap(cvpOut, uint256(0), address(this), new bytes(0));
 
-    cvp.transfer(feePayout, cvpOut);
+    cvp.safeTransfer(feePayout, cvpOut);
 
     emit PayoutCVP(feePayout, wethBalance, cvpOut);
   }
@@ -286,7 +213,7 @@ contract EthPiptSwap is Ownable {
         // token share relatively 1 ether of first token
         calculations[i].tokenAmount = poolRatio.mul(pipt.getBalance(_tokens[i])).div(1 ether);
 
-        (calculations[i].tokenReserve, calculations[i].ethReserve, ) = uniswapPairFor(_tokens[i]).getReserves();
+        (calculations[i].tokenReserve, calculations[i].ethReserve, ) = _uniswapPairFor(_tokens[i]).getReserves();
         calculations[i].ethAmount = UniswapV2Library.getAmountIn(
           calculations[i].tokenAmount,
           calculations[i].ethReserve,
@@ -335,33 +262,121 @@ contract EthPiptSwap is Ownable {
     for (uint256 i = 0; i < _tokens.length; i++) {
       tokensOutPipt[i] = poolRatio.mul(pipt.getBalance(_tokens[i])).div(1 ether);
 
-      (uint256 tokenReserve, uint256 ethReserve, ) = uniswapPairFor(_tokens[i]).getReserves();
+      (uint256 tokenReserve, uint256 ethReserve, ) = _uniswapPairFor(_tokens[i]).getReserves();
       ethOutUniswap[i] = UniswapV2Library.getAmountOut(tokensOutPipt[i], tokenReserve, ethReserve);
       totalEthOut = totalEthOut.add(ethOutUniswap[i]);
     }
   }
 
-  function calcEthFee(uint256 ethValue) public view returns (uint256 ethFee, uint256 ethAfterFee) {
+  function calcEthFee(uint256 ethAmount) public view returns (uint256 ethFee, uint256 ethAfterFee) {
     ethFee = 0;
     uint256 len = feeLevels.length;
     for (uint256 i = 0; i < len; i++) {
-      if (ethValue >= feeLevels[i]) {
-        ethFee = ethValue.mul(feeAmounts[i]).div(1 ether);
+      if (ethAmount >= feeLevels[i]) {
+        ethFee = ethAmount.mul(feeAmounts[i]).div(1 ether);
         break;
       }
     }
-    ethAfterFee = ethValue.sub(ethFee);
+    ethAfterFee = ethAmount.sub(ethFee);
   }
 
-  function getFeeLevels() public view returns (uint256[] memory) {
+  function getFeeLevels() external view returns (uint256[] memory) {
     return feeLevels;
   }
 
-  function getFeeAmounts() public view returns (uint256[] memory) {
+  function getFeeAmounts() external view returns (uint256[] memory) {
     return feeAmounts;
   }
 
-  function uniswapPairFor(address token) internal view returns (IUniswapV2Pair) {
+  function _uniswapPairFor(address token) internal view returns (IUniswapV2Pair) {
     return IUniswapV2Pair(uniswapEthPairByTokenAddress[token]);
+  }
+
+  function _swapWethToPiptByPoolOut(uint256 _wethAmount, uint256 _poolAmountOut) internal {
+    require(_wethAmount > 0, "ETH required");
+
+    {
+      address poolRestrictions = pipt.getRestrictions();
+      if (address(poolRestrictions) != address(0)) {
+        uint256 maxTotalSupply = IPoolRestrictions(poolRestrictions).getMaxTotalSupply(address(pipt));
+        require(pipt.totalSupply().add(_poolAmountOut) <= maxTotalSupply, "PIPT_MAX_SUPPLY");
+      }
+    }
+
+    (uint256 feeAmount, uint256 swapAmount) = calcEthFee(_wethAmount);
+
+    uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(10);
+
+    address[] memory tokens = pipt.getCurrentTokens();
+    uint256 len = tokens.length;
+
+    CalculationStruct[] memory calculations = new CalculationStruct[](tokens.length);
+    uint256[] memory tokensInPipt = new uint256[](tokens.length);
+
+    uint256 totalEthSwap = 0;
+    for (uint256 i = 0; i < len; i++) {
+      IUniswapV2Pair tokenPair = _uniswapPairFor(tokens[i]);
+
+      (calculations[i].tokenReserve, calculations[i].ethReserve, ) = tokenPair.getReserves();
+      tokensInPipt[i] = ratio.mul(pipt.getBalance(tokens[i])).div(1 ether);
+      calculations[i].ethAmount = UniswapV2Library.getAmountIn(
+        tokensInPipt[i],
+        calculations[i].ethReserve,
+        calculations[i].tokenReserve
+      );
+
+      weth.safeTransfer(address(tokenPair), calculations[i].ethAmount);
+
+      tokenPair.swap(tokensInPipt[i], uint256(0), address(this), new bytes(0));
+      totalEthSwap = totalEthSwap.add(calculations[i].ethAmount);
+
+      if (reApproveTokens[tokens[i]]) {
+        TokenInterface(tokens[i]).approve(address(pipt), 0);
+      }
+
+      TokenInterface(tokens[i]).approve(address(pipt), tokensInPipt[i]);
+    }
+
+    (, uint256 communityJoinFee, , ) = pipt.getCommunityFee();
+    (uint256 poolAmountOutAfterFee, uint256 poolAmountOutFee) =
+      pipt.calcAmountWithCommunityFee(_poolAmountOut, communityJoinFee, address(this));
+
+    emit EthToPiptSwap(msg.sender, swapAmount, feeAmount, _poolAmountOut, poolAmountOutFee);
+
+    pipt.joinPool(_poolAmountOut, tokensInPipt);
+    pipt.safeTransfer(msg.sender, poolAmountOutAfterFee);
+
+    uint256 ethDiff = swapAmount.sub(totalEthSwap);
+    if (ethDiff > 0) {
+      weth.withdraw(ethDiff);
+      msg.sender.transfer(ethDiff);
+      emit OddEth(msg.sender, ethDiff);
+    }
+  }
+
+  function _swapPiptToWeth(uint256 _poolAmountIn) internal returns (uint256) {
+    address[] memory tokens = pipt.getCurrentTokens();
+    uint256 len = tokens.length;
+
+    (uint256[] memory tokensOutPipt, uint256[] memory ethOutUniswap, uint256 totalEthOut, uint256 poolAmountFee) =
+      calcSwapPiptToEthInputs(_poolAmountIn, tokens);
+
+    pipt.safeTransferFrom(msg.sender, address(this), _poolAmountIn);
+
+    pipt.approve(address(pipt), _poolAmountIn);
+
+    pipt.exitPool(_poolAmountIn, tokensOutPipt);
+
+    for (uint256 i = 0; i < len; i++) {
+      IUniswapV2Pair tokenPair = _uniswapPairFor(tokens[i]);
+      TokenInterface(tokens[i]).safeTransfer(address(tokenPair), tokensOutPipt[i]);
+      tokenPair.swap(uint256(0), ethOutUniswap[i], address(this), new bytes(0));
+    }
+
+    (uint256 ethFeeAmount, uint256 ethOutAmount) = calcEthFee(totalEthOut);
+
+    emit PiptToEthSwap(msg.sender, _poolAmountIn, poolAmountFee, ethOutAmount, ethFeeAmount);
+
+    return ethOutAmount;
   }
 }
