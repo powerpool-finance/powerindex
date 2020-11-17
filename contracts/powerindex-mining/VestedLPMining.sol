@@ -364,6 +364,7 @@ contract VestedLPMining is
       address cvpPoolByMeta = cvpPoolByMetaPool[lpToken];
       if (cvpPoolByMeta == address(0)) {
         lpCvp = SafeMath96.fromUint(cvp.balanceOf(lpToken), "VLPMining::_doCheckpointVotes:1");
+        totalLpCvp = totalLpCvp.add(lpCvp);
       } else {
         uint256 poolTotalSupply = IERC20(cvpPoolByMeta).totalSupply();
         uint256 poolBalance = IERC20(cvpPoolByMeta).balanceOf(lpToken);
@@ -371,8 +372,6 @@ contract VestedLPMining is
         uint256 metaPoolCvp = cvp.balanceOf(cvpPoolByMeta);
         lpCvp = SafeMath96.fromUint(metaPoolCvp.mul(lpShare).div(SCALE), "VLPMining::_doCheckpointVotes:1");
       }
-
-      totalLpCvp = totalLpCvp.add(lpCvp);
 
       if (!pool.votesEnabled) {
         continue;

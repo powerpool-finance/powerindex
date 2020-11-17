@@ -3,7 +3,7 @@ const { createSnapshot, revertToSnapshot } = require('./helpers/blockchain');
 const assert = require('chai').assert;
 const CvpToken = artifacts.require('MockCvp');
 const LPMining = artifacts.require('LPMining');
-const VestedLPMining = artifacts.require('VestedLPMining');
+const VestedLPMining = artifacts.require('MockVestedLPMiningMath');
 const MockERC20 = artifacts.require('MockERC20');
 const Reservoir = artifacts.require('Reservoir');
 
@@ -655,6 +655,7 @@ describe('VestedLPMining', () => {
     const metaLp = await MockERC20.new('LPToken', 'LP', ether('200'), { from: minter });
     await lp.transfer(metaLp.address, ether('100'), { from: minter });
 
+    await lpMining.add('1', lp.address, '1', true, {from: minter});
     await lpMining.add('1', metaLp.address, '1', true, {from: minter});
     await lpMining.setCvpPoolByMetaPool(metaLp.address, lp.address, {from: minter});
 
@@ -662,17 +663,18 @@ describe('VestedLPMining', () => {
     await metaLp.transfer(alice, ether('50'), {from: minter});
     await metaLp.approve(lpMining.address, ether('50'), {from: alice});
     await time.advanceBlockTo(this.shiftBlock('2089'));
-    await lpMining.deposit('0', ether('50'), {from: alice});
+    await lpMining.deposit('1', ether('50'), {from: alice});
+    assert.equal(await lpMining.__getTotalPooledCvp(), ether('50000').toString());
     // console.log('logs', logs.map(e => e.args));
     const firstBlockNumber = await web3.eth.getBlockNumber(); // block #2090
     await time.advanceBlock();
     assert.equal(await lpMining.getCurrentVotes(alice), ether('1250').toString());
     assert.equal((await lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), ether('1250').toString());
     await time.advanceBlockTo(this.shiftBlock('2105'));
-    assert.equal((await lpMining.pendingCvp(0, alice)).toString(), ether('15').toString());
+    assert.equal((await lpMining.pendingCvp('1', alice)).toString(), ether('7.5').toString());
 
     assert.equal(await lpMining.getCurrentVotes(alice), ether('1250').toString());
-    await lpMining.deposit('0', '0', {from: alice});
-    assert.equal(await lpMining.getCurrentVotes(alice), ether('1263.793103448275862069').toString());
+    await lpMining.deposit('1', '0', {from: alice});
+    assert.equal(await lpMining.getCurrentVotes(alice), ether('1256.896551724137931035').toString());
   });
 });
