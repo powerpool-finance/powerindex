@@ -4,9 +4,12 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./powerindex-router/PowerIndexWrappedController.sol";
 
 contract PowerIndexPoolController is PowerIndexWrappedController {
+  using SafeERC20 for IERC20;
+
   bytes4 public constant BIND_SIG = bytes4(keccak256(bytes("bind(address,uint256,uint256,uint256,uint256)")));
   bytes4 public constant UNBIND_SIG = bytes4(keccak256(bytes("unbind(address)")));
 
@@ -34,7 +37,7 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     uint256 fromTimestamp,
     uint256 targetTimestamp
   ) external {
-    IERC20(token).transferFrom(msg.sender, address(this), balance);
+    IERC20(token).safeTransferFrom(msg.sender, address(this), balance);
     IERC20(token).approve(address(pool), balance);
     pool.bind(token, balance, targetDenorm, fromTimestamp, targetTimestamp);
   }
@@ -68,7 +71,7 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
 
     pool.unbind(_token);
     (, , , address communityWallet) = pool.getCommunityFee();
-    IERC20(_token).transfer(communityWallet, tokenBalance);
+    IERC20(_token).safeTransfer(communityWallet, tokenBalance);
   }
 
   function _checkSignature(bytes4 signature) internal pure override {

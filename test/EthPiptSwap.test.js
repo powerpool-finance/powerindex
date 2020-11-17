@@ -35,7 +35,7 @@ function addBN(bn1, bn2) {
     .toString(10);
 }
 
-describe.only('EthPiptSwap and Erc20PiptSwap', () => {
+describe('EthPiptSwap and Erc20PiptSwap', () => {
   const swapFee = ether('0.0001');
   const communitySwapFee = ether('0.001');
   const communityJoinFee = ether('0.001');
