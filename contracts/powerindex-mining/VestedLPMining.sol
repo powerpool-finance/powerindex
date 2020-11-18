@@ -30,13 +30,11 @@ contract VestedLPMining is
   /// @dev properties grouped to optimize storage costs
 
   struct User {
-    /// @dev new slot
     uint32 lastUpdateBlock; // block when the params (below) were updated
     uint32 vestingBlock; // block by when all entitled CVP tokens to be vested
     uint96 pendedCvp; // amount of CVPs tokens entitled but not yet vested to the user
     uint96 cvpAdjust; // adjustments for pended CVP tokens amount computation
     // (with regard to LP token deposits/withdrawals in the past)
-    /// @dev new slot
     uint256 lptAmount; // amount of LP tokens the user has provided to a pool
     /** @dev
      * At any time, the amount of CVP tokens entitled to a user but not yet vested is the sum of:
@@ -56,25 +54,22 @@ contract VestedLPMining is
   }
 
   struct Pool {
-    /// @dev new slot
     IERC20 lpToken; // address of the LP token contract
     bool votesEnabled; // if the pool is enabled to write votes
     uint8 poolType; // pool type (1 - Uniswap, 2 - Balancer)
     uint32 allocPoint; // points assigned to the pool, which affect CVPs distribution between pools
     uint32 lastUpdateBlock; // latest block when the pool params which follow was updated
-    /// @dev new slot
     uint256 accCvpPerLpt; // accumulated distributed CVPs per one deposited LP token, times 1e12
   }
+
   // scale factor for `accCvpPerLpt`
   uint256 internal constant SCALE = 1e12;
 
-  /// @dev new slot
   // The CVP TOKEN
   IERC20 public cvp;
   // Total amount of CVP tokens pended (not yet vested to users)
   uint96 public cvpVestingPool;
 
-  /// @dev new slot
   // Reservoir address
   address public reservoir;
   // Vesting duration in blocks
@@ -84,7 +79,6 @@ contract VestedLPMining is
   // The amount of CVP tokens rewarded to all pools every block
   uint96 public cvpPerBlock;
 
-  /// @dev new slot
   // The migrator contract (only the owner may assign it)
   ILpTokenMigrator public migrator;
 
