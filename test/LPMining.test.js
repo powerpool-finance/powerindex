@@ -44,11 +44,11 @@ describe('LPMining', () => {
 
   context('With ERC/LP token added to the field', () => {
     beforeEach(async () => {
-      this.lp = await MockERC20.new('LPToken', 'LP', '10000000000', { from: minter });
+      this.lp = await MockERC20.new('LPToken', 'LP', '18', '10000000000', { from: minter });
       await this.lp.transfer(alice, '1000', { from: minter });
       await this.lp.transfer(bob, '1000', { from: minter });
       await this.lp.transfer(carol, '1000', { from: minter });
-      this.lp2 = await MockERC20.new('LPToken2', 'LP2', '10000000000', { from: minter });
+      this.lp2 = await MockERC20.new('LPToken2', 'LP2', '18', '10000000000', { from: minter });
       await this.lp2.transfer(alice, '1000', { from: minter });
       await this.lp2.transfer(bob, '1000', { from: minter });
       await this.lp2.transfer(carol, '1000', { from: minter });
@@ -220,7 +220,7 @@ describe('LPMining', () => {
       assert.equal((await this.lpMining.pendingCvp(0, alice)).valueOf().toString(10), '1333');
       assert.equal((await this.lpMining.pendingCvp(1, bob)).valueOf().toString(10), '333');
 
-      this.lp3 = await MockERC20.new('LPToken3', 'LP3', '10000000000', { from: minter });
+      this.lp3 = await MockERC20.new('LPToken3', 'LP3', '18', '10000000000', { from: minter });
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp3.address), false);
       await this.lpMining.add('20', this.lp3.address, '1', true, { from: minter });
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp.address), true);
@@ -230,7 +230,7 @@ describe('LPMining', () => {
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp3.address), true);
       assert.equal(await this.lpMining.poolPidByAddress(this.lp3.address), '2');
 
-      this.lp4 = await MockERC20.new('LPToken4', 'LP4', '10000000000', { from: minter });
+      this.lp4 = await MockERC20.new('LPToken4', 'LP4', '18', '10000000000', { from: minter });
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp4.address), false);
       await this.lpMining.add('20', this.lp4.address, '1', true, { from: minter });
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp.address), true);

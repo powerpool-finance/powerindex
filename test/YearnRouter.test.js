@@ -32,7 +32,7 @@ describe('PowerIndexRouter Tests', () => {
   });
 
   it('should allow creating a proposal in YFI', async () => {
-    const yfi = await MockERC20.new('yearn.finance', 'YFI', ether('1000000'));
+    const yfi = await MockERC20.new('yearn.finance', 'YFI', '18', ether('1000000'));
     const yearnGovernance = await MockYearnGovernance.new();
 
     const poolRestrictions = await PoolRestrictions.new();
