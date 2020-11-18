@@ -61,4 +61,10 @@ contract MockVestedLPMiningMath is VestedLPMining {
     emit _UpdatedPool(p.lastUpdateBlock, p.accCvpPerLpt, cvpReward);
     return (p.lastUpdateBlock, p.accCvpPerLpt, cvpReward);
   }
+
+  function __getTotalPooledCvp() external view returns (uint96) {
+    uint192 sharedData = book[address(this)].getLatestData();
+    (uint96 totalPooledCvp, ) = _unpackData(sharedData);
+    return totalPooledCvp;
+  }
 }
