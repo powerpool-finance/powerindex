@@ -1,4 +1,3 @@
-/* global artifacts, beforeEach, contract, describe, it  */
 // Based on https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/test/math/SafeMath.test.js
 const MockSafeMath96 = artifacts.require('MockSafeMath96');
 const { BN, expectRevert } = require('@openzeppelin/test-helpers');

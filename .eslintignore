@@ -1,0 +1,15 @@
+# folders
+artifacts/
+build/
+cache/
+coverage/
+coverage-remote/
+dist/
+lib/
+node_modules/
+typechain/
+tmp/
+
+# files
+.solcover.js
+coverage.json

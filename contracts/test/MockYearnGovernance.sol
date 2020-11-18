@@ -66,7 +66,7 @@ library Math {
     }
 }
 
-// File: @openzeppelin/contracts/math/SafeMath.sol
+// File: @openzeppelin/contracts/math/SafeMathUniswap.sol
 
 /**
  * @dev Wrappers over Solidity's arithmetic operations with added overflow
@@ -577,7 +577,7 @@ contract LPTokenWrapper {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    IERC20 public vote = IERC20(0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e);
+    IERC20 public vote;
 
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
@@ -650,8 +650,8 @@ contract MockYearnGovernance is LPTokenWrapper, IRewardDistributionRecipient {
 
     mapping (uint => Proposal) public proposals;
     uint public proposalCount;
-    uint public period = 17280; // voting period in blocks ~ 17280 3 days for 15s/block
-    uint public lock = 17280; // vote lock in blocks ~ 17280 3 days for 15s/block
+    uint public period = 10; // voting period in blocks ~ 17280 3 days for 15s/block
+    uint public lock = 10; // vote lock in blocks ~ 17280 3 days for 15s/block
     uint public minimum = 1e18;
     uint public quorum = 2000;
     bool public config = true;
@@ -684,11 +684,12 @@ contract MockYearnGovernance is LPTokenWrapper, IRewardDistributionRecipient {
         lock = _lock;
     }
 
-    function initialize(uint id) public {
+    function initialize(uint id, address _governance, address _voteToken) public {
         require(config == true, "!config");
         config = false;
         proposalCount = id;
-        governance = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
+        governance = _governance;
+        vote = IERC20(_voteToken);
     }
 
     event NewProposal(uint id, address creator, uint start, uint duration, address executor);

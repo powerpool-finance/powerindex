@@ -2,16 +2,23 @@
 
 pragma solidity 0.6.12;
 
-interface WrappedPiErc20Interface {
-    function deposit(uint256 _amount) external;
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-    function withdraw(uint256 _amount) external;
+interface WrappedPiErc20Interface is IERC20 {
+  function deposit(uint256 _amount) external;
 
-    function changeRouter(address _newRouter) external;
+  function withdraw(uint256 _amount) external;
 
-    function approveToken(address _to, uint256 _amount) external;
+  function changeRouter(address _newRouter) external;
 
-    function callVoting(address voting, bytes4 signature, bytes calldata args, uint value) external;
+  function approveToken(address _to, uint256 _amount) external;
 
-    function getWrappedBalance() external returns(uint);
+  function callVoting(
+    address voting,
+    bytes4 signature,
+    bytes calldata args,
+    uint256 value
+  ) external;
+
+  function getWrappedBalance() external view returns (uint256);
 }

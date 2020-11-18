@@ -1,4 +1,3 @@
-/* global after, afterEach, artifacts, assert, before, beforeEach, contract, describe, it, web3 */
 const MockCacheCheckpoint = artifacts.require('MockDelegatableCheckpoints');
 
 const str = (bn) => bn.toString(10);
