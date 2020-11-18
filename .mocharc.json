@@ -3,6 +3,6 @@
   "exit": true,
   "extension": ["js"],
   "recursive": "test",
-  "require": ["@nomiclabs/buidler/register"],
+  "require": ["hardhat/register"],
   "timeout": 10000
 }

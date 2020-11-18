@@ -1,4 +1,4 @@
-usePlugin('@nomiclabs/buidler-truffle5');
+require('@nomiclabs/hardhat-truffle5');
 
 const pIteration = require('p-iteration');
 

@@ -1,10 +1,8 @@
-const { usePlugin } = require('@nomiclabs/buidler/config');
-
-usePlugin('@nomiclabs/buidler-ganache');
-usePlugin('@nomiclabs/buidler-truffle5');
-usePlugin('solidity-coverage');
-usePlugin('buidler-contract-sizer');
-usePlugin('buidler-gas-reporter');
+require('@nomiclabs/hardhat-ganache');
+require('@nomiclabs/hardhat-truffle5');
+require('solidity-coverage');
+require('hardhat-contract-sizer');
+require('hardhat-gas-reporter');
 require('./tasks/fetchPoolsData');
 require('./tasks/deployVestedLpMining');
 
@@ -37,7 +35,7 @@ const config = {
     alphaSort: false,
     runOnCompile: true,
   },
-  defaultNetwork: 'buidlerevm',
+  defaultNetwork: 'hardhat',
   gasReporter: {
     currency: 'USD',
     enabled: !!process.env.REPORT_GAS,
@@ -46,7 +44,7 @@ const config = {
     timeout: 20000,
   },
   networks: {
-    buidlerevm: {
+    hardhat: {
       chainId: 31337,
       accounts: testAccounts,
     },
@@ -81,11 +79,12 @@ const config = {
     sources: './contracts',
     tests: './test',
   },
-  solc: {
-    /* https://buidler.dev/buidler-evm/#solidity-optimizer-support */
-    optimizer: {
-      enabled: true,
-      runs: 200,
+  solidity: {
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
     },
     version: '0.6.12',
   },
