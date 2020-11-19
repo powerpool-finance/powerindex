@@ -41,7 +41,7 @@ const config = {
     enabled: !!process.env.REPORT_GAS,
   },
   mocha: {
-    timeout: 20000,
+    timeout: 70000,
   },
   networks: {
     hardhat: {
