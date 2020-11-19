@@ -12,3 +12,4 @@ contracts/interfaces/IUniswapV2Pair.sol
 contracts/test/uniswapv2/
 contracts/test/MockWETH.sol
 contracts/test/MockYearnGovernance.sol
+contracts/test/AragonVoting.sol

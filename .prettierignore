@@ -14,6 +14,7 @@ contracts/lib/
 contracts/test/uniswapv2/
 contracts/test/MockWETH.sol
 contracts/test/MockYearnGovernance.sol
+contracts/test/AragonVoting.sol
 
 # files
 coverage.json
