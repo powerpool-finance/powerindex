@@ -25,11 +25,11 @@ function signatureAndArgs(payload) {
 }
 
 describe('WrappedPiErc20 Unit Tests', () => {
-  let minter, bob, alice, yearnOwner;
-  let yfi, poolRestrictions, router, yfiWrapper;
+  let bob, alice;
+  let yfi, router, yfiWrapper;
 
   before(async function () {
-    [minter, bob, alice, yearnOwner] = await web3.eth.getAccounts();
+    [bob, alice] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function () {
