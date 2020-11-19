@@ -1,23 +1,16 @@
 const { expectRevert, ether } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
-const BFactory = artifacts.require('BFactory');
-const BPool = artifacts.require('BPool');
 const MockERC20 = artifacts.require('MockERC20');
-const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
-const MockErc20Migrator = artifacts.require('MockErc20Migrator');
 const PowerIndexRouter = artifacts.require('PowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexSimpleRouter = artifacts.require('PowerIndexSimpleRouter');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 
 MockERC20.numberFormat = 'String';
-MockErc20Migrator.numberFormat = 'String';
-BPool.numberFormat = 'String';
-PowerIndexPoolController.numberFormat = 'String';
 PowerIndexRouter.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 
-const { web3 } = BFactory;
+const { web3 } = MockERC20;
 
 describe('PowerIndex Router Test', () => {
   let minter, bob, alice;

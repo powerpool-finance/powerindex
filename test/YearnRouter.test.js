@@ -1,24 +1,17 @@
 const { time, ether: rEther } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
-const BFactory = artifacts.require('BFactory');
-const BPool = artifacts.require('BPool');
 const MockERC20 = artifacts.require('MockERC20');
-const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
-const MockErc20Migrator = artifacts.require('MockErc20Migrator');
 const PowerIndexRouter = artifacts.require('PowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const MockYearnGovernance = artifacts.require('MockYearnGovernance');
 
 MockERC20.numberFormat = 'String';
-MockErc20Migrator.numberFormat = 'String';
-BPool.numberFormat = 'String';
-PowerIndexPoolController.numberFormat = 'String';
 PowerIndexRouter.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 MockYearnGovernance.numberFormat = 'String';
 
-const { web3 } = BFactory;
+const { web3 } = MockERC20;
 
 function ether(value) {
   return rEther(value.toString()).toString(10);
