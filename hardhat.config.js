@@ -1,4 +1,4 @@
-require('@nomiclabs/hardhat-ganache');
+require('@powerpool/hardhat-ganache');
 require('@nomiclabs/hardhat-truffle5');
 require('solidity-coverage');
 require('hardhat-contract-sizer');
@@ -47,6 +47,12 @@ const config = {
     hardhat: {
       chainId: 31337,
       accounts: testAccounts,
+      allowUnlimitedContractSize: true
+    },
+    ganache: {
+      url: 'http://127.0.0.1:8945',
+      defaultBalanceEther: 1e9,
+      hardfork: 'muirGlacier',
     },
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
@@ -66,9 +72,6 @@ const config = {
     coverage: {
       url: 'http://127.0.0.1:8555',
     },
-    ganache: {
-      url: 'http://127.0.0.1:8545',
-    },
   },
   paths: {
     artifacts: './artifacts',
@@ -82,7 +85,7 @@ const config = {
   solidity: {
     settings: {
       optimizer: {
-        enabled: true,
+        enabled: process.env.COMPILE_TARGET === 'release',
         runs: 200,
       },
     },

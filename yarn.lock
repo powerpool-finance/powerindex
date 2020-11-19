@@ -476,15 +476,6 @@
   resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-ethers/-/hardhat-ethers-2.0.0.tgz#ebab032b3aed03945ea560f56bb67aec56a30cbc"
   integrity sha512-fIi6XP9PgKqwSNVcLDr6S5hvGlc21PendaLD5eGdXEXc9aYQ0OJX8Mk3evs+p78x7W9n9U3ZcKtTiGc1+YScDw==
 
-"@nomiclabs/hardhat-ganache@^2.0.0":
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-ganache/-/hardhat-ganache-2.0.0.tgz#92ec922af01de36b39042db94cb0b5ca91eb9616"
-  integrity sha512-JJI4+5bHZUoeuIZL42usxp+0i/krYnoApzzA2Xii1P7DwrZHwFBa2OCtR1sUq5z3VTSTvQKrJ1d2/Y6CoQGTKQ==
-  dependencies:
-    debug "^4.1.1"
-    ganache-core "^2.7.0"
-    ts-interface-checker "^0.1.9"
-
 "@nomiclabs/hardhat-truffle5@^2.0.0":
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-truffle5/-/hardhat-truffle5-2.0.0.tgz#1363b7f4f90e3d5b049d22e5e6d3519ba1b91fdf"
@@ -604,6 +595,15 @@
     web3-eth "1.2.2"
     web3-eth-contract "1.2.2"
     web3-utils "1.2.2"
+
+"@powerpool/hardhat-ganache@^2.0.0":
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/@powerpool/hardhat-ganache/-/hardhat-ganache-2.0.1.tgz#8d3659e7b47ded2a4f081e6e9edb944402bf6e0b"
+  integrity sha512-QLncT/v2U+DrXVBkTFV85N4WkWu2rF5Vpvax3xQKajk0MDRQC9c5/4SLFSPYnKPEfYkLvEgYr4llU/np8MuE6g==
+  dependencies:
+    debug "^4.1.1"
+    ganache-core "^2.7.0"
+    ts-interface-checker "^0.1.9"
 
 "@resolver-engine/core@^0.2.1":
   version "0.2.1"
