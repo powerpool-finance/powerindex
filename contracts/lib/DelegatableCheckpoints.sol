@@ -14,16 +14,14 @@ library DelegatableCheckpoints {
 
     /// @dev A set of checkpoints and a 'delegatee'
     struct Record {
-        /// new slot
         uint32 numCheckpoints;
         uint32 lastCheckpointBlock;
         address delegatee;
         // uint32 __reserved;
 
-        /// new slot
         // Checkpoints by IDs
         mapping (uint32 => Checkpoint) checkpoints;
-        // @dev Checkpoint IDs get counted from 1 (but not from 0) -
+        // Checkpoint IDs get counted from 1 (but not from 0) -
         // the 1st checkpoint has ID of 1, and the last checkpoint' ID is `numCheckpoints`
     }
 
