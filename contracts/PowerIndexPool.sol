@@ -119,6 +119,10 @@ contract PowerIndexPool is BPool {
     external
     _logs_ // _lock_  Bind does not lock because it jumps to `rebind` and `setDynamicWeight`, which does
   {
+    uint tokensLen = _tokens.length;
+    if (_tokens.length >= MAX_BOUND_TOKENS - 1) {
+
+    }
     super.bind(token, balance, MIN_WEIGHT);
 
     setDynamicWeight(token, targetDenorm, fromTimestamp, targetTimestamp);
