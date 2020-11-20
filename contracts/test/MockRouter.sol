@@ -7,6 +7,9 @@ import "../powerindex-router/PowerIndexSimpleRouter.sol";
 contract MockRouter is PowerIndexSimpleRouter {
   event MockWrapperCallback(uint256 withdrawAmount);
 
+  constructor(address _poolRestrictions) public PowerIndexSimpleRouter(_poolRestrictions) {
+  }
+
   function wrapperCallback(uint256 _withdrawAmount) external virtual override {
     emit MockWrapperCallback(_withdrawAmount);
   }

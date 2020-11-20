@@ -1,82 +1,134 @@
 [
-  {
-    "tokenAddress": "0x80fB784B7eD66730e8b1DBd9820aFD29931aab03",
-    "tokenSymbol": "LEND",
-    "balancerBalance": 183277.82826995128,
-    "uniswapPair": {
-      "address": "0xaB3F9bF1D81ddb224a2014e98B238638824bCf20",
-      "tokenReserve": 2802188.266621945,
-      "ethReserve": 2554.72532699901
-    }
-  },
-  {
-    "tokenAddress": "0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e",
-    "tokenSymbol": "YFI",
-    "balancerBalance": 4.782531821234806,
-    "uniswapPair": {
-      "address": "0x2fDbAdf3C4D5A8666Bc06645B8358ab803996E28",
-      "tokenReserve": 417.0741505297207,
-      "ethReserve": 14471.987525871662
-    }
-  },
-  {
-    "tokenAddress": "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F",
-    "tokenSymbol": "SNX",
-    "balancerBalance": 17672.207859828817,
-    "uniswapPair": {
-      "address": "0x43AE24960e5534731Fc831386c07755A2dc33D47",
-      "tokenReserve": 418483.7383855132,
-      "ethReserve": 3987.7523557588506
-    }
-  },
-  {
-    "tokenAddress": "0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1",
-    "tokenSymbol": "CVP",
-    "balancerBalance": 42230.08989265705,
-    "uniswapPair": {
-      "address": "0x12D4444f96C644385D8ab355F6DDf801315b6254",
-      "tokenReserve": 570183.0600218237,
-      "ethReserve": 2257.4204268307262
-    }
-  },
-  {
-    "tokenAddress": "0xc00e94Cb662C3520282E6f5717214004A7f26888",
-    "tokenSymbol": "COMP",
-    "balancerBalance": 665.7880788656614,
-    "uniswapPair": {
-      "address": "0xCFfDdeD873554F362Ac02f8Fb1f02E5ada10516f",
-      "tokenReserve": 7962.420856070089,
-      "ethReserve": 2018.3575765173127
-    }
-  },
-  {
-    "tokenAddress": "0x0d438F3b5175Bebc262bF23753C1E53d03432bDE",
-    "tokenSymbol": "wNXM",
-    "balancerBalance": 2459.2824095519336,
-    "uniswapPair": {
-      "address": "0x23bFf8ca20AAc06EFDf23cEe3B8ae296A30Dfd27",
-      "tokenReserve": 39951.561181093784,
-      "ethReserve": 2704.795785272123
-    }
-  },
-  {
-    "tokenAddress": "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2",
-    "tokenSymbol": "MKR",
-    "balancerBalance": 110.6480185704023,
-    "uniswapPair": {
-      "address": "0xC2aDdA861F89bBB333c90c492cB837741916A225",
-      "tokenReserve": 5326.771092846547,
-      "ethReserve": 8020.625768452451
-    }
-  },
-  {
-    "tokenAddress": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
-    "tokenSymbol": "UNI",
-    "balancerBalance": 21464.91628471451,
-    "uniswapPair": {
-      "address": "0xd3d2E2692501A5c9Ca623199D38826e513033a17",
-      "tokenReserve": 7821694.501102348,
-      "ethReserve": 60286.034868891875
-    }
+ {
+  "tokenAddress": "0x80fB784B7eD66730e8b1DBd9820aFD29931aab03",
+  "tokenSymbol": "LEND",
+  "tokenDecimals": "18",
+  "balancerBalance": "111428770669030136434599",
+  "uniswapPair": {
+   "address": "0xaB3F9bF1D81ddb224a2014e98B238638824bCf20",
+   "tokenReserve": "817635578870797641604044",
+   "ethReserve": "1206055139961787773165"
   }
+ },
+ {
+  "tokenAddress": "0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e",
+  "tokenSymbol": "YFI",
+  "tokenDecimals": "18",
+  "balancerBalance": "3959593673065414270",
+  "uniswapPair": {
+   "address": "0x2fDbAdf3C4D5A8666Bc06645B8358ab803996E28",
+   "tokenReserve": "320458170903657503174",
+   "ethReserve": "13268511342183693777978"
+  }
+ },
+ {
+  "tokenAddress": "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F",
+  "tokenSymbol": "SNX",
+  "tokenDecimals": "18",
+  "balancerBalance": "16761527476699646278392",
+  "uniswapPair": {
+   "address": "0x43AE24960e5534731Fc831386c07755A2dc33D47",
+   "tokenReserve": "468931313430724390247663",
+   "ethReserve": "4629285360903992097163"
+  }
+ },
+ {
+  "tokenAddress": "0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1",
+  "tokenSymbol": "CVP",
+  "tokenDecimals": "18",
+  "balancerBalance": "39550899706321655945515",
+  "uniswapPair": {
+   "address": "0x12D4444f96C644385D8ab355F6DDf801315b6254",
+   "tokenReserve": "543919683796672905723375",
+   "ethReserve": "2298976587449515746470"
+  }
+ },
+ {
+  "tokenAddress": "0xc00e94Cb662C3520282E6f5717214004A7f26888",
+  "tokenSymbol": "COMP",
+  "tokenDecimals": "18",
+  "balancerBalance": "652765256209606314705",
+  "uniswapPair": {
+   "address": "0xCFfDdeD873554F362Ac02f8Fb1f02E5ada10516f",
+   "tokenReserve": "7988993350704457452278",
+   "ethReserve": "2028641270840939205259"
+  }
+ },
+ {
+  "tokenAddress": "0x0d438F3b5175Bebc262bF23753C1E53d03432bDE",
+  "tokenSymbol": "wNXM",
+  "tokenDecimals": "18",
+  "balancerBalance": "2964592024444247433496",
+  "uniswapPair": {
+   "address": "0x23bFf8ca20AAc06EFDf23cEe3B8ae296A30Dfd27",
+   "tokenReserve": "13610197531760839361084",
+   "ethReserve": "757806601626571822278"
+  }
+ },
+ {
+  "tokenAddress": "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2",
+  "tokenSymbol": "MKR",
+  "tokenDecimals": "18",
+  "balancerBalance": "150341709877369308751",
+  "uniswapPair": {
+   "address": "0xC2aDdA861F89bBB333c90c492cB837741916A225",
+   "tokenReserve": "6191650924406374690864",
+   "ethReserve": "6741893463689915867501"
+  }
+ },
+ {
+  "tokenAddress": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+  "tokenSymbol": "UNI",
+  "tokenDecimals": "18",
+  "balancerBalance": "21963232436018472390818",
+  "uniswapPair": {
+   "address": "0xd3d2E2692501A5c9Ca623199D38826e513033a17",
+   "tokenReserve": "8022998491756297942156138",
+   "ethReserve": "60307082007107581682153"
+  }
+ },
+ {
+  "tokenAddress": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+  "tokenSymbol": "USDC",
+  "tokenDecimals": "6",
+  "balancerBalance": "0",
+  "uniswapPair": {
+   "address": "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc",
+   "tokenReserve": "90977725677050",
+   "ethReserve": "189107730983673871179295"
+  }
+ },
+ {
+  "tokenAddress": "0x6b175474e89094c44da98b954eedeac495271d0f",
+  "tokenSymbol": "DAI",
+  "tokenDecimals": "18",
+  "balancerBalance": "0",
+  "uniswapPair": {
+   "address": "0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11",
+   "tokenReserve": "111669611974712733006075560",
+   "ethReserve": "232348333921504115057833"
+  }
+ },
+ {
+  "tokenAddress": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+  "tokenSymbol": "USDT",
+  "tokenDecimals": "6",
+  "balancerBalance": "0",
+  "uniswapPair": {
+   "address": "0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852",
+   "tokenReserve": "234329247640859152647011",
+   "ethReserve": "112932334980485"
+  }
+ },
+ {
+  "tokenAddress": "0x4Fabb145d64652a948d72533023f6E7A623C7C53",
+  "tokenSymbol": "BUSD",
+  "tokenDecimals": "18",
+  "balancerBalance": "0",
+  "uniswapPair": {
+   "address": "0xC2923b8a9683556A3640ccc2961B2F52B5C4459A",
+   "tokenReserve": "56754033689155048185534",
+   "ethReserve": "120523072826867308025"
+  }
+ }
 ]

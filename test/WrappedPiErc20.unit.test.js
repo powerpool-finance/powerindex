@@ -24,7 +24,7 @@ function signatureAndArgs(payload) {
   }
 }
 
-describe('WrappedPiErc20 Unit Tests', () => {
+describe.only('WrappedPiErc20 Unit Tests', () => {
   let bob, alice;
   let yfi, router, yfiWrapper;
 
@@ -33,8 +33,8 @@ describe('WrappedPiErc20 Unit Tests', () => {
   });
 
   beforeEach(async function () {
-    yfi = await MockERC20.new('yearn.finance', 'YFI', ether('1000000'));
-    router = await MockRouter.new();
+    yfi = await MockERC20.new('yearn.finance', 'YFI', 18, ether('1000000'));
+    router = await MockRouter.new(alice);
     yfiWrapper = await WrappedPiErc20.new(yfi.address, router.address, 'wrapped.yearn.finance', 'WYFI');
   });
 

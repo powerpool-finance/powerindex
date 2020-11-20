@@ -56,11 +56,11 @@ describe('PowerIndexWrapper', () => {
   const communityJoinFee = ether('0.04');
   const communityExitFee = ether('0.07');
 
-  let tokens, pool, poolWrapper, poolController, poolRouter;
+  let tokens, pool, poolWrapper, poolController, poolRouter, poolRestrictions;
 
   let minter, alice, communityWallet;
   before(async function () {
-    [minter, alice, communityWallet] = await web3.eth.getAccounts();
+    [minter, alice, communityWallet, poolRestrictions] = await web3.eth.getAccounts();
   });
 
   beforeEach(async () => {
@@ -71,7 +71,7 @@ describe('PowerIndexWrapper', () => {
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: minter });
 
     this.token1 = await MockCvp.new();
-    this.token2 = await MockERC20.new('My Token 2', 'MT2', ether('1000000'));
+    this.token2 = await MockERC20.new('My Token 2', 'MT2', '18', ether('1000000'));
     tokens = [this.token1.address, this.token2.address];
 
     await this.token1.approve(this.bActions.address, balances[0]);
@@ -94,7 +94,7 @@ describe('PowerIndexWrapper', () => {
 
     poolWrapper = await PowerIndexWrapper.new(pool.address);
     poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address);
-    poolRouter = await PowerIndexSimpleRouter.new();
+    poolRouter = await PowerIndexSimpleRouter.new(poolRestrictions);
 
     await pool.setWrapper(poolWrapper.address, true);
 

@@ -10,7 +10,7 @@ const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const MockErc20Migrator = artifacts.require('MockErc20Migrator');
-const PowerIndexRouter = artifacts.require('PowerIndexRouter');
+const PowerIndexRouter = artifacts.require('PowerIndexSimpleRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 
@@ -86,7 +86,7 @@ describe('PowerIndexPoolController', () => {
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: minter });
 
     this.token1 = await MockCvp.new();
-    this.token2 = await MockERC20.new('My Token 2', 'MT2', ether('1000000'));
+    this.token2 = await MockERC20.new('My Token 2', 'MT2', '18', ether('1000000'));
     tokens = [this.token1.address, this.token2.address];
 
     await this.token1.approve(this.bActions.address, balances[0]);
@@ -140,7 +140,7 @@ describe('PowerIndexPoolController', () => {
   });
 
   it('should allow swapping a token with a new version', async () => {
-    this.token3 = await MockERC20.new('My Token 3', 'MT3', ether('1000000'));
+    this.token3 = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
     this.migrator = await MockErc20Migrator.new(this.token2.address, this.token3.address, alice);
     const amount = await pool.getBalance(this.token2.address);
     await this.token3.transfer(this.migrator.address, ether('1000000'));

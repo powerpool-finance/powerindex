@@ -95,7 +95,7 @@ describe('PowerIndexPool', () => {
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: controller });
 
     this.token1 = await MockCvp.new();
-    this.token2 = await MockERC20.new('My Token 2', 'MT2', ether('1000000'));
+    this.token2 = await MockERC20.new('My Token 2', 'MT2', '18', ether('1000000'));
     tokens = [this.token1.address, this.token2.address];
 
     fromTimestamps = [await getTimestamp(100), await getTimestamp(100)].map(w => w.toString());
@@ -448,7 +448,7 @@ describe('PowerIndexPool', () => {
       fromTimestamp = await getTimestamp(100);
       targetTimestamp = await getTimestamp(11000);
 
-      this.token3 = await MockERC20.new('My Token 3', 'MT3', ether('1000000'));
+      this.token3 = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
       await this.token3.approve(pool.address, initialBalance);
       await pool.bind(this.token3.address, initialBalance, targetWeight, fromTimestamp, targetTimestamp);
 

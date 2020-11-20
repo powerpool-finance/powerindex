@@ -1,7 +1,7 @@
 const { time, ether: rEther } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
-const PowerIndexRouter = artifacts.require('PowerIndexRouter');
+const PowerIndexRouter = artifacts.require('YearnPowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const MockYearnGovernance = artifacts.require('MockYearnGovernance');
@@ -17,7 +17,7 @@ function ether(value) {
   return rEther(value.toString()).toString(10);
 }
 
-describe('PowerIndexRouter Tests', () => {
+describe('YearnRouter Tests', () => {
   let minter, bob, alice, yearnOwner;
 
   before(async function () {
@@ -25,7 +25,7 @@ describe('PowerIndexRouter Tests', () => {
   });
 
   it('should allow creating a proposal in YFI', async () => {
-    const yfi = await MockERC20.new('yearn.finance', 'YFI', ether('1000000'));
+    const yfi = await MockERC20.new('yearn.finance', 'YFI', '18', ether('1000000'));
     const yearnGovernance = await MockYearnGovernance.new();
 
     const poolRestrictions = await PoolRestrictions.new();
@@ -33,7 +33,7 @@ describe('PowerIndexRouter Tests', () => {
     const yfiWrapper = await WrappedPiErc20.new(yfi.address, router.address, 'wrapped.yearn.finance', 'WYFI');
 
     await yearnGovernance.initialize(0, yearnOwner, yfi.address);
-    await router.setVotingForWrappedToken(yfiWrapper.address, yearnGovernance.address);
+    await router.setVotingAndStackingForWrappedToken(yfiWrapper.address, yearnGovernance.address, yearnGovernance.address);
     await router.setReserveRatioForWrappedToken(yfiWrapper.address, ether('0.2'));
 
     assert.equal(await router.owner(), minter);
