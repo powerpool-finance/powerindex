@@ -102,6 +102,8 @@ contract BPool is BToken, BMath, BPoolInterface {
     mapping(address => Record) internal _records;
     uint internal _totalWeight;
 
+    mapping(address => uint256) internal _lastSwapBlock;
+
     constructor(string memory name, string memory symbol) public {
         _name = name;
         _symbol = symbol;
@@ -463,6 +465,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
+        _preventSameTxOrigin();
         _onlyWrapperOrNotWrapperMode();
         _requireContractIsFinalized();
 
@@ -497,6 +500,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
+        _preventSameTxOrigin();
         _onlyWrapperOrNotWrapperMode();
         _requireContractIsFinalized();
 
@@ -540,6 +544,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint tokenAmountOut, uint spotPriceAfter)
     {
+        _preventSameTxOrigin();
         _onlyWrapperOrNotWrapperMode();
         _requireTokenIsBound(tokenIn);
         _requireTokenIsBound(tokenOut);
@@ -613,6 +618,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint tokenAmountIn, uint spotPriceAfter)
     {
+        _preventSameTxOrigin();
         _onlyWrapperOrNotWrapperMode();
         _requireTokenIsBound(tokenIn);
         _requireTokenIsBound(tokenOut);
@@ -682,6 +688,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         returns (uint poolAmountOut)
 
     {
+        _preventSameTxOrigin();
         _requireContractIsFinalized();
         _onlyWrapperOrNotWrapperMode();
         _requireTokenIsBound(tokenIn);
@@ -724,6 +731,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint tokenAmountIn)
     {
+        _preventSameTxOrigin();
         _requireContractIsFinalized();
         _onlyWrapperOrNotWrapperMode();
         _requireTokenIsBound(tokenIn);
@@ -768,6 +776,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint tokenAmountOut)
     {
+        _preventSameTxOrigin();
         _requireContractIsFinalized();
         _onlyWrapperOrNotWrapperMode();
         _requireTokenIsBound(tokenOut);
@@ -811,6 +820,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint poolAmountIn)
     {
+        _preventSameTxOrigin();
         _requireContractIsFinalized();
         _onlyWrapperOrNotWrapperMode();
         _requireTokenIsBound(tokenOut);
@@ -948,6 +958,13 @@ contract BPool is BToken, BMath, BPoolInterface {
         internal view
     {
         require(!_wrapperMode || msg.sender == _wrapper, "ONLY_WRAPPER");
+    }
+
+    function _preventSameTxOrigin()
+      internal
+    {
+      require(block.number > _lastSwapBlock[tx.origin], "SAME_TX_ORIGIN");
+      _lastSwapBlock[tx.origin] = block.number;
     }
 
     function _getDenormWeight(address token)
