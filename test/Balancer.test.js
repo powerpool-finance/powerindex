@@ -7,6 +7,8 @@ const MockERC20 = artifacts.require('MockERC20');
 const MockVoting = artifacts.require('MockVoting');
 const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
+const EthPiptSwap = artifacts.require('EthPiptSwap');
+const MockBPoolClient = artifacts.require('MockBPoolClient');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
@@ -536,6 +538,15 @@ describe('Balancer', () => {
         addBN(token2AliceBalanceBefore, expectedSwapOutWithoutFee).toString(),
       );
     });
+  });
+
+  it.only('pool should prevent same tx origins calls in same block', async () => {
+    const ethPiptSwap = await EthPiptSwap.new(this.weth.address, this.token1.address, pool.address, minter);
+    const mockClient = await MockBPoolClient.new();
+    await expectRevert(
+      mockClient.callBPoolTwice(ethPiptSwap.address, { from: minter, value: ether('1') }),
+      'SAME_TX_ORIGIN',
+    );
   });
 
   it('pool restrictions should work properly', async () => {
