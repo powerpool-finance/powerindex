@@ -10,7 +10,7 @@ const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const MockErc20Migrator = artifacts.require('MockErc20Migrator');
-const PowerIndexRouter = artifacts.require('PowerIndexRouter');
+const PowerIndexRouter = artifacts.require('PowerIndexSimpleRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 

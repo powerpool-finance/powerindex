@@ -5,7 +5,6 @@ const BPool = artifacts.require('BPool');
 const MockERC20 = artifacts.require('MockERC20');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const MockErc20Migrator = artifacts.require('MockErc20Migrator');
-const PowerIndexRouter = artifacts.require('PowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexSimpleRouter = artifacts.require('PowerIndexSimpleRouter');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
@@ -14,7 +13,6 @@ MockERC20.numberFormat = 'String';
 MockErc20Migrator.numberFormat = 'String';
 BPool.numberFormat = 'String';
 PowerIndexPoolController.numberFormat = 'String';
-PowerIndexRouter.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 
 const { web3 } = BFactory;
@@ -28,10 +26,10 @@ describe('PowerIndex Router Test', () => {
 
   it('should allow swapping a token with a new version', async () => {
     const token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
-    const router = await PowerIndexSimpleRouter.new();
-    const wrapper = await WrappedPiErc20.new(token.address, router.address, 'WToken', 'WTKN');
     const poolRestrictions = await PoolRestrictions.new();
-    const router2 = await PowerIndexRouter.new(poolRestrictions.address);
+    const router = await PowerIndexSimpleRouter.new(poolRestrictions.address);
+    const wrapper = await WrappedPiErc20.new(token.address, router.address, 'WToken', 'WTKN');
+    const router2 = await PowerIndexSimpleRouter.new(poolRestrictions.address);
 
     assert.equal(await router.owner(), minter);
 
