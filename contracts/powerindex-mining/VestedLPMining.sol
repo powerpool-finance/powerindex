@@ -93,6 +93,8 @@ contract VestedLPMining is
 
   mapping(address => address) public cvpPoolByMetaPool;
 
+  mapping(address => uint256) public lastSwapBlock;
+
   /// @inheritdoc IVestedLPMining
   function initialize(
     IERC20 _cvp,
@@ -258,6 +260,7 @@ contract VestedLPMining is
   /// @inheritdoc IVestedLPMining
   function deposit(uint256 _pid, uint256 _amount) public override nonReentrant {
     _validatePoolId(_pid);
+    _preventSameTxOrigin();
 
     Pool storage pool = pools[_pid];
     User storage user = users[_pid][msg.sender];
@@ -278,6 +281,7 @@ contract VestedLPMining is
   /// @inheritdoc IVestedLPMining
   function withdraw(uint256 _pid, uint256 _amount) public override nonReentrant {
     _validatePoolId(_pid);
+    _preventSameTxOrigin();
 
     Pool storage pool = pools[_pid];
     User storage user = users[_pid][msg.sender];
@@ -299,6 +303,7 @@ contract VestedLPMining is
   /// @inheritdoc IVestedLPMining
   function emergencyWithdraw(uint256 _pid) public override nonReentrant {
     _validatePoolId(_pid);
+    _preventSameTxOrigin();
 
     Pool storage pool = pools[_pid];
     User storage user = users[_pid][msg.sender];
@@ -572,5 +577,10 @@ contract VestedLPMining is
 
   function _currBlock() private view returns (uint32) {
     return SafeMath32.fromUint(block.number, "VLPMining::_currBlock:overflow");
+  }
+
+  function _preventSameTxOrigin() internal {
+    require(block.number > lastSwapBlock[tx.origin], "SAME_TX_ORIGIN");
+    lastSwapBlock[tx.origin] = block.number;
   }
 }
