@@ -24,7 +24,7 @@ function signatureAndArgs(payload) {
   }
 }
 
-describe.only('WrappedPiErc20 Unit Tests', () => {
+describe('WrappedPiErc20 Unit Tests', () => {
   let bob, alice;
   let yfi, router, yfiWrapper;
 
