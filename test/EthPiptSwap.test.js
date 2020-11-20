@@ -13,6 +13,7 @@ const WETH = artifacts.require('MockWETH');
 const EthPiptSwap = artifacts.require('EthPiptSwap');
 const Erc20PiptSwap = artifacts.require('Erc20PiptSwap');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
+const MockBPoolClient = artifacts.require('MockBPoolClient');
 
 MockERC20.numberFormat = 'String';
 UniswapV2Pair.numberFormat = 'String';
@@ -387,5 +388,31 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
       assert.equal(addBN(bobBalanceBefore, swapPiptToEthInputs.totalErc20Out), await usdcToken.balanceOf(bob));
       assert.equal(await pool.balanceOf(bob), '0');
     });
+
+    it('BPool should prevent double swap in same transaction by EthPiptSwap', async () => {
+      await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('200').toString(10)], { from: minter });
+
+      const ethPiptSwap = await EthPiptSwap.new(this.weth.address, cvp.address, pool.address, feeManager, {
+        from: minter,
+      });
+
+      await ethPiptSwap.setUniswapFactoryAllowed(
+        [this.uniswapFactory.address],
+        [true],
+        { from: minter },
+      );
+
+      await ethPiptSwap.fetchUnswapPairsFromFactory(
+        this.uniswapFactory.address,
+        tokens.map(t => t.address),
+        { from: bob },
+      )
+
+      const mockClient = await MockBPoolClient.new();
+      await expectRevert(
+        mockClient.callBPoolTwice(ethPiptSwap.address, { from: minter, value: ether('1') }),
+        'SAME_TX_ORIGIN',
+      );
+    })
   });
 });
