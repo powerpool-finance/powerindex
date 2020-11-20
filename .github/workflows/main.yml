@@ -34,8 +34,8 @@ jobs:
       - run: yarn
       - run: yarn run lint:sol
       - run: yarn run lint:js
-      - run: yarn compile-release
-      - run: yarn test-ganache
+      - run: yarn compile
+      - run: yarn test
 
   coverage:
     strategy:
