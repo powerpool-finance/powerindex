@@ -1,4 +1,4 @@
-const { time, ether: rEther } = require('@openzeppelin/test-helpers');
+const { ether: rEther } = require('@openzeppelin/test-helpers');
 const contract = require('@truffle/contract');
 const fs = require('fs');
 const assert = require('chai').assert;
@@ -27,10 +27,10 @@ function ether(value) {
 
 //TODO: resolve "Smart contract depositors not allowed" revert
 describe.skip('CrvRouter Tests', () => {
-  let minter, bob, alice, yearnOwner;
+  let minter, alice;
 
   before(async function () {
-    [minter, bob, alice, yearnOwner] = await web3.eth.getAccounts();
+    [minter, alice] = await web3.eth.getAccounts();
   });
 
   it('should correctly vote for CRV voting', async () => {
@@ -73,7 +73,7 @@ describe.skip('CrvRouter Tests', () => {
     await crv.approve(crvWrapper.address, ether('10000'), { from: alice });
     const res = await crvWrapper.deposit(ether('10000'), { from: alice });
     const logCallVoting = WrappedPiErc20.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'CallVoting')[0];
-    console.log("logCallVoting", logCallVoting);
+    console.log('logCallVoting', logCallVoting);
 
     //
     // assert.equal(await crvWrapper.totalSupply(), ether('10000'));
