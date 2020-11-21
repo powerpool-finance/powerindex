@@ -85,8 +85,8 @@ const config = {
   solidity: {
     settings: {
       optimizer: {
-        enabled: process.env.COMPILE_TARGET === 'release',
-        runs: 200,
+        enabled: true,
+        runs: 1,
       },
     },
     version: '0.6.12',

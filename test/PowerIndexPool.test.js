@@ -52,12 +52,13 @@ function isBNHigher(bn1, bn2) {
   return toBN(bn1.toString(10)).gt(toBN(bn2.toString(10)));
 }
 
-function assertEqualWithAccuracy(bn1, bn2, accuracyWei = '30', message = '') {
+function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei, message = '') {
   bn1 = toBN(bn1.toString(10));
   bn2 = toBN(bn2.toString(10));
   const bn1GreaterThenBn2 = bn1.gt(bn2);
   let diff = bn1GreaterThenBn2 ? bn1.sub(bn2) : bn2.sub(bn1);
-  assert.equal(diff.lte(toBN(accuracyWei)), true, message);
+  let diffPercent = divScalarBN(diff, bn1);
+  assert.equal(toBN(diffPercent).lte(toBN(accuracyPercentWei)), true, message);
 }
 
 async function getTimestamp(shift = 0) {
@@ -222,10 +223,10 @@ describe('PowerIndexPool', () => {
 
       const expectedSwapOut = await this.calcOutGivenIn(_tokenFrom, _tokenTo, amountAfterCommunitySwapFee);
       // console.log('expectedSwapOut', web3.utils.fromWei(expectedSwapOut, 'ether'));
-      console.log('await pool.getBalance(_tokenFrom)', await pool.getBalance(_tokenFrom), 'amountToSwap', amountToSwap);
-      console.log('await pool.getBalance(_tokenTo)', await pool.getBalance(_tokenTo), 'expectedSwapOut', expectedSwapOut);
-      console.log('await getDenormWeight(_tokenFrom, await getTimestamp(1))', await getDenormWeight(_tokenFrom, await getTimestamp(1)));
-      console.log('await getDenormWeight(_tokenTo, await getTimestamp(1))', await getDenormWeight(_tokenTo, await getTimestamp(1)));
+      // console.log('await pool.getBalance(_tokenFrom)', await pool.getBalance(_tokenFrom), 'amountToSwap', amountToSwap);
+      // console.log('await pool.getBalance(_tokenTo)', await pool.getBalance(_tokenTo), 'expectedSwapOut', expectedSwapOut);
+      // console.log('await getDenormWeight(_tokenFrom, await getTimestamp(1))', await getDenormWeight(_tokenFrom, await getTimestamp(1)));
+      // console.log('await getDenormWeight(_tokenTo, await getTimestamp(1))', await getDenormWeight(_tokenTo, await getTimestamp(1)));
       const price = (
         await pool.calcSpotPrice(
           addBN(await pool.getBalance(_tokenFrom), amountToSwap),
@@ -358,7 +359,7 @@ describe('PowerIndexPool', () => {
       await this.exitswapExternAmountOut(this.token2, divScalarBN(token2BalanceNeedInWithFee, ether('5')));
 
       const amountToSwapFixed = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
-      await assertEqualWithAccuracy(amountToSwapBefore, amountToSwapFixed, ether('0.003'));
+      await assertEqualWithAccuracy(amountToSwapBefore, amountToSwapFixed, ether('0.015'));
     });
 
     it('balances ratio should be restored by swapExactAmountIn', async () => {
@@ -371,7 +372,7 @@ describe('PowerIndexPool', () => {
       await this.multihopBatchSwapExactIn(tokens[0], tokens[1], divScalarBN(token1BalanceNeedInWithFee, ether('4')));
 
       const amountToSwapFixed = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
-      await assertEqualWithAccuracy(amountToSwapBefore, amountToSwapFixed, ether('0.003'));
+      await assertEqualWithAccuracy(amountToSwapBefore, amountToSwapFixed, ether('0.015'));
     });
   });
 
@@ -448,7 +449,7 @@ describe('PowerIndexPool', () => {
 
       const token1BalanceNeedInWithFee = ether('188000');
 
-      await this.joinPool([this.token1, this.token2], token1BalanceNeedInWithFee);
+      await this.joinPool([this.token1.address, this.token2.address], token1BalanceNeedInWithFee);
 
       fromTimestamp = await getTimestamp(100);
       targetTimestamp = await getTimestamp(11000);
@@ -689,7 +690,7 @@ describe('PowerIndexPool', () => {
     });
   });
 
-  describe.only('8 tokens', () => {
+  describe('8 tokens', () => {
     const b = ether('0.001');
     const tw = ether('6.25');
     let fromTimestamp, targetTimestamp;
@@ -774,14 +775,19 @@ describe('PowerIndexPool', () => {
 
       assert.equal(await pool.isBound(newToken.address), true);
 
-      assert.equal(
+      assertEqualWithAccuracy(
         await this.calcPoolOutGivenSingleIn(newToken.address, ether('0.0001')),
-        ether('0.003722400198')
+        ether('0.003722400198'),
+        ether('0.01')
       );
-      assert.equal(
+      assertEqualWithAccuracy(
         await this.calcPoolOutGivenSingleIn(oldTokenAddress, ether('0.0001')),
-        ether('0.154882811838447')
+        ether('0.154882811838447'),
+        ether('0.01')
       );
+
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('0.001'), ether('0.01'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('150400.008'), ether('0.01'));
 
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0001'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0001'));
@@ -792,6 +798,9 @@ describe('PowerIndexPool', () => {
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.001'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0015'));
 
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('0.005275'), ether('0.01'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('150400.007964752950931892'), ether('0.01'));
+
       await time.increase(11000 / 3);
 
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.002'));
@@ -800,6 +809,9 @@ describe('PowerIndexPool', () => {
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.005'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.007'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.01'));
+
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('0.0333'), ether('0.01'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('60987.690675181463841264'), ether('0.01'));
 
       await time.increase(11000 / 3);
 
@@ -813,19 +825,56 @@ describe('PowerIndexPool', () => {
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.2'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.3'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.4'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.6'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.8'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('1'));
 
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('3.57205'), ether('0.01'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('5.06328129221017354'), ether('0.01'));
+
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('1.2'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('1.5'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('2'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('2.5'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('5'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('7'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('10'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('15'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('20'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('30'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('45'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('60'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('90'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('100'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('150'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('200'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('300'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('500'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('750'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('1000'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('1500'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('2000'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('2500'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('3500'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('5000'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('7500'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('10000'));
+
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('33528.31205'), ether('0.01'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('0.000000032762959096'), ether('0.01'));
+
       await time.increase(11000 / 3);
 
-      assert.equal(
-        await this.calcPoolOutGivenSingleIn(oldTokenAddress, ether('0.0001')),
-        ether('0.0000000225600012')
+      assertEqualWithAccuracy(
+        await this.calcPoolOutGivenSingleIn(oldTokenAddress, ether('0.00000001')),
+        ether('0.011361611404341'),
+        ether('0.01')
       );
 
-      assert.equal(
+      assertEqualWithAccuracy(
         await this.calcPoolOutGivenSingleIn(newToken.address, ether('0.0001')),
-        ether('37146.5837496710892441')
+        ether('0.6947673398357076'),
+        ether('0.01')
       );
     });
   });
