@@ -133,36 +133,37 @@ describe('PowerIndexPool Unit', () => {
         pool.setDynamicWeight(tokens[0], ether('40'), '1', '2', { from: controller }),
         'CANT_SET_PAST_TIMESTAMP',
       );
-      //TODO: figure out why MAX_WEIGHT_PER_SECOND require message not working in buidler
-      await expectRevert.unspecified(
+      await expectRevert(
         pool.setDynamicWeight(tokens[0], ether('40'), fromTimestamps[0], parseInt(fromTimestamps[0]) + 100, {
           from: controller,
         }),
+        'MAX_WEIGHT_PER_SECOND'
       );
-      //TODO: figure out why MIN_WEIGHT_PER_SECOND require message not working in buidler
-      await expectRevert.unspecified(
+      await expectRevert(
         pool.setDynamicWeight(tokens[0], parseInt(fromWeights[0]) + 10, fromTimestamps[0], targetTimestamps[0], {
           from: controller,
         }),
+        'MIN_WEIGHT_PER_SECOND'
       );
-      //TODO: figure out why TIMESTAMP_INCORRECT_DELTA require message not working in buidler
-      await expectRevert.unspecified(
+      await expectRevert(
         pool.setDynamicWeight(tokens[0], ether('40'), targetTimestamps[0], fromTimestamps[0], { from: controller }),
+        'TIMESTAMP_INCORRECT_DELTA'
       );
-      await expectRevert.unspecified(
+      await expectRevert(
         pool.setDynamicWeight(tokens[0], ether('40'), targetTimestamps[0], targetTimestamps[0], { from: controller }),
+        'TIMESTAMP_INCORRECT_DELTA'
       );
       await expectRevert(
         pool.setDynamicWeight(tokens[0], ether('51'), fromTimestamps[0], targetTimestamps[0], { from: controller }),
         'TARGET_WEIGHT_BOUNDS',
       );
-      //TODO: figure out why MAX_TARGET_TOTAL_WEIGHT require message not working in buidler
-      await expectRevert.unspecified(
+      await expectRevert(
         pool.setDynamicWeight(tokens[0], ether('45'), fromTimestamps[0], targetTimestamps[0], { from: controller }),
+        'MAX_TARGET_TOTAL_WEIGHT'
       );
-      //TODO: figure out why NOT_CONTROLLER require message not working in buidler
-      await expectRevert.unspecified(
+      await expectRevert(
         pool.setDynamicWeight(tokens[0], ether('10'), fromTimestamps[0], targetTimestamps[0], { from: alice }),
+        'NOT_CONTROLLER'
       );
     });
   });
@@ -171,8 +172,7 @@ describe('PowerIndexPool Unit', () => {
     it('original bind should be disabled', async () => {
       const newToken = await MockERC20.new('New Token', 'NT', '18', ether('1000000'));
       await newToken.approve(pool.address, ether('1'));
-      //TODO: figure out why DISABLED require message not working in buidler
-      await expectRevert.unspecified(pool.bind(newToken.address, ether('1'), ether('10')));
+      await expectRevert(pool.bind(newToken.address, ether('1'), ether('10')), 'DISABLED');
     });
     it('original rebind should be disabled', async () => {
       await this.token1.approve(pool.address, ether('1'));

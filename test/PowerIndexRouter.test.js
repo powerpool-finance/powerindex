@@ -34,7 +34,7 @@ describe('PowerIndex Router Test', () => {
     assert.equal(await wrapper.totalSupply(), ether('100'));
     assert.equal(await wrapper.balanceOf(alice), ether('100'));
 
-    await expectRevert.unspecified(wrapper.changeRouter(bob));
+    await expectRevert(wrapper.changeRouter(bob), 'ONLY_ROUTER');
     await router.migrateWrappedTokensToNewRouter([wrapper.address], router2.address);
 
     assert.equal(await wrapper.router(), router2.address);
