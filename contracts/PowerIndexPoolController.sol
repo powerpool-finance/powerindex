@@ -36,10 +36,33 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     uint256 targetDenorm,
     uint256 fromTimestamp,
     uint256 targetTimestamp
-  ) external {
+  )
+    external
+    onlyOwner
+  {
     IERC20(token).safeTransferFrom(msg.sender, address(this), balance);
     IERC20(token).approve(address(pool), balance);
     pool.bind(token, balance, targetDenorm, fromTimestamp, targetTimestamp);
+  }
+
+  function replaceTokenWithNew(
+    address oldToken,
+    address newToken,
+    uint256 balance,
+    uint256 fromTimestamp,
+    uint256 targetTimestamp
+  )
+    external
+    onlyOwner
+  {
+    uint256 minWeight = pool.getMinWeight();
+    (,,,uint256 targetDenorm) = pool.getDynamicWeightSettings(oldToken);
+
+    pool.setDynamicWeight(oldToken, minWeight, fromTimestamp, targetTimestamp);
+
+    IERC20(newToken).safeTransferFrom(msg.sender, address(this), balance);
+    IERC20(newToken).approve(address(pool), balance);
+    pool.bind(newToken, balance, targetDenorm.sub(minWeight), fromTimestamp, targetTimestamp);
   }
 
   /**

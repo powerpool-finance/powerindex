@@ -119,10 +119,7 @@ contract PowerIndexPool is BPool {
     external
     _logs_ // _lock_  Bind does not lock because it jumps to `rebind` and `setDynamicWeight`, which does
   {
-    uint tokensLen = _tokens.length;
-    if (_tokens.length >= MAX_BOUND_TOKENS - 1) {
-
-    }
+    _validateNewTokenBind();
     super.bind(token, balance, MIN_WEIGHT);
 
     setDynamicWeight(token, targetDenorm, fromTimestamp, targetTimestamp);
@@ -231,5 +228,17 @@ contract PowerIndexPool is BPool {
 
   function _subTotalWeight(uint256 _amount) internal virtual override {
     // storage total weight don't change, it's calculated only by _getTotalWeight()
+  }
+
+  function _validateNewTokenBind() internal {
+    uint tokensLen = _tokens.length;
+    if (tokensLen == MAX_BOUND_TOKENS - 1) {
+      for (uint i = 0; i < tokensLen; i++) {
+        if (_dynamicWeights[_tokens[i]].targetDenorm == MIN_WEIGHT) {
+          return;
+        }
+      }
+      revert("NEW_TOKEN_NOT_ALLOWED"); // If there is no tokens with target MIN_WEIGHT
+    }
   }
 }

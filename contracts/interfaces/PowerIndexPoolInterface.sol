@@ -29,4 +29,6 @@ interface PowerIndexPoolInterface is BPoolInterface {
       uint256 fromDenorm,
       uint256 targetDenorm
     );
+
+  function getMinWeight() external view override returns (uint);
 }

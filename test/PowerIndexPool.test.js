@@ -40,6 +40,11 @@ function addBN(bn1, bn2) {
     .add(toBN(bn2.toString(10)))
     .toString(10);
 }
+function mulBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .mul(toBN(bn2.toString(10)))
+    .toString(10);
+}
 function isBNHigherOrEqual(bn1, bn2) {
   return toBN(bn1.toString(10)).gte(toBN(bn2.toString(10)));
 }
@@ -182,24 +187,19 @@ describe('PowerIndexPool', () => {
     this.joinPool = async (tokens, _token1In) => {
       const poolOutAmount = divScalarBN(
         mulScalarBN(_token1In, await pool.totalSupply()),
-        await pool.getBalance(this.token1.address),
+        await pool.getBalance(tokens[0]),
       );
       let ratio = divScalarBN(poolOutAmount, await pool.totalSupply());
-      const token1InAmount = mulScalarBN(
-        mulScalarBN(ratio, await pool.getBalance(this.token1.address)),
-        ether('1.001'),
-      );
-      const token2InAmount = mulScalarBN(
-        mulScalarBN(ratio, await pool.getBalance(this.token2.address)),
-        ether('1.001'),
-      );
-
-      await this.token1.transfer(alice, token1InAmount);
-      await this.token1.approve(pool.address, token1InAmount, { from: alice });
-      await this.token2.transfer(alice, token2InAmount);
-      await this.token2.approve(pool.address, token2InAmount, { from: alice });
-
-      await pool.joinPool(poolOutAmount, [token1InAmount, token2InAmount], { from: alice });
+      const amounts = [];
+      await pIteration.forEachSeries(tokens, async (t) => {
+        const tokenInAmount = mulScalarBN(mulScalarBN(ratio, await pool.getBalance(t)), ether('1.001'));
+        console.log('tokenInAmount', tokenInAmount)
+        const token = await MockERC20.at(t);
+        await token.transfer(alice, tokenInAmount);
+        await token.approve(pool.address, tokenInAmount, { from: alice });
+        amounts.push(tokenInAmount);
+      });
+      await pool.joinPool(poolOutAmount, amounts, { from: alice });
     };
 
     this.exitswapExternAmountOut = async (_token, _amountOut) => {
@@ -208,6 +208,7 @@ describe('PowerIndexPool', () => {
       if (isBNHigher(poolAmountIn, await pool.balanceOf(alice))) {
         await pool.transfer(alice, poolAmountIn);
       }
+      console.log('poolAmountIn', poolAmountIn)
       await pool.approve(pool.address, poolAmountIn, { from: alice });
       await pool.exitswapExternAmountOut(_token.address, _amountOut, poolAmountIn, { from: alice });
     };
@@ -219,14 +220,18 @@ describe('PowerIndexPool', () => {
       (await MockERC20.at(_tokenFrom)).transfer(alice, amountToSwap);
       (await MockERC20.at(_tokenFrom)).approve(this.bExchange.address, amountToSwap, { from: alice });
 
-      const expectedSwapOut = await this.calcOutGivenIn(tokens[0], tokens[1], amountAfterCommunitySwapFee);
+      const expectedSwapOut = await this.calcOutGivenIn(_tokenFrom, _tokenTo, amountAfterCommunitySwapFee);
       // console.log('expectedSwapOut', web3.utils.fromWei(expectedSwapOut, 'ether'));
+      console.log('await pool.getBalance(_tokenFrom)', await pool.getBalance(_tokenFrom), 'amountToSwap', amountToSwap);
+      console.log('await pool.getBalance(_tokenTo)', await pool.getBalance(_tokenTo), 'expectedSwapOut', expectedSwapOut);
+      console.log('await getDenormWeight(_tokenFrom, await getTimestamp(1))', await getDenormWeight(_tokenFrom, await getTimestamp(1)));
+      console.log('await getDenormWeight(_tokenTo, await getTimestamp(1))', await getDenormWeight(_tokenTo, await getTimestamp(1)));
       const price = (
         await pool.calcSpotPrice(
-          addBN(await pool.getBalance(tokens[0]), amountToSwap),
-          await getDenormWeight(tokens[0], await getTimestamp(1)),
-          subBN(await pool.getBalance(tokens[1]), expectedSwapOut),
-          await getDenormWeight(tokens[1], await getTimestamp(1)),
+          addBN(await pool.getBalance(_tokenFrom), amountToSwap),
+          await getDenormWeight(_tokenFrom, await getTimestamp(1)),
+          subBN(await pool.getBalance(_tokenTo), expectedSwapOut),
+          await getDenormWeight(_tokenTo, await getTimestamp(1)),
           swapFee,
         )
       ).toString(10);
@@ -680,6 +685,147 @@ describe('PowerIndexPool', () => {
           fromDenorm: await pool.MIN_WEIGHT(),
           targetDenorm: targetWeight.toString(),
         },
+      );
+    });
+  });
+
+  describe.only('8 tokens', () => {
+    const b = ether('0.001');
+    const tw = ether('6.25');
+    let fromTimestamp, targetTimestamp;
+
+    beforeEach(async () => {
+      const t2 = await MockERC20.new('My Token 2', 'MT2', '18', ether('1000000'));
+      const t3 = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
+      const t4 = await MockERC20.new('My Token 4', 'MT4', '18', ether('1000000'));
+      const t5 = await MockERC20.new('My Token 5', 'MT5', '18', ether('1000000'));
+      const t6 = await MockERC20.new('My Token 6', 'MT6', '18', ether('1000000'));
+      const t7 = await MockERC20.new('My Token 7', 'MT7', '18', ether('1000000'));
+      const t8 = await MockERC20.new('My Token 8', 'MT8', '18', ether('1000000'));
+      tokens = [this.token1.address, t2.address, t3.address, t4.address, t5.address, t6.address, t7.address, t8.address];
+
+      let ft = await getTimestamp(100);
+      let tt = await getTimestamp(11000);
+
+      const newBalances = tokens.map((t, i) => mulBN(b, i + 1));
+      const newTargetWeights = tokens.map((t, i) => tw.toString());
+      fromTimestamps = tokens.map(() => ft.toString());
+      targetTimestamps = tokens.map(() => tt.toString());
+
+      await pIteration.forEach(tokens, async (t, i) => {
+        const token = await MockERC20.at(t);
+        await token.approve(this.bActions.address, newBalances[i]);
+      })
+
+      const res = await this.bActions.create(
+        this.bFactory.address,
+        name,
+        symbol,
+        {
+          minWeightPerSecond,
+          maxWeightPerSecond,
+          swapFee,
+          communitySwapFee,
+          communityJoinFee,
+          communityExitFee,
+          communityFeeReceiver: communityWallet,
+          finalize: true,
+        },
+        tokens.map((t, i) => ({
+          token: t,
+          balance: newBalances[i],
+          targetDenorm: newTargetWeights[i],
+          fromTimestamp: fromTimestamps[i],
+          targetTimestamp: targetTimestamps[i],
+        })),
+      );
+
+      const logNewPool = PowerIndexPoolFactory.decodeLogs(res.receipt.rawLogs).filter(
+        l => l.event === 'LOG_NEW_POOL',
+      )[0];
+      pool = await PowerIndexPool.at(logNewPool.args.pool);
+
+      await time.increase(11000);
+    });
+
+    it('should correctly change 8-th token to new', async () => {
+      await this.joinPool(tokens, ether('18800'));
+
+      const oldTokenAddress = tokens[7];
+
+      const poolAmountOutBeforeReplace = await this.calcPoolOutGivenSingleIn(oldTokenAddress, ether('0.0001'));
+      assert.equal(poolAmountOutBeforeReplace, ether('0.154882811838447'));
+
+      const minWeight = await pool.MIN_WEIGHT();
+      const newToken = await MockERC20.new('New Token', 'NT', '18', ether('1000000'));
+
+      assert.equal(await pool.isBound(newToken.address), false);
+      assert.equal(await pool.getNumTokens(), '8');
+
+      fromTimestamp = await getTimestamp(100);
+      targetTimestamp = await getTimestamp(11000);
+
+      await newToken.approve(pool.address, b);
+      await expectRevert(pool.bind(newToken.address, b, tw, fromTimestamp, targetTimestamp), 'NEW_TOKEN_NOT_ALLOWED');
+
+      await pool.setDynamicWeight(oldTokenAddress, minWeight, fromTimestamp, targetTimestamp);
+
+      await pool.bind(newToken.address, b, subBN(tw, minWeight), fromTimestamp, targetTimestamp);
+
+      assert.equal(await pool.isBound(newToken.address), true);
+
+      assert.equal(
+        await this.calcPoolOutGivenSingleIn(newToken.address, ether('0.0001')),
+        ether('0.003722400198')
+      );
+      assert.equal(
+        await this.calcPoolOutGivenSingleIn(oldTokenAddress, ether('0.0001')),
+        ether('0.154882811838447')
+      );
+
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0001'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0001'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0002'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0003'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0005'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0008'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.001'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0015'));
+
+      await time.increase(11000 / 3);
+
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.002'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0025'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.003'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.005'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.007'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.01'));
+
+      await time.increase(11000 / 3);
+
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.015'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.02'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.03'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.04'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.07'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.1'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.15'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.2'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.3'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.4'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.8'));
+      await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('1'));
+
+      await time.increase(11000 / 3);
+
+      assert.equal(
+        await this.calcPoolOutGivenSingleIn(oldTokenAddress, ether('0.0001')),
+        ether('0.0000000225600012')
+      );
+
+      assert.equal(
+        await this.calcPoolOutGivenSingleIn(newToken.address, ether('0.0001')),
+        ether('37146.5837496710892441')
       );
     });
   });
