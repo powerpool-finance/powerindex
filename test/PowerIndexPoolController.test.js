@@ -250,7 +250,7 @@ describe('PowerIndexPoolController', () => {
         mulScalarBN(price, ether('1.05')),
         { from: alice },
       ),
-      "NOT_BOUND"
+      'NOT_BOUND'
     );
 
     await poolWrapper.swapExactAmountIn(

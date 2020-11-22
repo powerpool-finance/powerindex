@@ -231,9 +231,9 @@ contract PowerIndexPool is BPool {
   }
 
   function _validateNewTokenBind() internal {
-    uint tokensLen = _tokens.length;
+    uint256 tokensLen = _tokens.length;
     if (tokensLen == MAX_BOUND_TOKENS - 1) {
-      for (uint i = 0; i < tokensLen; i++) {
+      for (uint256 i = 0; i < tokensLen; i++) {
         if (_dynamicWeights[_tokens[i]].targetDenorm == MIN_WEIGHT) {
           return;
         }

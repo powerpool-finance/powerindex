@@ -709,7 +709,7 @@ describe('PowerIndexPool', () => {
       let tt = await getTimestamp(11000);
 
       const newBalances = tokens.map((t, i) => mulBN(b, i + 1));
-      const newTargetWeights = tokens.map((t, i) => tw.toString());
+      const newTargetWeights = tokens.map(() => tw.toString());
       fromTimestamps = tokens.map(() => ft.toString());
       targetTimestamps = tokens.map(() => tt.toString());
 
@@ -769,11 +769,24 @@ describe('PowerIndexPool', () => {
       await newToken.approve(pool.address, b);
       await expectRevert(pool.bind(newToken.address, b, tw, fromTimestamp, targetTimestamp), 'NEW_TOKEN_NOT_ALLOWED');
 
-      await pool.setDynamicWeight(oldTokenAddress, minWeight, fromTimestamp, targetTimestamp);
+      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
+      await pool.setController(poolController.address);
 
-      await pool.bind(newToken.address, b, subBN(tw, minWeight), fromTimestamp, targetTimestamp);
-
+      await newToken.approve(poolController.address, b);
+      await poolController.replaceTokenWithNew(oldTokenAddress, newToken.address, b, fromTimestamp, targetTimestamp);
       assert.equal(await pool.isBound(newToken.address), true);
+
+      const oldTokenSettings = await pool.getDynamicWeightSettings(oldTokenAddress);
+      assert.equal(oldTokenSettings.fromTimestamp, fromTimestamp);
+      assert.equal(oldTokenSettings.targetTimestamp, targetTimestamp);
+      assert.equal(oldTokenSettings.fromDenorm, tw);
+      assert.equal(oldTokenSettings.targetDenorm, minWeight);
+
+      const newTokenSettings = await pool.getDynamicWeightSettings(newToken.address);
+      assert.equal(newTokenSettings.fromTimestamp, fromTimestamp);
+      assert.equal(newTokenSettings.targetTimestamp, targetTimestamp);
+      assert.equal(newTokenSettings.fromDenorm, minWeight);
+      assert.equal(newTokenSettings.targetDenorm, subBN(tw, minWeight));
 
       assertEqualWithAccuracy(
         await this.calcPoolOutGivenSingleIn(newToken.address, ether('0.0001')),
@@ -798,8 +811,8 @@ describe('PowerIndexPool', () => {
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.001'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0015'));
 
-      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('0.005275'), ether('0.01'));
-      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('150400.007964752950931892'), ether('0.01'));
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('0.005275'), ether('0.03'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('150400.007964752950931892'), ether('0.03'));
 
       await time.increase(11000 / 3);
 
@@ -810,8 +823,8 @@ describe('PowerIndexPool', () => {
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.007'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.01'));
 
-      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('0.0333'), ether('0.01'));
-      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('60987.690675181463841264'), ether('0.01'));
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('0.0333'), ether('0.03'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('60987.690675181463841264'), ether('0.03'));
 
       await time.increase(11000 / 3);
 
@@ -829,8 +842,8 @@ describe('PowerIndexPool', () => {
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.8'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('1'));
 
-      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('3.57205'), ether('0.01'));
-      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('5.06328129221017354'), ether('0.01'));
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('3.57205'), ether('0.03'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('5.06328129221017354'), ether('0.03'));
 
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('1.2'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('1.5'));
@@ -860,22 +873,55 @@ describe('PowerIndexPool', () => {
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('7500'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('10000'));
 
-      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('33528.31205'), ether('0.01'));
-      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('0.000000032762959096'), ether('0.01'));
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('33528.31205'), ether('0.03'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('0.000000032762959096'), ether('0.03'));
 
       await time.increase(11000 / 3);
 
       assertEqualWithAccuracy(
         await this.calcPoolOutGivenSingleIn(oldTokenAddress, ether('0.00000001')),
         ether('0.011361611404341'),
-        ether('0.01')
+        ether('0.03')
       );
 
       assertEqualWithAccuracy(
         await this.calcPoolOutGivenSingleIn(newToken.address, ether('0.0001')),
         ether('0.6947673398357076'),
-        ether('0.01')
+        ether('0.03')
       );
+    });
+
+    it('should correctly change 8-th token by replaceTokenWithNewFromNow', async () => {
+      await this.joinPool(tokens, ether('18800'));
+
+      const oldTokenAddress = tokens[7];
+
+      const minWeight = await pool.MIN_WEIGHT();
+      const newToken = await MockERC20.new('New Token', 'NT', '18', ether('1000000'));
+
+      assert.equal(await pool.isBound(newToken.address), false);
+      assert.equal(await pool.getNumTokens(), '8');
+
+      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
+      await pool.setController(poolController.address);
+
+      const duration = '10000';
+      await newToken.approve(poolController.address, b);
+      const res = await poolController.replaceTokenWithNewFromNow(oldTokenAddress, newToken.address, b, duration);
+      const txTimestamp = ((await web3.eth.getBlock(res.receipt.blockNumber)).timestamp + 1).toString();
+      assert.equal(await pool.isBound(newToken.address), true);
+
+      const oldTokenSettings = await pool.getDynamicWeightSettings(oldTokenAddress);
+      assert.equal(oldTokenSettings.fromTimestamp, txTimestamp);
+      assert.equal(oldTokenSettings.targetTimestamp, addBN(txTimestamp, duration));
+      assert.equal(oldTokenSettings.fromDenorm, tw);
+      assert.equal(oldTokenSettings.targetDenorm, minWeight);
+
+      const newTokenSettings = await pool.getDynamicWeightSettings(newToken.address);
+      assert.equal(newTokenSettings.fromTimestamp, txTimestamp);
+      assert.equal(newTokenSettings.targetTimestamp, addBN(txTimestamp, duration));
+      assert.equal(newTokenSettings.fromDenorm, minWeight);
+      assert.equal(newTokenSettings.targetDenorm, subBN(tw, minWeight));
     });
   });
 

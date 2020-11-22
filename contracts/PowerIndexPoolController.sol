@@ -36,33 +36,46 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     uint256 targetDenorm,
     uint256 fromTimestamp,
     uint256 targetTimestamp
-  )
-    external
-    onlyOwner
-  {
+  ) external onlyOwner {
     IERC20(token).safeTransferFrom(msg.sender, address(this), balance);
     IERC20(token).approve(address(pool), balance);
     pool.bind(token, balance, targetDenorm, fromTimestamp, targetTimestamp);
   }
 
+  /**
+   * @notice Set target weight of old token to MIN_WEIGHT and add new token with previous weight of old token
+   * @param oldToken Token to replace
+   * @param newToken New token
+   * @param balance Initial new token balance
+   * @param fromTimestamp From timestamp of dynamic weight
+   * @param targetTimestamp Target timestamp of dynamic weight
+   */
   function replaceTokenWithNew(
     address oldToken,
     address newToken,
     uint256 balance,
     uint256 fromTimestamp,
     uint256 targetTimestamp
-  )
-    external
-    onlyOwner
-  {
-    uint256 minWeight = pool.getMinWeight();
-    (,,,uint256 targetDenorm) = pool.getDynamicWeightSettings(oldToken);
+  ) external onlyOwner {
+    _replaceTokenWithNew(oldToken, newToken, balance, fromTimestamp, targetTimestamp);
+  }
 
-    pool.setDynamicWeight(oldToken, minWeight, fromTimestamp, targetTimestamp);
-
-    IERC20(newToken).safeTransferFrom(msg.sender, address(this), balance);
-    IERC20(newToken).approve(address(pool), balance);
-    pool.bind(newToken, balance, targetDenorm.sub(minWeight), fromTimestamp, targetTimestamp);
+  /**
+   * @notice The same as replaceTokenWithNew, but sets fromTimestamp with block.timestamp
+              and uses durationFromNow to set targetTimestamp
+   * @param oldToken Token to replace
+   * @param newToken New token
+   * @param balance Initial new token balance
+   * @param durationFromNow Duration for set targetTimestamp by sum with block.timestamp
+   */
+  function replaceTokenWithNewFromNow(
+    address oldToken,
+    address newToken,
+    uint256 balance,
+    uint256 durationFromNow
+  ) external onlyOwner {
+    uint256 now = block.timestamp.add(1);
+    _replaceTokenWithNew(oldToken, newToken, balance, now, now.add(durationFromNow));
   }
 
   /**
@@ -99,5 +112,22 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
 
   function _checkSignature(bytes4 signature) internal pure override {
     require(signature != BIND_SIG && signature != UNBIND_SIG && signature != CALL_VOTING_SIG, "SIGNATURE_NOT_ALLOWED");
+  }
+
+  function _replaceTokenWithNew(
+    address oldToken,
+    address newToken,
+    uint256 balance,
+    uint256 fromTimestamp,
+    uint256 targetTimestamp
+  ) internal {
+    uint256 minWeight = pool.getMinWeight();
+    (, , , uint256 targetDenorm) = pool.getDynamicWeightSettings(oldToken);
+
+    pool.setDynamicWeight(oldToken, minWeight, fromTimestamp, targetTimestamp);
+
+    IERC20(newToken).safeTransferFrom(msg.sender, address(this), balance);
+    IERC20(newToken).approve(address(pool), balance);
+    pool.bind(newToken, balance, targetDenorm.sub(minWeight), fromTimestamp, targetTimestamp);
   }
 }
