@@ -6,7 +6,6 @@
   "scripts": {
     "build": "yarn run compile && yarn run typechain",
     "clean": "hardhat clean",
-    "compile-release": "COMPILE_TARGET=release hardhat compile",
     "compile": "hardhat compile",
     "coverage": "hardhat coverage --show-stack-traces --solcoverjs ./.solcover.js --network coverage --temp artifacts --testfiles \"./test/**/*.js\"",
     "lint:sol": "solhint --config ./.solhint.json \"contracts/**/*.sol\"",
@@ -14,7 +13,7 @@
     "prettier": "prettier --config .prettierrc --write \"**/*.{js,json,md,sol,ts}\"",
     "prettier:sol": "prettier --config .prettierrc --write \"contracts/**/*.sol\"",
     "test": "mocha --timeout 50000",
-    "test-ganache": "COMPILE_TARGET=release hardhat test --network ganache"
+    "test-ganache": "hardhat test --network ganache"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^3.1.0",

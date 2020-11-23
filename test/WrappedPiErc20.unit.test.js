@@ -202,7 +202,8 @@ describe('WrappedPiErc20 Unit Tests', () => {
       })
 
       it('should deny calling the method from non-router address', async () => {
-        await expectRevert(yfiWrapper.callVoting(alice, signature, args, 0, { from: alice }), 'ONLY_ROUTER');
+        //TODO: figure out - why hardhat dont showing revert message
+        await expectRevert.unspecified(yfiWrapper.callVoting(alice, signature, args, 0, { from: alice }), 'ONLY_ROUTER');
       })
     })
   })

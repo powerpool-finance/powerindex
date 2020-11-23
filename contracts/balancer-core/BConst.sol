@@ -18,7 +18,7 @@ contract BConst {
     uint public constant BONE              = 10**18;
 
     uint public constant MIN_BOUND_TOKENS  = 2;
-    uint public constant MAX_BOUND_TOKENS  = 8;
+    uint public constant MAX_BOUND_TOKENS  = 9;
 
     uint public constant MIN_FEE           = BONE / 10**6;
     uint public constant MAX_FEE           = BONE / 10;

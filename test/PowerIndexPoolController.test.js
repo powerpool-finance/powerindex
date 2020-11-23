@@ -176,7 +176,7 @@ describe('PowerIndexPoolController', () => {
 
     await this.token1.approve(poolWrapper.address, amountToSwap, { from: alice });
     // TODO: A wrong error message due probably the Buidler EVM bug
-    await expectRevert.unspecified(
+    await expectRevert(
       poolWrapper.swapExactAmountIn(
         this.token1.address,
         amountToSwap,
@@ -241,7 +241,7 @@ describe('PowerIndexPoolController', () => {
 
     await this.token1.approve(poolWrapper.address, amountToSwap, { from: alice });
     // TODO: A wrong error message due probably the Buidler EVM bug
-    await expectRevert.unspecified(
+    await expectRevert(
       poolWrapper.swapExactAmountIn(
         this.token1.address,
         amountToSwap,
@@ -250,6 +250,7 @@ describe('PowerIndexPoolController', () => {
         mulScalarBN(price, ether('1.05')),
         { from: alice },
       ),
+      'NOT_BOUND'
     );
 
     await poolWrapper.swapExactAmountIn(
