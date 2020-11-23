@@ -123,4 +123,6 @@ interface BPoolInterface is IERC20, BMathInterface {
   ) external;
 
   function getMinWeight() external view returns (uint256);
+
+  function getMaxBoundTokens() external view returns (uint256);
 }

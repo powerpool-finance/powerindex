@@ -194,7 +194,6 @@ describe('PowerIndexPool', () => {
       const amounts = [];
       await pIteration.forEachSeries(tokens, async (t) => {
         const tokenInAmount = mulScalarBN(mulScalarBN(ratio, await pool.getBalance(t)), ether('1.001'));
-        console.log('tokenInAmount', tokenInAmount)
         const token = await MockERC20.at(t);
         await token.transfer(alice, tokenInAmount);
         await token.approve(pool.address, tokenInAmount, { from: alice });
@@ -209,7 +208,6 @@ describe('PowerIndexPool', () => {
       if (isBNHigher(poolAmountIn, await pool.balanceOf(alice))) {
         await pool.transfer(alice, poolAmountIn);
       }
-      console.log('poolAmountIn', poolAmountIn)
       await pool.approve(pool.address, poolAmountIn, { from: alice });
       await pool.exitswapExternAmountOut(_token.address, _amountOut, poolAmountIn, { from: alice });
     };
@@ -766,13 +764,15 @@ describe('PowerIndexPool', () => {
       fromTimestamp = await getTimestamp(100);
       targetTimestamp = await getTimestamp(11000);
 
-      await newToken.approve(pool.address, b);
-      await expectRevert(pool.bind(newToken.address, b, tw, fromTimestamp, targetTimestamp), 'NEW_TOKEN_NOT_ALLOWED');
-
       const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
       await pool.setController(poolController.address);
 
       await newToken.approve(poolController.address, b);
+      await expectRevert(
+        poolController.bind(newToken.address, b, tw, fromTimestamp, targetTimestamp),
+        'NEW_TOKEN_NOT_ALLOWED'
+      );
+
       await poolController.replaceTokenWithNew(oldTokenAddress, newToken.address, b, fromTimestamp, targetTimestamp);
       assert.equal(await pool.isBound(newToken.address), true);
 

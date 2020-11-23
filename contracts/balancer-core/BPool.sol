@@ -1013,4 +1013,11 @@ contract BPool is BToken, BMath, BPoolInterface {
     {
         return MIN_WEIGHT;
     }
+
+    function getMaxBoundTokens()
+        external view override
+        returns (uint)
+    {
+      return MAX_BOUND_TOKENS;
+    }
 }

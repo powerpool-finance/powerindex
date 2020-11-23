@@ -37,6 +37,8 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     uint256 fromTimestamp,
     uint256 targetTimestamp
   ) external onlyOwner {
+    _validateNewTokenBind();
+
     IERC20(token).safeTransferFrom(msg.sender, address(this), balance);
     IERC20(token).approve(address(pool), balance);
     pool.bind(token, balance, targetDenorm, fromTimestamp, targetTimestamp);
@@ -129,5 +131,21 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     IERC20(newToken).safeTransferFrom(msg.sender, address(this), balance);
     IERC20(newToken).approve(address(pool), balance);
     pool.bind(newToken, balance, targetDenorm.sub(minWeight), fromTimestamp, targetTimestamp);
+  }
+
+  function _validateNewTokenBind() internal {
+    address[] memory tokens = pool.getCurrentTokens();
+    uint256 tokensLen = tokens.length;
+    uint256 minWeight = pool.getMinWeight();
+
+    if (tokensLen == pool.getMaxBoundTokens() - 1) {
+      for (uint256 i = 0; i < tokensLen; i++) {
+        (, , , uint256 targetDenorm) = pool.getDynamicWeightSettings(tokens[i]);
+        if (targetDenorm == minWeight) {
+          return;
+        }
+      }
+      revert("NEW_TOKEN_NOT_ALLOWED"); // If there is no tokens with target MIN_WEIGHT
+    }
   }
 }
