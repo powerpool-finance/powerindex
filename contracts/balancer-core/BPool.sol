@@ -62,6 +62,13 @@ contract BPool is BToken, BMath, BPoolInterface {
         bytes           outputData
     );
 
+    event LOG_COMMUNITY_FEE(
+        address indexed caller,
+        address indexed receiver,
+        address indexed token,
+        uint256         tokenAmount
+    );
+
     modifier _logs_() {
         emit LOG_CALL(msg.sig, msg.sender, msg.data);
         _;
@@ -493,6 +500,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _mintPoolShare(poolAmountOut);
         _pushPoolShare(msg.sender, poolAmountOutAfterFee);
         _pushPoolShare(_communityFeeReceiver, poolAmountOutFee);
+
+        emit LOG_COMMUNITY_FEE(msg.sender, _communityFeeReceiver, address(this), poolAmountOutFee);
     }
 
     function exitPool(uint poolAmountIn, uint[] calldata minAmountsOut)
@@ -529,6 +538,7 @@ contract BPool is BToken, BMath, BPoolInterface {
             _pushUnderlying(t, msg.sender, tokenAmountOut);
         }
 
+        emit LOG_COMMUNITY_FEE(msg.sender, _communityFeeReceiver, address(this), poolAmountInFee);
     }
 
 
@@ -602,6 +612,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _pullCommunityFeeUnderlying(tokenIn, msg.sender, tokenAmountInFee);
         _pullUnderlying(tokenIn, msg.sender, tokenAmountInAfterFee);
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
+
+        emit LOG_COMMUNITY_FEE(msg.sender, _communityFeeReceiver, tokenIn, tokenAmountInFee);
 
         return (tokenAmountOut, spotPriceAfter);
     }
@@ -677,6 +689,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOutAfterFee);
         _pushUnderlying(tokenOut, _communityFeeReceiver, tokenAmountOutFee);
 
+        emit LOG_COMMUNITY_FEE(msg.sender, _communityFeeReceiver, tokenOut, tokenAmountOutFee);
+
         return (tokenAmountIn, spotPriceAfter);
     }
 
@@ -721,6 +735,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _pushPoolShare(msg.sender, poolAmountOut);
         _pullCommunityFeeUnderlying(tokenIn, msg.sender, tokenAmountInFee);
         _pullUnderlying(tokenIn, msg.sender, tokenAmountInAfterFee);
+
+        emit LOG_COMMUNITY_FEE(msg.sender, _communityFeeReceiver, tokenIn, tokenAmountInFee);
 
         return poolAmountOut;
     }
@@ -767,6 +783,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _pushPoolShare(_communityFeeReceiver, poolAmountOutFee);
         _pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
 
+        emit LOG_COMMUNITY_FEE(msg.sender, _communityFeeReceiver, address(this), poolAmountOutFee);
+
         return tokenAmountIn;
     }
 
@@ -811,6 +829,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOutAfterFee);
         _pushUnderlying(tokenOut, _communityFeeReceiver, tokenAmountOutFee);
 
+        emit LOG_COMMUNITY_FEE(msg.sender, _communityFeeReceiver, tokenOut, tokenAmountOutFee);
+
         return tokenAmountOutAfterFee;
     }
 
@@ -854,6 +874,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _burnPoolShare(poolAmountIn);
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOutAfterFee);
         _pushUnderlying(tokenOut, _communityFeeReceiver, tokenAmountOutFee);
+
+        emit LOG_COMMUNITY_FEE(msg.sender, _communityFeeReceiver, tokenOut, tokenAmountOutFee);
 
         return poolAmountIn;
     }
