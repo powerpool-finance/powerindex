@@ -63,7 +63,7 @@ contract MockVestedLPMiningMath is VestedLPMining {
   }
 
   function __getTotalPooledCvp() external view returns (uint96) {
-    uint192 sharedData = book[address(this)].getLatestData();
+    (uint192 sharedData, uint32 blockNumber) = book[address(this)].getLatestData();
     (uint96 totalPooledCvp, ) = _unpackData(sharedData);
     return totalPooledCvp;
   }

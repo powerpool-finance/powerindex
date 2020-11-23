@@ -25,7 +25,7 @@ function mulBN(bn1, bn2) {
     .toString(10);
 }
 
-describe('VestedLPMining', () => {
+describe.only('VestedLPMining', () => {
   let alice, bob, carol, minter;
   before(async function () {
     [, alice, bob, carol, minter] = await web3.eth.getAccounts();

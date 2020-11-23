@@ -10,7 +10,8 @@ contract MockDelegatableCheckpoints {
   mapping(address => DelegatableCheckpoints.Record) public records;
 
   function getLatestData(address user) public view returns (uint192) {
-    return records[user].getLatestData();
+    (uint192 data, ) = records[user].getLatestData();
+    return data;
   }
 
   function getPriorData(
@@ -18,7 +19,8 @@ contract MockDelegatableCheckpoints {
     uint256 blockNumber,
     uint256 checkpointId
   ) public view returns (uint192) {
-    return records[user].getPriorData(blockNumber, checkpointId);
+    (uint192 data, ) = records[user].getPriorData(blockNumber, checkpointId);
+    return data;
   }
 
   function findCheckpoint(address user, uint256 blockNumber) public view returns (uint32 id, uint192 data) {

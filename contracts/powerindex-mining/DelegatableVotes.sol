@@ -49,11 +49,12 @@ abstract contract DelegatableVotes {
    * @return The number of current votes for `account`
    */
   function getCurrentVotes(address account) external view returns (uint96) {
-    uint192 userData = book[account].getLatestData();
+    (uint192 userData, uint32 userDataBlockNumber) = book[account].getLatestData();
     if (userData == 0) return 0;
 
-    uint192 sharedData = book[address(this)].getLatestData();
-    return _computeUserVotes(userData, sharedData);
+    (uint192 sharedData, ) = book[address(this)].getLatestData();
+    (uint192 sharedDataAtUserSave, ) = book[address(this)].getPriorData(userDataBlockNumber, 0);
+    return _computeUserVotes(userData, sharedData, sharedDataAtUserSave);
   }
 
   /**
@@ -84,11 +85,12 @@ abstract contract DelegatableVotes {
     uint32 userCheckpointId,
     uint32 sharedCheckpointId
   ) public view returns (uint96) {
-    uint192 userData = book[account].getPriorData(blockNumber, userCheckpointId);
+    (uint192 userData, uint32 userDataBlockNumber) = book[account].getPriorData(blockNumber, userCheckpointId);
     if (userData == 0) return 0;
 
-    uint192 sharedData = book[address(this)].getPriorData(blockNumber, sharedCheckpointId);
-    return _computeUserVotes(userData, sharedData);
+    (uint192 sharedData, ) = book[address(this)].getPriorData(blockNumber, sharedCheckpointId);
+    (uint192 sharedDataAtUserSave, ) = book[address(this)].getPriorData(userDataBlockNumber, 0);
+    return _computeUserVotes(userData, sharedData, sharedDataAtUserSave);
   }
 
   /// @notice Returns IDs of checkpoints which store the given account' voice computation data
@@ -116,9 +118,10 @@ abstract contract DelegatableVotes {
     address _delegatee = src.delegatee;
     DelegatableCheckpoints.Record storage dst = _delegatee == address(0) ? src : book[_delegatee];
 
+    (uint192 latestData, ) = dst.getLatestData();
     dst.writeCheckpoint(
       // keep in mind voices which others could have delegated
-      _computeUserData(dst.getLatestData(), data, delegatables[account])
+      _computeUserData(latestData, data, delegatables[account])
     );
     delegatables[account] = data;
   }
@@ -145,11 +148,11 @@ abstract contract DelegatableVotes {
     }
     uint192 delegatable = delegatables[account];
 
-    uint192 srcPrevData = src.getLatestData();
+    (uint192 srcPrevData, ) = src.getLatestData();
     uint192 srcData = _computeUserData(srcPrevData, 0, delegatable);
     if (srcPrevData != srcData) src.writeCheckpoint(srcData);
 
-    uint192 dstPrevData = dst.getLatestData();
+    (uint192 dstPrevData, ) = dst.getLatestData();
     uint192 dstData = _computeUserData(dstPrevData, delegatable, 0);
     if (dstPrevData != dstData) dst.writeCheckpoint(dstData);
   }
@@ -163,7 +166,11 @@ abstract contract DelegatableVotes {
     _moveUserData(delegator, currentDelegate, delegatee_);
   }
 
-  function _computeUserVotes(uint192 userData, uint192 sharedData) internal pure virtual returns (uint96 votes);
+  function _computeUserVotes(
+    uint192 userData,
+    uint192 sharedData,
+    uint192 sharedDataAtUserSave
+  ) internal pure virtual returns (uint96 votes);
 
   function _computeUserData(
     uint192 prevData,
