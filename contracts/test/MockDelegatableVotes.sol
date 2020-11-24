@@ -25,7 +25,11 @@ contract MockDelegatableVotes is DelegatableVotes {
     return _getCheckpoint(account, checkpointId);
   }
 
-  function _computeUserVotes(uint192 userData, uint192 sharedData) internal pure override returns (uint96 votes) {
+  function _computeUserVotes(
+    uint192 userData,
+    uint192 sharedData,
+    uint192 sharedDataAtUserSave
+  ) internal pure override returns (uint96 votes) {
     votes = uint96(userData + sharedData);
   }
 }

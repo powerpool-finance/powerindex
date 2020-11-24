@@ -5,7 +5,7 @@ const MockVestedLPMiningMath = artifacts.require('MockVestedLPMiningMath');
 
 const { toBN } = web3.utils;
 
-describe.only('VestedLPMining (internal math)', () => {
+describe('VestedLPMining (internal math)', () => {
   let deployer, doesNotMatter;
   before(async function () {
     [, deployer, doesNotMatter] = await web3.eth.getAccounts();

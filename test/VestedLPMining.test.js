@@ -25,7 +25,7 @@ function mulBN(bn1, bn2) {
     .toString(10);
 }
 
-describe.only('VestedLPMining', () => {
+describe('VestedLPMining', () => {
   let alice, bob, carol, minter;
   before(async function () {
     [, alice, bob, carol, minter] = await web3.eth.getAccounts();
@@ -640,7 +640,7 @@ describe.only('VestedLPMining', () => {
     });
   });
 
-  it('should correctly calculate votes of meta pools', async () => {
+  it.only('should correctly calculate votes of meta pools', async () => {
     // 100 per block farming rate starting at block 2000
     await time.advanceBlockTo(this.shiftBlock('1999'));
     this.lpMining = await VestedLPMining.new({from: minter});
@@ -674,9 +674,36 @@ describe.only('VestedLPMining', () => {
     await time.advanceBlockTo(this.shiftBlock('2105'));
     assert.equal((await this.lpMining.pendingCvp('1', alice)).toString(), ether('7.5').toString());
 
+    await this.cvp.transfer(lp.address, ether('50000'), {from: minter});
+
+    await metaLp.transfer(bob, ether('100'), {from: minter});
+    await metaLp.approve(this.lpMining.address, ether('100'), {from: bob});
+    await this.lpMining.deposit('1', ether('100'), {from: bob});
+
+    await time.advanceBlockTo(this.shiftBlock('2115'));
+
+    assert.equal(await this.lpMining.__getTotalPooledCvp(), ether('100000').toString());
+
     assert.equal(await this.lpMining.getCurrentVotes(alice), ether('1250').toString());
+    assert.equal(await this.lpMining.getCurrentVotes(bob), ether('5000').toString());
+
+    await lp.mockWithdrawErc20(this.cvp.address, ether('75000'));
+
+    await metaLp.transfer(carol, ether('10'), {from: minter});
+    await metaLp.approve(this.lpMining.address, ether('10'), {from: carol});
+    await this.lpMining.deposit('1', ether('10'), {from: carol});
+
+    await time.advanceBlockTo(this.shiftBlock('2125'));
+
+    assert.equal(await this.lpMining.__getTotalPooledCvp(), ether('25000').toString());
+
+    assert.equal(await this.lpMining.getCurrentVotes(alice), ether('1250').toString());
+    assert.equal(await this.lpMining.getCurrentVotes(bob), ether('5000').toString());
+    assert.equal(await this.lpMining.getCurrentVotes(carol), ether('125').toString());
+
     await this.lpMining.deposit('1', '0', {from: alice});
-    assert.equal(await this.lpMining.getCurrentVotes(alice), ether('1256.896551724137931035').toString());
+    await time.advanceBlockTo(this.shiftBlock('2135'));
+    assert.equal(await this.lpMining.getCurrentVotes(alice), ether('634.015012254889705883').toString());
   });
 
   it('should prevent depositing and withdrawing in same transaction', async () => {

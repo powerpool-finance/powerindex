@@ -14,4 +14,8 @@ contract MockERC20 is ERC20 {
     _mint(msg.sender, supply);
     _setupDecimals(decimals);
   }
+
+  function mockWithdrawErc20(address token, uint256 amount) public {
+    ERC20(token).transfer(msg.sender, amount);
+  }
 }
