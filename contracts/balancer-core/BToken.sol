@@ -118,7 +118,7 @@ contract BToken is BTokenBase, IERC20 {
         _move(src, dst, amt);
         if (msg.sender != src && _allowance[src][msg.sender] != uint256(-1)) {
             _allowance[src][msg.sender] = bsub(_allowance[src][msg.sender], amt);
-            emit Approval(msg.sender, dst, _allowance[src][msg.sender]);
+            emit Approval(src, msg.sender, _allowance[src][msg.sender]);
         }
         return true;
     }
