@@ -260,7 +260,7 @@ contract VestedLPMining is
   /// @inheritdoc IVestedLPMining
   function deposit(uint256 _pid, uint256 _amount) public override nonReentrant {
     _validatePoolId(_pid);
-    _preventSameTxOrigin();
+    _preventSameTxOriginAndMsgSender();
 
     Pool storage pool = pools[_pid];
     User storage user = users[_pid][msg.sender];
@@ -281,7 +281,7 @@ contract VestedLPMining is
   /// @inheritdoc IVestedLPMining
   function withdraw(uint256 _pid, uint256 _amount) public override nonReentrant {
     _validatePoolId(_pid);
-    _preventSameTxOrigin();
+    _preventSameTxOriginAndMsgSender();
 
     Pool storage pool = pools[_pid];
     User storage user = users[_pid][msg.sender];
@@ -303,7 +303,7 @@ contract VestedLPMining is
   /// @inheritdoc IVestedLPMining
   function emergencyWithdraw(uint256 _pid) public override nonReentrant {
     _validatePoolId(_pid);
-    _preventSameTxOrigin();
+    _preventSameTxOriginAndMsgSender();
 
     Pool storage pool = pools[_pid];
     User storage user = users[_pid][msg.sender];
@@ -579,8 +579,13 @@ contract VestedLPMining is
     return SafeMath32.fromUint(block.number, "VLPMining::_currBlock:overflow");
   }
 
-  function _preventSameTxOrigin() internal {
+  function _preventSameTxOriginAndMsgSender() internal {
     require(block.number > lastSwapBlock[tx.origin], "SAME_TX_ORIGIN");
     lastSwapBlock[tx.origin] = block.number;
+
+    if (msg.sender != tx.origin) {
+      require(block.number > lastSwapBlock[msg.sender], "SAME_MSG_SENDER");
+      lastSwapBlock[msg.sender] = block.number;
+    }
   }
 }
