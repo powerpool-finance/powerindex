@@ -18,4 +18,12 @@ contract MockERC20 is ERC20 {
   function mockWithdrawErc20(address token, uint256 amount) public {
     ERC20(token).transfer(msg.sender, amount);
   }
+
+  function mint(address account, uint256 amount) public {
+    _mint(account, amount);
+  }
+
+  function burn(uint256 amount) public {
+    _burn(msg.sender, amount);
+  }
 }
