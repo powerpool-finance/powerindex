@@ -3,7 +3,7 @@ const { createSnapshot, revertToSnapshot } = require('./helpers/blockchain');
 const assert = require('chai').assert;
 const CvpToken = artifacts.require('MockCvp');
 const LPMining = artifacts.require('LPMining');
-const VestedLPMining = artifacts.require('MockVestedLPMiningMath');
+const VestedLPMining = artifacts.require('MockVestedLPMining');
 const MockVestedLPMiningClient = artifacts.require('MockVestedLPMiningClient');
 const MockERC20 = artifacts.require('MockERC20');
 const Reservoir = artifacts.require('Reservoir');
@@ -82,25 +82,42 @@ describe('VestedLPMining', () => {
   });
 
   context('With ERC/LP token added to the field', () => {
-    it('should allow emergency withdraw', async () => {
-      // 100 per block farming rate starting at block 100 with 1 block vesting period
-      this.lpMining = await VestedLPMining.new({ from: minter });
-      await this.lpMining.initialize(
-        this.cvp.address,
-        this.reservoir.address,
-        '100',
-        this.shiftBlock('100'),
-        '100000',
-        { from: minter },
-      );
-      await this.prepareReservoir();
 
-      await this.lpMining.add('100', this.lp.address, '1', true, { from: minter });
-      await this.lp.approve(this.lpMining.address, '1000', { from: bob });
-      await this.lpMining.deposit(0, '100', { from: bob });
-      assert.equal((await this.lp.balanceOf(bob)).toString(), '900');
-      await this.lpMining.emergencyWithdraw(0, { from: bob });
-      assert.equal((await this.lp.balanceOf(bob)).toString(), '1000');
+    context('Emergency withdraw', () => {
+      beforeEach(async () => {
+        // 100 per block farming rate starting at block 100 with 1 block vesting period
+        this.lpMining = await VestedLPMining.new({ from: minter });
+        await this.lpMining.initialize(
+          this.cvp.address,
+          this.reservoir.address,
+          '100', // _cvpPerBlock
+          this.shiftBlock('50'), // _startBlock
+          '10', // _cvpVestingPeriodInBlocks
+          { from: minter }
+        );
+        await this.prepareReservoir();
+
+        await this.lpMining.add('100', this.lp.address, '1', true, { from: minter });
+        await this.lp.approve(this.lpMining.address, '1000', { from: bob });
+        await this.lpMining.deposit(0, '100', { from: bob });
+        assert.equal((await this.lp.balanceOf(bob)).toString(), '900');
+      });
+
+      it('should allow LP token withdrawal', async () => {
+        await this.lpMining.emergencyWithdraw(0, { from: bob });
+        assert.equal((await this.lp.balanceOf(bob)).toString(), '1000');
+      });
+
+      it('should NOT revert if rounding errors occur', async () => {
+        await time.advanceBlockTo(this.shiftBlock('99'));
+        await this.lpMining.updatePool(0); // block #100
+        assert.equal(await this.lpMining.cvpVestingPool(), '5000'); // (100-50) * 100
+        assert.equal(await this.lpMining.pendingCvp(0, bob), '5000');
+
+        await this.lpMining._setCvpVestingPool('4999');
+        await this.lpMining.emergencyWithdraw(0, { from: bob });
+        assert.equal((await this.lp.balanceOf(bob)).toString(), '1000');
+      });
     });
 
     it('should give out CVPs only after farming time', async () => {

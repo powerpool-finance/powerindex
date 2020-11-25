@@ -5,7 +5,7 @@ pragma experimental ABIEncoderV2;
 
 import "../powerindex-mining/VestedLPMining.sol";
 
-contract MockVestedLPMiningMath is VestedLPMining {
+contract MockVestedLPMining is VestedLPMining {
   uint256 private _mockLptBalance;
 
   function _setMockParams(uint256 mockLptBalance, uint256 mockTotalAllocPoint) external {
@@ -14,9 +14,15 @@ contract MockVestedLPMiningMath is VestedLPMining {
     totalAllocPoint = mockTotalAllocPoint;
   }
 
+  // (Optional) Mock for VestedLPMining::lpToken:balanceOf
+  // to use it, pass `address(this)` as `_cvp` to VestedLPMining::initialize
   function balanceOf(address account) external view returns (uint256) {
     require(account == address(this), "MockVestedLPMiningMath::balanceOf");
     return _mockLptBalance;
+  }
+
+  function _setCvpVestingPool(uint256 _cvpVestingPool) external {
+    cvpVestingPool = SafeMath96.fromUint(_cvpVestingPool);
   }
 
   event _UpdatedUser(

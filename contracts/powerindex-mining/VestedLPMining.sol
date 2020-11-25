@@ -313,11 +313,7 @@ contract VestedLPMining is
 
     if (user.pendedCvp > 0) {
       // TODO: Make user.pendedCvp be updated as of the pool' lastUpdateBlock
-      if (user.pendedCvp > cvpVestingPool) {
-        cvpVestingPool = cvpVestingPool.sub(user.pendedCvp);
-      } else {
-        cvpVestingPool = 0;
-      }
+      cvpVestingPool = user.pendedCvp > cvpVestingPool ? 0 : cvpVestingPool.sub(user.pendedCvp);
     }
 
     user.lptAmount = 0;
