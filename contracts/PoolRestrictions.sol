@@ -65,6 +65,7 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
     bool[] calldata _allowed
   ) external onlyOwner {
     uint256 len = _senders.length;
+    _validateArrayLength(len);
     require(len == _allowed.length, "Arrays lengths are not equals");
     for (uint256 i = 0; i < len; i++) {
       votingSenderAllowed[_votingAddress][_senders[i]] = _allowed[i];
@@ -74,6 +75,7 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
 
   function setWithoutFee(address[] calldata _addresses, bool _withoutFee) external onlyOwner {
     uint256 len = _addresses.length;
+    _validateArrayLength(len);
     for (uint256 i = 0; i < len; i++) {
       withoutFeeAddresses[_addresses[i]] = _withoutFee;
       emit SetWithoutFee(_addresses[i], _withoutFee);
@@ -104,6 +106,7 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
 
   function _setTotalRestrictions(address[] memory _poolsList, uint256[] memory _maxTotalSupplyList) internal {
     uint256 len = _poolsList.length;
+    _validateArrayLength(len);
     require(len == _maxTotalSupplyList.length, "Arrays lengths are not equals");
 
     for (uint256 i = 0; i < len; i++) {
@@ -114,6 +117,7 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
 
   function _setVotingSignatures(bytes4[] memory _signatures, bool[] memory _allowed) internal {
     uint256 len = _signatures.length;
+    _validateArrayLength(len);
     require(len == _allowed.length, "Arrays lengths are not equals");
 
     for (uint256 i = 0; i < len; i++) {
@@ -129,11 +133,16 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
     bool[] memory _allowed
   ) internal {
     uint256 len = _signatures.length;
+    _validateArrayLength(len);
     require(len == _allowed.length, "Arrays lengths are not equals");
 
     for (uint256 i = 0; i < len; i++) {
       votingSignatures[_votingAddress][_signatures[i]] = VotingSignature(_allowed[i], _override);
       emit SetSignatureAllowedForAddress(_votingAddress, _signatures[i], _allowed[i], _override);
     }
+  }
+
+  function _validateArrayLength(uint256 _len) internal {
+    require(_len <= 100, "Array length should be less or equal 100");
   }
 }

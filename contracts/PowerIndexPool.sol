@@ -209,7 +209,7 @@ contract PowerIndexPool is BPool {
     uint256 targetTimestamp
   ) internal pure returns (uint256) {
     uint256 delta = targetDenorm > fromDenorm ? bsub(targetDenorm, fromDenorm) : bsub(fromDenorm, targetDenorm);
-    return delta / bsub(targetTimestamp, fromTimestamp);
+    return div(delta, bsub(targetTimestamp, fromTimestamp));
   }
 
   function _getTotalWeight() internal view override returns (uint256) {

@@ -86,6 +86,11 @@ contract BNum is BConst {
         return c2;
     }
 
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {
+      require(b > 0, "ERR_DIV_ZERO");
+      return a / b;
+    }
+
     // DSMath.wpow
     function bpowi(uint a, uint n)
         internal pure

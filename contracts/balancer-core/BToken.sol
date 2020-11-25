@@ -41,6 +41,8 @@ contract BTokenBase is BNum {
 
     function _move(address src, address dst, uint amt) internal {
         require(_balance[src] >= amt, "ERR_INSUFFICIENT_BAL");
+        _validateAddress(src);
+        _validateAddress(dst);
         _balance[src] = bsub(_balance[src], amt);
         _balance[dst] = badd(_balance[dst], amt);
         emit Transfer(src, dst, amt);
@@ -52,6 +54,10 @@ contract BTokenBase is BNum {
 
     function _pull(address from, uint amt) internal {
         _move(from, address(this), amt);
+    }
+
+    function _validateAddress(address addr) internal {
+        require(addr != address(0), "ERR_NULL_ADDRESS");
     }
 }
 
@@ -86,18 +92,21 @@ contract BToken is BTokenBase, IERC20 {
     }
 
     function approve(address dst, uint amt) external override returns (bool) {
+        _validateAddress(dst);
         _allowance[msg.sender][dst] = amt;
         emit Approval(msg.sender, dst, amt);
         return true;
     }
 
     function increaseApproval(address dst, uint amt) external returns (bool) {
+        _validateAddress(dst);
         _allowance[msg.sender][dst] = badd(_allowance[msg.sender][dst], amt);
         emit Approval(msg.sender, dst, _allowance[msg.sender][dst]);
         return true;
     }
 
     function decreaseApproval(address dst, uint amt) external returns (bool) {
+        _validateAddress(dst);
         uint oldValue = _allowance[msg.sender][dst];
         if (amt > oldValue) {
             _allowance[msg.sender][dst] = 0;
@@ -118,7 +127,7 @@ contract BToken is BTokenBase, IERC20 {
         _move(src, dst, amt);
         if (msg.sender != src && _allowance[src][msg.sender] != uint256(-1)) {
             _allowance[src][msg.sender] = bsub(_allowance[src][msg.sender], amt);
-            emit Approval(msg.sender, dst, _allowance[src][msg.sender]);
+            emit Approval(src, msg.sender, _allowance[src][msg.sender]);
         }
         return true;
     }
