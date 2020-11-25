@@ -1,7 +1,7 @@
 const { time } = require('@openzeppelin/test-helpers');
 const { createSnapshot, revertToSnapshot } = require('./helpers/blockchain');
 const assert = require('chai').assert;
-const MockVestedLPMiningMath = artifacts.require('MockVestedLPMiningMath');
+const MockVestedLPMining = artifacts.require('MockVestedLPMining');
 
 const { toBN } = web3.utils;
 
@@ -24,7 +24,7 @@ describe('VestedLPMining (internal math)', () => {
 
   before(async () => {
     this.startBlock = await web3.eth.getBlockNumber();
-    this.vestingMath = await MockVestedLPMiningMath.new();
+    this.vestingMath = await MockVestedLPMining.new();
     await this.vestingMath.initialize(
       this.vestingMath.address,
       doesNotMatter,
