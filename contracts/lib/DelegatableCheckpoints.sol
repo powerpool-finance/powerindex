@@ -43,12 +43,12 @@ library DelegatableCheckpoints {
      * @dev Gets the data recorded in the latest checkpoint of the given record
      */
     function getLatestData(Record storage record)
-    internal view returns (uint192)
+    internal view returns (uint192, uint32)
     {
         Record memory _record = record;
         return _record.numCheckpoints == 0
-        ? 0
-        : record.checkpoints[_record.numCheckpoints].data;
+        ? (0, 0)
+        : (record.checkpoints[_record.numCheckpoints].data, record.checkpoints[_record.numCheckpoints].fromBlock);
     }
 
     /**
@@ -60,7 +60,7 @@ library DelegatableCheckpoints {
      * @return The data effective as of the given block
      */
     function getPriorData(Record storage record, uint blockNumber, uint checkpointId)
-    internal view returns (uint192)
+    internal view returns (uint192, uint32)
     {
         uint32 blockNum = _safeMinedBlockNum(blockNumber);
         Record memory _record = record;
@@ -73,21 +73,21 @@ library DelegatableCheckpoints {
 
             cp = record.checkpoints[cpId];
             if (cp.fromBlock == blockNum) {
-                return cp.data;
-            } else if (cp.fromBlock < blockNum) {
+                return (cp.data, cp.fromBlock);
+            } else if (cp.fromBlock < cp.fromBlock) {
                 if (cpId == _record.numCheckpoints) {
-                    return cp.data;
+                    return (cp.data, cp.fromBlock);
                 }
                 uint32 nextFromBlock = record.checkpoints[cpId + 1].fromBlock;
                 if (nextFromBlock > blockNum) {
-                    return cp.data;
+                    return (cp.data, cp.fromBlock);
                 }
             }
         }
 
         // Finally, search trough all checkpoints
-        ( , uint192 data) = _findCheckpoint(record, _record.numCheckpoints, blockNum);
-        return data;
+        (uint32 checkpointId, uint192 data) = _findCheckpoint(record, _record.numCheckpoints, blockNum);
+        return (data, record.checkpoints[checkpointId].fromBlock);
     }
 
     /**

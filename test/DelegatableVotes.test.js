@@ -1,3 +1,4 @@
+const { time } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
 const MockDelegatableVotes = artifacts.require('MockDelegatableVotes');
 
@@ -19,6 +20,7 @@ describe('DelegatableVotes', () => {
 
     it('should return the only checkpoint value', async () => {
       await this.dlgVotes.__writeUserData(alice, 358);
+      await time.advanceBlock();
 
       const res = await this.dlgVotes.getCurrentVotes(alice);
       assert.equal(res.toString(), '358');
@@ -28,6 +30,7 @@ describe('DelegatableVotes', () => {
       await this.dlgVotes.__writeUserData(alice, 358);
       await this.dlgVotes.__writeUserData(alice, 359);
       await this.dlgVotes.__writeUserData(alice, 360);
+      await time.advanceBlock();
 
       const res = await this.dlgVotes.getCurrentVotes(alice);
       assert.equal(res.toString(), '360');
@@ -36,6 +39,7 @@ describe('DelegatableVotes', () => {
     it('should return value for a user given', async () => {
       await this.dlgVotes.__writeUserData(alice, 58);
       await this.dlgVotes.__writeUserData(bob, 39);
+      await time.advanceBlock();
 
       assert.equal((await this.dlgVotes.getCurrentVotes(alice)).toString(), '58');
       assert.equal((await this.dlgVotes.getCurrentVotes(bob)).toString(), '39');
@@ -79,19 +83,25 @@ describe('DelegatableVotes', () => {
       this.txs = [];
       /* 0*/ this.txs.push(await this.dlgVotes.__writeSharedData(1010));
       /* 1*/ this.txs.push(await this.dlgVotes.__writeUserData(alice, 500));
+      await time.advanceBlock();
       /* 2*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(alice));
       /* 3*/ this.txs.push(await this.dlgVotes.__writeUserData(bob, 300));
+      await time.advanceBlock();
       /* 4*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(bob));
       /* 5*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(alice));
       /* 6*/ this.txs.push(await this.dlgVotes.__writeSharedData(906)); // Sh 906
       /* 7*/ this.txs.push(await this.dlgVotes.__writeUserData(bob, 204)); // B 204
+      await time.advanceBlock();
       /* 8*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(bob));
       /* 9*/ this.txs.push(await this.dlgVotes.__writeUserData(alice, 402)); // A 402
+      await time.advanceBlock();
       /*10*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(alice));
       /*11*/ this.txs.push(await this.dlgVotes.__moveUserData(alice, alice, carol));
+      await time.advanceBlock();
       /*12*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(alice));
       /*13*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(carol));
       /*14*/ this.txs.push(await this.dlgVotes.__moveUserData(bob, bob, carol));
+      await time.advanceBlock();
       /*15*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(alice));
       /*16*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(bob));
       /*17*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(carol));
@@ -106,12 +116,14 @@ describe('DelegatableVotes', () => {
                with `delegate`, bob "double-spends" his voices moving them to alice w/o writing off from carol.
             */
       /*21*/ this.txs.push(await this.dlgVotes.delegate(alice, { from: bob }));
+      await time.advanceBlock();
       /*22*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(alice));
       /*23*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(bob));
       /*24*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(carol));
       /*25*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(carl));
       /*26*/ this.txs.push(await this.dlgVotes.delegatee.call({ from: alice }));
       /*27*/ this.txs.push(await this.dlgVotes.delegate(carl, { from: alice }));
+      await time.advanceBlock();
       /*28*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(alice));
       /*29*/ this.txs.push(await this.dlgVotes.getCurrentVotes.call(carl));
       /*30*/ this.txs.push(await this.dlgVotes.delegatee.call({ from: alice }));

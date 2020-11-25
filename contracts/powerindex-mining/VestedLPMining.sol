@@ -539,14 +539,25 @@ contract VestedLPMining is
     }
   }
 
-  function _computeUserVotes(uint192 userData, uint192 sharedData) internal pure override returns (uint96 votes) {
+  function _computeUserVotes(
+    uint192 userData,
+    uint192 sharedData,
+    uint192 sharedDataAtUserSave
+  ) internal pure override returns (uint96 votes) {
     (uint96 ownCvp, uint96 pooledCvpShare) = _unpackData(userData);
-    (uint96 totalPooledCvp, ) = _unpackData(sharedData);
+    (uint96 currentTotalPooledCvp, ) = _unpackData(sharedData);
+    (uint96 totalPooledCvpAtUserSave, ) = _unpackData(sharedDataAtUserSave);
 
     if (pooledCvpShare == 0) {
       votes = ownCvp;
     } else {
-      uint256 pooledCvp = uint256(pooledCvpShare).mul(totalPooledCvp).div(SCALE);
+      uint256 pooledCvp = uint256(pooledCvpShare).mul(currentTotalPooledCvp).div(SCALE);
+      if (currentTotalPooledCvp != totalPooledCvpAtUserSave) {
+        uint256 totalCvpDiffRatio = uint256(currentTotalPooledCvp).mul(SCALE).div(uint256(totalPooledCvpAtUserSave));
+        if (totalCvpDiffRatio > SCALE) {
+          pooledCvp = pooledCvp.mul(SCALE).div(totalCvpDiffRatio);
+        }
+      }
       votes = ownCvp.add(SafeMath96.fromUint(pooledCvp, "VLPMining::_computeVotes"));
     }
   }
