@@ -24,15 +24,10 @@ contract PowerIndexAbstractController is Ownable {
    * @notice Call any function from pool, except prohibited signatures
    * @param signature Method signature
    * @param args Encoded method inputs
-   * @param value Send value to pool
    */
-  function callPool(
-    bytes4 signature,
-    bytes calldata args,
-    uint256 value
-  ) external onlyOwner {
+  function callPool(bytes4 signature, bytes calldata args) external onlyOwner {
     _checkSignature(signature);
-    (bool success, bytes memory data) = address(pool).call{ value: value }(abi.encodePacked(signature, args));
+    (bool success, bytes memory data) = address(pool).call(abi.encodePacked(signature, args));
     require(success, "NOT_SUCCESS");
     emit CallPool(success, signature, args, data);
   }

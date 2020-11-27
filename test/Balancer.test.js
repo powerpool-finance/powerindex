@@ -650,17 +650,17 @@ describe('Balancer', () => {
       const setSwapFeeSig = pool.contract._jsonInterface.filter(item => item.name === 'setSwapFee')[0].signature;
       const setSwapFeeArgs = web3.eth.abi.encodeParameters(['uint256'], [ether('0.005').toString()]);
       await expectRevert(
-        poolController.callPool(setSwapFeeSig, setSwapFeeArgs, '0', { from: alice }),
+        poolController.callPool(setSwapFeeSig, setSwapFeeArgs, { from: alice }),
         'Ownable: caller is not the owner',
       );
 
       const setSwapFeeArgsIncorrect = web3.eth.abi.encodeParameters(['uint256'], [ether('5').toString()]);
       await expectRevert(
-        poolController.callPool(setSwapFeeSig, setSwapFeeArgsIncorrect, '0', { from: minter }),
+        poolController.callPool(setSwapFeeSig, setSwapFeeArgsIncorrect, { from: minter }),
         'NOT_SUCCESS',
       );
 
-      await poolController.callPool(setSwapFeeSig, setSwapFeeArgs, '0', { from: minter });
+      await poolController.callPool(setSwapFeeSig, setSwapFeeArgs, { from: minter });
       assert.equal(await pool.getSwapFee(), ether('0.005').toString());
     });
 
@@ -670,7 +670,7 @@ describe('Balancer', () => {
       const setRestrictionsSig = pool.contract._jsonInterface.filter(item => item.name === 'setRestrictions')[0]
         .signature;
       const setRestrictionsArgs = web3.eth.abi.encodeParameters(['address'], [poolRestrictions.address]);
-      await poolController.callPool(setRestrictionsSig, setRestrictionsArgs, '0', { from: minter });
+      await poolController.callPool(setRestrictionsSig, setRestrictionsArgs, { from: minter });
       assert.equal(await pool.getController(), poolController.address);
 
       assert.equal(await this.token1.delegated(pool.address, pool.address), '0');
@@ -690,7 +690,7 @@ describe('Balancer', () => {
         [this.token1.address, delegateSig, '0x' + delegateData.slice(10), '0'],
       );
       await expectRevert(
-        poolController.callPool(callVotingSig, callVotingArgs, '0', { from: minter }),
+        poolController.callPool(callVotingSig, callVotingArgs, { from: minter }),
         'SIGNATURE_NOT_ALLOWED',
       );
 

@@ -196,7 +196,7 @@ describe('PowerIndexPool Unit', () => {
         [this.token1.address, balances[0], targetWeights[0], fromTimestamps[0], targetWeights[0]],
       );
       await expectRevert(
-        poolController.callPool(bindSig, bindArgs, '0', { from: controller }),
+        poolController.callPool(bindSig, bindArgs, { from: controller }),
         'SIGNATURE_NOT_ALLOWED',
       );
     });
@@ -207,7 +207,7 @@ describe('PowerIndexPool Unit', () => {
       const unbindSig = pool.contract._jsonInterface.filter(item => item.name === 'unbind')[0].signature;
       const unbindArgs = web3.eth.abi.encodeParameters(['address'], [this.token1.address]);
       await expectRevert(
-        poolController.callPool(unbindSig, unbindArgs, '0', { from: controller }),
+        poolController.callPool(unbindSig, unbindArgs, { from: controller }),
         'SIGNATURE_NOT_ALLOWED',
       );
     });
