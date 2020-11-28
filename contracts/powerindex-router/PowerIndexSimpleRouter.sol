@@ -2,15 +2,11 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/WrappedPiErc20Interface.sol";
-import "../interfaces/PiRouterInterface.sol";
 import "../interfaces/IPoolRestrictions.sol";
+import "./PowerIndexNaiveRouter.sol";
 
-contract PowerIndexSimpleRouter is PiRouterInterface, Ownable {
-  using SafeMath for uint256;
-
+contract PowerIndexSimpleRouter is PowerIndexNaiveRouter {
   mapping(address => uint256) public reserveRatioByWrapped;
   mapping(address => address) public votingByWrapped;
   mapping(address => address) public stackingByWrapped;
@@ -26,19 +22,8 @@ contract PowerIndexSimpleRouter is PiRouterInterface, Ownable {
   );
   event SetReserveRatioForWrappedToken(address indexed wrappedToken, uint256 ratio);
 
-  constructor(address _poolRestrictions) public Ownable() {
+  constructor(address _poolRestrictions) public PowerIndexNaiveRouter() Ownable() {
     poolRestriction = IPoolRestrictions(_poolRestrictions);
-  }
-
-  function migrateWrappedTokensToNewRouter(address[] calldata _wrappedTokens, address _newRouter)
-    external
-    override
-    onlyOwner
-  {
-    uint256 len = _wrappedTokens.length;
-    for (uint256 i = 0; i < len; i++) {
-      WrappedPiErc20Interface(_wrappedTokens[i]).changeRouter(_newRouter);
-    }
   }
 
   function setVotingAndStackingForWrappedToken(
@@ -55,10 +40,6 @@ contract PowerIndexSimpleRouter is PiRouterInterface, Ownable {
     require(_reserveRatio <= 1 ether, "GREATER_THAN_100_PCT");
     reserveRatioByWrapped[_wrappedToken] = _reserveRatio;
     emit SetReserveRatioForWrappedToken(_wrappedToken, _reserveRatio);
-  }
-
-  function wrapperCallback(uint256 _withdrawAmount) external virtual override {
-    // DO NOTHING
   }
 
   function _callVoting(
