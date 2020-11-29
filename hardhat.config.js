@@ -5,6 +5,7 @@ require('hardhat-contract-sizer');
 require('hardhat-gas-reporter');
 require('./tasks/fetchPoolsData');
 require('./tasks/deployVestedLpMining');
+require('./tasks/deployMainnetPowerIndexPool');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
@@ -59,8 +60,15 @@ const config = {
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
       accounts: getAccounts('mainnet'),
-      gasPrice: 30000000000,
+      gasPrice: 18 * 10 ** 9,
       gasMultiplier: 2,
+    },
+    mainnetfork: {
+      url: 'http://127.0.0.1:8545/',
+      accounts: getAccounts('mainnet'),
+      gasPrice: 18 * 10 ** 9,
+      gasMultiplier: 2,
+      timeout: 2000000,
     },
     local: {
       url: 'http://127.0.0.1:8545',
