@@ -6,6 +6,7 @@ require('hardhat-gas-reporter');
 require('./tasks/fetchPoolsData');
 require('./tasks/deployVestedLpMining');
 require('./tasks/deployMainnetPowerIndexPool');
+require('./tasks/deployErc20PiptSwap');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
@@ -61,7 +62,7 @@ const config = {
       url: 'https://mainnet-eth.compound.finance',
       accounts: getAccounts('mainnet'),
       gasPrice: 19 * 10 ** 9,
-      gasMultiplier: 2,
+      gasMultiplier: 1.2,
     },
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
