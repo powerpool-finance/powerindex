@@ -75,7 +75,7 @@ contract CurvePowerIndexRouter is PowerIndexSimpleRouter {
 
   function wrapperCallback(uint256 _withdrawAmount) external override {
     address wrappedToken = msg.sender;
-    address stackingAddress = stackingByWrapped[wrappedToken];
+    address stackingAddress = stakingByWrapped[wrappedToken];
 
     // Ignore the tokens without a voting assigned
     if (stackingAddress == address(0)) {
@@ -102,7 +102,7 @@ contract CurvePowerIndexRouter is PowerIndexSimpleRouter {
   function _stakeWrappedToVoting(address _wrappedToken, uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
 
-    CurveStakeInterface staking = CurveStakeInterface(stackingByWrapped[_wrappedToken]);
+    CurveStakeInterface staking = CurveStakeInterface(stakingByWrapped[_wrappedToken]);
     (uint256 lockedAmount, uint256 lockedEnd) = staking.locked(_wrappedToken);
 
     if (lockedEnd != 0 && lockedEnd <= block.timestamp) {

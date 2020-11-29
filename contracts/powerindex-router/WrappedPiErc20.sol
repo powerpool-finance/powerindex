@@ -86,7 +86,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
     uint256 value
   ) external override onlyRouter {
     (bool success, bytes memory data) = voting.call{ value: value }(abi.encodePacked(signature, args));
-    require(success, "CALL_VOTING_REVERTED");
+    require(success, "CALL_EXTERNAL_REVERTED");
 
     emit CallVoting(voting, success, signature, args, data);
   }

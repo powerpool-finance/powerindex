@@ -13,7 +13,7 @@ contract PowerIndexSimpleRouter is PiRouterInterface, Ownable {
 
   mapping(address => uint256) public reserveRatioByWrapped;
   mapping(address => address) public votingByWrapped;
-  mapping(address => address) public stackingByWrapped;
+  mapping(address => address) public stakingByWrapped;
 
   IPoolRestrictions public poolRestriction;
 
@@ -47,7 +47,7 @@ contract PowerIndexSimpleRouter is PiRouterInterface, Ownable {
     address _stacking
   ) external onlyOwner {
     votingByWrapped[_wrappedToken] = _voting;
-    stackingByWrapped[_wrappedToken] = _stacking;
+    stakingByWrapped[_wrappedToken] = _stacking;
     emit SetVotingAndStackingForWrappedToken(_wrappedToken, _voting, _stacking);
   }
 
@@ -74,7 +74,7 @@ contract PowerIndexSimpleRouter is PiRouterInterface, Ownable {
     bytes4 _sig,
     bytes memory _data
   ) internal {
-    WrappedPiErc20Interface(_wrappedToken).callVoting(stackingByWrapped[_wrappedToken], _sig, _data, 0);
+    WrappedPiErc20Interface(_wrappedToken).callVoting(stakingByWrapped[_wrappedToken], _sig, _data, 0);
   }
 
   function _checkVotingSenderAllowed(address _wrappedToken) internal view {
@@ -88,6 +88,7 @@ contract PowerIndexSimpleRouter is PiRouterInterface, Ownable {
     uint256 _withdrawAmount
   )
     internal
+    view
     returns (
       ReserveStatus status,
       uint256 diff,
@@ -96,8 +97,8 @@ contract PowerIndexSimpleRouter is PiRouterInterface, Ownable {
   {
     uint256 wrappedBalance = WrappedPiErc20Interface(_wrappedToken).getWrappedBalance();
 
-    uint256 reserveAmount = reserveRatioByWrapped[_wrappedToken].mul(_stakedBalance.add(wrappedBalance)).div(1 ether);
-    reserveAmount = reserveAmount.add(_withdrawAmount);
+    uint256 _reserveAmount = reserveRatioByWrapped[_wrappedToken].mul(_stakedBalance.add(wrappedBalance)).div(1 ether);
+    reserveAmount = _reserveAmount.add(_withdrawAmount);
     if (reserveAmount > wrappedBalance) {
       status = ReserveStatus.ABOVE;
       diff = reserveAmount.sub(wrappedBalance);
@@ -112,7 +113,7 @@ contract PowerIndexSimpleRouter is PiRouterInterface, Ownable {
 
   function _approveWrappedTokenToStacking(address _wrappedToken, uint256 _amount) internal {
     WrappedPiErc20Interface wrappedPi = WrappedPiErc20Interface(_wrappedToken);
-    wrappedPi.approveToken(stackingByWrapped[_wrappedToken], _amount);
+    wrappedPi.approveToken(stakingByWrapped[_wrappedToken], _amount);
   }
 
   function _approveWrappedTokenToVoting(address _wrappedToken, uint256 _amount) internal {
