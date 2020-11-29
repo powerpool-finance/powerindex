@@ -70,7 +70,7 @@ abstract contract DelegatableVotes {
 
   /**
    * @notice Gas-optimized version of the `getPriorVotes` function -
-   * it accepts IDs of checkpoints to look for voice data as of the given block in
+   * it accepts IDs of checkpoints to look for votes data as of the given block in
    * (if the checkpoints miss the data, it get searched through all checkpoints recorded)
    * @dev Call (off-chain) the `findCheckpoints` function to get needed IDs
    * @param account The address of the account to get votes for
@@ -93,7 +93,7 @@ abstract contract DelegatableVotes {
     return _computeUserVotes(userData, sharedData, sharedDataAtUserSave);
   }
 
-  /// @notice Returns IDs of checkpoints which store the given account' voice computation data
+  /// @notice Returns IDs of checkpoints which store the given account' votes computation data
   /// @dev Intended for off-chain use (by UI)
   function findCheckpoints(address account, uint256 blockNumber)
     external
@@ -120,7 +120,7 @@ abstract contract DelegatableVotes {
 
     (uint192 latestData, ) = dst.getLatestData();
     dst.writeCheckpoint(
-      // keep in mind voices which others could have delegated
+      // keep in mind votes which others could have delegated
       _computeUserData(latestData, data, delegatables[account])
     );
     delegatables[account] = data;

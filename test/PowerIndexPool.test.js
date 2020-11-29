@@ -811,8 +811,8 @@ describe('PowerIndexPool', () => {
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.001'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.0015'));
 
-      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('0.005275'), ether('0.03'));
-      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('150400.007964752950931892'), ether('0.03'));
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('0.005275'), ether('0.05'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('150400.007964752950931892'), ether('0.05'));
 
       await time.increase(11000 / 3);
 
@@ -823,8 +823,8 @@ describe('PowerIndexPool', () => {
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.007'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.01'));
 
-      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('0.0333'), ether('0.03'));
-      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('60987.690675181463841264'), ether('0.03'));
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('0.0333'), ether('0.05'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('60987.690675181463841264'), ether('0.05'));
 
       await time.increase(11000 / 3);
 
@@ -842,8 +842,8 @@ describe('PowerIndexPool', () => {
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('0.8'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('1'));
 
-      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('3.57205'), ether('0.03'));
-      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('5.06328129221017354'), ether('0.03'));
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('3.57205'), ether('0.05'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('5.06328129221017354'), ether('0.05'));
 
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('1.2'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('1.5'));
@@ -873,21 +873,21 @@ describe('PowerIndexPool', () => {
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('7500'));
       await this.multihopBatchSwapExactIn(newToken.address, oldTokenAddress, ether('10000'));
 
-      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('33528.31205'), ether('0.03'));
-      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('0.000000032762959096'), ether('0.03'));
+      assertEqualWithAccuracy(await pool.getBalance(newToken.address), ether('33528.31205'), ether('0.05'));
+      assertEqualWithAccuracy(await pool.getBalance(oldTokenAddress), ether('0.000000032762959096'), ether('0.05'));
 
       await time.increase(11000 / 3);
 
       assertEqualWithAccuracy(
         await this.calcPoolOutGivenSingleIn(oldTokenAddress, ether('0.00000001')),
         ether('0.011361611404341'),
-        ether('0.03')
+        ether('0.05')
       );
 
       assertEqualWithAccuracy(
         await this.calcPoolOutGivenSingleIn(newToken.address, ether('0.0001')),
         ether('0.6947673398357076'),
-        ether('0.03')
+        ether('0.05')
       );
     });
 
