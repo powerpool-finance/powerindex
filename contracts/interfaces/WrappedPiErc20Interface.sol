@@ -13,7 +13,7 @@ interface WrappedPiErc20Interface is IERC20 {
 
   function approveToken(address _to, uint256 _amount) external;
 
-  function callVoting(
+  function callExternal(
     address voting,
     bytes4 signature,
     bytes calldata args,

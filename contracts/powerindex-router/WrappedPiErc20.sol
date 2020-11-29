@@ -19,7 +19,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
   event Withdraw(address indexed account, uint256 amount);
   event Approve(address indexed to, uint256 amount);
   event ChangeRouter(address indexed newRouter);
-  event CallVoting(
+  event CallExternal(
     address indexed voting,
     bool indexed success,
     bytes4 indexed inputSig,
@@ -79,7 +79,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
     emit Approve(_to, _amount);
   }
 
-  function callVoting(
+  function callExternal(
     address voting,
     bytes4 signature,
     bytes calldata args,
@@ -88,7 +88,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
     (bool success, bytes memory data) = voting.call{ value: value }(abi.encodePacked(signature, args));
     require(success, "CALL_EXTERNAL_REVERTED");
 
-    emit CallVoting(voting, success, signature, args, data);
+    emit CallExternal(voting, success, signature, args, data);
   }
 
   function getWrappedBalance() external view override returns (uint256) {

@@ -102,17 +102,17 @@ contract AavePowerIndexRouter is PowerIndexSimpleRouter {
   /*** INTERNALS ***/
 
   function _triggerCoolDown(address _wrappedToken) internal {
-    _callStacking(_wrappedToken, COOLDOWN_SIG, "");
+    _callStaking(_wrappedToken, COOLDOWN_SIG, "");
   }
 
   function _stakeWrappedToStaking(address _wrappedToken, uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
-    _approveWrappedTokenToStacking(_wrappedToken, _amount);
-    _callStacking(_wrappedToken, STAKE_SIG, abi.encode(_amount));
+    _approveWrappedTokenToStaking(_wrappedToken, _amount);
+    _callStaking(_wrappedToken, STAKE_SIG, abi.encode(_amount));
   }
 
   function _withdrawWrappedFromStaking(address _wrappedToken, uint256 _amount) internal {
     require(_amount > 0, "CANT_WITHDRAW_0");
-    _callStacking(_wrappedToken, REDEEM_SIG, abi.encode(_amount));
+    _callStaking(_wrappedToken, REDEEM_SIG, abi.encode(_amount));
   }
 }

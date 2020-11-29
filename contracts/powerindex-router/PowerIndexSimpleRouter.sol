@@ -15,10 +15,10 @@ contract PowerIndexSimpleRouter is PowerIndexNaiveRouter {
 
   enum ReserveStatus { EQUAL, ABOVE, BELLOW }
 
-  event SetVotingAndStackingForWrappedToken(
+  event SetVotingAndStakingForWrappedToken(
     address indexed wrappedToken,
     address indexed voting,
-    address indexed stacking
+    address indexed staking
   );
   event SetReserveRatioForWrappedToken(address indexed wrappedToken, uint256 ratio);
 
@@ -26,14 +26,14 @@ contract PowerIndexSimpleRouter is PowerIndexNaiveRouter {
     poolRestriction = IPoolRestrictions(_poolRestrictions);
   }
 
-  function setVotingAndStackingForWrappedToken(
+  function setVotingAndStakingForWrappedToken(
     address _wrappedToken,
     address _voting,
-    address _stacking
+    address _staking
   ) external onlyOwner {
     votingByWrapped[_wrappedToken] = _voting;
-    stakingByWrapped[_wrappedToken] = _stacking;
-    emit SetVotingAndStackingForWrappedToken(_wrappedToken, _voting, _stacking);
+    stakingByWrapped[_wrappedToken] = _staking;
+    emit SetVotingAndStakingForWrappedToken(_wrappedToken, _voting, _staking);
   }
 
   function setReserveRatioForWrappedToken(address _wrappedToken, uint256 _reserveRatio) external onlyOwner {
@@ -47,15 +47,15 @@ contract PowerIndexSimpleRouter is PowerIndexNaiveRouter {
     bytes4 _sig,
     bytes memory _data
   ) internal {
-    WrappedPiErc20Interface(_wrappedToken).callVoting(votingByWrapped[_wrappedToken], _sig, _data, 0);
+    WrappedPiErc20Interface(_wrappedToken).callExternal(votingByWrapped[_wrappedToken], _sig, _data, 0);
   }
 
-  function _callStacking(
+  function _callStaking(
     address _wrappedToken,
     bytes4 _sig,
     bytes memory _data
   ) internal {
-    WrappedPiErc20Interface(_wrappedToken).callVoting(stakingByWrapped[_wrappedToken], _sig, _data, 0);
+    WrappedPiErc20Interface(_wrappedToken).callExternal(stakingByWrapped[_wrappedToken], _sig, _data, 0);
   }
 
   function _checkVotingSenderAllowed(address _wrappedToken) internal view {
@@ -92,7 +92,7 @@ contract PowerIndexSimpleRouter is PowerIndexNaiveRouter {
     }
   }
 
-  function _approveWrappedTokenToStacking(address _wrappedToken, uint256 _amount) internal {
+  function _approveWrappedTokenToStaking(address _wrappedToken, uint256 _amount) internal {
     WrappedPiErc20Interface wrappedPi = WrappedPiErc20Interface(_wrappedToken);
     wrappedPi.approveToken(stakingByWrapped[_wrappedToken], _amount);
   }

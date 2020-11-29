@@ -75,14 +75,14 @@ contract CurvePowerIndexRouter is PowerIndexSimpleRouter {
 
   function wrapperCallback(uint256 _withdrawAmount) external override {
     address wrappedToken = msg.sender;
-    address stackingAddress = stakingByWrapped[wrappedToken];
+    address stakingAddress = stakingByWrapped[wrappedToken];
 
     // Ignore the tokens without a voting assigned
-    if (stackingAddress == address(0)) {
+    if (stakingAddress == address(0)) {
       return;
     }
 
-    CurveStakeInterface staking = CurveStakeInterface(stackingAddress);
+    CurveStakeInterface staking = CurveStakeInterface(stakingAddress);
     (ReserveStatus status, uint256 diff, uint256 reserveAmount) =
       _getReserveStatus(wrappedToken, staking.balanceOf(wrappedToken), _withdrawAmount);
 
@@ -110,21 +110,21 @@ contract CurvePowerIndexRouter is PowerIndexSimpleRouter {
       lockedEnd = 0;
     }
 
-    _approveWrappedTokenToStacking(_wrappedToken, _amount);
+    _approveWrappedTokenToStaking(_wrappedToken, _amount);
 
     if (lockedEnd == 0) {
-      _callStacking(_wrappedToken, CREATE_STAKE_SIG, abi.encode(_amount, block.timestamp + WEEK));
+      _callStaking(_wrappedToken, CREATE_STAKE_SIG, abi.encode(_amount, block.timestamp + WEEK));
     } else {
       if (block.timestamp + minLockTime > lockedEnd) {
-        _callStacking(_wrappedToken, INCREASE_STAKE_TIME_SIG, abi.encode(block.timestamp + minLockTime));
+        _callStaking(_wrappedToken, INCREASE_STAKE_TIME_SIG, abi.encode(block.timestamp + minLockTime));
       }
       if (_amount > lockedAmount) {
-        _callStacking(_wrappedToken, INCREASE_STAKE_SIG, abi.encode(_amount.sub(lockedAmount)));
+        _callStaking(_wrappedToken, INCREASE_STAKE_SIG, abi.encode(_amount.sub(lockedAmount)));
       }
     }
   }
 
   function _withdrawWrappedFromVoting(address _wrappedToken) internal {
-    _callStacking(_wrappedToken, WITHDRAW_SIG, abi.encode());
+    _callStaking(_wrappedToken, WITHDRAW_SIG, abi.encode());
   }
 }
