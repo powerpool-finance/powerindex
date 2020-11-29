@@ -3,10 +3,10 @@
 pragma solidity 0.6.12;
 
 import "../interfaces/WrappedPiErc20Interface.sol";
-import "./PowerIndexSimpleRouter.sol";
+import "./PowerIndexBasicRouter.sol";
 import "../interfaces/CurveStakeInterface.sol";
 
-contract CurvePowerIndexRouter is PowerIndexSimpleRouter {
+contract CurvePowerIndexRouter is PowerIndexBasicRouter {
   event SetMinLockTime(uint256 minLockTime);
 
   bytes4 public constant CREATE_STAKE_SIG = bytes4(keccak256(bytes("create_lock(uint256,uint256)")));
@@ -21,7 +21,7 @@ contract CurvePowerIndexRouter is PowerIndexSimpleRouter {
 
   uint256 public minLockTime;
 
-  constructor(address _poolRestrictions, uint256 _minLockTime) public PowerIndexSimpleRouter(_poolRestrictions) {
+  constructor(address _poolRestrictions, uint256 _minLockTime) public PowerIndexBasicRouter(_poolRestrictions) {
     minLockTime = _minLockTime;
   }
 

@@ -4,16 +4,16 @@ pragma solidity 0.6.12;
 
 import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/aave/IStakedAave.sol";
-import "./PowerIndexSimpleRouter.sol";
+import "./PowerIndexBasicRouter.sol";
 
-contract AavePowerIndexRouter is PowerIndexSimpleRouter {
+contract AavePowerIndexRouter is PowerIndexBasicRouter {
   bytes4 public constant COOLDOWN_SIG = bytes4(keccak256(bytes("cooldown()")));
   bytes4 public constant STAKE_SIG = bytes4(keccak256(bytes("stake(address,uint256)")));
   bytes4 public constant REDEEM_SIG = bytes4(keccak256(bytes("redeem(address,uint256)")));
   bytes4 public constant VOTE_FOR_SIG = bytes4(keccak256(bytes("voteFor(uint256)")));
   bytes4 public constant VOTE_AGAINST_SIG = bytes4(keccak256(bytes("voteAgainst(uint256)")));
 
-  constructor(address _poolRestrictions) public PowerIndexSimpleRouter(_poolRestrictions) {}
+  constructor(address _poolRestrictions) public PowerIndexBasicRouter(_poolRestrictions) {}
 
   /*** THE PROXIED METHOD EXECUTORS ***/
 

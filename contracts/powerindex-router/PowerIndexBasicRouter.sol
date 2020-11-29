@@ -6,7 +6,7 @@ import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/IPoolRestrictions.sol";
 import "./PowerIndexNaiveRouter.sol";
 
-contract PowerIndexSimpleRouter is PowerIndexNaiveRouter {
+contract PowerIndexBasicRouter is PowerIndexNaiveRouter {
   mapping(address => uint256) public reserveRatioByWrapped;
   mapping(address => address) public votingByWrapped;
   mapping(address => address) public stakingByWrapped;

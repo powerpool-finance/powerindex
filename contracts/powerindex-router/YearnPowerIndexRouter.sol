@@ -4,9 +4,9 @@ pragma solidity 0.6.12;
 
 import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/YearnGovernanceInterface.sol";
-import "./PowerIndexSimpleRouter.sol";
+import "./PowerIndexBasicRouter.sol";
 
-contract YearnPowerIndexRouter is PowerIndexSimpleRouter {
+contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   bytes4 public constant REGISTER_SIG = bytes4(keccak256(bytes("register()")));
   bytes4 public constant EXIT_SIG = bytes4(keccak256(bytes("exit()")));
   bytes4 public constant PROPOSE_SIG = bytes4(keccak256(bytes("propose(address,string)")));
@@ -15,7 +15,7 @@ contract YearnPowerIndexRouter is PowerIndexSimpleRouter {
   bytes4 public constant VOTE_FOR_SIG = bytes4(keccak256(bytes("voteFor(uint256)")));
   bytes4 public constant VOTE_AGAINST_SIG = bytes4(keccak256(bytes("voteAgainst(uint256)")));
 
-  constructor(address _poolRestrictions) public PowerIndexSimpleRouter(_poolRestrictions) {}
+  constructor(address _poolRestrictions) public PowerIndexBasicRouter(_poolRestrictions) {}
 
   /*** THE PROXIED METHOD EXECUTORS ***/
 

@@ -2,11 +2,11 @@ const { expectRevert, ether } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
-const PowerIndexSimpleRouter = artifacts.require('PowerIndexSimpleRouter');
+const PowerIndexBasicRouter = artifacts.require('PowerIndexBasicRouter');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 
 MockERC20.numberFormat = 'String';
-PowerIndexSimpleRouter.numberFormat = 'String';
+PowerIndexBasicRouter.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 
 const { web3 } = MockERC20;
@@ -21,9 +21,9 @@ describe('PowerIndex Router Test', () => {
   it('should allow swapping a token with a new version', async () => {
     const token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
     const poolRestrictions = await PoolRestrictions.new();
-    const router = await PowerIndexSimpleRouter.new(poolRestrictions.address);
+    const router = await PowerIndexBasicRouter.new(poolRestrictions.address);
     const wrapper = await WrappedPiErc20.new(token.address, router.address, 'WToken', 'WTKN');
-    const router2 = await PowerIndexSimpleRouter.new(poolRestrictions.address);
+    const router2 = await PowerIndexBasicRouter.new(poolRestrictions.address);
 
     assert.equal(await router.owner(), minter);
 
