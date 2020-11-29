@@ -71,7 +71,7 @@ task('deploy-power-index-pool', 'Deploy PowerIndexPool').setAction(async () => {
         balance: balances[index],
         targetDenorm: ether('6.25'),
         fromTimestamp: '1606688190',
-        targetTimestamp: '1607116590'
+        targetTimestamp: '1607120190'
       })),
       sendOptions,
     );

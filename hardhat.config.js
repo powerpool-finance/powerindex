@@ -60,13 +60,13 @@ const config = {
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
       accounts: getAccounts('mainnet'),
-      gasPrice: 18 * 10 ** 9,
+      gasPrice: 19 * 10 ** 9,
       gasMultiplier: 2,
     },
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
       accounts: getAccounts('mainnet'),
-      gasPrice: 18 * 10 ** 9,
+      gasPrice: 19 * 10 ** 9,
       gasMultiplier: 2,
       timeout: 2000000,
     },
