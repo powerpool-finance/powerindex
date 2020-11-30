@@ -1,6 +1,6 @@
 require('@powerpool/hardhat-ganache');
 require('@nomiclabs/hardhat-truffle5');
-require("@nomiclabs/hardhat-etherscan");
+require('@nomiclabs/hardhat-etherscan');
 require('solidity-coverage');
 require('hardhat-contract-sizer');
 require('hardhat-gas-reporter');
