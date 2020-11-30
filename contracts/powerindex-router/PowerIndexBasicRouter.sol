@@ -4,9 +4,10 @@ pragma solidity 0.6.12;
 
 import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/IPoolRestrictions.sol";
+import "../interfaces/PowerIndexBasicRouterInterface.sol";
 import "./PowerIndexNaiveRouter.sol";
 
-contract PowerIndexBasicRouter is PowerIndexNaiveRouter {
+contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiveRouter {
   mapping(address => uint256) public reserveRatioByWrapped;
   mapping(address => address) public votingByWrapped;
   mapping(address => address) public stakingByWrapped;
@@ -30,7 +31,7 @@ contract PowerIndexBasicRouter is PowerIndexNaiveRouter {
     address _wrappedToken,
     address _voting,
     address _staking
-  ) external onlyOwner {
+  ) external override onlyOwner {
     votingByWrapped[_wrappedToken] = _voting;
     stakingByWrapped[_wrappedToken] = _staking;
     emit SetVotingAndStakingForWrappedToken(_wrappedToken, _voting, _staking);

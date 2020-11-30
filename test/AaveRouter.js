@@ -1,11 +1,13 @@
-const { time, ether: rEther } = require('@openzeppelin/test-helpers');
-const { artifactFromBytecode } = require('./helpers/index');
+const { time, ether: rEther, expectEvent } = require('@openzeppelin/test-helpers');
+const { artifactFromBytecode, toEvmBytes32 } = require('./helpers/index');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
+const AIP2ProposalPayload = artifacts.require('AIP2ProposalPayload');
 const { web3 } = MockERC20;
+const { keccak256, numberToHex } = web3.utils;
 
 const StakedAave = artifactFromBytecode('aave/StakedAave')
 const AaveProtoGovernance = artifactFromBytecode('aave/AaveProtoGovernance')
@@ -22,15 +24,15 @@ function ether(value) {
 }
 
 describe('AaveRouter Tests', () => {
-  let minter, bob, alice, yearnOwner, rewardsVault, emissionManager, lendToken;
+  let minter, bob, alice, charlie, yearnOwner, rewardsVault, emissionManager, lendToken;
 
   before(async function () {
-    [minter, bob, alice, yearnOwner, rewardsVault, emissionManager, lendToken] = await web3.eth.getAccounts();
+    [minter, bob, alice, charlie, yearnOwner, rewardsVault, emissionManager, lendToken] = await web3.eth.getAccounts();
   });
 
   it.only('should allow depositing Aave and staking it in a StakedAave contract', async () => {
     // 0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9
-    const aave = await MockERC20.new('Aave Token', 'AAVE', '18', ether('1000000'));
+    const aave = await MockERC20.new('Aave Token', 'AAVE', '18', ether('100000000000'));
 
     // Setting up Aave Governance and Staking
     // 0x4da27a545c0c5B758a6BA100e3a049001de870f5
@@ -57,7 +59,7 @@ describe('AaveRouter Tests', () => {
 
     // 0xf7ff0aee0c2d6fbdea3a85742443e284b62fd0b2
     const paramsProvider = await GovernanceParamsProvider.new(
-      2,
+      ether(1),
       // 0x72bbcfc20d355fc3e8ac4ce8fcaf63874f746631
       aavePropositionPower.address,
       // 0x5ac493b8c2cef1f02f117b9ba2797e7da95574aa
@@ -65,7 +67,7 @@ describe('AaveRouter Tests', () => {
     );
 
     // 0x8a2efd9a790199f4c94c6effe210fce0b4724f52
-    const governance = await AaveProtoGovernance.new(
+    const aaveGovernance = await AaveProtoGovernance.new(
       // 0xf7ff0aee0c2d6fbdea3a85742443e284b62fd0b2
       paramsProvider.address
     );
@@ -75,10 +77,13 @@ describe('AaveRouter Tests', () => {
 
     const aaveWrapper = await WrappedPiErc20.new(aave.address, router.address, 'wrapped.aave', 'WAAVE');
 
-    await router.setVotingAndStackingForWrappedToken(aaveWrapper.address, governance.address, stakedAave.address);
+    // Setting up...
+    await router.setVotingAndStakingForWrappedToken(aaveWrapper.address, aaveGovernance.address, stakedAave.address);
     await router.setReserveRatioForWrappedToken(aaveWrapper.address, ether('0.2'));
 
     assert.equal(await router.owner(), minter);
+
+    await aavePropositionPower.mint(charlie, ether(3));
 
     await aave.transfer(alice, ether('10000'));
     await aave.approve(aaveWrapper.address, ether('10000'), { from: alice });
@@ -87,30 +92,66 @@ describe('AaveRouter Tests', () => {
     assert.equal(await aaveWrapper.totalSupply(), ether('10000'));
     assert.equal(await aaveWrapper.balanceOf(alice), ether('10000'));
 
-    return;
     // The router has partially staked the deposit with regard to the reserve ration value (20/80)
     assert.equal(await aave.balanceOf(aaveWrapper.address), ether(2000));
-    assert.equal(await aave.balanceOf(yearnGovernance.address), ether(8000));
+    assert.equal(await aave.balanceOf(stakedAave.address), ether(8000));
 
-    // The votes are allocated on the yfiWrapper contract
+    // The stakeAave are allocated on the aaveWrapper contract
     assert.equal(await stakedAave.balanceOf(aaveWrapper.address), ether(8000));
 
-    const proposalString = 'Lets do it';
+    /// Voting....
+    await aave.transfer(alice, ether(23000000));
+    await aave.approve(aaveWrapper.address, ether(23000000), { from: alice });
+    await aaveWrapper.deposit(ether(23000000), { from: alice });
+    assert.equal(await stakedAave.balanceOf(aaveWrapper.address), ether(18408000));
 
-    await poolRestrictions.setVotingAllowedForSenders(stakedAave.address, [alice], [true]);
+    let executor = await AIP2ProposalPayload.new();
 
-    await router.executeRegister(aaveWrapper.address, { from: alice });
-    await router.executePropose(aaveWrapper.address, bob, proposalString, { from: alice });
-    await router.executeVoteFor(aaveWrapper.address, 0, { from: alice });
+    await poolRestrictions.setVotingAllowedForSenders(aaveGovernance.address, [alice], [true]);
 
-    await time.advanceBlockTo((await time.latestBlock()).toNumber() + 10);
+    await aaveGovernance.newProposal(
+      // proposalType
+      numberToHex("1"),
+      // ipfsHash
+      "0x0",
+      // threshold
+      ether(13000000),
+      // proposalExecutor
+      executor.address,
+      // votingBlocksDuration
+      1660,
+      // validatingBlocksDuration
+      1660,
+      // _maxMovesToVotingAllowed
+      4,
+      { from: charlie }
+    )
+    await router.executeSubmitVote(aaveWrapper.address, 0, 1, votingStrategy.address, { from: alice });
 
-    await yearnGovernance.tallyVotes(0);
+    console.time('REWIND');
+    await time.advanceBlockTo((await time.latestBlock()).toNumber() + 1662);
+    console.timeEnd('REWIND');
+    await aaveGovernance.tryToMoveToValidating(0);
+    console.time('REWIND2');
+    await time.advanceBlockTo((await time.latestBlock()).toNumber() + 1662);
+    console.timeEnd('REWIND2');
 
-    const proposal = await yearnGovernance.proposals(0);
-    assert.equal(proposal.open, false);
-    assert.equal(proposal.totalForVotes, ether(8000));
-    assert.equal(proposal.totalAgainstVotes, ether(0));
-    assert.equal(proposal.hash, proposalString);
+    assert.equal(await web3.eth.getStorageAt(aaveGovernance.address, "0x3333"), toEvmBytes32(0));
+
+    let res = await aaveGovernance.resolveProposal(0, { from: lendToken });
+    await expectEvent.inTransaction(res.tx, AaveProtoGovernance, 'YesWins', {
+      proposalId: '0'
+    });
+    await expectEvent.inTransaction(res.tx, AIP2ProposalPayload, 'ProposalExecuted', {
+      caller: lendToken
+    });
+
+    const proposal = await aaveGovernance.getProposalBasicData(0);
+    assert.equal(proposal._proposalStatus, 3);
+
+    assert.equal(
+      await web3.eth.getStorageAt(aaveGovernance.address, "0x3333"),
+      '0x000000000000000000000000000000000000000000000000000000000000002a'
+    );
   });
 });

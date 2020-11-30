@@ -3,28 +3,23 @@
 pragma solidity 0.6.12;
 
 import "../interfaces/WrappedPiErc20Interface.sol";
+import "../interfaces/aave/IAaveProtoGovernance.sol";
 import "../interfaces/aave/IStakedAave.sol";
 import "./PowerIndexBasicRouter.sol";
 
 contract AavePowerIndexRouter is PowerIndexBasicRouter {
-  bytes4 public constant COOLDOWN_SIG = bytes4(keccak256(bytes("cooldown()")));
-  bytes4 public constant STAKE_SIG = bytes4(keccak256(bytes("stake(address,uint256)")));
-  bytes4 public constant REDEEM_SIG = bytes4(keccak256(bytes("redeem(address,uint256)")));
-  bytes4 public constant VOTE_FOR_SIG = bytes4(keccak256(bytes("voteFor(uint256)")));
-  bytes4 public constant VOTE_AGAINST_SIG = bytes4(keccak256(bytes("voteAgainst(uint256)")));
-
   constructor(address _poolRestrictions) public PowerIndexBasicRouter(_poolRestrictions) {}
 
   /*** THE PROXIED METHOD EXECUTORS ***/
 
-  function executeVoteFor(address _wrappedToken, uint256 _id) external {
+  function executeSubmitVote(address _wrappedToken, uint256 _id, uint256 _vote, address _asset) external {
     _checkVotingSenderAllowed(_wrappedToken);
-    _callVoting(_wrappedToken, VOTE_FOR_SIG, abi.encode(_id));
+    _callVoting(_wrappedToken, IAaveProtoGovernance(0).submitVoteByVoter.selector, abi.encode(_id, _vote, _asset));
   }
 
-  function executeVoteAgainst(address _wrappedToken, uint256 _id) external {
+  function executeCancelVote(address _wrappedToken, uint256 _id) external {
     _checkVotingSenderAllowed(_wrappedToken);
-    _callVoting(_wrappedToken, VOTE_AGAINST_SIG, abi.encode(_id));
+    _callVoting(_wrappedToken, IAaveProtoGovernance(0).cancelVoteByVoter.selector, abi.encode(_id));
   }
 
   /*** OWNER METHODS ***/
@@ -102,17 +97,17 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   /*** INTERNALS ***/
 
   function _triggerCoolDown(address _wrappedToken) internal {
-    _callStaking(_wrappedToken, COOLDOWN_SIG, "");
+    _callStaking(_wrappedToken, IStakedAave(0).cooldown.selector, "");
   }
 
   function _stakeWrappedToStaking(address _wrappedToken, uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
     _approveWrappedTokenToStaking(_wrappedToken, _amount);
-    _callStaking(_wrappedToken, STAKE_SIG, abi.encode(_amount));
+    _callStaking(_wrappedToken, IStakedAave(0).stake.selector, abi.encode(_wrappedToken, _amount));
   }
 
   function _withdrawWrappedFromStaking(address _wrappedToken, uint256 _amount) internal {
     require(_amount > 0, "CANT_WITHDRAW_0");
-    _callStaking(_wrappedToken, REDEEM_SIG, abi.encode(_amount));
+    _callStaking(_wrappedToken, IStakedAave(0).redeem.selector, abi.encode(_amount));
   }
 }

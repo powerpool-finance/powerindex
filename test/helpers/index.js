@@ -17,6 +17,11 @@ function artifactFromBytecode(name) {
   return contract;
 }
 
+function toEvmBytes32(bytes32) {
+  return web3.utils.padRight(bytes32, 64);
+}
+
 module.exports = {
-  artifactFromBytecode
+  artifactFromBytecode,
+  toEvmBytes32
 }

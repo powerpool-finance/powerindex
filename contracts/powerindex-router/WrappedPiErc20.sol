@@ -5,7 +5,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "../interfaces/PiRouterInterface.sol";
+import "../interfaces/PowerIndexNaiveRouterInterface.sol";
 import "../interfaces/WrappedPiErc20Interface.sol";
 
 contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
@@ -43,7 +43,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
   }
 
   function pokeRouter() external {
-    PiRouterInterface(router).wrapperCallback(0);
+    PowerIndexNaiveRouterInterface(router).wrapperCallback(0);
   }
 
   function deposit(uint256 _amount) external override {
@@ -54,7 +54,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
     token.safeTransferFrom(_msgSender(), address(this), _amount);
     _mint(_msgSender(), _amount);
 
-    PiRouterInterface(router).wrapperCallback(0);
+    PowerIndexNaiveRouterInterface(router).wrapperCallback(0);
   }
 
   function withdraw(uint256 _amount) external override {
@@ -62,7 +62,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
 
     emit Withdraw(_msgSender(), _amount);
 
-    PiRouterInterface(router).wrapperCallback(_amount);
+    PowerIndexNaiveRouterInterface(router).wrapperCallback(_amount);
 
     ERC20(address(this)).transferFrom(_msgSender(), address(this), _amount);
     _burn(address(this), _amount);
@@ -86,7 +86,8 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
     uint256 value
   ) external override onlyRouter {
     (bool success, bytes memory data) = voting.call{ value: value }(abi.encodePacked(signature, args));
-    require(success, "CALL_EXTERNAL_REVERTED");
+    require(success, string(data));
+//    require(success, "CALL_EXTERNAL_REVERTED");
 
     emit CallExternal(voting, success, signature, args, data);
   }
