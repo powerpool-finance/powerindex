@@ -1,5 +1,6 @@
 require('@powerpool/hardhat-ganache');
 require('@nomiclabs/hardhat-truffle5');
+require("@nomiclabs/hardhat-etherscan");
 require('solidity-coverage');
 require('hardhat-contract-sizer');
 require('hardhat-gas-reporter');
@@ -63,6 +64,7 @@ const config = {
       accounts: getAccounts('mainnet'),
       gasPrice: 24 * 10 ** 9,
       gasMultiplier: 1.2,
+      timeout: 2000000,
     },
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
@@ -96,7 +98,7 @@ const config = {
   solidity: {
     settings: {
       optimizer: {
-        enabled: process.env.COMPILE_TARGET === 'release',
+        enabled: !!process.env.ETHERSCAN_KEY || process.env.COMPILE_TARGET === 'release',
         runs: 1,
       },
     },
@@ -106,6 +108,9 @@ const config = {
     outDir: 'typechain',
     target: 'ethers-v5',
   },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_KEY
+  }
 };
 
 module.exports = config;
