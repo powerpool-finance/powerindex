@@ -47,7 +47,7 @@ task('deploy-power-index-pool', 'Deploy PowerIndexPool').setAction(async () => {
     const balances = [];
     await pIteration.forEachSeries(poolConfig.tokens, async (tokenAddr, index) => {
       const token = await MockERC20.at(tokenAddr);
-      balances[index] = (await token.balanceOf(deployer)).toString(10);
+      balances[index] = (await callContract(token, 'balanceOf', [deployer])).toString(10);
       console.log('approve', token.address, balances[index]);
       await token.approve(bActions.address, balances[index], sendOptions);
     });
@@ -91,3 +91,8 @@ task('deploy-power-index-pool', 'Deploy PowerIndexPool').setAction(async () => {
     return toWei(amount.toString(), 'ether');
   }
 });
+
+function callContract(contract, method, args = []) {
+  console.log(method, args);
+  return contract.contract.methods[method].apply(contract.contract, args).call();
+}
