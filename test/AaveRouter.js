@@ -30,7 +30,7 @@ describe('AaveRouter Tests', () => {
     [minter, bob, alice, charlie, yearnOwner, rewardsVault, emissionManager, lendToken] = await web3.eth.getAccounts();
   });
 
-  it.only('should allow depositing Aave and staking it in a StakedAave contract', async () => {
+  it('should allow depositing Aave and staking it in a StakedAave contract', async () => {
     // 0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9
     const aave = await MockERC20.new('Aave Token', 'AAVE', '18', ether('100000000000'));
 

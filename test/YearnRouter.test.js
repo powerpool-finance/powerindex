@@ -33,7 +33,7 @@ describe('YearnRouter Tests', () => {
     const yfiWrapper = await WrappedPiErc20.new(yfi.address, router.address, 'wrapped.yearn.finance', 'WYFI');
 
     await yearnGovernance.initialize(0, yearnOwner, yfi.address);
-    await router.setVotingAndStackingForWrappedToken(yfiWrapper.address, yearnGovernance.address, yearnGovernance.address);
+    await router.setVotingAndStakingForWrappedToken(yfiWrapper.address, yearnGovernance.address, yearnGovernance.address);
     await router.setReserveRatioForWrappedToken(yfiWrapper.address, ether('0.2'));
 
     assert.equal(await router.owner(), minter);

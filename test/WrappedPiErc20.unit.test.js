@@ -34,7 +34,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
   beforeEach(async function () {
     yfi = await MockERC20.new('yearn.finance', 'YFI', 18, ether('1000000'));
-    router = await MockRouter.new(alice);
+    router = await MockRouter.new();
     yfiWrapper = await WrappedPiErc20.new(yfi.address, router.address, 'wrapped.yearn.finance', 'WYFI');
   });
 
@@ -186,10 +186,10 @@ describe('WrappedPiErc20 Unit Tests', () => {
       });
 
       it('should allow the router calling any method on any contract', async () => {
-        const data2 = await yfiWrapper.contract.methods.callVoting(router.address, signature, args, 0).encodeABI();
+        const data2 = await yfiWrapper.contract.methods.callExternal(router.address, signature, args, 0).encodeABI();
         const res = await router.execute(yfiWrapper.address, data2);
 
-        await expectEvent.inTransaction(res.tx, WrappedPiErc20, 'CallVoting', {
+        await expectEvent.inTransaction(res.tx, WrappedPiErc20, 'CallExternal', {
           voting: router.address,
           inputSig: web3.utils.padRight(signature, 64),
           inputData: args,
@@ -202,8 +202,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
       })
 
       it('should deny calling the method from non-router address', async () => {
-        //TODO: figure out - why hardhat dont showing revert message
-        await expectRevert.unspecified(yfiWrapper.callVoting(alice, signature, args, 0, { from: alice }), 'ONLY_ROUTER');
+        await expectRevert(yfiWrapper.callExternal(alice, signature, args, 0, { from: alice }), 'ONLY_ROUTER');
       })
     })
   })
