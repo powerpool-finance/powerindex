@@ -62,14 +62,14 @@ const config = {
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
       accounts: getAccounts('mainnet'),
-      gasPrice: 24 * 10 ** 9,
+      gasPrice: 61 * 10 ** 9,
       gasMultiplier: 1.2,
       timeout: 2000000,
     },
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
       accounts: getAccounts('mainnet'),
-      gasPrice: 24 * 10 ** 9,
+      gasPrice: 61 * 10 ** 9,
       gasMultiplier: 2,
       timeout: 2000000,
     },
@@ -99,7 +99,7 @@ const config = {
     settings: {
       optimizer: {
         enabled: !!process.env.ETHERSCAN_KEY || process.env.COMPILE_TARGET === 'release',
-        runs: 1,
+        runs: 2,
       },
     },
     version: '0.6.12',
