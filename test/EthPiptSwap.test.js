@@ -1,10 +1,10 @@
 const fs = require('fs');
 
-const { expectRevert, ether } = require('@openzeppelin/test-helpers');
+const { expectRevert, time } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
-const BFactory = artifacts.require('BFactory');
-const BActions = artifacts.require('BActions');
-const BPool = artifacts.require('BPool');
+const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
+const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
+const PowerIndexPool = artifacts.require('PowerIndexPool');
 const MockERC20 = artifacts.require('MockERC20');
 const UniswapV2Factory = artifacts.require('MockUniswapV2Factory');
 const UniswapV2Pair = artifacts.require('UniswapV2Pair');
@@ -20,10 +20,19 @@ UniswapV2Pair.numberFormat = 'String';
 UniswapV2Router02.numberFormat = 'String';
 EthPiptSwap.numberFormat = 'String';
 Erc20PiptSwap.numberFormat = 'String';
-BPool.numberFormat = 'String';
+PowerIndexPool.numberFormat = 'String';
 
-const { web3 } = BFactory;
+const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
+
+function ether(val) {
+  return web3.utils.toWei(val.toString(), 'ether');
+}
+
+async function getTimestamp(shift = 0) {
+  const currentTimestamp = (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp;
+  return currentTimestamp + shift;
+}
 
 function subBN(bn1, bn2) {
   return toBN(bn1.toString(10))
@@ -55,8 +64,8 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
     this.weth = await WETH.new();
     this.weth.deposit({ value: ether('50000000') });
 
-    this.bFactory = await BFactory.new({ from: minter });
-    this.bActions = await BActions.new({ from: minter });
+    this.bFactory = await PowerIndexPoolFactory.new({ from: minter });
+    this.bActions = await PowerIndexPoolActions.new({ from: minter });
     this.uniswapFactory = await UniswapV2Factory.new(feeManager, { from: minter });
     this.uniswapRouter = await UniswapV2Router02.new(this.uniswapFactory.address, this.weth.address, { from: minter });
 
@@ -71,27 +80,44 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
       );
     };
 
-    this.makeBalancerPool = async (_tokens, _balances) => {
+    this.makePowerIndexPool = async (_tokens, _balances) => {
+      const fromTimestamp = await getTimestamp(100);
+      const targetTimestamp = await getTimestamp(100 + 60 * 60 * 24 * 5);
       for (let i = 0; i < _tokens.length; i++) {
         await _tokens[i].approve(this.bActions.address, '0x' + 'f'.repeat(64));
       }
 
       const weightPart = 50 / _tokens.length;
+      const minWeightPerSecond = ether('0.00000001');
+      const maxWeightPerSecond = ether('0.1');
+
       const res = await this.bActions.create(
         this.bFactory.address,
-        'My Pool',
-        'MP',
-        _tokens.map(t => t.address),
-        _balances,
-        _tokens.map(() => ether(weightPart.toString(10))),
-        [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
-        permanentVotingPower,
-        true,
+        'Test Pool',
+        'TP',
+        {
+          minWeightPerSecond,
+          maxWeightPerSecond,
+          swapFee,
+          communitySwapFee,
+          communityJoinFee,
+          communityExitFee,
+          communityFeeReceiver: permanentVotingPower,
+          finalize: true,
+        },
+        _tokens.map((t, i) => ({
+          token: t.address,
+          balance: _balances[i],
+          targetDenorm: ether(weightPart),
+          fromTimestamp: fromTimestamp.toString(),
+          targetTimestamp: targetTimestamp.toString()
+        })),
       );
 
-      const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
-      const pool = await BPool.at(logNewPool.args.pool);
+      const logNewPool = PowerIndexPoolFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
+      const pool = await PowerIndexPool.at(logNewPool.args.pool);
       await pool.setRestrictions(this.poolRestrictions.address, { from: minter });
+
       return pool;
     };
 
@@ -140,7 +166,9 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
 
       balancerTokens =  tokens.filter((t, i) => poolsData[i].balancerBalance !== '0');
 
-      pool = await this.makeBalancerPool(balancerTokens, bPoolBalances.filter(b => b !== '0'));
+      pool = await this.makePowerIndexPool(balancerTokens, bPoolBalances.filter(b => b !== '0'));
+
+      await time.increase(12 * 60 * 60);
     });
 
     it('swapEthToPipt should work properly', async () => {
@@ -200,7 +228,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         'PIPT_MAX_SUPPLY',
       );
 
-      await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('200').toString(10)], { from: minter });
+      await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('20000').toString(10)], { from: minter });
 
       let bobBalanceBefore = await web3.eth.getBalance(bob);
 
@@ -389,7 +417,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
       assert.equal(await pool.balanceOf(bob), '0');
     });
 
-    it('BPool should prevent double swap in same transaction by EthPiptSwap', async () => {
+    it('PowerIndexPool should prevent double swap in same transaction by EthPiptSwap', async () => {
       await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('200').toString(10)], { from: minter });
 
       const ethPiptSwap = await EthPiptSwap.new(this.weth.address, cvp.address, pool.address, feeManager, {

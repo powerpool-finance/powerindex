@@ -10,7 +10,7 @@ task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async () => {
   console.log('deployer', deployer);
   const sendOptions = { from: deployer };
   const admin = '0xb258302c3f209491d604165549079680708581cc';
-  const poolAddress = '0x9FAc54B1ddAC9968Df67B31F217c63C4c118656d';
+  const poolAddress = '0x26607aC599266b21d13c7aCF7942c7701a8b699c';
   const uniswapFactoryAddress = '0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f';
 
   const pool = await PowerIndexPool.at(poolAddress);

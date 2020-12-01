@@ -4,14 +4,14 @@ const fs = require('fs');
 
 task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
   const wethAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
-  const balancerPoolAddress = '0xb2B9335791346E94245DCd316A9C9ED486E6dD7f';
+  const balancerPoolAddress = '0x26607aC599266b21d13c7aCF7942c7701a8b699c';
   const uniswapFactoryAddress = '0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f';
 
   const BPool = artifacts.require('BPool');
   const MockERC20 = artifacts.require('MockERC20');
 
   const pool = await BPool.at(balancerPoolAddress);
-  const tokensAddresses = await callContract(pool, 'getCurrentTokens');
+  const tokensAddresses = await callContract(pool, 'getCurrentTokens', [], 'array');
 
   tokensAddresses.push('0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'); // USDC
   tokensAddresses.push('0x6b175474e89094c44da98b954eedeac495271d0f'); // DAI
@@ -47,9 +47,13 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
   fs.writeFileSync('./data/poolsData.json', JSON.stringify(tokens, null, ' '));
 });
 
-function callContract(contract, method, args = []) {
+async function callContract(contract, method, args = [], type = null) {
   console.log(method, args);
-  return contract.contract.methods[method].apply(contract.contract, args).call();
+  let result = await contract.contract.methods[method].apply(contract.contract, args).call();
+  if (type === 'array') {
+    result = [].concat(result);
+  }
+  return result;
 }
 
 module.exports = {};
