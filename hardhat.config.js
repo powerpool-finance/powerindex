@@ -8,6 +8,7 @@ require('./tasks/fetchPoolsData');
 require('./tasks/deployVestedLpMining');
 require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
+require('./tasks/testMainnetErc20PiptSwap');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
@@ -62,14 +63,14 @@ const config = {
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
       accounts: getAccounts('mainnet'),
-      gasPrice: 61 * 10 ** 9,
+      gasPrice: 88 * 10 ** 9,
       gasMultiplier: 1.2,
       timeout: 2000000,
     },
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
       accounts: getAccounts('mainnet'),
-      gasPrice: 61 * 10 ** 9,
+      gasPrice: 88 * 10 ** 9,
       gasMultiplier: 2,
       timeout: 2000000,
     },
