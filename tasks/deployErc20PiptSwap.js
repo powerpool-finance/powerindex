@@ -29,9 +29,9 @@ task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async () => {
     '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', //USDC
     '0x6B175474E89094C44Da98b954EedeAC495271d0F', //DAI
     '0x1494CA1F11D487c2bBe4543E90080AeBa4BA3C2b', //DPI
+    '0xbb2b8038a1640196fbe3e38816f3e67cba72d940', //WBTC
   ];
 
-  await erc20PiptSwap.setUniswapFactoryAllowed([uniswapFactoryAddress], [true], sendOptions);
   await erc20PiptSwap.fetchUnswapPairsFromFactory(
     uniswapFactoryAddress,
     (await callContract(pool, 'getCurrentTokens')).concat(swapCoins),
