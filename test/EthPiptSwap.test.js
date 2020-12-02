@@ -44,6 +44,25 @@ function addBN(bn1, bn2) {
     .add(toBN(bn2.toString(10)))
     .toString(10);
 }
+function divScalarBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .mul(toBN(ether('1').toString(10)))
+    .div(toBN(bn2.toString(10)))
+    .toString(10);
+}
+
+function isBNHigher(bn1, bn2) {
+  return toBN(bn1.toString(10)).gt(toBN(bn2.toString(10)));
+}
+
+function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei, message = '') {
+  bn1 = toBN(bn1.toString(10));
+  bn2 = toBN(bn2.toString(10));
+  const bn1GreaterThenBn2 = bn1.gt(bn2);
+  let diff = bn1GreaterThenBn2 ? bn1.sub(bn2) : bn2.sub(bn1);
+  let diffPercent = divScalarBN(diff, bn1);
+  assert.equal(toBN(diffPercent).lte(toBN(accuracyPercentWei)), true, message);
+}
 
 describe('EthPiptSwap and Erc20PiptSwap', () => {
   const swapFee = ether('0.0001');
@@ -220,6 +239,9 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         balancerTokens.map(t => t.address),
         slippage,
       );
+      const needEthToPoolOut = await ethPiptSwap.calcNeedEthToPoolOut(swapEthToPiptInputs.poolOut, slippage);
+      assertEqualWithAccuracy(needEthToPoolOut, ethToSwap, ether('0.007'))
+      assert.equal(isBNHigher(needEthToPoolOut, ethToSwap), true)
 
       await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('10').toString(10)], { from: minter });
 
@@ -319,31 +341,17 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         from: feeManager,
       });
 
-      assert.equal(await erc20PiptSwap.uniswapFactoryAllowed(this.uniswapFactory.address), false);
       await expectRevert(erc20PiptSwap.fetchUnswapPairsFromFactory(
         this.uniswapFactory.address,
         tokens.map(t => t.address),
         { from: bob },
-      ), 'FACTORY_NOT_ALLOWED');
-
-      await expectRevert(erc20PiptSwap.setUniswapFactoryAllowed(
-        [this.uniswapFactory.address],
-        [true],
-        { from: bob },
       ), 'Ownable: caller is not the owner');
-
-      await erc20PiptSwap.setUniswapFactoryAllowed(
-        [this.uniswapFactory.address],
-        [true],
-        { from: minter },
-      );
-      assert.equal(await erc20PiptSwap.uniswapFactoryAllowed(this.uniswapFactory.address), true);
 
       await erc20PiptSwap.fetchUnswapPairsFromFactory(
         this.uniswapFactory.address,
         tokens.map(t => t.address),
-        { from: bob },
-      )
+        { from: minter },
+      );
 
       const {token: usdcToken, pair: usdcPair} = tokenBySymbol['USDC'];
 
@@ -373,6 +381,9 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         slippage,
         true,
       );
+      const needErc20ToPoolOut = await erc20PiptSwap.calcNeedErc20ToPoolOut(tokenAddress, swapErc20ToPiptInputs.poolOut, slippage);
+      assertEqualWithAccuracy(needErc20ToPoolOut, amountToSwap, ether('0.007'));
+      assert.equal(isBNHigher(needErc20ToPoolOut, amountToSwap), true)
 
       let bobBalanceBefore = await usdcToken.balanceOf(bob);
 
@@ -424,16 +435,10 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         from: minter,
       });
 
-      await ethPiptSwap.setUniswapFactoryAllowed(
-        [this.uniswapFactory.address],
-        [true],
-        { from: minter },
-      );
-
       await ethPiptSwap.fetchUnswapPairsFromFactory(
         this.uniswapFactory.address,
         tokens.map(t => t.address),
-        { from: bob },
+        { from: minter },
       )
 
       const mockClient = await MockBPoolClient.new();

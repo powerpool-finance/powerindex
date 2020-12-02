@@ -102,6 +102,16 @@ contract Erc20PiptSwap is EthPiptSwap {
     return calcSwapEthToPiptInputs(ethAmount, _tokens, _slippage);
   }
 
+  function calcNeedErc20ToPoolOut(
+    address _swapToken,
+    uint256 _poolAmountOut,
+    uint256 _slippage
+  ) external view returns (uint256) {
+    uint256 resultEth = calcNeedEthToPoolOut(_poolAmountOut, _slippage);
+    (uint256 tokenReserve, uint256 ethReserve, ) = _uniswapPairFor(_swapToken).getReserves();
+    return UniswapV2Library.getAmountIn(resultEth.mul(1003).div(1000), tokenReserve, ethReserve);
+  }
+
   function calcSwapPiptToErc20Inputs(
     address _swapToken,
     uint256 _poolAmountIn,

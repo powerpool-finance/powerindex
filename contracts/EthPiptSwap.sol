@@ -29,7 +29,6 @@ contract EthPiptSwap is Ownable {
   address public feePayout;
   address public feeManager;
 
-  mapping(address => bool) public uniswapFactoryAllowed;
   mapping(address => address) public uniswapEthPairByTokenAddress;
   mapping(address => bool) public reApproveTokens;
   uint256 public defaultSlippage;
@@ -41,7 +40,6 @@ contract EthPiptSwap is Ownable {
     uint256 ethReserve;
   }
 
-  event SetUniswapFactoryAllowed(address indexed factory, bool indexed allowed);
   event SetTokenSetting(address indexed token, bool indexed reApprove, address indexed uniswapPair);
   event SetDefaultSlippage(uint256 newDefaultSlippage);
   event SetFees(
@@ -173,28 +171,16 @@ contract EthPiptSwap is Ownable {
   ) external onlyOwner {
     uint256 len = _tokens.length;
     require(len == _pairs.length && len == _reapprove.length, "LENGTHS_NOT_EQUAL");
-    for (uint256 i = 0; i < _tokens.length; i++) {
+    for (uint256 i = 0; i < len; i++) {
       uniswapEthPairByTokenAddress[_tokens[i]] = _pairs[i];
       reApproveTokens[_tokens[i]] = _reapprove[i];
       emit SetTokenSetting(_tokens[i], _reapprove[i], _pairs[i]);
     }
   }
 
-  function setUniswapFactoryAllowed(address[] memory _factories, bool[] memory _allowed) external onlyOwner {
-    uint256 len = _factories.length;
-    require(len == _allowed.length, "LENGTHS_NOT_EQUAL");
-    for (uint256 i = 0; i < _factories.length; i++) {
-      uniswapFactoryAllowed[_factories[i]] = _allowed[i];
-      emit SetUniswapFactoryAllowed(_factories[i], _allowed[i]);
-    }
-  }
-
-  function fetchUnswapPairsFromFactory(address _factory, address[] calldata _tokens) external {
-    require(uniswapFactoryAllowed[_factory], "FACTORY_NOT_ALLOWED");
-
+  function fetchUnswapPairsFromFactory(address _factory, address[] calldata _tokens) external onlyOwner {
     uint256 len = _tokens.length;
-    for (uint256 i = 0; i < _tokens.length; i++) {
-      require(uniswapEthPairByTokenAddress[_tokens[i]] == address(0), "ALREADY_SET");
+    for (uint256 i = 0; i < len; i++) {
       uniswapEthPairByTokenAddress[_tokens[i]] = IUniswapV2Factory(_factory).getPair(_tokens[i], address(weth));
     }
   }
@@ -290,6 +276,28 @@ contract EthPiptSwap is Ownable {
     }
   }
 
+  function calcNeedEthToPoolOut(uint256 _poolAmountOut, uint256 _slippage) public view returns (uint256) {
+    uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(10);
+
+    address[] memory tokens = pipt.getCurrentTokens();
+    uint256 len = tokens.length;
+
+    CalculationStruct[] memory calculations = new CalculationStruct[](len);
+    uint256[] memory tokensInPipt = new uint256[](len);
+
+    uint256 totalEthSwap = 0;
+    for (uint256 i = 0; i < len; i++) {
+      IUniswapV2Pair tokenPair = _uniswapPairFor(tokens[i]);
+
+      (calculations[i].tokenReserve, calculations[i].ethReserve, ) = tokenPair.getReserves();
+      tokensInPipt[i] = ratio.mul(pipt.getBalance(tokens[i])).div(1 ether);
+      totalEthSwap = UniswapV2Library
+        .getAmountIn(tokensInPipt[i], calculations[i].ethReserve, calculations[i].tokenReserve)
+        .add(totalEthSwap);
+    }
+    return totalEthSwap.add(totalEthSwap.mul(_slippage).div(1 ether));
+  }
+
   function calcEthFee(uint256 ethAmount) public view returns (uint256 ethFee, uint256 ethAfterFee) {
     ethFee = 0;
     uint256 len = feeLevels.length;
@@ -332,8 +340,8 @@ contract EthPiptSwap is Ownable {
     address[] memory tokens = pipt.getCurrentTokens();
     uint256 len = tokens.length;
 
-    CalculationStruct[] memory calculations = new CalculationStruct[](tokens.length);
-    uint256[] memory tokensInPipt = new uint256[](tokens.length);
+    CalculationStruct[] memory calculations = new CalculationStruct[](len);
+    uint256[] memory tokensInPipt = new uint256[](len);
 
     uint256 totalEthSwap = 0;
     for (uint256 i = 0; i < len; i++) {
