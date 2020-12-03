@@ -9,6 +9,7 @@ require('./tasks/deployVestedLpMining');
 require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
 require('./tasks/testMainnetErc20PiptSwap');
+require('./tasks/deployPoolRestrictions');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
