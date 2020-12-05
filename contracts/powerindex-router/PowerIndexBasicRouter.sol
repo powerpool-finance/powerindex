@@ -78,12 +78,4 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
       diff = 0;
     }
   }
-
-  function _approveWrappedTokenToStaking(uint256 _amount) internal {
-    wrappedToken.approveToken(staking, _amount);
-  }
-
-  function _approveWrappedTokenToVoting(uint256 _amount) internal {
-    wrappedToken.approveToken(voting, _amount);
-  }
 }
