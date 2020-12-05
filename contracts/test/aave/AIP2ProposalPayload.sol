@@ -5,6 +5,7 @@ import "../../interfaces/PowerIndexBasicRouterInterface.sol";
 
 contract AIP2ProposalPayload {
   event ProposalExecuted(address caller);
+
   function execute() external {
     bytes32 value = bytes32(uint256(42));
     assembly {

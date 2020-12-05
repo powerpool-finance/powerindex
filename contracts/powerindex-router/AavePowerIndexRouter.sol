@@ -9,82 +9,79 @@ import "./PowerIndexBasicRouter.sol";
 import "hardhat/console.sol";
 
 contract AavePowerIndexRouter is PowerIndexBasicRouter {
+  enum CoolDownStatus { NONE, COOLDOWN, UNSTAKE_WINDOW }
 
-  enum CoolDownStatus {
-    NONE,
-    COOLDOWN,
-    UNSTAKE_WINDOW
-  }
-
-  constructor(address _poolRestrictions) public PowerIndexBasicRouter(_poolRestrictions) {}
+  constructor(address _wrappedToken, address _poolRestrictions) public PowerIndexBasicRouter(_wrappedToken, _poolRestrictions) {}
 
   /*** THE PROXIED METHOD EXECUTORS ***/
 
-  function executeSubmitVote(address _wrappedToken, uint256 _id, uint256 _vote, address _asset) external {
-    _checkVotingSenderAllowed(_wrappedToken);
-    _callVoting(_wrappedToken, IAaveProtoGovernance(0).submitVoteByVoter.selector, abi.encode(_id, _vote, _asset));
+  function executeSubmitVote(
+    uint256 _id,
+    uint256 _vote,
+    address _asset
+  ) external {
+    _checkVotingSenderAllowed();
+    _callVoting(IAaveProtoGovernance(0).submitVoteByVoter.selector, abi.encode(_id, _vote, _asset));
   }
 
-  function executeCancelVote(address _wrappedToken, uint256 _id) external {
-    _checkVotingSenderAllowed(_wrappedToken);
-    _callVoting(_wrappedToken, IAaveProtoGovernance(0).cancelVoteByVoter.selector, abi.encode(_id));
+  function executeCancelVote(uint256 _id) external {
+    _checkVotingSenderAllowed();
+    _callVoting(IAaveProtoGovernance(0).cancelVoteByVoter.selector, abi.encode(_id));
   }
 
   /*** OWNER METHODS ***/
 
-  function stakeWrappedToVoting(address _wrappedToken, uint256 _amount) external onlyOwner {
-    _stakeWrappedToStaking(_wrappedToken, _amount);
+  function stake(uint256 _amount) external onlyOwner {
+    _stake(_amount);
   }
 
-  function withdrawWrappedFromVoting(address _wrappedToken, uint256 _amount) external onlyOwner {
-    _withdrawWrappedFromStaking(_wrappedToken, _amount);
+  function redeem(uint256 _amount) external onlyOwner {
+    _redeem(_amount);
   }
 
   /*** WRAPPED TOKEN CALLBACK ***/
 
   function wrapperCallback(uint256 _withdrawAmount) external override {
-    address wrappedToken = msg.sender;
-    address votingAddress = votingByWrapped[wrappedToken];
-    address stakingAddress = stakingByWrapped[wrappedToken];
+    address wrappedToken_ = msg.sender;
 
     // Ignore the tokens without a voting assigned
-    if (votingAddress == address(0)) {
+    if (voting == address(0)) {
       return;
     }
 
     (ReserveStatus reserveStatus, uint256 diff, uint256 reserveAmount) =
-      _getReserveStatus(wrappedToken, IERC20(stakingAddress).balanceOf(wrappedToken), _withdrawAmount);
+      _getReserveStatus(IERC20(staking).balanceOf(wrappedToken_), _withdrawAmount);
 
     console.log("withdraw     ", _withdrawAmount);
     console.log("status       ", uint256(reserveStatus));
     console.log("diff         ", diff);
     console.log("reserveAmount", reserveAmount);
-    console.log("staked       ", IERC20(stakingAddress).balanceOf(wrappedToken));
+    console.log("staked       ", IERC20(staking).balanceOf(wrappedToken_));
 
     // TOOD: revert if _withdrawAmount > reserveAmjunt
     if (reserveStatus == ReserveStatus.ABOVE) {
-      CoolDownStatus coolDownStatus = getCoolDownStatus(stakingAddress);
+      CoolDownStatus coolDownStatus = getCoolDownStatus();
       if (coolDownStatus == CoolDownStatus.NONE) {
-        _triggerCoolDown(wrappedToken);
+        _triggerCoolDown();
       } else if (coolDownStatus == CoolDownStatus.COOLDOWN) {
-        _withdrawWrappedFromStaking(wrappedToken, diff);
+        _redeem(diff);
       }
 
       // else do nothing
     } else if (reserveStatus == ReserveStatus.BELLOW) {
-      _stakeWrappedToStaking(msg.sender, diff);
+      _stake(diff);
     }
   }
 
-  function getCoolDownStatus(address _stakingAddress) public view returns (CoolDownStatus) {
-    IStakedAave staking = IStakedAave(_stakingAddress);
-    uint256 stakerCoolDown = staking.stakersCooldowns(address(this));
-    uint256 coolDownSeconds = staking.COOLDOWN_SECONDS();
-    uint256 unstakeWindow = staking.UNSTAKE_WINDOW();
+  function getCoolDownStatus() public view returns (CoolDownStatus) {
+    IStakedAave _staking = IStakedAave(staking);
+    uint256 stakerCoolDown = _staking.stakersCooldowns(address(this));
+    uint256 coolDownSeconds = _staking.COOLDOWN_SECONDS();
+    uint256 unstakeWindow = _staking.UNSTAKE_WINDOW();
     uint256 current = block.timestamp;
 
     if (stakerCoolDown == 0) {
-     return CoolDownStatus.NONE;
+      return CoolDownStatus.NONE;
     }
 
     uint256 coolDownFinishesAt = stakerCoolDown.add(coolDownSeconds);
@@ -105,18 +102,18 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   /*** INTERNALS ***/
 
-  function _triggerCoolDown(address _wrappedToken) internal {
-    _callStaking(_wrappedToken, IStakedAave(0).cooldown.selector, "");
+  function _triggerCoolDown() internal {
+    _callStaking(IStakedAave(0).cooldown.selector, "");
   }
 
-  function _stakeWrappedToStaking(address _wrappedToken, uint256 _amount) internal {
+  function _stake(uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
-    _approveWrappedTokenToStaking(_wrappedToken, _amount);
-    _callStaking(_wrappedToken, IStakedAave(0).stake.selector, abi.encode(_wrappedToken, _amount));
+    wrappedToken.approveToken(staking, _amount);
+    _callStaking(IStakedAave(0).stake.selector, abi.encode(wrappedToken, _amount));
   }
 
-  function _withdrawWrappedFromStaking(address _wrappedToken, uint256 _amount) internal {
-    require(_amount > 0, "CANT_WITHDRAW_0");
-    _callStaking(_wrappedToken, IStakedAave(0).redeem.selector, abi.encode(_amount));
+  function _redeem(uint256 _amount) internal {
+    require(_amount > 0, "CANT_REDEEM_0");
+    _callStaking(IStakedAave(0).redeem.selector, abi.encode(_amount));
   }
 }

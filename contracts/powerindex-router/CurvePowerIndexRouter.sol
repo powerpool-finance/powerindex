@@ -21,7 +21,7 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
 
   uint256 public minLockTime;
 
-  constructor(address _poolRestrictions, uint256 _minLockTime) public PowerIndexBasicRouter(_poolRestrictions) {
+  constructor(address _wrappedToken, address _poolRestrictions, uint256 _minLockTime) public PowerIndexBasicRouter(_wrappedToken, _poolRestrictions) {
     minLockTime = _minLockTime;
   }
 
@@ -33,98 +33,94 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
   /*** THE PROXIED METHOD EXECUTORS ***/
 
   function executePropose(
-    address _wrappedToken,
     bytes calldata _executionScript,
     string calldata _metadata,
     bool _castVote,
     bool _executesIfDecided
   ) external {
-    _checkVotingSenderAllowed(_wrappedToken);
-    _callVoting(_wrappedToken, PROPOSE_SIG, abi.encode(_executionScript, _metadata, _castVote, _executesIfDecided));
+    _checkVotingSenderAllowed();
+    _callVoting(PROPOSE_SIG, abi.encode(_executionScript, _metadata, _castVote, _executesIfDecided));
   }
 
   function executeVoteFor(
-    address _wrappedToken,
     uint256 _voteId,
     bool _executesIfDecided
   ) external {
-    _checkVotingSenderAllowed(_wrappedToken);
-    _callVoting(_wrappedToken, VOTE_SIG, abi.encode(_voteId, true, _executesIfDecided));
+    _checkVotingSenderAllowed();
+    _callVoting(VOTE_SIG, abi.encode(_voteId, true, _executesIfDecided));
   }
 
   function executeVoteAgainst(
-    address _wrappedToken,
     uint256 _voteId,
     bool _executesIfDecided
   ) external {
-    _checkVotingSenderAllowed(_wrappedToken);
-    _callVoting(_wrappedToken, VOTE_SIG, abi.encode(_voteId, false, _executesIfDecided));
+    _checkVotingSenderAllowed();
+    _callVoting(VOTE_SIG, abi.encode(_voteId, false, _executesIfDecided));
   }
 
   /*** OWNER METHODS ***/
 
-  function stakeWrappedToVoting(address _wrappedToken, uint256 _amount) external onlyOwner {
-    _stakeWrappedToVoting(_wrappedToken, _amount);
+  function stake(uint256 _amount) external onlyOwner {
+    _stake(_amount);
   }
 
-  function withdrawWrappedFromVoting(address _wrappedToken) external onlyOwner {
-    _withdrawWrappedFromVoting(_wrappedToken);
+  function redeem(address _wrappedToken) external onlyOwner {
+    _redeem();
   }
 
   /*** WRAPPED TOKEN CALLBACK ***/
 
   function wrapperCallback(uint256 _withdrawAmount) external override {
-    address wrappedToken = msg.sender;
-    address stakingAddress = stakingByWrapped[wrappedToken];
+    address wrappedToken_ = msg.sender;
 
     // Ignore the tokens without a voting assigned
-    if (stakingAddress == address(0)) {
+    if (staking == address(0)) {
       return;
     }
 
-    CurveStakeInterface staking = CurveStakeInterface(stakingAddress);
+    CurveStakeInterface staking_ = CurveStakeInterface(staking);
     (ReserveStatus status, uint256 diff, uint256 reserveAmount) =
-      _getReserveStatus(wrappedToken, staking.balanceOf(wrappedToken), _withdrawAmount);
+      _getReserveStatus(staking_.balanceOf(wrappedToken_), _withdrawAmount);
 
     if (status == ReserveStatus.ABOVE) {
-      (, uint256 end) = staking.locked(wrappedToken);
+      (, uint256 end) = staking_.locked(wrappedToken_);
       if (end < block.timestamp) {
-        _withdrawWrappedFromVoting(wrappedToken);
-        _stakeWrappedToVoting(msg.sender, reserveAmount);
+        _redeem();
+        _stake(reserveAmount);
       }
     } else if (status == ReserveStatus.BELLOW) {
-      _stakeWrappedToVoting(msg.sender, diff);
+      _stake(diff);
     }
   }
 
   /*** INTERNALS ***/
 
-  function _stakeWrappedToVoting(address _wrappedToken, uint256 _amount) internal {
+  function _stake(uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
 
-    CurveStakeInterface staking = CurveStakeInterface(stakingByWrapped[_wrappedToken]);
-    (uint256 lockedAmount, uint256 lockedEnd) = staking.locked(_wrappedToken);
+    CurveStakeInterface staking_ = CurveStakeInterface(staking);
+    (uint256 lockedAmount, uint256 lockedEnd) = staking_.locked(address(wrappedToken));
 
     if (lockedEnd != 0 && lockedEnd <= block.timestamp) {
-      _withdrawWrappedFromVoting(_wrappedToken);
+      _redeem();
       lockedEnd = 0;
     }
 
-    _approveWrappedTokenToStaking(_wrappedToken, _amount);
+    wrappedToken.approveToken(staking, _amount);
 
     if (lockedEnd == 0) {
-      _callStaking(_wrappedToken, CREATE_STAKE_SIG, abi.encode(_amount, block.timestamp + WEEK));
+      _callStaking(CREATE_STAKE_SIG, abi.encode(_amount, block.timestamp + WEEK));
     } else {
       if (block.timestamp + minLockTime > lockedEnd) {
-        _callStaking(_wrappedToken, INCREASE_STAKE_TIME_SIG, abi.encode(block.timestamp + minLockTime));
+        _callStaking(INCREASE_STAKE_TIME_SIG, abi.encode(block.timestamp + minLockTime));
       }
       if (_amount > lockedAmount) {
-        _callStaking(_wrappedToken, INCREASE_STAKE_SIG, abi.encode(_amount.sub(lockedAmount)));
+        _callStaking(INCREASE_STAKE_SIG, abi.encode(_amount.sub(lockedAmount)));
       }
     }
   }
 
-  function _withdrawWrappedFromVoting(address _wrappedToken) internal {
-    _callStaking(_wrappedToken, WITHDRAW_SIG, abi.encode());
+  function _redeem() internal {
+    _callStaking(WITHDRAW_SIG, abi.encode());
   }
 }

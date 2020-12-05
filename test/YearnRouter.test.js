@@ -18,10 +18,10 @@ function ether(value) {
 }
 
 describe('YearnRouter Tests', () => {
-  let minter, bob, alice, yearnOwner;
+  let minter, bob, alice, yearnOwner, stub;
 
   before(async function () {
-    [minter, bob, alice, yearnOwner] = await web3.eth.getAccounts();
+    [minter, bob, alice, yearnOwner, stub] = await web3.eth.getAccounts();
   });
 
   it('should allow creating a proposal in YFI', async () => {
@@ -29,14 +29,15 @@ describe('YearnRouter Tests', () => {
     const yearnGovernance = await MockYearnGovernance.new();
 
     const poolRestrictions = await PoolRestrictions.new();
-    const router = await PowerIndexRouter.new(poolRestrictions.address);
-    const yfiWrapper = await WrappedPiErc20.new(yfi.address, router.address, 'wrapped.yearn.finance', 'WYFI');
+    const yfiWrapper = await WrappedPiErc20.new(yfi.address, stub, 'wrapped.yearn.finance', 'WYFI');
+    const yfiRouter = await PowerIndexRouter.new(yfiWrapper.address, poolRestrictions.address);
+    await yfiWrapper.changeRouter(yfiRouter.address, { from: stub });
 
     await yearnGovernance.initialize(0, yearnOwner, yfi.address);
-    await router.setVotingAndStakingForWrappedToken(yfiWrapper.address, yearnGovernance.address, yearnGovernance.address);
-    await router.setReserveRatioForWrappedToken(yfiWrapper.address, ether('0.2'));
+    await yfiRouter.setVotingAndStaking(yearnGovernance.address, yearnGovernance.address);
+    await yfiRouter.setReserveRatio(ether('0.2'));
 
-    assert.equal(await router.owner(), minter);
+    assert.equal(await yfiRouter.owner(), minter);
 
     await yfi.transfer(alice, ether('10000'));
     await yfi.approve(yfiWrapper.address, ether('10000'), { from: alice });
@@ -56,9 +57,9 @@ describe('YearnRouter Tests', () => {
 
     await poolRestrictions.setVotingAllowedForSenders(yearnGovernance.address, [alice], [true]);
 
-    await router.executeRegister(yfiWrapper.address, { from: alice });
-    await router.executePropose(yfiWrapper.address, bob, proposalString, { from: alice });
-    await router.executeVoteFor(yfiWrapper.address, 0, { from: alice });
+    await yfiRouter.executeRegister({ from: alice });
+    await yfiRouter.executePropose(bob, proposalString, { from: alice });
+    await yfiRouter.executeVoteFor(0, { from: alice });
 
     await time.advanceBlockTo((await time.latestBlock()).toNumber() + 10);
 

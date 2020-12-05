@@ -15,84 +15,82 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   bytes4 public constant VOTE_FOR_SIG = bytes4(keccak256(bytes("voteFor(uint256)")));
   bytes4 public constant VOTE_AGAINST_SIG = bytes4(keccak256(bytes("voteAgainst(uint256)")));
 
-  constructor(address _poolRestrictions) public PowerIndexBasicRouter(_poolRestrictions) {}
+  constructor(address _wrappedToken, address _poolRestrictions) public PowerIndexBasicRouter(_wrappedToken, _poolRestrictions) {}
 
   /*** THE PROXIED METHOD EXECUTORS ***/
 
-  function executeRegister(address _wrappedToken) external {
-    _checkVotingSenderAllowed(_wrappedToken);
-    _callVoting(_wrappedToken, REGISTER_SIG, "");
+  function executeRegister() external {
+    _checkVotingSenderAllowed();
+    _callVoting(REGISTER_SIG, "");
   }
 
-  function executeExit(address _wrappedToken) external {
-    _checkVotingSenderAllowed(_wrappedToken);
-    _callVoting(_wrappedToken, EXIT_SIG, "");
+  function executeExit() external {
+    _checkVotingSenderAllowed();
+    _callVoting(EXIT_SIG, "");
   }
 
   function executePropose(
-    address _wrappedToken,
     address _executor,
     string calldata _hash
   ) external {
-    _checkVotingSenderAllowed(_wrappedToken);
-    _callVoting(_wrappedToken, PROPOSE_SIG, abi.encode(_executor, _hash));
+    _checkVotingSenderAllowed();
+    _callVoting(PROPOSE_SIG, abi.encode(_executor, _hash));
   }
 
-  function executeVoteFor(address _wrappedToken, uint256 _id) external {
-    _checkVotingSenderAllowed(_wrappedToken);
-    _callVoting(_wrappedToken, VOTE_FOR_SIG, abi.encode(_id));
+  function executeVoteFor(uint256 _id) external {
+    _checkVotingSenderAllowed();
+    _callVoting(VOTE_FOR_SIG, abi.encode(_id));
   }
 
-  function executeVoteAgainst(address _wrappedToken, uint256 _id) external {
-    _checkVotingSenderAllowed(_wrappedToken);
-    _callVoting(_wrappedToken, VOTE_AGAINST_SIG, abi.encode(_id));
+  function executeVoteAgainst(uint256 _id) external {
+    _checkVotingSenderAllowed();
+    _callVoting(VOTE_AGAINST_SIG, abi.encode(_id));
   }
 
   /*** OWNER METHODS ***/
 
-  function stakeWrappedToVoting(address _wrappedToken, uint256 _amount) external onlyOwner {
-    _stakeWrappedToVoting(_wrappedToken, _amount);
+  function stake(uint256 _amount) external onlyOwner {
+    _stake(_amount);
   }
 
-  function withdrawWrappedFromVoting(address _wrappedToken, uint256 _amount) external onlyOwner {
-    _withdrawWrappedFromVoting(_wrappedToken, _amount);
+  function redeem(uint256 _amount) external onlyOwner {
+    _redeem(_amount);
   }
 
   /*** WRAPPED TOKEN CALLBACK ***/
 
   function wrapperCallback(uint256 _withdrawAmount) external override {
-    address wrappedToken = msg.sender;
-    address votingAddress = votingByWrapped[wrappedToken];
+    address wrappedToken_ = msg.sender;
 
     // Ignore the tokens without a voting assigned
-    if (votingAddress == address(0)) {
+    if (voting == address(0)) {
       return;
     }
 
-    YearnGovernanceInterface voting = YearnGovernanceInterface(votingAddress);
+    YearnGovernanceInterface _voting = YearnGovernanceInterface(voting);
     (ReserveStatus status, uint256 diff, ) =
-      _getReserveStatus(wrappedToken, voting.balanceOf(wrappedToken), _withdrawAmount);
+      _getReserveStatus(_voting.balanceOf(wrappedToken_), _withdrawAmount);
 
     if (status == ReserveStatus.ABOVE) {
-      uint256 voteLockUntilBlock = voting.voteLock(wrappedToken);
+      uint256 voteLockUntilBlock = _voting.voteLock(wrappedToken_);
       if (voteLockUntilBlock < block.number) {
-        _withdrawWrappedFromVoting(wrappedToken, diff);
+        _redeem(diff);
       }
     } else if (status == ReserveStatus.BELLOW) {
-      _stakeWrappedToVoting(msg.sender, diff);
+      _stake(diff);
     }
   }
 
   /*** INTERNALS ***/
 
-  function _stakeWrappedToVoting(address _wrappedToken, uint256 _amount) internal {
+  function _stake(uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
-    _approveWrappedTokenToVoting(_wrappedToken, _amount);
-    _callVoting(_wrappedToken, STAKE_SIG, abi.encode(_amount));
+    wrappedToken.approveToken(voting, _amount);
+    _callVoting(STAKE_SIG, abi.encode(_amount));
   }
 
-  function _withdrawWrappedFromVoting(address _wrappedToken, uint256 _amount) internal {
+  function _redeem(uint256 _amount) internal {
     require(_amount > 0, "CANT_WITHDRAW_0");
-    _callVoting(_wrappedToken, WITHDRAW_SIG, abi.encode(_amount));
+    _callVoting(WITHDRAW_SIG, abi.encode(_amount));
   }
 }

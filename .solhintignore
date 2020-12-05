@@ -9,6 +9,7 @@ contracts/bactions-proxy/
 contracts/lib/
 contracts/interfaces/IUniswapV2Factory.sol
 contracts/interfaces/IUniswapV2Pair.sol
+contracts/interfaces/aave/
 contracts/test/uniswapv2/
 contracts/test/MockWETH.sol
 contracts/test/MockYearnGovernance.sol

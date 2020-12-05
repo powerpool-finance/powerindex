@@ -29,7 +29,7 @@ const COOLDOWN_STATUS = {
   UNSTAKE_WINDOW: 2
 };
 
-describe.only("AaveRouter Tests", () => {
+describe("AaveRouter Tests", () => {
   let minter, bob, alice, charlie, yearnOwner, rewardsVault, emissionManager, lendToken;
 
   before(async function() {
@@ -72,7 +72,7 @@ describe.only("AaveRouter Tests", () => {
     it("should allow depositing Aave and staking it in a StakedAave contract", async () => {
     });
 
-    describe.only('stake', async () => {
+    describe('stake', async () => {
       beforeEach(async () => {
         await aave.transfer(alice, ether("10000"));
         await aave.transfer(bob, ether("10000"));
@@ -116,7 +116,7 @@ describe.only("AaveRouter Tests", () => {
           assert.equal(await stakedAave.balanceOf(aaveWrapper.address), ether(16000));
         });
 
-        it.only('it should stake the excess of funds while in the COOLDOWN period', async () => {
+        it('it should stake the excess of funds while in the COOLDOWN period', async () => {
           await aaveWrapper.approve(aaveWrapper.address, ether(500), { from: alice });
           await aaveWrapper.withdraw(ether(500), { from: alice });
           await aaveWrapper.approve(aaveWrapper.address, ether(500), { from: alice });

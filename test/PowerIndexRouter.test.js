@@ -12,18 +12,20 @@ WrappedPiErc20.numberFormat = 'String';
 const { web3 } = MockERC20;
 
 describe('PowerIndex Router Test', () => {
-  let minter, bob, alice;
+  let minter, bob, alice, stub;
 
   before(async function () {
-    [minter, bob, alice] = await web3.eth.getAccounts();
+    [minter, bob, alice, stub] = await web3.eth.getAccounts();
   });
 
   it('should allow swapping a token with a new version', async () => {
     const token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
     const poolRestrictions = await PoolRestrictions.new();
-    const router = await PowerIndexBasicRouter.new(poolRestrictions.address);
-    const wrapper = await WrappedPiErc20.new(token.address, router.address, 'WToken', 'WTKN');
-    const router2 = await PowerIndexBasicRouter.new(poolRestrictions.address);
+    const wrapper = await WrappedPiErc20.new(token.address, stub, 'WToken', 'WTKN');
+    const router = await PowerIndexBasicRouter.new(wrapper.address, poolRestrictions.address);
+    const router2 = await PowerIndexBasicRouter.new(wrapper.address, poolRestrictions.address);
+
+    await wrapper.changeRouter(router.address, { from: stub });
 
     assert.equal(await router.owner(), minter);
 
@@ -35,7 +37,7 @@ describe('PowerIndex Router Test', () => {
     assert.equal(await wrapper.balanceOf(alice), ether('100'));
 
     await expectRevert(wrapper.changeRouter(bob), 'ONLY_ROUTER');
-    await router.migrateWrappedTokensToNewRouter([wrapper.address], router2.address);
+    await router.migrateToNewRouter(wrapper.address, router2.address);
 
     assert.equal(await wrapper.router(), router2.address);
 

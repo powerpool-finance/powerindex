@@ -9,69 +9,50 @@ import "./PowerIndexNaiveRouter.sol";
 import "hardhat/console.sol";
 
 contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiveRouter {
-  mapping(address => uint256) public reserveRatioByWrapped;
-  mapping(address => address) public votingByWrapped;
-  mapping(address => address) public stakingByWrapped;
-
   uint256 public constant HUNDRED_PCT = 1 ether;
 
-  IPoolRestrictions public poolRestriction;
+  event SetVotingAndStaking(address indexed voting, address indexed staking);
+  event SetReserveRatio(uint256 ratio);
 
   enum ReserveStatus { EQUAL, ABOVE, BELLOW }
 
-  event SetVotingAndStakingForWrappedToken(
-    address indexed wrappedToken,
-    address indexed voting,
-    address indexed staking
-  );
-  event SetReserveRatioForWrappedToken(address indexed wrappedToken, uint256 ratio);
+  WrappedPiErc20Interface public immutable wrappedToken;
 
-  constructor(address _poolRestrictions) public PowerIndexNaiveRouter() Ownable() {
+  IPoolRestrictions public poolRestriction;
+  address public voting;
+  address public staking;
+  uint256 public reserveRatio;
+
+  constructor(address _wrappedToken, address _poolRestrictions) public PowerIndexNaiveRouter() Ownable() {
+    wrappedToken = WrappedPiErc20Interface(_wrappedToken);
     poolRestriction = IPoolRestrictions(_poolRestrictions);
   }
 
-  function setVotingAndStakingForWrappedToken(
-    address _wrappedToken,
-    address _voting,
-    address _staking
-  ) external override onlyOwner {
-    votingByWrapped[_wrappedToken] = _voting;
-    stakingByWrapped[_wrappedToken] = _staking;
-    emit SetVotingAndStakingForWrappedToken(_wrappedToken, _voting, _staking);
+  function setVotingAndStaking(address _voting, address _staking) external override onlyOwner {
+    voting = _voting;
+    staking = _staking;
+    emit SetVotingAndStaking(_voting, _staking);
   }
 
-  function setReserveRatioForWrappedToken(address _wrappedToken, uint256 _reserveRatio) external onlyOwner {
+  function setReserveRatio(uint256 _reserveRatio) external onlyOwner {
     require(_reserveRatio <= 1 ether, "GREATER_THAN_100_PCT");
-    reserveRatioByWrapped[_wrappedToken] = _reserveRatio;
-    emit SetReserveRatioForWrappedToken(_wrappedToken, _reserveRatio);
+    reserveRatio = _reserveRatio;
+    emit SetReserveRatio(_reserveRatio);
   }
 
-  function _callVoting(
-    address _wrappedToken,
-    bytes4 _sig,
-    bytes memory _data
-  ) internal {
-    WrappedPiErc20Interface(_wrappedToken).callExternal(votingByWrapped[_wrappedToken], _sig, _data, 0);
+  function _callVoting(bytes4 _sig, bytes memory _data) internal {
+    wrappedToken.callExternal(voting, _sig, _data, 0);
   }
 
-  function _callStaking(
-    address _wrappedToken,
-    bytes4 _sig,
-    bytes memory _data
-  ) internal {
-    WrappedPiErc20Interface(_wrappedToken).callExternal(stakingByWrapped[_wrappedToken], _sig, _data, 0);
+  function _callStaking(bytes4 _sig, bytes memory _data) internal {
+    wrappedToken.callExternal(staking, _sig, _data, 0);
   }
 
-  function _checkVotingSenderAllowed(address _wrappedToken) internal view {
-    address voting = votingByWrapped[_wrappedToken];
+  function _checkVotingSenderAllowed() internal view {
     require(poolRestriction.isVotingSenderAllowed(voting, msg.sender), "SENDER_NOT_ALLOWED");
   }
 
-  function _getReserveStatus(
-    address _wrappedToken,
-    uint256 _stakedBalance,
-    uint256 _withdrawAmount
-  )
+  function _getReserveStatus(uint256 _stakedBalance, uint256 _withdrawAmount)
     internal
     view
     returns (
@@ -80,11 +61,9 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
       uint256 reserveAmount
     )
   {
-    uint256 wrappedBalance = WrappedPiErc20Interface(_wrappedToken).getWrappedBalance();
+    uint256 wrappedBalance = wrappedToken.getWrappedBalance();
 
-    uint256 _reserveAmount = reserveRatioByWrapped[_wrappedToken]
-      .mul(_stakedBalance.add(wrappedBalance))
-      .div(HUNDRED_PCT);
+    uint256 _reserveAmount = reserveRatio.mul(_stakedBalance.add(wrappedBalance)).div(HUNDRED_PCT);
 
     reserveAmount = _reserveAmount.add(_withdrawAmount);
 
@@ -100,13 +79,11 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     }
   }
 
-  function _approveWrappedTokenToStaking(address _wrappedToken, uint256 _amount) internal {
-    WrappedPiErc20Interface wrappedPi = WrappedPiErc20Interface(_wrappedToken);
-    wrappedPi.approveToken(stakingByWrapped[_wrappedToken], _amount);
+  function _approveWrappedTokenToStaking(uint256 _amount) internal {
+    wrappedToken.approveToken(staking, _amount);
   }
 
-  function _approveWrappedTokenToVoting(address _wrappedToken, uint256 _amount) internal {
-    WrappedPiErc20Interface wrappedPi = WrappedPiErc20Interface(_wrappedToken);
-    wrappedPi.approveToken(votingByWrapped[_wrappedToken], _amount);
+  function _approveWrappedTokenToVoting(uint256 _amount) internal {
+    wrappedToken.approveToken(voting, _amount);
   }
 }

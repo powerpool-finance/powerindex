@@ -10,15 +10,8 @@ import "../interfaces/PowerIndexNaiveRouterInterface.sol";
 contract PowerIndexNaiveRouter is PowerIndexNaiveRouterInterface, Ownable {
   using SafeMath for uint256;
 
-  function migrateWrappedTokensToNewRouter(address[] calldata _wrappedTokens, address _newRouter)
-    external
-    override
-    onlyOwner
-  {
-    uint256 len = _wrappedTokens.length;
-    for (uint256 i = 0; i < len; i++) {
-      WrappedPiErc20Interface(_wrappedTokens[i]).changeRouter(_newRouter);
-    }
+  function migrateToNewRouter(address _wrappedToken, address _newRouter) external override onlyOwner {
+    WrappedPiErc20Interface(_wrappedToken).changeRouter(_newRouter);
   }
 
   function wrapperCallback(uint256 _withdrawAmount) external virtual override {
