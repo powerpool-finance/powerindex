@@ -6,11 +6,14 @@ import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/IPoolRestrictions.sol";
 import "../interfaces/PowerIndexBasicRouterInterface.sol";
 import "./PowerIndexNaiveRouter.sol";
+import "hardhat/console.sol";
 
 contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiveRouter {
   mapping(address => uint256) public reserveRatioByWrapped;
   mapping(address => address) public votingByWrapped;
   mapping(address => address) public stakingByWrapped;
+
+  uint256 public constant HUNDRED_PCT = 1 ether;
 
   IPoolRestrictions public poolRestriction;
 
@@ -79,8 +82,12 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   {
     uint256 wrappedBalance = WrappedPiErc20Interface(_wrappedToken).getWrappedBalance();
 
-    uint256 _reserveAmount = reserveRatioByWrapped[_wrappedToken].mul(_stakedBalance.add(wrappedBalance)).div(1 ether);
+    uint256 _reserveAmount = reserveRatioByWrapped[_wrappedToken]
+      .mul(_stakedBalance.add(wrappedBalance))
+      .div(HUNDRED_PCT);
+
     reserveAmount = _reserveAmount.add(_withdrawAmount);
+
     if (reserveAmount > wrappedBalance) {
       status = ReserveStatus.ABOVE;
       diff = reserveAmount.sub(wrappedBalance);

@@ -6,8 +6,16 @@ import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/aave/IAaveProtoGovernance.sol";
 import "../interfaces/aave/IStakedAave.sol";
 import "./PowerIndexBasicRouter.sol";
+import "hardhat/console.sol";
 
 contract AavePowerIndexRouter is PowerIndexBasicRouter {
+
+  enum CoolDownStatus {
+    NONE,
+    COOLDOWN,
+    UNSTAKE_WINDOW
+  }
+
   constructor(address _poolRestrictions) public PowerIndexBasicRouter(_poolRestrictions) {}
 
   /*** THE PROXIED METHOD EXECUTORS ***/
@@ -44,14 +52,21 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
       return;
     }
 
-    (ReserveStatus reserveStatus, uint256 diff, ) =
+    (ReserveStatus reserveStatus, uint256 diff, uint256 reserveAmount) =
       _getReserveStatus(wrappedToken, IERC20(stakingAddress).balanceOf(wrappedToken), _withdrawAmount);
 
+    console.log("withdraw     ", _withdrawAmount);
+    console.log("status       ", uint256(reserveStatus));
+    console.log("diff         ", diff);
+    console.log("reserveAmount", reserveAmount);
+    console.log("staked       ", IERC20(stakingAddress).balanceOf(wrappedToken));
+
+    // TOOD: revert if _withdrawAmount > reserveAmjunt
     if (reserveStatus == ReserveStatus.ABOVE) {
       CoolDownStatus coolDownStatus = getCoolDownStatus(stakingAddress);
       if (coolDownStatus == CoolDownStatus.NONE) {
-        // TODO: triggerCooldown
-      } else if (coolDownStatus == CoolDownStatus.PENDING) {
+        _triggerCoolDown(wrappedToken);
+      } else if (coolDownStatus == CoolDownStatus.COOLDOWN) {
         _withdrawWrappedFromStaking(wrappedToken, diff);
       }
 
@@ -61,13 +76,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     }
   }
 
-  enum CoolDownStatus {
-    NONE,
-    PENDING,
-    UNSTAKE_WINDOW
-  }
-
-  function getCoolDownStatus(address _stakingAddress) internal view returns (CoolDownStatus) {
+  function getCoolDownStatus(address _stakingAddress) public view returns (CoolDownStatus) {
     IStakedAave staking = IStakedAave(_stakingAddress);
     uint256 stakerCoolDown = staking.stakersCooldowns(address(this));
     uint256 coolDownSeconds = staking.COOLDOWN_SECONDS();
@@ -81,7 +90,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     uint256 coolDownFinishesAt = stakerCoolDown.add(coolDownSeconds);
 
     if (current <= coolDownFinishesAt) {
-      return CoolDownStatus.PENDING;
+      return CoolDownStatus.COOLDOWN;
     }
 
     uint256 unstakeFinishesAt = coolDownFinishesAt.add(unstakeWindow);
