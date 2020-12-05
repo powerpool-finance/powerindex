@@ -2,9 +2,9 @@
 
 pragma solidity 0.6.12;
 
-import "../interfaces/WrappedPiErc20Interface.sol";
-import "./PowerIndexBasicRouter.sol";
-import "../interfaces/CurveStakeInterface.sol";
+import "../../interfaces/WrappedPiErc20Interface.sol";
+import "../PowerIndexBasicRouter.sol";
+import "../../interfaces/CurveStakeInterface.sol";
 
 contract CurvePowerIndexRouter is PowerIndexBasicRouter {
   event SetMinLockTime(uint256 minLockTime);

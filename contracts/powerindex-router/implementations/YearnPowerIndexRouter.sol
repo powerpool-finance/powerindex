@@ -2,9 +2,9 @@
 
 pragma solidity 0.6.12;
 
-import "../interfaces/WrappedPiErc20Interface.sol";
-import "../interfaces/YearnGovernanceInterface.sol";
-import "./PowerIndexBasicRouter.sol";
+import "../../interfaces/WrappedPiErc20Interface.sol";
+import "../../interfaces/YearnGovernanceInterface.sol";
+import "./../PowerIndexBasicRouter.sol";
 
 contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   bytes4 public constant REGISTER_SIG = bytes4(keccak256(bytes("register()")));

@@ -2,10 +2,10 @@
 
 pragma solidity 0.6.12;
 
-import "../interfaces/WrappedPiErc20Interface.sol";
-import "../interfaces/aave/IAaveProtoGovernance.sol";
-import "../interfaces/aave/IStakedAave.sol";
-import "./PowerIndexBasicRouter.sol";
+import "../../interfaces/WrappedPiErc20Interface.sol";
+import "../../interfaces/aave/IAaveProtoGovernance.sol";
+import "../../interfaces/aave/IStakedAave.sol";
+import "../PowerIndexBasicRouter.sol";
 import "hardhat/console.sol";
 
 contract AavePowerIndexRouter is PowerIndexBasicRouter {
