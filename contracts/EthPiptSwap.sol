@@ -104,10 +104,10 @@ contract EthPiptSwap is Ownable {
     return _swapWethToPiptByPoolOut(msg.value, poolAmountOut);
   }
 
-  function swapEthToPiptByPoolOut (uint256 _poolAmountOut)
+  function swapEthToPiptByPoolOut(uint256 _poolAmountOut)
     external
     payable
-    returns(uint256 poolAmountOutAfterFee, uint256 oddEth)
+    returns (uint256 poolAmountOutAfterFee, uint256 oddEth)
   {
     weth.deposit{ value: msg.value }();
 
