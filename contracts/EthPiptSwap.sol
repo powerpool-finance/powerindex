@@ -92,7 +92,7 @@ contract EthPiptSwap is Ownable {
     swapEthToPipt(defaultSlippage);
   }
 
-  function swapEthToPipt(uint256 _slippage) public payable {
+  function swapEthToPipt(uint256 _slippage) public payable returns (uint256 poolAmountOutAfterFee, uint256 oddEth) {
     (, uint256 swapAmount) = calcEthFee(msg.value);
 
     address[] memory tokens = pipt.getCurrentTokens();
@@ -101,17 +101,21 @@ contract EthPiptSwap is Ownable {
 
     weth.deposit{ value: msg.value }();
 
-    _swapWethToPiptByPoolOut(msg.value, poolAmountOut);
+    return _swapWethToPiptByPoolOut(msg.value, poolAmountOut);
   }
 
-  function swapEthToPiptByPoolOut(uint256 _poolAmountOut) external payable {
+  function swapEthToPiptByPoolOut(uint256 _poolAmountOut)
+    external
+    payable
+    returns (uint256 poolAmountOutAfterFee, uint256 oddEth)
+  {
     weth.deposit{ value: msg.value }();
 
-    _swapWethToPiptByPoolOut(msg.value, _poolAmountOut);
+    return _swapWethToPiptByPoolOut(msg.value, _poolAmountOut);
   }
 
-  function swapPiptToEth(uint256 _poolAmountIn) external {
-    uint256 ethOutAmount = _swapPiptToWeth(_poolAmountIn);
+  function swapPiptToEth(uint256 _poolAmountIn) external returns (uint256 ethOutAmount) {
+    ethOutAmount = _swapPiptToWeth(_poolAmountIn);
 
     weth.withdraw(ethOutAmount);
     msg.sender.transfer(ethOutAmount);
@@ -322,7 +326,10 @@ contract EthPiptSwap is Ownable {
     return IUniswapV2Pair(uniswapEthPairByTokenAddress[token]);
   }
 
-  function _swapWethToPiptByPoolOut(uint256 _wethAmount, uint256 _poolAmountOut) internal {
+  function _swapWethToPiptByPoolOut(uint256 _wethAmount, uint256 _poolAmountOut)
+    internal
+    returns (uint256 poolAmountOutAfterFee, uint256 oddEth)
+  {
     require(_wethAmount > 0, "ETH_REQUIRED");
 
     {
@@ -367,20 +374,26 @@ contract EthPiptSwap is Ownable {
       TokenInterface(tokens[i]).approve(address(pipt), tokensInPipt[i]);
     }
 
-    (, uint256 communityJoinFee, , ) = pipt.getCommunityFee();
-    (uint256 poolAmountOutAfterFee, uint256 poolAmountOutFee) =
-      pipt.calcAmountWithCommunityFee(_poolAmountOut, communityJoinFee, address(this));
+    uint256 poolAmountOutFee;
+    {
+      (, uint256 communityJoinFee, , ) = pipt.getCommunityFee();
+      (poolAmountOutAfterFee, poolAmountOutFee) = pipt.calcAmountWithCommunityFee(
+        _poolAmountOut,
+        communityJoinFee,
+        address(this)
+      );
+    }
 
     emit EthToPiptSwap(msg.sender, swapAmount, feeAmount, _poolAmountOut, poolAmountOutFee);
 
     pipt.joinPool(_poolAmountOut, tokensInPipt);
     pipt.safeTransfer(msg.sender, poolAmountOutAfterFee);
 
-    uint256 ethDiff = swapAmount.sub(totalEthSwap);
-    if (ethDiff > 0) {
-      weth.withdraw(ethDiff);
-      msg.sender.transfer(ethDiff);
-      emit OddEth(msg.sender, ethDiff);
+    oddEth = swapAmount.sub(totalEthSwap);
+    if (oddEth > 0) {
+      weth.withdraw(oddEth);
+      msg.sender.transfer(oddEth);
+      emit OddEth(msg.sender, oddEth);
     }
   }
 
