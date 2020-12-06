@@ -43,7 +43,7 @@ contract Erc20PiptSwap is EthPiptSwap {
     address _swapToken,
     uint256 _swapAmount,
     uint256 _slippage
-  ) external {
+  ) external returns (uint256 poolAmountOut) {
     IERC20(_swapToken).safeTransferFrom(msg.sender, address(this), _swapAmount);
 
     IUniswapV2Pair tokenPair = _uniswapPairFor(_swapToken);
@@ -55,20 +55,20 @@ contract Erc20PiptSwap is EthPiptSwap {
 
     (, uint256 ethSwapAmount) = calcEthFee(ethAmount);
     address[] memory tokens = pipt.getCurrentTokens();
-    (, , uint256 poolAmountOut) = calcSwapEthToPiptInputs(ethSwapAmount, tokens, _slippage);
+    (, , poolAmountOut) = calcSwapEthToPiptInputs(ethSwapAmount, tokens, _slippage);
 
     _swapWethToPiptByPoolOut(ethAmount, poolAmountOut);
 
     emit Erc20ToPiptSwap(msg.sender, _swapToken, _swapAmount, ethAmount, poolAmountOut);
   }
 
-  function swapPiptToErc20(address _swapToken, uint256 _poolAmountIn) external {
+  function swapPiptToErc20(address _swapToken, uint256 _poolAmountIn) external returns (uint256 erc20Out) {
     uint256 ethOut = _swapPiptToWeth(_poolAmountIn);
 
     IUniswapV2Pair tokenPair = _uniswapPairFor(_swapToken);
 
     (uint256 tokenReserve, uint256 ethReserve, ) = tokenPair.getReserves();
-    uint256 erc20Out = UniswapV2Library.getAmountOut(ethOut, ethReserve, tokenReserve);
+    erc20Out = UniswapV2Library.getAmountOut(ethOut, ethReserve, tokenReserve);
 
     weth.safeTransfer(address(tokenPair), ethOut);
 
