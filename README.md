@@ -3,12 +3,13 @@
 ![CI](https://github.com/powerpool-finance/powerindex/workflows/CI/badge.svg)
 [![codecov](https://codecov.io/gh/powerpool-finance/powerindex/branch/master/graph/badge.svg)](https://codecov.io/gh/powerpool-finance/powerindex)
 
-This repository contains PowerIndex smart contracs. PowerIndex is an ecosystem product of PowerPool. The main feature of PowerIndex is a possibility to create special pools, not available in Balancer with unique governance and pool design.
+This repository contains PowerIndex smart contracs. PowerIndex is the main product of PowerPool. The main feature of PowerIndex is a possibility to create special pools with unique governance and pool design.
 
 ✅🚨 Security review status: **partially audited**
 
 More details in 👉:
-- [`PowerIndexPool.sol` and `PoolRestrictions.sol` Security Audit by MixBytes](https://github.com/powerpool-finance/powerpool-docs/blob/master/audits/PowerIndexPoolSecurityAuditScope1.pdf).
+- [`PowerIndexPool.sol` and `PoolRestrictions.sol` Security Audit by MixBytes](https://github.com/powerpool-finance/powerpool-docs/blob/master/audits/PowerIndexPoolSecurityAuditScope1.pdf)
+- [`VestedLPMining.sol` and `PowerIndexPoolController.sol` Security Audit by Pessimistic](https://github.com/powerpool-finance/powerpool-docs/blob/master/audits/PowerIndexPool_SecurityAudit_Scope1_Pessimistic.pdf)
 
 
 ## Contracts on Ethereum Main Network
