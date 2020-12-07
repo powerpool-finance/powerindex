@@ -95,6 +95,20 @@ contract VestedLPMining is
 
   mapping(address => uint256) public lastSwapBlock;
 
+  struct PoolVestingSetting {
+    address supplyPool;
+    uint256[] supplyLevels;
+    uint256[] cashShares;
+  }
+  mapping(address => PoolVestingSetting) public poolVestingSettings;
+
+  address public manager;
+
+  modifier onlyManagerOrOwner() {
+    require(owner() == _msgSender() || manager == _msgSender(), "Caller is not the owner or manager");
+    _;
+  }
+
   /// @inheritdoc IVestedLPMining
   function initialize(
     IERC20 _cvp,
@@ -124,7 +138,7 @@ contract VestedLPMining is
     IERC20 _lpToken,
     uint8 _poolType,
     bool _votesEnabled
-  ) public override onlyOwner {
+  ) public override onlyManagerOrOwner {
     require(!isLpTokenAdded(_lpToken), "VLPMining: token already added");
 
     massUpdatePools();
@@ -154,7 +168,7 @@ contract VestedLPMining is
     uint256 _allocPoint,
     uint8 _poolType,
     bool _votesEnabled
-  ) public override onlyOwner {
+  ) public override onlyManagerOrOwner {
     massUpdatePools();
     totalAllocPoint = totalAllocPoint.sub(uint256(pools[_pid].allocPoint)).add(_allocPoint);
     pools[_pid].allocPoint = SafeMath32.fromUint(_allocPoint, "VLPMining: too big allocation");
@@ -162,6 +176,12 @@ contract VestedLPMining is
     pools[_pid].poolType = _poolType;
 
     emit SetLpToken(address(pools[_pid].lpToken), _pid, _allocPoint);
+  }
+
+  function setManager(address _manager) public override onlyOwner {
+    manager = _manager;
+
+    emit SetManager(_manager);
   }
 
   /// @inheritdoc IVestedLPMining
@@ -172,14 +192,14 @@ contract VestedLPMining is
   }
 
   /// @inheritdoc IVestedLPMining
-  function setCvpPerBlock(uint256 _cvpPerBlock) public override onlyOwner {
+  function setCvpPerBlock(uint256 _cvpPerBlock) public override onlyManagerOrOwner {
     cvpPerBlock = SafeMath96.fromUint(_cvpPerBlock, "VLPMining: too big cvpPerBlock");
 
     emit SetCvpPerBlock(_cvpPerBlock);
   }
 
   /// @inheritdoc IVestedLPMining
-  function setCvpVestingPeriodInBlocks(uint256 _cvpVestingPeriodInBlocks) public override onlyOwner {
+  function setCvpVestingPeriodInBlocks(uint256 _cvpVestingPeriodInBlocks) public override onlyManagerOrOwner {
     cvpVestingPeriodInBlocks = SafeMath32.fromUint(
       _cvpVestingPeriodInBlocks,
       "VLPMining: too big cvpVestingPeriodInBlocks"
@@ -188,8 +208,19 @@ contract VestedLPMining is
     emit SetCvpVestingPeriodInBlocks(_cvpVestingPeriodInBlocks);
   }
 
+  function setPoolVestingSettings(
+    address _lpToken,
+    address _supplyPool,
+    uint256[] memory _supplyLevels,
+    uint256[] memory _cashShares
+  ) public override onlyManagerOrOwner {
+    poolVestingSettings[_lpToken] = PoolVestingSetting(_supplyPool, _supplyLevels, _cashShares);
+
+    emit SetPoolVestingSettings(_lpToken, _supplyPool, _supplyLevels, _cashShares);
+  }
+
   /// @inheritdoc IVestedLPMining
-  function setCvpPoolByMetaPool(address _metaPool, address _cvpPool) public override onlyOwner {
+  function setCvpPoolByMetaPool(address _metaPool, address _cvpPool) public override onlyManagerOrOwner {
     cvpPoolByMetaPool[_metaPool] = _cvpPool;
 
     emit SetCvpPoolByMetaPool(_metaPool, _cvpPool);
@@ -232,7 +263,7 @@ contract VestedLPMining is
     User memory _user = users[_pid][user];
 
     _computePoolReward(_pool);
-    (, uint256 newlyVested) = _computeCvpVesting(_user, _pool.accCvpPerLpt);
+    (, uint256 newlyVested) = _computeCvpVesting(_user, _pool.accCvpPerLpt, address(_pool.lpToken));
 
     return newlyVested;
   }
@@ -266,7 +297,7 @@ contract VestedLPMining is
     User storage user = users[_pid][msg.sender];
 
     _doPoolUpdate(pool);
-    _vestUserCvp(user, pool.accCvpPerLpt);
+    _vestUserCvp(user, pool.accCvpPerLpt, address(pool.lpToken));
 
     if (_amount != 0) {
       pool.lpToken.safeTransferFrom(msg.sender, address(this), _amount);
@@ -288,7 +319,7 @@ contract VestedLPMining is
     require(user.lptAmount >= _amount, "VLPMining: amount exceeds balance");
 
     _doPoolUpdate(pool);
-    _vestUserCvp(user, pool.accCvpPerLpt);
+    _vestUserCvp(user, pool.accCvpPerLpt, address(pool.lpToken));
 
     if (_amount != 0) {
       user.lptAmount = user.lptAmount.sub(_amount);
@@ -322,6 +353,33 @@ contract VestedLPMining is
     user.vestingBlock = 0;
 
     _doCheckpointVotes(msg.sender);
+  }
+
+  function calcCashShare(address _lpToken) public view returns (uint256) {
+    PoolVestingSetting storage pvs = poolVestingSettings[_lpToken];
+    if (pvs.supplyPool == address(0)) {
+      return 0;
+    }
+    uint256 totalSupply = IERC20(pvs.supplyPool).totalSupply();
+    uint256 len = pvs.supplyLevels.length;
+    for (uint256 i = 0; i < len; i++) {
+      if (totalSupply >= pvs.supplyLevels[i]) {
+        return pvs.cashShares[i];
+      }
+    }
+    return 0;
+  }
+
+  function getPoolVestingSettings(address _lpToken) external view returns (
+    address supplyPool,
+    uint256[] memory supplyLevels,
+    uint256[] memory cashShares
+  ) {
+    return (
+      poolVestingSettings[_lpToken].supplyPool,
+      poolVestingSettings[_lpToken].supplyLevels,
+      poolVestingSettings[_lpToken].cashShares
+    );
   }
 
   /// @inheritdoc IVestedLPMining
@@ -420,11 +478,11 @@ contract VestedLPMining is
     }
   }
 
-  function _vestUserCvp(User storage user, uint256 accCvpPerLpt) internal {
+  function _vestUserCvp(User storage user, uint256 accCvpPerLpt, address _lpToken) internal {
     User memory _user = user;
     uint32 prevVestingBlock = _user.vestingBlock;
     uint32 prevUpdateBlock = _user.lastUpdateBlock;
-    (uint256 newlyEntitled, uint256 newlyVested) = _computeCvpVesting(_user, accCvpPerLpt);
+    (uint256 newlyEntitled, uint256 newlyVested) = _computeCvpVesting(_user, accCvpPerLpt, address(_lpToken));
 
     if (newlyEntitled != 0) {
       user.pendedCvp = _user.pendedCvp;
@@ -456,7 +514,7 @@ contract VestedLPMining is
    * @return newlyEntitled - CVP amount to entitle (on top of tokens entitled so far)
    * @return newlyVested - CVP amount to vest (on top of tokens already vested)
    */
-  function _computeCvpVesting(User memory _user, uint256 accCvpPerLpt)
+  function _computeCvpVesting(User memory _user, uint256 _accCvpPerLpt, address _lpToken)
     internal
     view
     returns (uint256 newlyEntitled, uint256 newlyVested)
@@ -467,14 +525,23 @@ contract VestedLPMining is
       return (0, 0);
     }
 
+    uint256 cashShare = calcCashShare(_lpToken);
+
     uint32 age = _user.lastUpdateBlock - prevBlock;
 
     // Tokens which are to be entitled starting from the `user.lastUpdateBlock`, shall be
     // vested proportionally to the number of blocks already minted within the period between
     // the `user.lastUpdateBlock` and `cvpVestingPeriodInBlocks` following the current block
-    newlyEntitled = uint256(_computeCvpToEntitle(_user.lptAmount, _user.cvpAdjust, accCvpPerLpt));
-    uint256 newToVest =
-      newlyEntitled == 0 ? 0 : (newlyEntitled.mul(uint256(age)).div(uint256(age + cvpVestingPeriodInBlocks)));
+    newlyEntitled = uint256(_computeCvpToEntitle(_user.lptAmount, _user.cvpAdjust, _accCvpPerLpt));
+
+    uint256 newToVest = 0;
+    if (newlyEntitled != 0) {
+      // newToVest = (cashShare * newlyEntitled) + (1 - cashshare) * (newlyEntitled * age / (age + cvpVestingPeriodInBlocks))
+      uint256 shareMulEntitled = cashShare.mul(newlyEntitled);
+      newToVest = shareMulEntitled.add(
+        (uint(1 ether).sub(cashShare)).mul(newlyEntitled.mul(uint256(age)).div(uint256(age + cvpVestingPeriodInBlocks)))
+      );
+    }
 
     // Tokens which have been pended since the `user.lastUpdateBlock` shall be vested:
     // - in full, if the `user.vestingBlock` has been mined

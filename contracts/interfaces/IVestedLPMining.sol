@@ -52,6 +52,15 @@ interface IVestedLPMining {
 
   function setCvpPoolByMetaPool(address _metaPool, address _cvpPool) external;
 
+  function setManager(address _manager) external;
+
+  function setPoolVestingSettings(
+    address _lpToken,
+    address _supplyPool,
+    uint256[] memory _supplyLevels,
+    uint256[] memory _cashShares
+  ) external;
+
   /// @notice Migrate LP token to another LP contract
   function migrate(uint256 _pid) external;
 
@@ -96,8 +105,10 @@ interface IVestedLPMining {
   event AddLpToken(address indexed lpToken, uint256 indexed pid, uint256 allocPoint);
   event SetLpToken(address indexed lpToken, uint256 indexed pid, uint256 allocPoint);
   event SetMigrator(address indexed migrator);
+  event SetManager(address indexed manager);
   event SetCvpPerBlock(uint256 cvpPerBlock);
   event SetCvpVestingPeriodInBlocks(uint256 cvpVestingPeriodInBlocks);
+  event SetPoolVestingSettings(address lpToken, address supplyPool, uint256[] supplyLevels, uint256[] cashShares);
   event SetCvpPoolByMetaPool(address indexed metaPool, address indexed cvpPool);
   event MigrateLpToken(address indexed oldLpToken, address indexed newLpToken, uint256 indexed pid);
 
