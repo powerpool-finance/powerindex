@@ -24,4 +24,4 @@ More details in 👉:
 ### Deprecated
 
 - `LP Mining` - [0xC0B5c7f2F5b5c6CDcc75AeBB73Ac8B5d87C68DcC](https://etherscan.io/address/0xC0B5c7f2F5b5c6CDcc75AeBB73Ac8B5d87C68DcC). The old liquidity mining contract;
-- `VestedLPMining`(Implementation - [0xaCD09e94a4FC629f9D4C09a3e5577F053fc583Ac](https://etherscan.io/address/0xaCD09e94a4FC629f9D4C09a3e5577F053fc583Ac)) is a reward contract developed to allow liquidity providers to vote and claim LP rewards. Liquidity providers (Power Index, Uniswap, Balancer) can deposit pool tokens and receive a reward in CVP and as well as voting rights, based on stake of these tokens. The accrued CVP tokens have a specified vesting period;
+- `VestedLPMining`(Implementation - [0xaCD09e94a4FC629f9D4C09a3e5577F053fc583Ac](https://etherscan.io/address/0xaCD09e94a4FC629f9D4C09a3e5577F053fc583Ac)). The old `VestedLPMining` implementation;
