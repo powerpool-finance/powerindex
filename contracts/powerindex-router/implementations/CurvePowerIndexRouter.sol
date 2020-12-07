@@ -21,7 +21,11 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
 
   uint256 public minLockTime;
 
-  constructor(address _wrappedToken, address _poolRestrictions, uint256 _minLockTime) public PowerIndexBasicRouter(_wrappedToken, _poolRestrictions) {
+  constructor(
+    address _wrappedToken,
+    address _poolRestrictions,
+    uint256 _minLockTime
+  ) public PowerIndexBasicRouter(_wrappedToken, _poolRestrictions) {
     minLockTime = _minLockTime;
   }
 
@@ -42,18 +46,12 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
     _callVoting(PROPOSE_SIG, abi.encode(_executionScript, _metadata, _castVote, _executesIfDecided));
   }
 
-  function executeVoteFor(
-    uint256 _voteId,
-    bool _executesIfDecided
-  ) external {
+  function executeVoteFor(uint256 _voteId, bool _executesIfDecided) external {
     _checkVotingSenderAllowed();
     _callVoting(VOTE_SIG, abi.encode(_voteId, true, _executesIfDecided));
   }
 
-  function executeVoteAgainst(
-    uint256 _voteId,
-    bool _executesIfDecided
-  ) external {
+  function executeVoteAgainst(uint256 _voteId, bool _executesIfDecided) external {
     _checkVotingSenderAllowed();
     _callVoting(VOTE_SIG, abi.encode(_voteId, false, _executesIfDecided));
   }
@@ -88,7 +86,7 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
         _redeem();
         _stake(reserveAmount);
       }
-    } else if (status == ReserveStatus.BELLOW) {
+    } else if (status == ReserveStatus.BELOW) {
       _stake(diff);
     }
   }
@@ -106,7 +104,7 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
       lockedEnd = 0;
     }
 
-    wrappedToken.approveToken(staking, _amount);
+    wrappedToken.approveUnderlying(staking, _amount);
 
     if (lockedEnd == 0) {
       _callStaking(CREATE_STAKE_SIG, abi.encode(_amount, block.timestamp + WEEK));

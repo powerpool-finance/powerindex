@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "../interfaces/PowerIndexNaiveRouterInterface.sol";
 import "../interfaces/WrappedPiErc20Interface.sol";
+import "hardhat/console.sol";
 
 contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
   using SafeMath for uint256;
@@ -74,22 +75,22 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
     emit ChangeRouter(router);
   }
 
-  function approveToken(address _to, uint256 _amount) external override onlyRouter {
+  function approveUnderlying(address _to, uint256 _amount) external override onlyRouter {
     token.approve(_to, _amount);
     emit Approve(_to, _amount);
   }
 
   function callExternal(
-    address voting,
+    address destination,
     bytes4 signature,
     bytes calldata args,
     uint256 value
   ) external override onlyRouter {
-    (bool success, bytes memory data) = voting.call{ value: value }(abi.encodePacked(signature, args));
+    (bool success, bytes memory data) = destination.call{ value: value }(abi.encodePacked(signature, args));
     require(success, string(data));
     //    require(success, "CALL_EXTERNAL_REVERTED");
 
-    emit CallExternal(voting, success, signature, args, data);
+    emit CallExternal(destination, success, signature, args, data);
   }
 
   function getWrappedBalance() external view override returns (uint256) {

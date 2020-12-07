@@ -15,7 +15,10 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   bytes4 public constant VOTE_FOR_SIG = bytes4(keccak256(bytes("voteFor(uint256)")));
   bytes4 public constant VOTE_AGAINST_SIG = bytes4(keccak256(bytes("voteAgainst(uint256)")));
 
-  constructor(address _wrappedToken, address _poolRestrictions) public PowerIndexBasicRouter(_wrappedToken, _poolRestrictions) {}
+  constructor(address _wrappedToken, address _poolRestrictions)
+    public
+    PowerIndexBasicRouter(_wrappedToken, _poolRestrictions)
+  {}
 
   /*** THE PROXIED METHOD EXECUTORS ***/
 
@@ -29,10 +32,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     _callVoting(EXIT_SIG, "");
   }
 
-  function executePropose(
-    address _executor,
-    string calldata _hash
-  ) external {
+  function executePropose(address _executor, string calldata _hash) external {
     _checkVotingSenderAllowed();
     _callVoting(PROPOSE_SIG, abi.encode(_executor, _hash));
   }
@@ -68,15 +68,14 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     }
 
     YearnGovernanceInterface _voting = YearnGovernanceInterface(voting);
-    (ReserveStatus status, uint256 diff, ) =
-      _getReserveStatus(_voting.balanceOf(wrappedToken_), _withdrawAmount);
+    (ReserveStatus status, uint256 diff, ) = _getReserveStatus(_voting.balanceOf(wrappedToken_), _withdrawAmount);
 
     if (status == ReserveStatus.ABOVE) {
       uint256 voteLockUntilBlock = _voting.voteLock(wrappedToken_);
       if (voteLockUntilBlock < block.number) {
         _redeem(diff);
       }
-    } else if (status == ReserveStatus.BELLOW) {
+    } else if (status == ReserveStatus.BELOW) {
       _stake(diff);
     }
   }
@@ -85,7 +84,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
 
   function _stake(uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
-    wrappedToken.approveToken(voting, _amount);
+    wrappedToken.approveUnderlying(voting, _amount);
     _callVoting(STAKE_SIG, abi.encode(_amount));
   }
 

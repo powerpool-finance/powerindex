@@ -14,7 +14,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   event SetVotingAndStaking(address indexed voting, address indexed staking);
   event SetReserveRatio(uint256 ratio);
 
-  enum ReserveStatus { EQUAL, ABOVE, BELLOW }
+  enum ReserveStatus { EQUAL, ABOVE, BELOW }
 
   WrappedPiErc20Interface public immutable wrappedToken;
 
@@ -58,24 +58,62 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     returns (
       ReserveStatus status,
       uint256 diff,
-      uint256 reserveAmount
+      uint256 adjustedReserveAmount
     )
   {
-    uint256 wrappedBalance = wrappedToken.getWrappedBalance();
+    return getReserveStatusPure(reserveRatio, wrappedToken.getWrappedBalance(), _stakedBalance, _withdrawAmount);
+  }
 
-    uint256 _reserveAmount = reserveRatio.mul(_stakedBalance.add(wrappedBalance)).div(HUNDRED_PCT);
+  /**
+   *
+   * Reserve status has the following options:
+   * * ABOVE - there is not enough underlying funds on the wrapper contract to satisfy the reserve ratio,
+   *           the diff amount should be redeemed from the staking contract
+   * * BELOW - there are some extra funds over reserve ratio on the wrapper contract,
+   *           the diff amount should be sent to the staking contract
+   */
+  function getReserveStatusPure(
+    uint256 _reserveRatio,
+    uint256 _leftOnWrapper,
+    uint256 _stakedBalance,
+    uint256 _withdrawAmount
+  )
+    public
+    pure
+    returns (
+      ReserveStatus status,
+      uint256 diff,
+      uint256 adjustedReserveAmount
+    )
+  {
+    adjustedReserveAmount = calculateReserveRatio(_reserveRatio, _leftOnWrapper, _stakedBalance, _withdrawAmount);
 
-    reserveAmount = _reserveAmount.add(_withdrawAmount);
-
-    if (reserveAmount > wrappedBalance) {
+    if (adjustedReserveAmount > _leftOnWrapper) {
       status = ReserveStatus.ABOVE;
-      diff = reserveAmount.sub(wrappedBalance);
-    } else if (reserveAmount < wrappedBalance) {
-      status = ReserveStatus.BELLOW;
-      diff = wrappedBalance.sub(reserveAmount);
+      diff = adjustedReserveAmount.sub(_leftOnWrapper);
+    } else if (adjustedReserveAmount < _leftOnWrapper) {
+      status = ReserveStatus.BELOW;
+      diff = _leftOnWrapper.sub(adjustedReserveAmount);
     } else {
       status = ReserveStatus.EQUAL;
       diff = 0;
     }
+  }
+
+  //                           / %reserveRatio * (staked + leftOnWrapper) \
+  // adjustedReserveAmount =  | -------------------------------------------| + withdrawAmount
+  //                           \                  100%                    /
+  //
+  // * reserveRationPct - % of a reserve ratio
+  // * staked - amount of original tokens staked on the staking contract
+  // * leftOnWrapper - amount of origin tokens left on the token-wrapper (WrappedPiErc20) contract
+  // * withdrawAmount could be negative in a case of deposit
+  function calculateReserveRatio(
+    uint256 _reserveRatio,
+    uint256 _leftOnWrapper,
+    uint256 _stakedBalance,
+    uint256 _withdrawAmount
+  ) public pure returns (uint256) {
+    return _reserveRatio.mul(_stakedBalance.add(_leftOnWrapper)).div(HUNDRED_PCT).add(_withdrawAmount);
   }
 }

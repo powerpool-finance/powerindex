@@ -9,9 +9,17 @@ import "../PowerIndexBasicRouter.sol";
 import "hardhat/console.sol";
 
 contract AavePowerIndexRouter is PowerIndexBasicRouter {
+  event TriggerCooldown();
+  event Stake(uint256 amount);
+  event Redeem(uint256 amount);
+  event IgnoreRedeemDueCoolDown(uint256 coolDownFinishesAt, uint256 unstakeFinishesAt);
+
   enum CoolDownStatus { NONE, COOLDOWN, UNSTAKE_WINDOW }
 
-  constructor(address _wrappedToken, address _poolRestrictions) public PowerIndexBasicRouter(_wrappedToken, _poolRestrictions) {}
+  constructor(address _wrappedToken, address _poolRestrictions)
+    public
+    PowerIndexBasicRouter(_wrappedToken, _poolRestrictions)
+  {}
 
   /*** THE PROXIED METHOD EXECUTORS ***/
 
@@ -49,71 +57,78 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
       return;
     }
 
-    (ReserveStatus reserveStatus, uint256 diff, uint256 reserveAmount) =
+    (ReserveStatus reserveStatus, uint256 diff, ) =
       _getReserveStatus(IERC20(staking).balanceOf(wrappedToken_), _withdrawAmount);
 
-    console.log("withdraw     ", _withdrawAmount);
-    console.log("status       ", uint256(reserveStatus));
-    console.log("diff         ", diff);
-    console.log("reserveAmount", reserveAmount);
-    console.log("staked       ", IERC20(staking).balanceOf(wrappedToken_));
-
-    // TOOD: revert if _withdrawAmount > reserveAmjunt
+    // TODO: eager revert if _withdrawAmount > reserveAmount
     if (reserveStatus == ReserveStatus.ABOVE) {
-      CoolDownStatus coolDownStatus = getCoolDownStatus();
+      (CoolDownStatus coolDownStatus, uint256 coolDownFinishesAt, uint256 unstakeFinishesAt) = getCoolDownStatus();
       if (coolDownStatus == CoolDownStatus.NONE) {
         _triggerCoolDown();
-      } else if (coolDownStatus == CoolDownStatus.COOLDOWN) {
+      } else if (coolDownStatus == CoolDownStatus.UNSTAKE_WINDOW) {
         _redeem(diff);
       }
-
-      // else do nothing
-    } else if (reserveStatus == ReserveStatus.BELLOW) {
+      /* if (coolDownStatus == CoolDownStatus.COOLDOWN) */
+      else {
+        emit IgnoreRedeemDueCoolDown(coolDownFinishesAt, unstakeFinishesAt);
+      }
+    } else if (reserveStatus == ReserveStatus.BELOW) {
       _stake(diff);
     }
   }
 
-  function getCoolDownStatus() public view returns (CoolDownStatus) {
+  function getCoolDownStatus()
+    public
+    view
+    returns (
+      CoolDownStatus status,
+      uint256 coolDownFinishesAt,
+      uint256 unstakeFinishesAt
+    )
+  {
     IStakedAave _staking = IStakedAave(staking);
-    uint256 stakerCoolDown = _staking.stakersCooldowns(address(this));
+    uint256 stakerCoolDown = _staking.stakersCooldowns(address(wrappedToken));
     uint256 coolDownSeconds = _staking.COOLDOWN_SECONDS();
     uint256 unstakeWindow = _staking.UNSTAKE_WINDOW();
     uint256 current = block.timestamp;
 
     if (stakerCoolDown == 0) {
-      return CoolDownStatus.NONE;
+      return (CoolDownStatus.NONE, 0, 0);
     }
 
-    uint256 coolDownFinishesAt = stakerCoolDown.add(coolDownSeconds);
+    coolDownFinishesAt = stakerCoolDown.add(coolDownSeconds);
+    unstakeFinishesAt = coolDownFinishesAt.add(unstakeWindow);
 
     if (current <= coolDownFinishesAt) {
-      return CoolDownStatus.COOLDOWN;
-    }
-
-    uint256 unstakeFinishesAt = coolDownFinishesAt.add(unstakeWindow);
-
-    // current > coolDownFinishesAt && ...
-    if (current < unstakeWindow) {
-      return (CoolDownStatus.UNSTAKE_WINDOW);
-    }
-
-    return CoolDownStatus.NONE;
+      status = CoolDownStatus.COOLDOWN;
+      // current > coolDownFinishesAt && ...
+    } else if (current < unstakeFinishesAt) {
+      status = CoolDownStatus.UNSTAKE_WINDOW;
+    } // else { status = CoolDownStatus.NONE; }
   }
 
   /*** INTERNALS ***/
 
   function _triggerCoolDown() internal {
     _callStaking(IStakedAave(0).cooldown.selector, "");
+    emit TriggerCooldown();
   }
 
   function _stake(uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
-    wrappedToken.approveToken(staking, _amount);
+    wrappedToken.approveUnderlying(staking, _amount);
+
     _callStaking(IStakedAave(0).stake.selector, abi.encode(wrappedToken, _amount));
+
+    emit Stake(_amount);
   }
 
   function _redeem(uint256 _amount) internal {
     require(_amount > 0, "CANT_REDEEM_0");
-    _callStaking(IStakedAave(0).redeem.selector, abi.encode(_amount));
+
+    _callStaking(IERC20(0).approve.selector, abi.encode(staking, _amount));
+    _callStaking(IStakedAave(0).redeem.selector, abi.encode(address(wrappedToken), _amount));
+
+    emit Redeem(_amount);
   }
 }
