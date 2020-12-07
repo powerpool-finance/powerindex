@@ -8,7 +8,7 @@ This repository contains PowerIndex smart contracs. PowerIndex is an ecosystem p
 ✅🚨 Security review status: **partially audited**
 
 More details in 👉:
-- [Power Index Pool Report(Scope 1) by MixBytes](https://github.com/powerpool-finance/powerpool-docs/blob/master/audits/PowerIndexPoolSecurityAuditScope1.pdf).
+- [`PowerIndexPool.sol` and `PoolRestrictions.sol` Security Audit by MixBytes](https://github.com/powerpool-finance/powerpool-docs/blob/master/audits/PowerIndexPoolSecurityAuditScope1.pdf).
 
 
 ## Contracts on Ethereum Main Network
