@@ -371,7 +371,8 @@ contract VestedLPMining is
   }
 
   function getPoolVestingSettings(address _lpToken)
-    external view
+    external
+    view
     returns (
       address supplyPool,
       uint256[] memory supplyLevels,
@@ -549,7 +550,8 @@ contract VestedLPMining is
       uint256 shareMulEntitled = cashShare.mul(newlyEntitled).div(1 ether);
       newToVest = shareMulEntitled.add(
         (uint256(1 ether).sub(cashShare))
-                .mul(newlyEntitled.mul(uint256(age)).div(uint256(age + cvpVestingPeriodInBlocks))).div(1 ether)
+          .mul(newlyEntitled.mul(uint256(age)).div(uint256(age + cvpVestingPeriodInBlocks)))
+          .div(1 ether)
       );
     }
 
