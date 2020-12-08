@@ -370,11 +370,14 @@ contract VestedLPMining is
     return 0;
   }
 
-  function getPoolVestingSettings(address _lpToken) external view returns (
-    address supplyPool,
-    uint256[] memory supplyLevels,
-    uint256[] memory cashShares
-  ) {
+  function getPoolVestingSettings(address _lpToken)
+    external view
+    returns (
+      address supplyPool,
+      uint256[] memory supplyLevels,
+      uint256[] memory cashShares
+    )
+  {
     return (
       poolVestingSettings[_lpToken].supplyPool,
       poolVestingSettings[_lpToken].supplyLevels,
@@ -478,7 +481,11 @@ contract VestedLPMining is
     }
   }
 
-  function _vestUserCvp(User storage user, uint256 accCvpPerLpt, address _lpToken) internal {
+  function _vestUserCvp(
+    User storage user,
+    uint256 accCvpPerLpt,
+    address _lpToken
+  ) internal {
     User memory _user = user;
     uint32 prevVestingBlock = _user.vestingBlock;
     uint32 prevUpdateBlock = _user.lastUpdateBlock;
@@ -514,11 +521,11 @@ contract VestedLPMining is
    * @return newlyEntitled - CVP amount to entitle (on top of tokens entitled so far)
    * @return newlyVested - CVP amount to vest (on top of tokens already vested)
    */
-  function _computeCvpVesting(User memory _user, uint256 _accCvpPerLpt, address _lpToken)
-    internal
-    view
-    returns (uint256 newlyEntitled, uint256 newlyVested)
-  {
+  function _computeCvpVesting(
+    User memory _user,
+    uint256 _accCvpPerLpt,
+    address _lpToken
+  ) internal view returns (uint256 newlyEntitled, uint256 newlyVested) {
     uint32 prevBlock = _user.lastUpdateBlock;
     _user.lastUpdateBlock = _currBlock();
     if (prevBlock >= _user.lastUpdateBlock) {
@@ -526,6 +533,7 @@ contract VestedLPMining is
     }
 
     uint256 cashShare = calcCashShare(_lpToken);
+    require(cashShare > 0, "Cash share cannot be null");
 
     uint32 age = _user.lastUpdateBlock - prevBlock;
 
@@ -536,10 +544,12 @@ contract VestedLPMining is
 
     uint256 newToVest = 0;
     if (newlyEntitled != 0) {
-      // newToVest = (cashShare * newlyEntitled) + (1 - cashshare) * (newlyEntitled * age / (age + cvpVestingPeriodInBlocks))
-      uint256 shareMulEntitled = cashShare.mul(newlyEntitled);
+      // newToVest = (cashShare * newlyEntitled) + (1 - cashshare)
+      //            * (newlyEntitled * age / (age + cvpVestingPeriodInBlocks))
+      uint256 shareMulEntitled = cashShare.mul(newlyEntitled).div(1 ether);
       newToVest = shareMulEntitled.add(
-        (uint(1 ether).sub(cashShare)).mul(newlyEntitled.mul(uint256(age)).div(uint256(age + cvpVestingPeriodInBlocks)))
+        (uint256(1 ether).sub(cashShare))
+                .mul(newlyEntitled.mul(uint256(age)).div(uint256(age + cvpVestingPeriodInBlocks))).div(1 ether)
       );
     }
 

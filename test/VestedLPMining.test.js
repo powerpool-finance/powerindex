@@ -38,6 +38,8 @@ describe('VestedLPMining', () => {
     this.cvp = await CvpToken.new({ from: minter });
     this.reservoir = await Reservoir.new({ from: minter });
 
+    this.supplyToken = await MockERC20.new('Supply', 'SUPPLY', '18', ether('1000000'));
+
     this.lp = await MockERC20.new('LPToken', 'LP', '18', '10000000000', { from: minter });
     await this.lp.transfer(alice, '1000', { from: minter });
     await this.lp.transfer(bob, '1000', { from: minter });
@@ -62,6 +64,9 @@ describe('VestedLPMining', () => {
     this.cvpBalanceOf = async user => (await this.cvp.balanceOf(user)).toString();
     this.allCvpOf = async (user, poolId = 0) =>
       (await this.cvp.balanceOf(user)).add(await this.lpMining.pendingCvp(poolId, user)).toString();
+    this.setPoolSettings = (lp, supplyToken, supplyEther, cashShareEther) => {
+      return this.lpMining.setPoolVestingSettings(lp.address, supplyToken.address, [ether(supplyEther)], [ether(cashShareEther)], {from: minter});
+    }
   });
 
   beforeEach(async function () {
@@ -77,6 +82,7 @@ describe('VestedLPMining', () => {
     await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '1000', this.shiftBlock('0'), '100', {
       from: minter,
     });
+    await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
     const cvp = await this.lpMining.cvp();
     assert.equal(cvp.valueOf(), this.cvp.address);
   });
@@ -95,6 +101,7 @@ describe('VestedLPMining', () => {
           '10', // _cvpVestingPeriodInBlocks
           { from: minter }
         );
+        await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
         await this.prepareReservoir();
 
         await this.lpMining.add('100', this.lp.address, '1', true, { from: minter });
@@ -126,6 +133,7 @@ describe('VestedLPMining', () => {
       await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('100'), '50', {
         from: minter,
       });
+      await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
       await this.prepareReservoir();
 
       await this.lpMining.add('100', this.lp.address, '1', true, { from: minter });
@@ -154,6 +162,7 @@ describe('VestedLPMining', () => {
       await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('200'), '50', {
         from: minter,
       });
+      await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
       await this.prepareReservoir();
 
       await this.lpMining.add('100', this.lp.address, '1', true, { from: minter });
@@ -181,6 +190,7 @@ describe('VestedLPMining', () => {
       await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('300'), '100', {
         from: minter,
       });
+      await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
       await this.prepareReservoir();
 
       await this.lpMining.add('100', this.lp.address, '1', true, { from: minter });
@@ -240,34 +250,34 @@ describe('VestedLPMining', () => {
 
       // Out of 1159, Alice should have:
       // 252 vested, 907 pending, of the latest - 201 may be vested at block 360
-      assert.equal(`${(await this.cvp.balanceOf.call(alice)).toString()}`, '252');
-      assert.equal(`${(await this.lpMining.pendingCvp.call(0, alice)).toString()}`, '907');
-      assert.equal(`${(await this.lpMining.vestableCvp.call(0, alice)).toString()}`, '201');
+      assert.equal(`${(await this.cvp.balanceOf.call(alice)).toString()}`, '704');
+      assert.equal(`${(await this.lpMining.pendingCvp.call(0, alice)).toString()}`, '455');
+      assert.equal(`${(await this.lpMining.vestableCvp.call(0, alice)).toString()}`, '101');
       // Out of 1183, Bob should have:
       // 285 vested, 898 pending, of the latest - 99 may be vested at block 360
-      assert.equal(`${(await this.cvp.balanceOf.call(bob)).toString()}`, '285');
-      assert.equal(`${(await this.lpMining.pendingCvp.call(0, bob)).toString()}`, '898');
-      assert.equal(`${(await this.lpMining.vestableCvp.call(0, bob)).toString()}`, '99');
+      assert.equal(`${(await this.cvp.balanceOf.call(bob)).toString()}`, '733');
+      assert.equal(`${(await this.lpMining.pendingCvp.call(0, bob)).toString()}`, '450');
+      assert.equal(`${(await this.lpMining.vestableCvp.call(0, bob)).toString()}`, '50');
       // Out of 2657, Carol should have:
       // 785 vested, 1872 pending, of the latest - nothing may be vested at block 360
-      assert.equal(`${(await this.cvp.balanceOf.call(carol)).toString()}`, '785');
-      assert.equal(`${(await this.lpMining.pendingCvp.call(0, carol)).toString()}`, '1872');
+      assert.equal(`${(await this.cvp.balanceOf.call(carol)).toString()}`, '1720');
+      assert.equal(`${(await this.lpMining.pendingCvp.call(0, carol)).toString()}`, '937');
       assert.equal(`${(await this.lpMining.vestableCvp.call(0, carol)).toString()}`, '0');
 
       // Alice withdraws 214 at block 361 (201 at block 360 + 12 newly released)
       await this.lpMining.withdraw(0, '0', { from: alice }); // block 361
-      assert.equal(await this.cvpBalanceOf(alice), '463');
+      assert.equal(await this.cvpBalanceOf(alice), '810');
 
       // In 100 blocks after the withdrawal, the entire amount is vested.
       await time.advanceBlockTo(this.shiftBlock('439'));
       await this.lpMining.withdraw(0, '0', { from: alice });
-      assert.equal(await this.cvpBalanceOf(alice), '1370');
+      assert.equal(await this.cvpBalanceOf(alice), '1265');
       await time.advanceBlockTo(this.shiftBlock('449'));
       await this.lpMining.withdraw(0, '0', { from: bob });
       assert.equal(await this.cvpBalanceOf(bob), '1183');
       await time.advanceBlockTo(this.shiftBlock('459'));
       await this.lpMining.withdraw(0, '0', { from: carol });
-      assert.equal(await this.cvpBalanceOf(carol), '2447');
+      assert.equal(await this.cvpBalanceOf(carol), '2552');
       assert.equal((await this.lpMining.cvpVestingPool()).toString() * 1 <= 1, true);
     });
 
@@ -277,6 +287,8 @@ describe('VestedLPMining', () => {
       await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('400'), '100', {
         from: minter,
       });
+      await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
+      await this.setPoolSettings(this.lp2, this.supplyToken, '1000000', '0.5');
       await this.prepareReservoir();
 
       await this.lp.approve(this.lpMining.address, '1000', { from: alice });
@@ -346,6 +358,7 @@ describe('VestedLPMining', () => {
       await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('500'), '100', {
         from: minter,
       });
+      await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
       await this.prepareReservoir();
 
       await this.lp.approve(this.lpMining.address, '1000', { from: alice });
@@ -359,8 +372,8 @@ describe('VestedLPMining', () => {
       // At block 606, Alice withdraws all pending rewards and should get 1600.
       await this.lpMining.deposit(0, '0', { from: alice });
       // out of 1600, 1380 still pend to be vested and 220 sent to her wallet
-      assert.equal((await this.lpMining.pendingCvp(0, alice)).toString(), '1380');
-      assert.equal(await this.cvpBalanceOf(alice), '220');
+      assert.equal((await this.lpMining.pendingCvp(0, alice)).toString(), '690');
+      assert.equal(await this.cvpBalanceOf(alice), '910');
     });
 
     it('should correctly checkpoint votes', async () => {
@@ -370,6 +383,8 @@ describe('VestedLPMining', () => {
       await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('700'), '100', {
         from: minter,
       });
+      await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
+      await this.setPoolSettings(this.lp2, this.supplyToken, '1000000', '0.5');
       await this.prepareReservoir();
 
       await this.cvp.transfer(this.lp.address, '5000000000', { from: minter });
@@ -400,9 +415,9 @@ describe('VestedLPMining', () => {
       // At block #807 (since `deposit` on #806), she has 100*16 "reward" CVP and 10 CVP as the share in LP pools
       assert.equal((await getUserCurrVotes(alice)).toString(), '1610');
       // 220 from the CVP award has been vested ...
-      assert.equal((await this.cvp.balanceOf(alice)).toString(), '220');
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '910');
       // ... 1380 remains pending, plus 10 as the share in LP pool(s) CVP
-      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
+      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '700');
 
       assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
 
@@ -412,11 +427,11 @@ describe('VestedLPMining', () => {
 
       // At block #809 (since `deposit` on #808), she should have 100*18 "reward" CVP and 30 "LP share" CVP
       assert.equal((await getUserCurrVotes(alice)).toString(), '1830');
-      assert.equal((await this.cvp.balanceOf(alice)).toString(), '250');
-      assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '1580');
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '1024');
+      assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '806');
       // Previously registered values shall remain unchanged
       assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
+      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '700');
 
       await this.lpMining.withdraw(0, '10', { from: alice });
       const fourthBlockNumber = await web3.eth.getBlockNumber(); // block #810
@@ -424,12 +439,12 @@ describe('VestedLPMining', () => {
 
       // At block #811 (since `withdraw` on #810), she has 100*20 "reward" CVP and 25 "share" CVP
       assert.equal((await getUserCurrVotes(alice)).toString(), '2024'); // +1 - rounding error
-      assert.equal((await this.cvp.balanceOf(alice)).toString(), '284'); // +1
-      assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '1740');
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '1139'); // +1
+      assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '885');
       // Previously registered values shall remain unchanged
       assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
-      assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '1580');
+      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '700');
+      assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '806');
 
       await this.cvp.transfer(this.lp.address, '5000000000', { from: minter });
       await this.lpMining.checkpointVotes(alice);
@@ -439,13 +454,13 @@ describe('VestedLPMining', () => {
       // At block #814 (since `withdraw` on #810), same 2000 "award" CVP,
       // but the "share" CVP amount is 50 (as the LP poll increased on block #819)
       assert.equal((await getUserCurrVotes(alice)).toString(), '2049'); // +1 - rounding error
-      assert.equal((await this.cvp.balanceOf(alice)).toString(), '284'); // +1
-      assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '1765');
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '1139'); // +1
+      assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '910');
       // Previously registered values shall remain unchanged
       assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
-      assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '1580');
-      assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '1740');
+      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '700');
+      assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '806');
+      assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '885');
 
       await this.cvp.transfer(this.lp2.address, '5000000000', { from: minter });
       await this.lp2.transfer(alice, '1000', { from: minter });
@@ -460,14 +475,14 @@ describe('VestedLPMining', () => {
       // - yet zero CVP "award" for the 2nd pool - since `deposit` on #816
       // - 55 "share" CVP after `deposit` on #819
       assert.equal((await getUserCurrVotes(alice)).toString(), '2053'); // +2 - rounding error
-      assert.equal((await this.cvp.balanceOf(alice)).toString(), '284'); // +1
-      assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).toString(), '1769');
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '1139'); // +1
+      assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).toString(), '914');
       // Previously registered values shall remain unchanged
       assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
-      assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '1580');
-      assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '1740');
-      assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '1765');
+      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '700');
+      assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '806');
+      assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '885');
+      assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '910');
 
       await this.lpMining.withdraw(0, 0, { from: alice }); // block #821
       await this.lpMining.withdraw(1, 0, { from: alice }); // block #822
@@ -477,15 +492,15 @@ describe('VestedLPMining', () => {
       // At block #823, she has:
       // - since `withdraw` on #821, 3100 of "reward" CVP, 50 as a share in the 1st pool, and 5 in the 2nd
       assert.equal((await getUserCurrVotes(alice)).toString(), '3153'); // +2 - rounding error
-      assert.equal((await this.cvp.balanceOf(alice)).toString(), '578');
-      assert.equal((await this.lpMining.getPriorVotes(alice, seventhBlockNumber)).toString(), '2575');
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '1836');
+      assert.equal((await this.lpMining.getPriorVotes(alice, seventhBlockNumber)).toString(), '1317');
       // Previously registered values shall remain unchanged
       assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
-      assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '1580');
-      assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '1740');
-      assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '1765');
-      assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).toString(), '1769');
+      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '700');
+      assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '806');
+      assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '885');
+      assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '910');
+      assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).toString(), '914');
 
       await this.lpMining.emergencyWithdraw(0, { from: alice }); // block #823
 
@@ -499,17 +514,17 @@ describe('VestedLPMining', () => {
       await time.advanceBlock();
 
       // `emergencyWithdraw` on #832: less 2375 "award" CVP and 50 "share" CVP - both for the 1st pool
-      assert.equal((await getUserCurrVotes(alice)).toString(), '724'); // +1 - rounding error
-      assert.equal((await this.cvp.balanceOf(alice)).toString(), '578');
-      assert.equal((await this.lpMining.getPriorVotes(alice, eighthBlockNumber)).toString(), '146');
+      assert.equal((await getUserCurrVotes(alice)).toString(), '1909'); // +1 - rounding error
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '1836');
+      assert.equal((await this.lpMining.getPriorVotes(alice, eighthBlockNumber)).toString(), '73');
       // Previously registered values shall remain unchanged
       assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), '5');
-      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '1390');
-      assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '1580');
-      assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '1740');
-      assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '1765');
-      assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).toString(), '1769');
-      assert.equal((await this.lpMining.getPriorVotes(alice, seventhBlockNumber)).toString(), '2575');
+      assert.equal((await this.lpMining.getPriorVotes(alice, secondBlockNumber)).toString(), '700');
+      assert.equal((await this.lpMining.getPriorVotes(alice, thirdBlockNumber)).toString(), '806');
+      assert.equal((await this.lpMining.getPriorVotes(alice, fourthBlockNumber)).toString(), '885');
+      assert.equal((await this.lpMining.getPriorVotes(alice, fifthBlockNumber)).toString(), '910');
+      assert.equal((await this.lpMining.getPriorVotes(alice, sixthBlockNumber)).toString(), '914');
+      assert.equal((await this.lpMining.getPriorVotes(alice, seventhBlockNumber)).toString(), '1317');
     });
 
     it('cvpPerBlock can be changed by owner', async () => {
@@ -519,6 +534,7 @@ describe('VestedLPMining', () => {
       await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('900'), '100', {
         from: minter,
       });
+      await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
       await this.prepareReservoir();
 
       await this.lp.approve(this.lpMining.address, '1000', { from: bob });
@@ -529,7 +545,7 @@ describe('VestedLPMining', () => {
       await this.lpMining.deposit(0, '0', { from: bob }); // block 920
       assert.equal(await this.allCvpOf(bob), '900');
 
-      await expectRevert(this.lpMining.setCvpPerBlock('200', { from: alice }), 'Ownable: caller is not the owner');
+      await expectRevert(this.lpMining.setCvpPerBlock('200', { from: alice }), 'Caller is not the owner or manager');
       await this.lpMining.setCvpPerBlock('200', { from: minter });
 
       await time.advanceBlockTo(this.shiftBlock('929'));
@@ -542,10 +558,11 @@ describe('VestedLPMining', () => {
       await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('900'), '100', {
         from: minter,
       });
+      await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
 
       await expectRevert(
         this.lpMining.setCvpVestingPeriodInBlocks('200', { from: alice }),
-        'Ownable: caller is not the owner',
+        'Caller is not the owner or manager',
       );
       await this.lpMining.setCvpVestingPeriodInBlocks('200', { from: minter });
       assert.equal(await this.lpMining.cvpVestingPeriodInBlocks(), '200');
@@ -648,6 +665,7 @@ describe('VestedLPMining', () => {
         '100000',
         { from: minter },
       );
+      await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
       await this.prepareReservoir();
 
       await this.lpMining.add('100', this.lp.address, '1', true, { from: minter });
@@ -664,6 +682,7 @@ describe('VestedLPMining', () => {
     this.lpMining.initialize(this.cvp.address, this.reservoir.address, ether('1'), this.shiftBlock('2000'), '200', {
       from: minter,
     });
+    await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
     await this.prepareReservoir();
 
     const lp = await MockERC20.new('LPToken', 'LP', '18', ether('1000'), { from: minter });
@@ -672,6 +691,7 @@ describe('VestedLPMining', () => {
 
     const metaLp = await MockERC20.new('LPToken', 'LP', '18', ether('200'), { from: minter });
     await lp.transfer(metaLp.address, ether('100'), { from: minter });
+    await this.setPoolSettings(metaLp, this.supplyToken, '1000000', '0.5');
 
     await this.lpMining.add('1', lp.address, '1', true, {from: minter});
     await this.lpMining.add('1', metaLp.address, '1', true, {from: minter});
@@ -730,10 +750,10 @@ describe('VestedLPMining', () => {
     await this.lpMining.deposit('1', '0', {from: carol});
     await time.advanceBlockTo(this.shiftBlock('2135'));
 
-    assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), ether('635.335547411779661017').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(dan)).toString(), ether('627.597322092660550459').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(bob)).toString(), ether('940.578078077916666667').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(carol)).toString(), ether('125.257400257371428572').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), ether('630.167773705889830509').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(dan)).toString(), ether('626.29866104633027523').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(bob)).toString(), ether('939.039039038958333334').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(carol)).toString(), ether('125.128700128685714286').toString());
 
     await this.cvp.transfer(lp.address, ether('75000'), {from: minter});
 
@@ -741,10 +761,10 @@ describe('VestedLPMining', () => {
 
     await time.advanceBlockTo(this.shiftBlock('2150'));
 
-    assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), ether('635.335547411779661017').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(dan)).toString(), ether('627.597322092660550459').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(bob)).toString(), ether('940.578078077916666667').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(carol)).toString(), ether('500.4550044549708022').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), ether('630.167773705889830509').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(dan)).toString(), ether('626.29866104633027523').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(bob)).toString(), ether('939.039039038958333334').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(carol)).toString(), ether('500.227502227485401100').toString());
 
     await this.lpMining.deposit('1', '0', {from: alice});
     await this.lpMining.deposit('1', '0', {from: dan});
@@ -752,10 +772,10 @@ describe('VestedLPMining', () => {
 
     await time.advanceBlockTo(this.shiftBlock('2175'));
 
-    assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), ether('2512.046606988151647835').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(dan)).toString(), ether('2505.275659833922426097').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(bob)).toString(), ether('3757.197822822443750001').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(carol)).toString(), ether('500.4550044549708022').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), ether('2506.023303494075823919').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(dan)).toString(), ether('2502.637829916961213050').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(bob)).toString(), ether('3753.598911411221875002').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(carol)).toString(), ether('500.227502227485401100').toString());
   });
 
   it('should correctly calculate votes of meta pools on total pooled cvp and totalSupply increasing and decreasing', async () => {
@@ -765,6 +785,7 @@ describe('VestedLPMining', () => {
     this.lpMining.initialize(this.cvp.address, this.reservoir.address, ether('1'), this.shiftBlock('2000'), '200', {
       from: minter,
     });
+    await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.5');
     await this.prepareReservoir();
 
     const lp = await MockERC20.new('LPToken', 'LP', '18', ether('1000'), { from: minter });
@@ -773,6 +794,7 @@ describe('VestedLPMining', () => {
 
     const metaLp = await MockERC20.new('LPToken', 'LP', '18', ether('200'), { from: minter });
     await lp.transfer(metaLp.address, ether('100'), { from: minter });
+    await this.setPoolSettings(metaLp, this.supplyToken, '1000000', '0.5');
 
     await this.lpMining.add('1', lp.address, '1', true, {from: minter});
     await this.lpMining.add('1', metaLp.address, '1', true, {from: minter});
@@ -832,9 +854,9 @@ describe('VestedLPMining', () => {
     await this.lpMining.deposit('1', '0', {from: bob});
     await time.advanceBlockTo(this.shiftBlock('2345'));
 
-    assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), ether('635.644754924406779662').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(dan)).toString(), ether('627.484742807281105991').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(bob)).toString(), ether('940.403834066511627907').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), ether('630.322377462203389831').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(dan)).toString(), ether('626.242371403640552996').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(bob)).toString(), ether('938.951917033255813954').toString());
     assert.equal((await this.lpMining.getCurrentVotes(carol)).toString(), ether('125').toString());
 
     await this.cvp.transfer(lp.address, ether('75000'), {from: minter});
@@ -843,10 +865,10 @@ describe('VestedLPMining', () => {
     await this.lpMining.deposit('1', '0', {from: carol});
     await time.advanceBlockTo(this.shiftBlock('2375'));
 
-    assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), ether('635.644754924406779662').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(dan)).toString(), ether('627.484742807281105991').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(bob)).toString(), ether('940.403834066511627907').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(carol)).toString(), ether('250.663821716438596492').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), ether('630.322377462203389831').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(dan)).toString(), ether('626.242371403640552996').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(bob)).toString(), ether('938.951917033255813954').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(carol)).toString(), ether('250.331910858219298246').toString());
 
     await this.lpMining.deposit('1', '0', {from: alice});
     await this.lpMining.deposit('1', '0', {from: dan});
@@ -854,10 +876,10 @@ describe('VestedLPMining', () => {
 
     await time.advanceBlockTo(this.shiftBlock('2385'));
 
-    assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), ether('1263.388971598625084747').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(dan)).toString(), ether('1257.268962510780829494').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(bob)).toString(), ether('1885.285983657863720931').toString());
-    assert.equal((await this.lpMining.getCurrentVotes(carol)).toString(), ether('250.663821716438596492').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), ether('1256.694485799312542374').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(dan)).toString(), ether('1253.634481255390414747').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(bob)).toString(), ether('1880.142991828931860466').toString());
+    assert.equal((await this.lpMining.getCurrentVotes(carol)).toString(), ether('250.331910858219298246').toString());
   });
 
   it('should prevent depositing and withdrawing in same transaction', async () => {
@@ -870,6 +892,7 @@ describe('VestedLPMining', () => {
     await this.prepareReservoir();
 
     const lp = await MockERC20.new('LPToken', 'LP', '18', ether('1000'), { from: minter });
+    await this.setPoolSettings(lp, this.supplyToken, '1000000', '0.5');
 
     await this.cvp.transfer(lp.address, ether('50000'), {from: minter});
 

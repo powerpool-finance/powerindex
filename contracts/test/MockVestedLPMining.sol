@@ -34,10 +34,11 @@ contract MockVestedLPMining is VestedLPMining {
     uint32 lastUpdateBlock
   );
 
-  function __computeCvpVesting(User calldata _user, uint256 _accCvpPerLpt, address _lpToken)
-    external
-    returns (uint256 newlyEntitled, uint256 newlyVested)
-  {
+  function __computeCvpVesting(
+    User calldata _user,
+    uint256 _accCvpPerLpt,
+    address _lpToken
+  ) external returns (uint256 newlyEntitled, uint256 newlyVested) {
     User memory u = _user;
 
     (newlyEntitled, newlyVested) = super._computeCvpVesting(u, _accCvpPerLpt, _lpToken);

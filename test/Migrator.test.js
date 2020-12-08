@@ -1,4 +1,4 @@
-const { expectRevert } = require('@openzeppelin/test-helpers');
+const { expectRevert, ether } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
 const CvpToken = artifacts.require('MockCvp');
 const LPMining = artifacts.require('LPMining');
@@ -28,6 +28,7 @@ describe('Migrator', () => {
     this.lp2 = await UniswapV2Pair.at(
       (await this.factory2.createPair(this.weth.address, this.token.address)).logs[0].args.pair,
     );
+    this.supplyToken = await MockERC20.new('Supply', 'SUPPLY', '18', ether('1000000'));
 
     this.reservoir = await Reservoir.new({ from: alice });
   });
@@ -38,6 +39,12 @@ describe('Migrator', () => {
       await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', '900', '100', {
         from: alice,
       });
+      await this.lpMining.setPoolVestingSettings(this.lp1.address, this.supplyToken.address, [ether('1000000')], [ether('0.5')], {
+        from: alice,
+      })
+      await this.lpMining.setPoolVestingSettings(this.lp2.address, this.supplyToken.address, [ether('1000000')], [ether('0.5')], {
+        from: alice,
+      })
       this.migrator = await Migrator.new(this.lpMining.address, this.factory1.address, this.factory2.address, '0');
 
       const supply = await this.cvp.totalSupply();

@@ -1,7 +1,8 @@
-const { time } = require('@openzeppelin/test-helpers');
+const { time, ether } = require('@openzeppelin/test-helpers');
 const { createSnapshot, revertToSnapshot } = require('./helpers/blockchain');
 const assert = require('chai').assert;
 const MockVestedLPMining = artifacts.require('MockVestedLPMining');
+const MockERC20 = artifacts.require('MockERC20');
 
 const { toBN } = web3.utils;
 
@@ -23,6 +24,9 @@ describe('VestedLPMining (internal math)', () => {
   const defTxOpts = { from: deployer };
 
   before(async () => {
+    this.lpToken = await MockERC20.new('Test', 'TEST', '18', ether('100'));
+    this.supplyToken = await MockERC20.new('Supply', 'SUPPLY', '18', ether('1000000'));
+
     this.startBlock = await web3.eth.getBlockNumber();
     this.vestingMath = await MockVestedLPMining.new();
     await this.vestingMath.initialize(
@@ -33,6 +37,7 @@ describe('VestedLPMining (internal math)', () => {
       vestPeriod,
       defTxOpts,
     );
+    await this.vestingMath.setPoolVestingSettings(this.lpToken.address, this.supplyToken.address, [ether('1000000')], [ether('0.5')])
     await this.vestingMath._setMockParams(mockLptBalance.toString(), mockTotalAllocPoint.toString());
     this.deployBlock = await web3.eth.getBlockNumber();
     this.shiftBlock = blockNum => `${1 * this.startBlock + 1 * blockNum}`;
@@ -109,7 +114,7 @@ describe('VestedLPMining (internal math)', () => {
           const currentBlock = this.shiftBlock('50');
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
+          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, this.lpToken.address);
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -133,10 +138,11 @@ describe('VestedLPMining (internal math)', () => {
           const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale).sub(toBN(user.cvpAdjust));
 
           const age = 1 * currentBlock - 1 * user.lastUpdateBlock;
-          const expectedVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
+          let expectedVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
+          expectedVesting = adjustEntitleVestingByShare(expectedEntitled, expectedVesting);
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
+          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, this.lpToken.address);
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -160,10 +166,11 @@ describe('VestedLPMining (internal math)', () => {
           const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale).sub(toBN(user.cvpAdjust));
 
           const age = 1 * currentBlock - 1 * user.lastUpdateBlock;
-          const expectedVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
+          let expectedVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
+          expectedVesting = adjustEntitleVestingByShare(expectedEntitled, expectedVesting);
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
+          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, this.lpToken.address);
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -194,7 +201,7 @@ describe('VestedLPMining (internal math)', () => {
             .div(toBN(`${1 * user.vestingBlock - 1 * user.lastUpdateBlock}`));
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
+          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, this.lpToken.address);
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -216,7 +223,7 @@ describe('VestedLPMining (internal math)', () => {
           const currentBlock = this.shiftBlock('50');
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
+          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, this.lpToken.address);
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -241,13 +248,12 @@ describe('VestedLPMining (internal math)', () => {
           const currentBlock = this.shiftBlock('35');
 
           const pended = toBN(user.pendedCvp);
-          const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale).sub(toBN(user.cvpAdjust));
-          const age = 1 * currentBlock - 1 * user.lastUpdateBlock;
-          const entitledVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
+          let {expectedEntitled, entitledVesting} = getExpectedVesting(user, accCvpPerLpt, currentBlock);
           const pendedVesting = pended
             .mul(toBN(`${1 * currentBlock - 1 * user.lastUpdateBlock}`))
             .div(toBN(`${1 * user.vestingBlock - 1 * user.lastUpdateBlock}`));
           const expectedVesting = entitledVesting.add(pendedVesting);
+
           const pendingPended = pended.sub(pendedVesting);
           const pendingEntitled = expectedEntitled.sub(entitledVesting);
           // weighted average between pending periods of "pended" and "entitled" CVPs
@@ -258,7 +264,7 @@ describe('VestedLPMining (internal math)', () => {
             .toString();
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
+          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, this.lpToken.address);
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -283,14 +289,10 @@ describe('VestedLPMining (internal math)', () => {
           // more than `user.vestingBlock`
           const currentBlock = this.shiftBlock('40');
 
-          const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale).sub(toBN(user.cvpAdjust));
-          const age = 1 * currentBlock - 1 * user.lastUpdateBlock;
-          const entitledVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
-          const pendedVesting = toBN(user.pendedCvp);
-          const expectedVesting = entitledVesting.add(pendedVesting);
+          const {expectedEntitled, expectedVesting} = getExpectedVesting(user, accCvpPerLpt, currentBlock);
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
+          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, this.lpToken.address);
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -319,14 +321,10 @@ describe('VestedLPMining (internal math)', () => {
       const currentBlock = this.shiftBlock('175');
       const accCvpPerLpt = '7362639340680';
 
-      const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale).sub(toBN(user.cvpAdjust));
-      const age = 1 * currentBlock - 1 * user.lastUpdateBlock;
-      const entitledVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
-      const pendedVesting = toBN(user.pendedCvp);
-      const expectedVesting = entitledVesting.add(pendedVesting);
+      const {expectedEntitled, expectedVesting} = getExpectedVesting(user, accCvpPerLpt, currentBlock);
 
       await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-      const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt);
+      const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, this.lpToken.address);
       const res = tx.receipt.logs[0].args;
 
       assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -342,4 +340,22 @@ describe('VestedLPMining (internal math)', () => {
       assert.equal(res.vestingBlock.toString(), `${1 * currentBlock + 1 * vestPeriod}`);
     });
   });
+
+  function getExpectedVesting(user, accCvpPerLpt, currentBlock) {
+    //    newlyEntitled
+    const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale).sub(toBN(user.cvpAdjust));
+    const age = 1 * currentBlock - 1 * user.lastUpdateBlock;
+    let entitledVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
+    entitledVesting = adjustEntitleVestingByShare(expectedEntitled, entitledVesting);
+    const pendedVesting = toBN(user.pendedCvp);
+    const expectedVesting = entitledVesting.add(pendedVesting);
+    return {expectedEntitled, expectedVesting, entitledVesting};
+  }
+
+  function adjustEntitleVestingByShare(expectedEntitled, entitledVesting) {
+    const cashShare = ether('0.5');
+    return (
+      expectedEntitled.mul(cashShare).div(ether('1'))
+    ).add((toBN(ether('1')).sub(cashShare)).mul(entitledVesting).div(ether('1')));
+  }
 });
