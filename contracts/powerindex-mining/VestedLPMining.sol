@@ -534,7 +534,6 @@ contract VestedLPMining is
     }
 
     uint256 cashShare = calcCashShare(_lpToken);
-    require(cashShare > 0, "Cash share cannot be null");
 
     uint32 age = _user.lastUpdateBlock - prevBlock;
 

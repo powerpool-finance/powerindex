@@ -22,6 +22,7 @@ describe('VestedLPMining (internal math)', () => {
   const mockTotalAllocPoint = toBN('2000');
 
   const defTxOpts = { from: deployer };
+  const cashShare = ether('0.5');
 
   before(async () => {
     this.lpToken = await MockERC20.new('Test', 'TEST', '18', ether('100'));
@@ -37,7 +38,7 @@ describe('VestedLPMining (internal math)', () => {
       vestPeriod,
       defTxOpts,
     );
-    await this.vestingMath.setPoolVestingSettings(this.lpToken.address, this.supplyToken.address, [ether('1000000')], [ether('0.5')])
+    await this.vestingMath.setPoolVestingSettings(this.lpToken.address, this.supplyToken.address, [ether('1000000')], [cashShare]);
     await this.vestingMath._setMockParams(mockLptBalance.toString(), mockTotalAllocPoint.toString());
     this.deployBlock = await web3.eth.getBlockNumber();
     this.shiftBlock = blockNum => `${1 * this.startBlock + 1 * blockNum}`;
@@ -139,7 +140,7 @@ describe('VestedLPMining (internal math)', () => {
 
           const age = 1 * currentBlock - 1 * user.lastUpdateBlock;
           let expectedVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
-          expectedVesting = adjustEntitleVestingByShare(expectedEntitled, expectedVesting);
+          expectedVesting = adjustEntitleVestingByShare(expectedEntitled, expectedVesting, cashShare);
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
           const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, this.lpToken.address);
@@ -167,7 +168,7 @@ describe('VestedLPMining (internal math)', () => {
 
           const age = 1 * currentBlock - 1 * user.lastUpdateBlock;
           let expectedVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
-          expectedVesting = adjustEntitleVestingByShare(expectedEntitled, expectedVesting);
+          expectedVesting = adjustEntitleVestingByShare(expectedEntitled, expectedVesting, cashShare);
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
           const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, this.lpToken.address);
@@ -248,7 +249,7 @@ describe('VestedLPMining (internal math)', () => {
           const currentBlock = this.shiftBlock('35');
 
           const pended = toBN(user.pendedCvp);
-          let {expectedEntitled, entitledVesting} = getExpectedVesting(user, accCvpPerLpt, currentBlock);
+          let {expectedEntitled, entitledVesting} = getExpectedVesting(user, accCvpPerLpt, currentBlock, cashShare);
           const pendedVesting = pended
             .mul(toBN(`${1 * currentBlock - 1 * user.lastUpdateBlock}`))
             .div(toBN(`${1 * user.vestingBlock - 1 * user.lastUpdateBlock}`));
@@ -279,6 +280,54 @@ describe('VestedLPMining (internal math)', () => {
           assert.equal(res.vestingBlock.toString(), `${1 * currentBlock + 1 * averageVestingPeriod}`);
         });
 
+        it('should entitle new CVPs and vest CVPs in proportion to mined blocks', async () => {
+          const user = getTestUser();
+          user.lptAmount = '2' + e18;
+          user.pendedCvp = `${1e6}`;
+          user.lastUpdateBlock = this.shiftBlock('30');
+          user.vestingBlock = this.shiftBlock('38');
+          user.cvpAdjust = `${0.5e6}`;
+          // less than `user.vestingBlock`
+          const currentBlock = this.shiftBlock('35');
+
+          const lpToken = await MockERC20.new('Test', 'TEST', '18', ether('100'));
+          const supplyToken = await MockERC20.new('Supply', 'SUPPLY', '18', ether('10'));
+          await this.vestingMath.setPoolVestingSettings(lpToken.address, supplyToken.address, [ether('1000000')], [cashShare]);
+
+          const nullCashShare = '0';
+
+          const pended = toBN(user.pendedCvp);
+          let {expectedEntitled, entitledVesting} = getExpectedVesting(user, accCvpPerLpt, currentBlock, nullCashShare);
+          const pendedVesting = pended
+            .mul(toBN(`${1 * currentBlock - 1 * user.lastUpdateBlock}`))
+            .div(toBN(`${1 * user.vestingBlock - 1 * user.lastUpdateBlock}`));
+          const expectedVesting = entitledVesting.add(pendedVesting);
+
+          const pendingPended = pended.sub(pendedVesting);
+          const pendingEntitled = expectedEntitled.sub(entitledVesting);
+          // weighted average between pending periods of "pended" and "entitled" CVPs
+          const averageVestingPeriod = pendingPended
+            .mul(toBN(`${1 * user.vestingBlock - 1 * currentBlock}`))
+            .add(pendingEntitled.mul(toBN(vestPeriod)))
+            .div(pendingPended.add(pendingEntitled))
+            .toString();
+
+          await time.advanceBlockTo(`${1 * currentBlock - 1}`);
+          const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, lpToken.address);
+          const res = tx.receipt.logs[0].args;
+
+          assert.equal(res.lastUpdateBlock.toString(), currentBlock);
+          // new CVPs entitled
+          assert.equal(res.newlyEntitled.toString(), expectedEntitled.toString());
+          // a part of "new" CVPs and a part of "old" CVPs are vested
+          assert.equal(res.newlyVested.toString(), expectedVesting.toString());
+          assert.equal(res.pendedCvp.toString(), pended.add(expectedEntitled).sub(expectedVesting).toString());
+          // new vesting block is between the old vesting block and `vestingPeriod` blocks from now
+          assert.equal(1 * currentBlock + 1 * averageVestingPeriod > 1 * user.vestingBlock, true);
+          assert.equal(1 * averageVestingPeriod < 1 * vestPeriod, true);
+          assert.equal(res.vestingBlock.toString(), `${1 * currentBlock + 1 * averageVestingPeriod}`);
+        });
+
         it('should vest entitled CVPs partially even if the vesting period past', async () => {
           const user = getTestUser();
           user.lptAmount = '2' + e18;
@@ -289,7 +338,7 @@ describe('VestedLPMining (internal math)', () => {
           // more than `user.vestingBlock`
           const currentBlock = this.shiftBlock('40');
 
-          const {expectedEntitled, expectedVesting} = getExpectedVesting(user, accCvpPerLpt, currentBlock);
+          const {expectedEntitled, expectedVesting} = getExpectedVesting(user, accCvpPerLpt, currentBlock, cashShare);
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
           const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, this.lpToken.address);
@@ -321,7 +370,7 @@ describe('VestedLPMining (internal math)', () => {
       const currentBlock = this.shiftBlock('175');
       const accCvpPerLpt = '7362639340680';
 
-      const {expectedEntitled, expectedVesting} = getExpectedVesting(user, accCvpPerLpt, currentBlock);
+      const {expectedEntitled, expectedVesting} = getExpectedVesting(user, accCvpPerLpt, currentBlock, cashShare);
 
       await time.advanceBlockTo(`${1 * currentBlock - 1}`);
       const tx = await this.vestingMath.__computeCvpVesting(user, accCvpPerLpt, this.lpToken.address);
@@ -341,19 +390,18 @@ describe('VestedLPMining (internal math)', () => {
     });
   });
 
-  function getExpectedVesting(user, accCvpPerLpt, currentBlock) {
+  function getExpectedVesting(user, accCvpPerLpt, currentBlock, cashShare) {
     //    newlyEntitled
     const expectedEntitled = toBN(user.lptAmount).mul(toBN(accCvpPerLpt)).div(Scale).sub(toBN(user.cvpAdjust));
     const age = 1 * currentBlock - 1 * user.lastUpdateBlock;
     let entitledVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
-    entitledVesting = adjustEntitleVestingByShare(expectedEntitled, entitledVesting);
+    entitledVesting = adjustEntitleVestingByShare(expectedEntitled, entitledVesting, toBN(cashShare));
     const pendedVesting = toBN(user.pendedCvp);
     const expectedVesting = entitledVesting.add(pendedVesting);
     return {expectedEntitled, expectedVesting, entitledVesting};
   }
 
-  function adjustEntitleVestingByShare(expectedEntitled, entitledVesting) {
-    const cashShare = ether('0.5');
+  function adjustEntitleVestingByShare(expectedEntitled, entitledVesting, cashShare) {
     return (
       expectedEntitled.mul(cashShare).div(ether('1'))
     ).add((toBN(ether('1')).sub(cashShare)).mul(entitledVesting).div(ether('1')));

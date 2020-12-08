@@ -910,4 +910,59 @@ describe('VestedLPMining', () => {
       'SAME_TX_ORIGIN',
     );
   });
+
+  it('calcCashShare should work correctly', async () => {
+    // 100 per block farming rate starting at block 2400
+    await time.advanceBlockTo(this.shiftBlock('2399'));
+    this.lpMining = await VestedLPMining.new({from: minter});
+    await this.lpMining.initialize(this.cvp.address, this.reservoir.address, ether('1'), this.shiftBlock('2000'), '100', {
+      from: minter,
+    });
+    await this.prepareReservoir();
+
+    const lp1 = await MockERC20.new('LPToken', 'LP', '18', ether('1000'), { from: minter });
+    const lp2 = await MockERC20.new('LPToken', 'LP', '18', ether('1000'), { from: minter });
+    const lp3 = await MockERC20.new('LPToken', 'LP', '18', ether('1000'), { from: minter });
+    const lp4 = await MockERC20.new('LPToken', 'LP', '18', ether('1000'), { from: minter });
+    const supplyToken1m = await MockERC20.new('Supply', 'SUPPLY', '18', ether('1000000'));
+    const supplyToken2m = await MockERC20.new('Supply', 'SUPPLY', '18', ether('2000000'));
+    const supplyToken3m = await MockERC20.new('Supply', 'SUPPLY', '18', ether('3000000'));
+    const supplyToken4m = await MockERC20.new('Supply', 'SUPPLY', '18', ether('4000000'));
+
+    const supplyList = [ether('4000000'), ether('3000000'), ether('2000000')];
+    const sharesList = [ether('0.7'), ether('0.6'), ether('0.5')];
+    await this.lpMining.setPoolVestingSettings(
+      lp1.address,
+      supplyToken1m.address,
+      supplyList,
+      sharesList,
+      {from: minter}
+    );
+    await this.lpMining.setPoolVestingSettings(
+      lp2.address,
+      supplyToken2m.address,
+      supplyList,
+      sharesList,
+      {from: minter}
+    );
+    await this.lpMining.setPoolVestingSettings(
+      lp3.address,
+      supplyToken3m.address,
+      supplyList,
+      sharesList,
+      {from: minter}
+    );
+    await this.lpMining.setPoolVestingSettings(
+      lp4.address,
+      supplyToken4m.address,
+      supplyList,
+      sharesList,
+      {from: minter}
+    );
+
+    assert.equal(await this.lpMining.calcCashShare(lp1.address), '0');
+    assert.equal((await this.lpMining.calcCashShare(lp2.address)).toString(), ether('0.5').toString());
+    assert.equal((await this.lpMining.calcCashShare(lp3.address)).toString(), ether('0.6').toString());
+    assert.equal((await this.lpMining.calcCashShare(lp4.address)).toString(), ether('0.7').toString());
+  });
 });
