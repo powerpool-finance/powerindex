@@ -567,6 +567,159 @@ describe('VestedLPMining', () => {
       await this.lpMining.setCvpVestingPeriodInBlocks('200', { from: minter });
       assert.equal(await this.lpMining.cvpVestingPeriodInBlocks(), '200');
     });
+
+    it('should correctly got cvp on 0.25 cashShare', async () => {
+      await time.advanceBlockTo(this.shiftBlock('999'));
+      this.lpMining = await VestedLPMining.new({ from: minter });
+      await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('1000'), '100', {
+        from: minter,
+      });
+      await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0.25');
+      await this.setPoolSettings(this.lp2, this.supplyToken, '1000000', '0.25');
+      await this.prepareReservoir();
+
+      await this.cvp.transfer(this.lp.address, '5000000000', { from: minter });
+      await this.lp.transfer(alice, '1000', { from: minter });
+      await this.lp.approve(this.lpMining.address, '1000', { from: alice });
+
+      await this.lpMining.add('1', this.lp.address, '1', true, { from: minter });
+
+      await time.advanceBlockTo(this.shiftBlock('1089'));
+      await this.lpMining.deposit(0, '10', { from: alice });
+      await time.advanceBlock();
+      await time.advanceBlockTo(this.shiftBlock('1105'));
+      assert.equal((await this.lpMining.pendingCvp(0, alice)).toString(), '1500');
+
+      await this.lpMining.deposit(0, '10', { from: alice });
+      await time.advanceBlock();
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '565');
+
+      await this.lpMining.deposit(0, '40', { from: alice });
+      await time.advanceBlock();
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '637');
+
+      await this.lpMining.withdraw(0, '10', { from: alice });
+      await time.advanceBlock();
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '711'); // +1
+
+      await this.lpMining.withdraw(0, 0, { from: alice });
+      await time.advanceBlock();
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '789');
+
+      await this.lpMining.emergencyWithdraw(0, { from: alice });
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '789');
+    });
+
+    it('should correctly got cvp on 1 cashShare', async () => {
+      await time.advanceBlockTo(this.shiftBlock('1199'));
+      this.lpMining = await VestedLPMining.new({ from: minter });
+      await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('1200'), '100', {
+        from: minter,
+      });
+      await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '1');
+      await this.setPoolSettings(this.lp2, this.supplyToken, '1000000', '1');
+      await this.prepareReservoir();
+
+      await this.cvp.transfer(this.lp.address, '5000000000', { from: minter });
+      await this.lp.transfer(alice, '1000', { from: minter });
+      await this.lp.approve(this.lpMining.address, '1000', { from: alice });
+
+      await this.lpMining.add('1', this.lp.address, '1', true, { from: minter });
+
+      await time.advanceBlockTo(this.shiftBlock('1289'));
+      await this.lpMining.deposit(0, '10', { from: alice });
+      await time.advanceBlock();
+      await time.advanceBlockTo(this.shiftBlock('1305'));
+      assert.equal((await this.lpMining.pendingCvp(0, alice)).toString(), '1500');
+
+      await this.lpMining.deposit(0, '10', { from: alice });
+      await time.advanceBlock();
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '1600');
+
+      await this.lpMining.deposit(0, '40', { from: alice });
+      await time.advanceBlock();
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '1800');
+
+      await this.lpMining.withdraw(0, '10', { from: alice });
+      await time.advanceBlock();
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '1999'); // +1
+
+      await this.lpMining.withdraw(0, 0, { from: alice });
+      await time.advanceBlock();
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '2199');
+
+      await this.lpMining.emergencyWithdraw(0, { from: alice });
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '2199');
+    });
+
+    it('should correctly got cvp on 0 cashShare', async () => {
+      await time.advanceBlockTo(this.shiftBlock('1399'));
+      this.lpMining = await VestedLPMining.new({ from: minter });
+      await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('1400'), '100', {
+        from: minter,
+      });
+      await this.setPoolSettings(this.lp, this.supplyToken, '1000000', '0');
+      await this.setPoolSettings(this.lp2, this.supplyToken, '1000000', '0');
+      await this.prepareReservoir();
+
+      await this.cvp.transfer(this.lp.address, '5000000000', { from: minter });
+      await this.lp.transfer(alice, '1000', { from: minter });
+      await this.lp.approve(this.lpMining.address, '1000', { from: alice });
+
+      await this.lpMining.add('1', this.lp.address, '1', true, { from: minter });
+
+      await time.advanceBlockTo(this.shiftBlock('1489'));
+      await this.lpMining.deposit(0, '10', { from: alice });
+      await time.advanceBlock();
+      await time.advanceBlockTo(this.shiftBlock('1505'));
+      assert.equal((await this.lpMining.pendingCvp(0, alice)).toString(), '1500');
+
+      await this.lpMining.deposit(0, '10', { from: alice });
+      await time.advanceBlock();
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '220');
+
+      await this.lpMining.deposit(0, '40', { from: alice });
+      await time.advanceBlock();
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '250');
+
+      await this.lpMining.withdraw(0, '10', { from: alice });
+      await time.advanceBlock();
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '284'); // +1
+
+      await this.lpMining.withdraw(0, 0, { from: alice });
+      await time.advanceBlock();
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '322');
+
+      await this.lpMining.emergencyWithdraw(0, { from: alice });
+
+      assert.equal((await this.cvp.balanceOf(alice)).toString(), '322');
+    });
+
+    it('should not allow 1.5 cashShare', async () => {
+      await time.advanceBlockTo(this.shiftBlock('1599'));
+      this.lpMining = await VestedLPMining.new({ from: minter });
+      await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('1600'), '100', {
+        from: minter,
+      });
+      await expectRevert(
+        this.setPoolSettings(this.lp, this.supplyToken, '1000000', '1.5'),
+        'Cash share must be 1 ether or less'
+      );
+    });
   });
 
   describe('Migration from LPMining to VestedLPMining', () => {

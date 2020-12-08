@@ -214,6 +214,13 @@ contract VestedLPMining is
     uint256[] memory _supplyLevels,
     uint256[] memory _cashShares
   ) public override onlyManagerOrOwner {
+    uint256 len = _supplyLevels.length;
+    require(len == _cashShares.length, "Lengths not equal");
+
+    for (uint256 i = 0; i < len; i++) {
+      require(_cashShares[i] <= 1 ether, "Cash share must be 1 ether or less");
+    }
+
     poolVestingSettings[_lpToken] = PoolVestingSetting(_supplyPool, _supplyLevels, _cashShares);
 
     emit SetPoolVestingSettings(_lpToken, _supplyPool, _supplyLevels, _cashShares);
