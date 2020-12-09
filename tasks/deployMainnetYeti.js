@@ -43,6 +43,10 @@ task('deploy-yeti', 'Deploy YETI').setAction(async () => {
     },
   ];
 
+  const minsOffset = 5;
+  const fromTimestamp = (Math.round(new Date().getTime() / 1000) + minsOffset * 60).toString();
+  const targetTimestamp = (parseInt(fromTimestamp) + 60).toString();
+
   await pIteration.forEachSeries(poolConfigs, async poolConfig => {
     const balances = [];
     await pIteration.forEachSeries(poolConfig.tokens, async (t, index) => {
@@ -57,8 +61,8 @@ task('deploy-yeti', 'Deploy YETI').setAction(async () => {
       poolConfig.name,
       poolConfig.symbol,
       {
-        minWeightPerSecond: ether('0.000005166997354497'),
-        maxWeightPerSecond: ether('0.000014467592592593'),
+        minWeightPerSecond: ether('0'),
+        maxWeightPerSecond: ether('1'),
         swapFee: ether(poolConfig.swapFee),
         communitySwapFee: ether(poolConfig.communitySwapFee),
         communityJoinFee: ether(poolConfig.communityJoinFee),
@@ -70,8 +74,8 @@ task('deploy-yeti', 'Deploy YETI').setAction(async () => {
         token: token.address,
         balance: balances[index],
         targetDenorm: token.denorm,
-        fromTimestamp: '1607532274',
-        targetTimestamp: '1607964274'
+        fromTimestamp,
+        targetTimestamp
       })),
       sendOptions,
     );
