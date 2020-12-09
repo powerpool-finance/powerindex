@@ -10,6 +10,7 @@ require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
 require('./tasks/testMainnetErc20PiptSwap');
 require('./tasks/deployPoolRestrictions');
+require('./tasks/deployMainnetYeti');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
