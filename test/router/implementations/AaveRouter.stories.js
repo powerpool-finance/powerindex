@@ -1,4 +1,4 @@
-const { time, ether: rEther, expectEvent } = require('@openzeppelin/test-helpers');
+const { constants, time, ether: rEther, expectEvent } = require('@openzeppelin/test-helpers');
 const { artifactFromBytecode } = require('../../helpers');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
@@ -7,7 +7,7 @@ const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const { web3 } = MockERC20;
 
-const StakedAave = artifactFromBytecode('aave/StakedAave');
+const StakedAave = artifactFromBytecode('aave/StakedAaveV2');
 
 MockERC20.numberFormat = 'String';
 AavePowerIndexRouter.numberFormat = 'String';
@@ -54,6 +54,11 @@ describe('AaveRouter Tests', () => {
       rewardsVault,
       emissionManager,
       12960000,
+      'Staked Aave',
+      'stkAAVE',
+      18,
+      // governance
+      constants.ZERO_ADDRESS
     );
     poolRestrictions = await PoolRestrictions.new();
     aaveWrapper = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'WAAVE');

@@ -1,19 +1,19 @@
-const { time, ether: rEther, expectEvent } = require('@openzeppelin/test-helpers');
-const { artifactFromBytecode, toEvmBytes32 } = require('../../helpers');
+const { constants, time, ether: rEther, expectEvent } = require('@openzeppelin/test-helpers');
+const { artifactFromBytecode, deployProxied, createOrGetProxyAdmin, splitPayload, advanceBlocks } = require('../../helpers');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
-const AIP2ProposalPayload = artifacts.require('AIP2ProposalPayload');
+const MyContract = artifacts.require('MyContract');
 const { web3 } = MockERC20;
-const { numberToHex } = web3.utils;
 
-const StakedAave = artifactFromBytecode('aave/StakedAave');
-const AaveProtoGovernance = artifactFromBytecode('aave/AaveProtoGovernance');
-const AssetVotingWeightProvider = artifactFromBytecode('aave/AssetVotingWeightProvider');
-const GovernanceParamsProvider = artifactFromBytecode('aave/GovernanceParamsProvider');
-const AaveVoteStrategyToken = artifactFromBytecode('aave/AaveVoteStrategyToken');
+const AaveToken = artifactFromBytecode('aave/AaveToken');
+const AaveTokenV2 = artifactFromBytecode('aave/AaveTokenV2');
+const StakedAaveV2 = artifactFromBytecode('aave/StakedAaveV2');
+const AaveGovernanceV2 = artifactFromBytecode('aave/AaveGovernanceV2');
+const AaveGovernanceStrategy = artifactFromBytecode('aave/AaveGovernanceStrategy');
+const AaveExecutor = artifactFromBytecode('aave/AaveExecutor');
 
 MockERC20.numberFormat = 'String';
 AavePowerIndexRouter.numberFormat = 'String';
@@ -23,6 +23,25 @@ function ether(value) {
   return rEther(value.toString()).toString(10);
 }
 
+// in blocks
+const VOTE_DURATION = 5;
+
+// 3 000 000
+// const AAVE_DISTRIBUTION_AMOUNT = ether(3000000);
+// const AAVE_MIGRATOR_AMOUNT = ether(13000000);
+// const AAVE_TOTAL_AMOUNT = ether(16000000);
+
+const ProposalState = {
+  Pending: 0,
+  Canceled: 1,
+  Active: 2,
+  Failed: 3,
+  Succeeded: 4,
+  Queued: 5,
+  Expired: 6,
+  Executed :7
+};
+
 const COOLDOWN_STATUS = {
   NONE: 0,
   COOLDOWN: 1,
@@ -30,11 +49,15 @@ const COOLDOWN_STATUS = {
 };
 
 describe('AaveRouter Tests', () => {
-  let minter, bob, alice, charlie, rewardsVault, emissionManager, lendToken, stub;
+  let deployer, minter, ppGovernance, aaveDistributor, bob, alice, charlie, rewardsVault, emissionManager, lendToken,
+    stub, guardian, admin;
 
-  before(async function () {
+  before(async function() {
     [
+      deployer,
       minter,
+      ppGovernance,
+      aaveDistributor,
       bob,
       alice,
       charlie,
@@ -42,28 +65,49 @@ describe('AaveRouter Tests', () => {
       emissionManager,
       lendToken,
       stub,
+      guardian,
+      admin,
     ] = await web3.eth.getAccounts();
   });
 
   let aave, stakedAave, aaveWrapper, aaveRouter, poolRestrictions;
 
+  // https://github.com/aave/aave-stake-v2
   describe('staking', async () => {
     beforeEach(async () => {
       // 0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9
-      aave = await MockERC20.new('Aave Token', 'AAVE', '18', ether('100000000000'));
+      aave = await deployProxied(AaveToken, [
+        // migrator
+        aaveDistributor,
+        // distributor
+        aaveDistributor,
+        // governance
+        constants.ZERO_ADDRESS,
+      ], { deployer, proxyAdminOwner: deployer, initializer: 'initialize' });
+      const proxyAdmin = await createOrGetProxyAdmin();
+      const aave2 = await AaveTokenV2.new();
+      await proxyAdmin.upgrade(aave.address, aave2.address);
 
       // Setting up Aave Governance and Staking
       // 0x4da27a545c0c5B758a6BA100e3a049001de870f5
-      stakedAave = await StakedAave.new(
+      stakedAave = await StakedAaveV2.new(
         // 0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9
         aave.address,
         // 0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9
         aave.address,
+        // cooldownSeconds
         864000,
+        // unstakeWindow
         172800,
         rewardsVault,
         emissionManager,
+        // distributionDuration
         12960000,
+        'Staked Aave',
+        'stkAAVE',
+        18,
+        // governance
+        constants.ZERO_ADDRESS,
       );
 
       poolRestrictions = await PoolRestrictions.new();
@@ -76,15 +120,16 @@ describe('AaveRouter Tests', () => {
       await aaveRouter.setReserveRatio(ether('0.2'));
 
       // Checks...
-      assert.equal(await aaveRouter.owner(), minter);
+      assert.equal(await aaveRouter.owner(), deployer);
     });
 
-    it('should allow depositing Aave and staking it in a StakedAave contract', async () => {});
+    it('should allow depositing Aave and staking it in a StakedAave contract', async () => {
+    });
 
     describe('stake', async () => {
       beforeEach(async () => {
-        await aave.transfer(alice, ether('10000'));
-        await aave.transfer(bob, ether('10000'));
+        await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
+        await aave.transfer(bob, ether('10000'), { from: aaveDistributor });
       });
 
       it('it should initially stake the excess of funds to the staking contract immediately', async () => {
@@ -144,47 +189,65 @@ describe('AaveRouter Tests', () => {
     });
 
     describe('do nothing', async () => {
-      it("it should do nothing if the stake hasn't changed", async () => {});
+      it('it should do nothing if the stake hasn\'t changed', async () => {
+      });
     });
 
+    // https://github.com/aave/governance-v2
     describe('voting', async () => {
-      let votingStrategy, aavePropositionPower, weightProvider, paramsProvider, aaveGovernance;
+      // let votingStrategy, aavePropositionPower, weightProvider, paramsProvider, aaveGovernance;
+      let executor, aaveGovernanceStrategy, aaveGovernanceV2;
 
       beforeEach(async () => {
-        // 0xa5e83c1a6e56f27f7764e5c5d99a9b8786e3a391
-        votingStrategy = await AaveVoteStrategyToken.new(aave.address, stakedAave.address);
-
-        // 0x72bbcfc20d355fc3e8ac4ce8fcaf63874f746631
-        aavePropositionPower = await MockERC20.new('Aave Proposition Power', 'APP', '18', ether('1000000'));
-
-        // 0x5ac493b8c2cef1f02f117b9ba2797e7da95574aa
-        weightProvider = await AssetVotingWeightProvider.new(
-          // [0xa5e83c1a6e56f27f7764e5c5d99a9b8786e3a391]
-          [votingStrategy.address],
-          [100],
+        // 0xb7e383ef9b1e9189fc0f71fb30af8aa14377429e
+        aaveGovernanceStrategy = await AaveGovernanceStrategy.new(
+          // 0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9
+          aave.address,
+          // 0x4da27a545c0c5b758a6ba100e3a049001de870f5
+          stakedAave.address,
         );
 
-        // 0xf7ff0aee0c2d6fbdea3a85742443e284b62fd0b2
-        paramsProvider = await GovernanceParamsProvider.new(
-          ether(1),
-          // 0x72bbcfc20d355fc3e8ac4ce8fcaf63874f746631
-          aavePropositionPower.address,
-          // 0x5ac493b8c2cef1f02f117b9ba2797e7da95574aa
-          weightProvider.address,
+        // 0xec568fffba86c094cf06b22134b23074dfe2252c
+        aaveGovernanceV2 = await AaveGovernanceV2.new(
+          aaveGovernanceStrategy.address,
+          // votingDelay
+          0,
+          guardian,
+          // executors
+          [],
         );
 
-        // 0x8a2efd9a790199f4c94c6effe210fce0b4724f52
-        aaveGovernance = await AaveProtoGovernance.new(
-          // 0xf7ff0aee0c2d6fbdea3a85742443e284b62fd0b2
-          paramsProvider.address,
+        // long - 0x61910ecd7e8e942136ce7fe7943f956cea1cc2f7, short - 0xee56e2b3d491590b5b31738cc34d5232f378a8d5
+        executor = await AaveExecutor.new(
+          aaveGovernanceV2.address,
+          // delay
+          604800,
+          // gracePeriod
+          432000,
+          // minimumDelay
+          604800,
+          // maximumDelay
+          864000,
+          // propositionThreshold
+          50,
+          // voteDuration (in blocks)
+          VOTE_DURATION,
+          // voteDifferential
+          1500,
+          // minimumQuorum
+          2000,
         );
 
-        await aavePropositionPower.mint(charlie, ether(3));
-        await aaveRouter.setVotingAndStaking(aaveGovernance.address, stakedAave.address);
+        await aaveGovernanceV2.authorizeExecutors([executor.address]);
+        await aaveRouter.setVotingAndStaking(aaveGovernanceV2.address, stakedAave.address);
       });
 
       it('should allow depositing Aave and staking it in a StakedAave contract', async () => {
-        await aave.transfer(alice, ether('10000'));
+        // The idea of the test to set a non-zero answer for the MyContract instance
+        const myContract = await MyContract.new();
+        await myContract.transferOwnership(executor.address);
+
+        await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
         await aave.approve(aaveWrapper.address, ether('10000'), { from: alice });
         await aaveWrapper.deposit(ether('10000'), { from: alice });
 
@@ -198,56 +261,54 @@ describe('AaveRouter Tests', () => {
         // The stakeAave are allocated on the aaveWrapper contract
         assert.equal(await stakedAave.balanceOf(aaveWrapper.address), ether(8000));
 
-        /// Voting....
-        await aave.transfer(alice, ether(23000000));
-        await aave.approve(aaveWrapper.address, ether(23000000), { from: alice });
-        await aaveWrapper.deposit(ether(23000000), { from: alice });
-        assert.equal(await stakedAave.balanceOf(aaveWrapper.address), ether(18408000));
+        /// Stake....
+        await aave.transfer(alice, ether(12300000), { from: aaveDistributor });
+        await aave.approve(aaveWrapper.address, ether(12300000), { from: alice });
+        await aaveWrapper.deposit(ether(12300000), { from: alice });
+        assert.equal(await stakedAave.balanceOf(aaveWrapper.address), ether(9848000));
+        assert.equal(await aave.balanceOf(aaveWrapper.address), ether(2462000));
 
-        let executor = await AIP2ProposalPayload.new();
+        await poolRestrictions.setVotingAllowedForSenders(aaveGovernanceV2.address, [alice], [true]);
 
-        await poolRestrictions.setVotingAllowedForSenders(aaveGovernance.address, [alice], [true]);
-
-        await aaveGovernance.newProposal(
-          // proposalType
-          numberToHex('1'),
-          // ipfsHash
-          '0x0',
-          // threshold
-          ether(13000000),
-          // proposalExecutor
+        /// Create a proposal...
+        const setAnswerData = myContract.contract.methods.setAnswer(42).encodeABI();
+        const createProposalData = aaveGovernanceV2.contract.methods.create(
           executor.address,
-          // votingBlocksDuration
-          5,
-          // validatingBlocksDuration
-          5,
-          // _maxMovesToVotingAllowed
-          4,
-          { from: charlie },
-        );
-        await aaveRouter.executeSubmitVote(0, 1, votingStrategy.address, { from: alice });
-
-        await time.advanceBlockTo((await time.latestBlock()).toNumber() + 5);
-        await aaveGovernance.tryToMoveToValidating(0);
-        await time.advanceBlockTo((await time.latestBlock()).toNumber() + 5);
-
-        assert.equal(await web3.eth.getStorageAt(aaveGovernance.address, '0x3333'), toEvmBytes32(0));
-
-        let res = await aaveGovernance.resolveProposal(0, { from: lendToken });
-        await expectEvent.inTransaction(res.tx, AaveProtoGovernance, 'YesWins', {
-          proposalId: '0',
-        });
-        await expectEvent.inTransaction(res.tx, AIP2ProposalPayload, 'ProposalExecuted', {
-          caller: lendToken,
+          [myContract.address],
+          [0],
+          [splitPayload(setAnswerData).signature],
+          [splitPayload(setAnswerData).calldata],
+          [false],
+          '0x0',
+        ).encodeABI();
+        assert.equal(await aaveGovernanceV2.getProposalsCount(), '0');
+        let res = await aaveRouter.executeCreate(splitPayload(createProposalData).calldata, { from: alice });
+        assert.equal(await aaveGovernanceV2.getProposalsCount(), '1');
+        await expectEvent.inTransaction(res.tx, AaveGovernanceV2, 'ProposalCreated', {
+          id: '0',
+          creator: aaveWrapper.address,
+          values: ['0'],
+          targets: [myContract.address],
+          signatures: [splitPayload(setAnswerData).signature],
+          calldatas: [splitPayload(setAnswerData).calldata],
+          withDelegatecalls: [false],
+          ipfsHash: constants.ZERO_BYTES32,
         });
 
-        const proposal = await aaveGovernance.getProposalBasicData(0);
-        assert.equal(proposal._proposalStatus, 3);
+        // Vote for the proposal...
+        res = await aaveRouter.executeSubmitVote(0, true, { from: alice });
+        await expectEvent.inTransaction(res.tx, AaveGovernanceV2, 'VoteEmitted', {
+          id: '0',
+          voter: aaveWrapper.address,
+          support: true,
+          votingPower: ether(12310000),
+        });
 
-        assert.equal(
-          await web3.eth.getStorageAt(aaveGovernance.address, '0x3333'),
-          '0x000000000000000000000000000000000000000000000000000000000000002a',
-        );
+        await advanceBlocks(VOTE_DURATION);
+        await aaveGovernanceV2.queue('0');
+        await time.increase(604801);
+        // await aaveGovernanceV2.execute('0');
+        // asser.equal(await aaveGovernanceV2.getProposalState('0'), ProposalState.Executed);
       });
     });
   });

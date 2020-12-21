@@ -3,7 +3,7 @@
 pragma solidity 0.6.12;
 
 import "../../interfaces/WrappedPiErc20Interface.sol";
-import "../../interfaces/aave/IAaveProtoGovernance.sol";
+import "../../interfaces/aave/IAaveGovernanceV2.sol";
 import "../../interfaces/aave/IStakedAave.sol";
 import "../PowerIndexBasicRouter.sol";
 import "hardhat/console.sol";
@@ -21,21 +21,22 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     PowerIndexBasicRouter(_wrappedToken, _poolRestrictions)
   {}
 
-  /*** THE PROXIED METHOD EXECUTORS ***/
+  /*** THE PROXIED METHOD EXECUTORS FOR VOTING ***/
 
-  function executeSubmitVote(
-    uint256 _id,
-    uint256 _vote,
-    address _asset
+  function executeCreate(
+    bytes calldata _args
   ) external {
     _checkVotingSenderAllowed();
-    _callVoting(IAaveProtoGovernance(0).submitVoteByVoter.selector, abi.encode(_id, _vote, _asset));
+    _callVoting(IAaveGovernanceV2(0).create.selector, _args);
   }
 
-  function executeCancelVote(uint256 _id) external {
+  function executeSubmitVote(uint256 _proposalId, bool _support) external {
     _checkVotingSenderAllowed();
-    _callVoting(IAaveProtoGovernance(0).cancelVoteByVoter.selector, abi.encode(_id));
+    _callVoting(IAaveGovernanceV2(0).submitVote.selector, abi.encode(_proposalId, _support));
   }
+
+  /*** THE PROXIED METHOD EXECUTORS FOR STAKING ***/
+
 
   /*** OWNER METHODS ***/
 
@@ -57,10 +58,10 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
       return;
     }
 
-    (ReserveStatus reserveStatus, uint256 diff, ) =
+    (ReserveStatus reserveStatus, uint256 diff,) =
       _getReserveStatus(IERC20(staking).balanceOf(wrappedToken_), _withdrawAmount);
 
-    // TODO: eager revert if _withdrawAmount > reserveAmount
+    // TODO: add lastUpdated constraint
     if (reserveStatus == ReserveStatus.ABOVE) {
       (CoolDownStatus coolDownStatus, uint256 coolDownFinishesAt, uint256 unstakeFinishesAt) = getCoolDownStatus();
       if (coolDownStatus == CoolDownStatus.NONE) {
