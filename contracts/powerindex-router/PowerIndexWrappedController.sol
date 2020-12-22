@@ -5,7 +5,8 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../PowerIndexAbstractController.sol";
 import "../interfaces/PowerIndexWrapperInterface.sol";
-import "./WrappedPiErc20.sol";
+import "../interfaces/WrappedPiErc20FactoryInterface.sol";
+import "../interfaces/WrappedPiErc20Interface.sol";
 
 contract PowerIndexWrappedController is PowerIndexAbstractController {
   event ReplacePoolTokenWithWrapped(
@@ -29,9 +30,11 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
   event SetPoolWrapper(address indexed bpoolWrapper);
 
   PowerIndexWrapperInterface public poolWrapper;
+  WrappedPiErc20FactoryInterface public wrapperFactory;
 
-  constructor(address _pool, address _poolWrapper) public PowerIndexAbstractController(_pool) {
+  constructor(address _pool, address _poolWrapper, address _wrapperFactory) public PowerIndexAbstractController(_pool) {
     poolWrapper = PowerIndexWrapperInterface(_poolWrapper);
+    wrapperFactory = WrappedPiErc20FactoryInterface(_wrapperFactory);
   }
 
   function setPoolWrapper(address _poolWrapper) external onlyOwner {
@@ -45,7 +48,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     string calldata _name,
     string calldata _symbol
   ) external onlyOwner {
-    WrappedPiErc20 wrappedToken = new WrappedPiErc20(_token, _router, _name, _symbol);
+    WrappedPiErc20Interface wrappedToken = wrapperFactory.build(_token, _router, _name, _symbol);
     uint256 denormalizedWeight = pool.getDenormalizedWeight(_token);
     uint256 balance = pool.getBalance(_token);
 

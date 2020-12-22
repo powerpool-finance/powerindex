@@ -8,6 +8,7 @@ const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
+const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const MockErc20Migrator = artifacts.require('MockErc20Migrator');
 const PowerIndexRouter = artifacts.require('PowerIndexSimpleRouter');
@@ -108,7 +109,8 @@ describe('PowerIndexPoolController', () => {
     pool = await BPool.at(logNewPool.args.pool);
 
     poolWrapper = await PowerIndexWrapper.new(pool.address);
-    controller = await PowerIndexPoolController.new(pool.address, zeroAddress);
+    const wrapperFactory = await WrappedPiErc20Factory.new();
+    controller = await PowerIndexPoolController.new(pool.address, zeroAddress, wrapperFactory.address);
 
     await pool.setWrapper(poolWrapper.address, true);
     await pool.setController(controller.address);

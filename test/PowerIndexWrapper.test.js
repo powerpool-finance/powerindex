@@ -11,6 +11,7 @@ const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const PowerIndexSimpleRouter = artifacts.require('PowerIndexSimpleRouter');
+const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 
 const { web3 } = BFactory;
 const { toBN } = web3.utils;
@@ -93,7 +94,8 @@ describe('PowerIndexWrapper', () => {
     pool = await BPool.at(logNewPool.args.pool);
 
     poolWrapper = await PowerIndexWrapper.new(pool.address);
-    poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address);
+    const wrapperFactory = await WrappedPiErc20Factory.new();
+    poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, wrapperFactory.address);
     poolRouter = await PowerIndexSimpleRouter.new(poolRestrictions);
 
     await pool.setWrapper(poolWrapper.address, true);
