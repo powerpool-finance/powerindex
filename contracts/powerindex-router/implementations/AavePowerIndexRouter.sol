@@ -23,9 +23,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   /*** THE PROXIED METHOD EXECUTORS FOR VOTING ***/
 
-  function executeCreate(
-    bytes calldata _args
-  ) external {
+  function executeCreate(bytes calldata _args) external {
     _checkVotingSenderAllowed();
     _callVoting(IAaveGovernanceV2(0).create.selector, _args);
   }
@@ -36,7 +34,6 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   }
 
   /*** THE PROXIED METHOD EXECUTORS FOR STAKING ***/
-
 
   /*** OWNER METHODS ***/
 
@@ -58,7 +55,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
       return;
     }
 
-    (ReserveStatus reserveStatus, uint256 diff,) =
+    (ReserveStatus reserveStatus, uint256 diff, ) =
       _getReserveStatus(IERC20(staking).balanceOf(wrappedToken_), _withdrawAmount);
 
     // TODO: add lastUpdated constraint

@@ -7,11 +7,10 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract MyContract is Ownable {
   uint256 internal theAnswer;
 
-  constructor() public Ownable() {
-  }
+  constructor() public Ownable() {}
 
   function setAnswer(uint256 _theAnswer) external view {
-//    theAnswer = _theAnswer;
+    //    theAnswer = _theAnswer;
   }
 
   function getAnswer() external view returns (uint256) {

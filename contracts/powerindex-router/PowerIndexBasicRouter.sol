@@ -14,11 +14,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   event SetVotingAndStaking(address indexed voting, address indexed staking);
   event SetReserveRatio(uint256 ratio);
 
-  enum ReserveStatus {
-    EQUILIBRIUM,
-    SHORTAGE,
-    EXCESS
-  }
+  enum ReserveStatus { EQUILIBRIUM, SHORTAGE, EXCESS }
 
   WrappedPiErc20Interface public immutable wrappedToken;
 
@@ -139,9 +135,9 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 _stakedBalance,
     uint256 _withdrawAmount
   ) public pure returns (uint256) {
-    return _reserveRatioPct
-        .mul(_stakedBalance.add(_leftOnWrapper).sub(_withdrawAmount))
-        .div(HUNDRED_PCT)
-        .add(_withdrawAmount);
+    return
+      _reserveRatioPct.mul(_stakedBalance.add(_leftOnWrapper).sub(_withdrawAmount)).div(HUNDRED_PCT).add(
+        _withdrawAmount
+      );
   }
 }
