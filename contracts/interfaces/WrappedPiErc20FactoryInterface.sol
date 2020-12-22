@@ -5,7 +5,7 @@ pragma solidity 0.6.12;
 import "./WrappedPiErc20Interface.sol";
 
 interface WrappedPiErc20FactoryInterface {
-  event NewWrappedPiErc20(address indexed token, address indexed creator);
+  event NewWrappedPiErc20(address indexed token, address indexed wrappedToken, address indexed creator);
 
   function build(
     address _token,

@@ -71,6 +71,7 @@ describe('PowerIndexPoolController', () => {
   let pool;
   let poolWrapper;
   let controller;
+  let wrapperFactory;
 
   let minter, alice, communityWallet;
   let amountToSwap, amountCommunitySwapFee, amountAfterCommunitySwapFee, expectedSwapOut;
@@ -109,7 +110,7 @@ describe('PowerIndexPoolController', () => {
     pool = await BPool.at(logNewPool.args.pool);
 
     poolWrapper = await PowerIndexWrapper.new(pool.address);
-    const wrapperFactory = await WrappedPiErc20Factory.new();
+    wrapperFactory = await WrappedPiErc20Factory.new();
     controller = await PowerIndexPoolController.new(pool.address, zeroAddress, wrapperFactory.address);
 
     await pool.setWrapper(poolWrapper.address, true);
@@ -217,6 +218,70 @@ describe('PowerIndexPoolController', () => {
 
     let res = await controller.replacePoolTokenWithNewWrapped(this.token2.address, router.address, 'WrappedTKN2', 'WTKN2');
     const wToken2 = await WrappedPiErc20.at(res.logs[0].args.wrappedToken);
+    expectEvent(res, 'ReplacePoolTokenWithWrapped', {
+      existingToken: this.token2.address,
+      wrappedToken: wToken2.address,
+      balance: ether('20'),
+      denormalizedWeight: ether('25'),
+    });
+
+    const price = (
+      await pool.calcSpotPrice(
+        addBN(balances[0], amountToSwap),
+        weights[0],
+        subBN(balances[1], expectedSwapOut),
+        weights[1],
+        swapFee,
+      )
+    ).toString(10);
+
+    assert.equal((await this.token1.balanceOf(alice)).toString(), amountToSwap.toString());
+    const token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
+    const token2AliceBalanceBefore = (await wToken2.balanceOf(alice)).toString();
+
+    await this.token1.approve(poolWrapper.address, amountToSwap, { from: alice });
+    // TODO: A wrong error message due probably the Buidler EVM bug
+    await expectRevert(
+      poolWrapper.swapExactAmountIn(
+        this.token1.address,
+        amountToSwap,
+        this.token2.address,
+        expectedSwapOut,
+        mulScalarBN(price, ether('1.05')),
+        { from: alice },
+      ),
+      'NOT_BOUND'
+    );
+
+    await poolWrapper.swapExactAmountIn(
+      this.token1.address,
+      amountToSwap,
+      wToken2.address,
+      expectedSwapOut,
+      mulScalarBN(price, ether('1.05')),
+      { from: alice },
+    );
+
+    assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
+    assert.equal(
+      (await this.token1.balanceOf(pool.address)).toString(),
+      addBN(token1PoolBalanceBefore, amountAfterCommunitySwapFee),
+    );
+
+    assert.equal(
+      (await wToken2.balanceOf(alice)).toString(),
+      addBN(token2AliceBalanceBefore, expectedSwapOut).toString(),
+    );
+  });
+
+  it('should allow swapping a token with exists wrapped version', async () => {
+    const poolRestrictions = await PoolRestrictions.new();
+    const router = await PowerIndexRouter.new(poolRestrictions.address);
+
+    let res = await wrapperFactory.build(this.token2.address, router.address, 'WrappedTKN2', 'WTKN2');
+    const wToken2 = await WrappedPiErc20.at(res.logs[0].args.wrappedToken);
+
+    res = await controller.replacePoolTokenWithExistsWrapped(this.token2.address, wToken2.address);
     expectEvent(res, 'ReplacePoolTokenWithWrapped', {
       existingToken: this.token2.address,
       wrappedToken: wToken2.address,
