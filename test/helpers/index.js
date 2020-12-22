@@ -91,6 +91,19 @@ function getInitializerData(impl, args, initializer) {
 }
 
 /**
+ * Fetches logs of a given contract for a given tx,
+ * since Truffle provides logs for a calle contract only.
+ * @param {TruffleContract} contract
+ * @param {object} receipt
+ * @param {string} receipt.tx
+ * @returns {Promise<{object}>}
+ */
+async function fetchLogs(contract, receipt) {
+  const res = await web3.eth.getTransactionReceipt(receipt.tx);
+  return contract.decodeLogs(res.logs);
+}
+
+/**
  * Creates a truffle contract from bytecode and abi
  * @param name of the contract along with path
  * @returns TruffleContract
@@ -131,5 +144,6 @@ module.exports = {
   toEvmBytes32,
   advanceBlocks,
   splitPayload,
+  fetchLogs,
   ether
 }

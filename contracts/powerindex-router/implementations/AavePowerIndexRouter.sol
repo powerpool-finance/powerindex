@@ -62,7 +62,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
       _getReserveStatus(IERC20(staking).balanceOf(wrappedToken_), _withdrawAmount);
 
     // TODO: add lastUpdated constraint
-    if (reserveStatus == ReserveStatus.ABOVE) {
+    if (reserveStatus == ReserveStatus.SHORTAGE) {
       (CoolDownStatus coolDownStatus, uint256 coolDownFinishesAt, uint256 unstakeFinishesAt) = getCoolDownStatus();
       if (coolDownStatus == CoolDownStatus.NONE) {
         _triggerCoolDown();
@@ -73,7 +73,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
       else {
         emit IgnoreRedeemDueCoolDown(coolDownFinishesAt, unstakeFinishesAt);
       }
-    } else if (reserveStatus == ReserveStatus.BELOW) {
+    } else if (reserveStatus == ReserveStatus.EXCESS) {
       _stake(diff);
     }
   }

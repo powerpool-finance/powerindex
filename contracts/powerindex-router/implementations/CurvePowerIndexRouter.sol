@@ -80,13 +80,13 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
     (ReserveStatus status, uint256 diff, uint256 reserveAmount) =
       _getReserveStatus(staking_.balanceOf(wrappedToken_), _withdrawAmount);
 
-    if (status == ReserveStatus.ABOVE) {
+    if (status == ReserveStatus.SHORTAGE) {
       (, uint256 end) = staking_.locked(wrappedToken_);
       if (end < block.timestamp) {
         _redeem();
         _stake(reserveAmount);
       }
-    } else if (status == ReserveStatus.BELOW) {
+    } else if (status == ReserveStatus.EXCESS) {
       _stake(diff);
     }
   }

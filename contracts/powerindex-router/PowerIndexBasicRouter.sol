@@ -14,7 +14,11 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   event SetVotingAndStaking(address indexed voting, address indexed staking);
   event SetReserveRatio(uint256 ratio);
 
-  enum ReserveStatus { EQUAL, ABOVE, BELOW }
+  enum ReserveStatus {
+    EQUILIBRIUM,
+    SHORTAGE,
+    EXCESS
+  }
 
   WrappedPiErc20Interface public immutable wrappedToken;
 
@@ -35,7 +39,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   }
 
   function setReserveRatio(uint256 _reserveRatio) external onlyOwner {
-    require(_reserveRatio <= 1 ether, "GREATER_THAN_100_PCT");
+    require(_reserveRatio <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
     reserveRatio = _reserveRatio;
     emit SetReserveRatio(_reserveRatio);
   }
@@ -52,6 +56,12 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     require(poolRestriction.isVotingSenderAllowed(voting, msg.sender), "SENDER_NOT_ALLOWED");
   }
 
+  /*
+   * * In case of deposit, the deposited amount is already accounted on the wrapper contract right away, no further
+   *   adjustment required.
+   * * In case of withdrawal, the withdrawAmount is deducted from the sum of wrapper and staked balances
+   *
+   */
   function _getReserveStatus(uint256 _stakedBalance, uint256 _withdrawAmount)
     internal
     view
@@ -65,15 +75,24 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   }
 
   /**
-   *
-   * Reserve status has the following options:
-   * * ABOVE - there is not enough underlying funds on the wrapper contract to satisfy the reserve ratio,
+   * @notice Calculates the desired reserve status
+   * @param _reserveRatioPct The reserve ratio in %, 1 ether == 100 ether
+   * @param _leftOnWrapper The amount of origin tokens left on the token-wrapper (WrappedPiErc20) contract
+   * @param _stakedBalance The amount of original tokens staked on the staking contract
+   * @param _withdrawAmount The amount to be withdrawn within the current transaction
+   *                        (could be negative in a case of deposit)
+   * @return status The reserve status:
+   * * SHORTAGE - There is not enough underlying funds on the wrapper contract to satisfy the reserve ratio,
    *           the diff amount should be redeemed from the staking contract
-   * * BELOW - there are some extra funds over reserve ratio on the wrapper contract,
+   * * EXCESS - there are some extra funds over reserve ratio on the wrapper contract,
    *           the diff amount should be sent to the staking contract
+   * * EQUILIBRIUM - the reserve ratio hasn't changed,
+   *           the diff amount is 0 and there are no additional stake/redeem actions expected
+   * @return diff The difference between `adjustedReserveAmount` and `_leftOnWrapper`
+   * @return expectedReserveAmount The calculated expected reserve amount
    */
   function getReserveStatusPure(
-    uint256 _reserveRatio,
+    uint256 _reserveRatioPct,
     uint256 _leftOnWrapper,
     uint256 _stakedBalance,
     uint256 _withdrawAmount
@@ -83,44 +102,45 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     returns (
       ReserveStatus status,
       uint256 diff,
-      uint256 adjustedReserveAmount
+      uint256 expectedReserveAmount
     )
   {
-    adjustedReserveAmount = calculateAdjustedReserveAmount(_reserveRatio, _leftOnWrapper, _stakedBalance, _withdrawAmount);
+    require(_reserveRatioPct <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
+    expectedReserveAmount = getExpectedReserveAmount(_reserveRatioPct, _leftOnWrapper, _stakedBalance, _withdrawAmount);
 
-    if (adjustedReserveAmount > _leftOnWrapper) {
-      status = ReserveStatus.ABOVE;
-      diff = adjustedReserveAmount.sub(_leftOnWrapper);
-    } else if (adjustedReserveAmount < _leftOnWrapper) {
-      status = ReserveStatus.BELOW;
-      diff = _leftOnWrapper.sub(adjustedReserveAmount);
+    if (expectedReserveAmount > _leftOnWrapper) {
+      status = ReserveStatus.SHORTAGE;
+      diff = expectedReserveAmount.sub(_leftOnWrapper);
+    } else if (expectedReserveAmount < _leftOnWrapper) {
+      status = ReserveStatus.EXCESS;
+      diff = _leftOnWrapper.sub(expectedReserveAmount);
     } else {
-      status = ReserveStatus.EQUAL;
+      status = ReserveStatus.EQUILIBRIUM;
       diff = 0;
     }
   }
 
   /**
-   * @notice Calculates a reserve amount taking into an account the withdrawAmount
+   * @notice Calculates an expected reserve amount after the transaction taking into an account the withdrawAmount
    * @param _reserveRatioPct % of a reserve ratio, 1 ether == 100%
    * @param _leftOnWrapper The amount of origin tokens left on the token-wrapper (WrappedPiErc20) contract
    * @param _stakedBalance The amount of original tokens staked on the staking contract
    * @param _withdrawAmount The amount to be withdrawn within the current transaction
    *                        (could be negative in a case of deposit)
-   * @return adjustedReserveAmount The amount of origin ERC20 tokens
+   * @return expectedReserveAmount The expected reserve amount
    *
-   *                           / %reserveRatio * (staked + leftOnWrapper) \
-   * adjustedReserveAmount =  | -------------------------------------------| + withdrawAmount
-   *                           \                  100%                    /
+   *                           / %reserveRatio * (staked + leftOnWrapper - withdrawAmount) \
+   * expectedReserveAmount =  | ------------------------------------------------------------| + withdrawAmount
+   *                           \                         100%                              /
    */
-  function calculateAdjustedReserveAmount(
+  function getExpectedReserveAmount(
     uint256 _reserveRatioPct,
     uint256 _leftOnWrapper,
     uint256 _stakedBalance,
     uint256 _withdrawAmount
   ) public pure returns (uint256) {
     return _reserveRatioPct
-        .mul(_stakedBalance.add(_leftOnWrapper))
+        .mul(_stakedBalance.add(_leftOnWrapper).sub(_withdrawAmount))
         .div(HUNDRED_PCT)
         .add(_withdrawAmount);
   }

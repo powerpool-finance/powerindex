@@ -1,5 +1,5 @@
 const { constants, time, ether: rEther, expectEvent } = require('@openzeppelin/test-helpers');
-const { artifactFromBytecode, deployProxied, createOrGetProxyAdmin, splitPayload, advanceBlocks } = require('../../helpers');
+const { artifactFromBytecode, deployProxied, fetchLogs, createOrGetProxyAdmin, splitPayload, advanceBlocks } = require('../../helpers');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
@@ -190,6 +190,22 @@ describe('AaveRouter Tests', () => {
 
     describe('do nothing', async () => {
       it('it should do nothing if the stake hasn\'t changed', async () => {
+        await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
+        await aave.approve(aaveWrapper.address, ether(1000), { from: alice });
+        await aaveWrapper.deposit(ether(1000), { from: alice });
+        await aave.transfer(aaveWrapper.address, ether(50), { from: alice })
+        assert.equal(await aave.balanceOf(aaveWrapper.address), ether(250));
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(800));
+
+        // 2nd
+        await aaveWrapper.approve(aaveWrapper.address, ether(50), { from: alice });
+        const res = await aaveWrapper.withdraw(ether(50), { from: alice });
+        let logs = await fetchLogs(AavePowerIndexRouter, res);
+        console.log('>>>', logs);
+
+        // The router has partially staked the deposit with regard to the reserve ration value (20/80)
+        assert.equal(await aave.balanceOf(aaveWrapper.address), ether(200));
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(800));
       });
     });
 

@@ -12,6 +12,12 @@ WrappedPiErc20.numberFormat = 'String';
 
 const { web3 } = MockERC20;
 
+const ReserveStatus = {
+  EQUILIBRIUM: 0,
+  SHORTAGE: 1,
+  EXCESS: 2
+}
+
 describe('PowerIndex BasicRouter Test', () => {
   let minter, bob, alice, stub;
   let poolRestrictions;
@@ -62,15 +68,10 @@ describe('PowerIndex BasicRouter Test', () => {
       router = await PowerIndexBasicRouter.new(wrapper.address, poolRestrictions.address);
     });
 
-    describe('calculateAdjustedReserveAmount()', async () => {
-      //
-      //                           / %reserveRatio * (staked + leftOnWrapper) \
-      // adjustedReserveAmount =  | -------------------------------------------| + withdrawAmount
-      //                           \                  100%                    /
-      //
+    describe('getExpectedReserveAmount()', async () => {
       it('should calculate values correctly', async () => {
         assert.equal(
-          await router.calculateReserveRatio(
+          await router.getExpectedReserveAmount(
             // reserveRatio, 1 eth == 100%
             ether('0.2'),
             // leftOnWrapper
@@ -80,41 +81,246 @@ describe('PowerIndex BasicRouter Test', () => {
             // withdrawnAmount
             ether(50)
           ),
+          ether(240)
+        )
+        assert.equal(
+          await router.getExpectedReserveAmount(ether('0.2'), ether(800), ether(250), ether(50)),
           ether(250)
+        )
+        assert.equal(
+          await router.getExpectedReserveAmount(ether('0.2'), ether(800), ether(150), ether(50)),
+          ether(230)
         )
       })
 
-      it('should handle 0 reserve ratio', async () => {
+      it('should correctly calculated with 0 RR', async () => {
         assert.equal(
-          await router.calculateReserveRatio(
-            // reserveRatio, 1 eth == 100%
-            ether(0),
-            // leftOnWrapper
-            ether(800),
-            // stakedBalance
-            ether(200),
-            // withdrawnAmount
-            ether(50)
-          ),
+          await router.getExpectedReserveAmount(ether(0), ether(800), ether(200), ether(50)),
           ether(50)
         )
       })
+    })
 
-      it('should ignore 0 withdrawnAmount', async () => {
-        assert.equal(
-          await router.calculateReserveRatio(
+    describe('getReserveStatusPure()', async () => {
+      it('should deny calling with an invalid reserve ratio', async function () {
+        await expectRevert(router.getReserveStatusPure(
+          // reserveRatio, 1 eth == 100%
+          ether('1.1'),
+          // leftOnWrapper
+          ether(200),
+          // stakedBalance
+          ether(800),
+          // withdrawnAmount
+          ether(50)
+        ), 'RR_GREATER_THAN_100_PCT');
+      })
+
+      describe('SHORTAGE', async () => {
+        it('should return with a shortage of the reserve', async () => {
+          // Case #1
+          let res = await router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('0.2'),
+            // leftOnWrapper
+            ether(200),
+            // stakedBalance
+            ether(800),
+            // withdrawnAmount
+            ether(50)
+          );
+          assert.equal(res.status, ReserveStatus.SHORTAGE);
+          assert.equal(res.diff, ether(40));
+          assert.equal(res.expectedReserveAmount, ether(240));
+
+          // Case #2
+          res = await router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('0.2'),
+            // leftOnWrapper
+            ether(200),
+            // stakedBalance
+            ether(850),
+            // withdrawnAmount
+            ether(50)
+          );
+          assert.equal(res.status, ReserveStatus.SHORTAGE);
+          assert.equal(res.diff, ether(50));
+          assert.equal(res.expectedReserveAmount, ether(250));
+
+          // Case #3
+          res = await router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('0.2'),
+            // leftOnWrapper
+            ether(200),
+            // stakedBalance
+            ether(800),
+            // withdrawnAmount
+            ether(500)
+          );
+          assert.equal(res.status, ReserveStatus.SHORTAGE);
+          assert.equal(res.diff, ether(400));
+          assert.equal(res.expectedReserveAmount, ether(600));
+
+          // Case #4
+          res = await router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('0.2'),
+            // leftOnWrapper
+            ether(50),
+            // stakedBalance
+            ether(1000),
+            // withdrawnAmount
+            ether(0)
+          );
+          assert.equal(res.status, ReserveStatus.SHORTAGE);
+          assert.equal(res.diff, ether(160));
+          assert.equal(res.expectedReserveAmount, ether(210));
+        });
+      })
+
+      describe('EXCESS', async () => {
+        it('should return with a excess of the reserve', async () => {
+          // Case #1
+          let res = await router.getReserveStatusPure(
             // reserveRatio, 1 eth == 100%
             ether('0.2'),
             // leftOnWrapper
             ether(800),
             // stakedBalance
-            ether(200),
+            ether(150),
+            // withdrawnAmount
+            ether(50)
+          );
+          assert.equal(res.status, ReserveStatus.EXCESS);
+          assert.equal(res.diff, ether(570));
+          assert.equal(res.expectedReserveAmount, ether(230));
+
+          // Case #2
+          res = await router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('0.2'),
+            // leftOnWrapper
+            ether(1000),
+            // stakedBalance
+            ether(0),
+            // withdrawnAmount
+            ether(50)
+          );
+          assert.equal(res.status, ReserveStatus.EXCESS);
+          assert.equal(res.diff, ether(760));
+          assert.equal(res.expectedReserveAmount, ether(240));
+
+          // Case #3
+          res = await router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('0.2'),
+            // leftOnWrapper
+            ether(2000),
+            // stakedBalance
+            ether(0),
+            // withdrawnAmount
+            ether(500)
+          );
+          assert.equal(res.status, ReserveStatus.EXCESS);
+          assert.equal(res.diff, ether(1200));
+          assert.equal(res.expectedReserveAmount, ether(800));
+
+          // Case #4
+          res = await router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('0.2'),
+            // leftOnWrapper
+            ether(250),
+            // stakedBalance
+            ether(800),
             // withdrawnAmount
             ether(0)
-          ),
-          ether(200)
-        )
+          );
+          assert.equal(res.status, ReserveStatus.EXCESS);
+          assert.equal(res.diff, ether(40));
+          assert.equal(res.expectedReserveAmount, ether(210));
+
+          // Case #4
+          res = await router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('0.2'),
+            // leftOnWrapper
+            ether(300),
+            // stakedBalance
+            ether(800),
+            // withdrawnAmount
+            ether(0)
+          );
+          assert.equal(res.status, ReserveStatus.EXCESS);
+          assert.equal(res.diff, ether(80));
+          assert.equal(res.expectedReserveAmount, ether(220));
+
+          // Case #5
+          res = await router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('0.2'),
+            // leftOnWrapper
+            ether(850),
+            // stakedBalance
+            ether(150),
+            // withdrawnAmount
+            ether(0)
+          );
+          assert.equal(res.status, ReserveStatus.EXCESS);
+          assert.equal(res.diff, ether(650));
+          assert.equal(res.expectedReserveAmount, ether(200));
+
+          // Case #6
+          res = await router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('0.2'),
+            // leftOnWrapper
+            ether(1050),
+            // stakedBalance
+            ether(0),
+            // withdrawnAmount
+            ether(0)
+          );
+          assert.equal(res.status, ReserveStatus.EXCESS);
+          assert.equal(res.diff, ether(840));
+          assert.equal(res.expectedReserveAmount, ether(210));
+        });
       })
-    })
-  })
+
+      describe('EQUILIBRIUM', async () => {
+        it('should return with an equlibrium for a deposit', async () => {
+          const res = await router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('0.2'),
+            // leftOnWrapper
+            ether(200),
+            // stakedBalance
+            ether(800),
+            // withdrawnAmount
+            ether(0)
+          );
+          assert.equal(res.status, ReserveStatus.EQUILIBRIUM);
+          assert.equal(res.diff, ether(0));
+          assert.equal(res.expectedReserveAmount, ether(200));
+        });
+
+        it('should return with an equlibrium for a withdrawal', async () => {
+          const res = await router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('0.2'),
+            // leftOnWrapper
+            ether(250),
+            // stakedBalance
+            ether(800),
+            // withdrawnAmount
+            ether(50)
+          );
+          assert.equal(res.status, ReserveStatus.EQUILIBRIUM);
+          assert.equal(res.diff, ether(0));
+          assert.equal(res.expectedReserveAmount, ether(250));
+        });
+      })
+    });
+  });
 });

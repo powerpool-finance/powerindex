@@ -70,12 +70,12 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     YearnGovernanceInterface _voting = YearnGovernanceInterface(voting);
     (ReserveStatus status, uint256 diff, ) = _getReserveStatus(_voting.balanceOf(wrappedToken_), _withdrawAmount);
 
-    if (status == ReserveStatus.ABOVE) {
+    if (status == ReserveStatus.SHORTAGE) {
       uint256 voteLockUntilBlock = _voting.voteLock(wrappedToken_);
       if (voteLockUntilBlock < block.number) {
         _redeem(diff);
       }
-    } else if (status == ReserveStatus.BELOW) {
+    } else if (status == ReserveStatus.EXCESS) {
       _stake(diff);
     }
   }
