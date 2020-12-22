@@ -1,4 +1,5 @@
 const { expectEvent, expectRevert, ether: rEther } = require('@openzeppelin/test-helpers');
+const { ether } = require('../helpers/index');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
@@ -11,10 +12,6 @@ MockYearnGovernance.numberFormat = 'String';
 MockRouter.numberFormat = 'String';
 
 const { web3 } = MockERC20;
-
-function ether(value) {
-  return rEther(value.toString()).toString(10);
-}
 
 function signatureAndArgs(payload) {
   assert(payload.length > 11, 'Payload too small');
@@ -163,7 +160,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
     describe('approveToken', async () => {
       it('should allow the router approving locked tokens', async () => {
-        const data = await yfiWrapper.contract.methods.approveToken(bob, ether(55)).encodeABI();
+        const data = await yfiWrapper.contract.methods.approveUnderlying(bob, ether(55)).encodeABI();
         const res = await router.execute(yfiWrapper.address, data);
 
         await expectEvent.inTransaction(res.tx, WrappedPiErc20, 'Approve', {
@@ -174,7 +171,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
       })
 
       it('should deny calling the method from non-router address', async () => {
-        await expectRevert(yfiWrapper.approveToken(alice, ether(33), { from: alice }), 'ONLY_ROUTER');
+        await expectRevert(yfiWrapper.approveUnderlying(alice, ether(33), { from: alice }), 'ONLY_ROUTER');
       })
     })
 

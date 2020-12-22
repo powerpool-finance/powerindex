@@ -1,4 +1,5 @@
-const { time, ether: rEther } = require('@openzeppelin/test-helpers');
+const { time } = require('@openzeppelin/test-helpers');
+const { ether } = require('../../helpers');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const PowerIndexRouter = artifacts.require('YearnPowerIndexRouter');
@@ -12,10 +13,6 @@ WrappedPiErc20.numberFormat = 'String';
 MockYearnGovernance.numberFormat = 'String';
 
 const { web3 } = MockERC20;
-
-function ether(value) {
-  return rEther(value.toString()).toString(10);
-}
 
 describe('YearnRouter Tests', () => {
   let minter, bob, alice, yearnOwner, stub;

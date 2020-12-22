@@ -147,11 +147,11 @@ describe('AaveRouter Tests', () => {
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'IgnoreRedeemDueCoolDown');
       await expectEvent.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem', {
-        amount: ether(1300),
+        amount: ether(1200),
       });
 
-      assert.equal(await aave.balanceOf(aaveWrapper.address), ether(1800));
-      assert.equal(await aave.balanceOf(stakedAave.address), ether(6700));
+      assert.equal(await aave.balanceOf(aaveWrapper.address), ether(1700));
+      assert.equal(await aave.balanceOf(stakedAave.address), ether(6800));
 
       //////////////////////////////////////////////////////////
       // Step #5. Withdraw 0.5K - while within an UNSTAKE_WINDOW
@@ -165,8 +165,8 @@ describe('AaveRouter Tests', () => {
         amount: ether(400),
       });
 
-      assert.equal(await aave.balanceOf(aaveWrapper.address), ether(1700));
-      assert.equal(await aave.balanceOf(stakedAave.address), ether(6300));
+      assert.equal(await aave.balanceOf(aaveWrapper.address), ether(1600));
+      assert.equal(await aave.balanceOf(stakedAave.address), ether(6400));
 
       ///////////////////////////////////////////////////////
       // Step #6. Deposit 3K - while within an UNSTAKE_WINDOW
@@ -177,7 +177,7 @@ describe('AaveRouter Tests', () => {
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'IgnoreRedeemDueCoolDown');
       await expectEvent.inTransaction(res.tx, AavePowerIndexRouter, 'Stake', {
-        amount: ether(2500),
+        amount: ether(2400),
       });
 
       assert.equal(await aaveWrapper.totalSupply(), ether(11000));
