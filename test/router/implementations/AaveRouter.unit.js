@@ -276,7 +276,7 @@ describe('AaveRouter Tests', () => {
           executor.address,
           [myContract.address],
           [0],
-          [splitPayload(setAnswerData).signature],
+          ['setAnswer(uint256)'],
           [splitPayload(setAnswerData).calldata],
           [false],
           '0x0',
@@ -289,7 +289,7 @@ describe('AaveRouter Tests', () => {
           creator: aaveWrapper.address,
           values: ['0'],
           targets: [myContract.address],
-          signatures: [splitPayload(setAnswerData).signature],
+          signatures: ['setAnswer(uint256)'],
           calldatas: [splitPayload(setAnswerData).calldata],
           withDelegatecalls: [false],
           ipfsHash: constants.ZERO_BYTES32,
@@ -307,8 +307,8 @@ describe('AaveRouter Tests', () => {
         await advanceBlocks(VOTE_DURATION);
         await aaveGovernanceV2.queue('0');
         await time.increase(604801);
-        // await aaveGovernanceV2.execute('0');
-        // asser.equal(await aaveGovernanceV2.getProposalState('0'), ProposalState.Executed);
+        await aaveGovernanceV2.execute('0');
+        assert.equal(await aaveGovernanceV2.getProposalState('0'), ProposalState.Executed);
       });
     });
   });
