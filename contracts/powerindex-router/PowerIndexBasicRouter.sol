@@ -86,7 +86,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
       uint256 adjustedReserveAmount
     )
   {
-    adjustedReserveAmount = calculateReserveRatio(_reserveRatio, _leftOnWrapper, _stakedBalance, _withdrawAmount);
+    adjustedReserveAmount = calculateAdjustedReserveAmount(_reserveRatio, _leftOnWrapper, _stakedBalance, _withdrawAmount);
 
     if (adjustedReserveAmount > _leftOnWrapper) {
       status = ReserveStatus.ABOVE;
@@ -100,20 +100,28 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     }
   }
 
-  //                           / %reserveRatio * (staked + leftOnWrapper) \
-  // adjustedReserveAmount =  | -------------------------------------------| + withdrawAmount
-  //                           \                  100%                    /
-  //
-  // * reserveRationPct - % of a reserve ratio
-  // * staked - amount of original tokens staked on the staking contract
-  // * leftOnWrapper - amount of origin tokens left on the token-wrapper (WrappedPiErc20) contract
-  // * withdrawAmount could be negative in a case of deposit
-  function calculateReserveRatio(
-    uint256 _reserveRatio,
+  /**
+   * @notice Calculates a reserve amount taking into an account the withdrawAmount
+   * @param _reserveRatioPct % of a reserve ratio, 1 ether == 100%
+   * @param _leftOnWrapper The amount of origin tokens left on the token-wrapper (WrappedPiErc20) contract
+   * @param _stakedBalance The amount of original tokens staked on the staking contract
+   * @param _withdrawAmount The amount to be withdrawn within the current transaction
+   *                        (could be negative in a case of deposit)
+   * @return adjustedReserveAmount The amount of origin ERC20 tokens
+   *
+   *                           / %reserveRatio * (staked + leftOnWrapper) \
+   * adjustedReserveAmount =  | -------------------------------------------| + withdrawAmount
+   *                           \                  100%                    /
+   */
+  function calculateAdjustedReserveAmount(
+    uint256 _reserveRatioPct,
     uint256 _leftOnWrapper,
     uint256 _stakedBalance,
     uint256 _withdrawAmount
   ) public pure returns (uint256) {
-    return _reserveRatio.mul(_stakedBalance.add(_leftOnWrapper)).div(HUNDRED_PCT).add(_withdrawAmount);
+    return _reserveRatioPct
+        .mul(_stakedBalance.add(_leftOnWrapper))
+        .div(HUNDRED_PCT)
+        .add(_withdrawAmount);
   }
 }

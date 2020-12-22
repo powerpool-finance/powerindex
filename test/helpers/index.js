@@ -1,3 +1,4 @@
+const { ether: rEther } = require('@openzeppelin/test-helpers');
 const TruffleContract = require('@nomiclabs/truffle-contract');
 const template = artifacts.require('Migrations');
 const { promisify } = require('util');
@@ -119,11 +120,16 @@ function splitPayload(payload) {
   }
 }
 
+function ether(value) {
+  return rEther(value.toString()).toString(10);
+}
+
 module.exports = {
   deployProxied,
   createOrGetProxyAdmin,
   artifactFromBytecode,
   toEvmBytes32,
   advanceBlocks,
-  splitPayload
+  splitPayload,
+  ether
 }

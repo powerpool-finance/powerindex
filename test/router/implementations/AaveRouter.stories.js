@@ -1,5 +1,5 @@
-const { constants, time, ether: rEther, expectEvent } = require('@openzeppelin/test-helpers');
-const { artifactFromBytecode } = require('../../helpers');
+const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
+const { artifactFromBytecode, ether } = require('../../helpers');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
@@ -12,10 +12,6 @@ const StakedAave = artifactFromBytecode('aave/StakedAaveV2');
 MockERC20.numberFormat = 'String';
 AavePowerIndexRouter.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
-
-function ether(value) {
-  return rEther(value.toString()).toString(10);
-}
 
 const COOLDOWN_STATUS = {
   NONE: 0,
