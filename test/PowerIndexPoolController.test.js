@@ -215,16 +215,13 @@ describe('PowerIndexPoolController', () => {
     const poolRestrictions = await PoolRestrictions.new();
     const router = await PowerIndexRouter.new(poolRestrictions.address);
 
-    let res = await controller.replacePoolTokenWithWrapped(this.token2.address, router.address, 'WrappedTKN2', 'WTKN2');
+    let res = await controller.replacePoolTokenWithNewWrapped(this.token2.address, router.address, 'WrappedTKN2', 'WTKN2');
     const wToken2 = await WrappedPiErc20.at(res.logs[0].args.wrappedToken);
     expectEvent(res, 'ReplacePoolTokenWithWrapped', {
       existingToken: this.token2.address,
       wrappedToken: wToken2.address,
-      router: router.address,
       balance: ether('20'),
       denormalizedWeight: ether('25'),
-      name: 'WrappedTKN2',
-      symbol: 'WTKN2',
     });
 
     const price = (
@@ -280,7 +277,7 @@ describe('PowerIndexPoolController', () => {
     const poolRestrictions = await PoolRestrictions.new();
     const router = await PowerIndexRouter.new(poolRestrictions.address);
 
-    let res = await controller.replacePoolTokenWithWrapped(this.token2.address, router.address, 'WrappedTKN2', 'WTKN2');
+    let res = await controller.replacePoolTokenWithNewWrapped(this.token2.address, router.address, 'WrappedTKN2', 'WTKN2');
     const wToken2 = await WrappedPiErc20.at(res.logs[0].args.wrappedToken);
     assert.equal(await wToken2.balanceOf(pool.address), ether('20'));
 

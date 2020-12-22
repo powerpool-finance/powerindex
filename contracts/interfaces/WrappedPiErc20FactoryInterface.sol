@@ -12,5 +12,5 @@ interface WrappedPiErc20FactoryInterface {
     address _router,
     string calldata _name,
     string calldata _symbol
-  ) external returns(WrappedPiErc20Interface);
+  ) external returns (WrappedPiErc20Interface);
 }

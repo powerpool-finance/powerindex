@@ -103,7 +103,7 @@ describe('PowerIndexWrapper', () => {
     await poolWrapper.setController(poolController.address);
     await pool.setController(poolController.address);
 
-    res = await poolController.replacePoolTokenWithWrapped(this.token2.address, poolRouter.address, 'W T 2', 'WT2');
+    res = await poolController.replacePoolTokenWithNewWrapped(this.token2.address, poolRouter.address, 'W T 2', 'WT2');
     this.token2Wrapper = await WrappedPiErc20.at(
       res.receipt.logs.filter(l => l.event === 'ReplacePoolTokenWithWrapped')[0].args.wrappedToken,
     );

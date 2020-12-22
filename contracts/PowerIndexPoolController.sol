@@ -20,12 +20,11 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     uint256 targetTimestamp;
   }
 
-  constructor(address _pool, address _poolWrapper, address _wrapperFactory)
-    public
-    PowerIndexWrappedController(_pool, _poolWrapper, _wrapperFactory)
-  {
-
-  }
+  constructor(
+    address _pool,
+    address _poolWrapper,
+    address _wrapperFactory
+  ) public PowerIndexWrappedController(_pool, _poolWrapper, _wrapperFactory) {}
 
   /**
    * @notice Call bind of pool
