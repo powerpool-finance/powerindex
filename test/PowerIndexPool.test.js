@@ -613,7 +613,7 @@ describe('PowerIndexPool', () => {
       const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
       assert.equal(poolAmountOutAfterJoin, ether('152.544804372061724031').toString());
 
-      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
+      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
       const fromTimestamp = await getTimestamp(100);
       await poolController.setDynamicWeightList([
@@ -764,7 +764,7 @@ describe('PowerIndexPool', () => {
       fromTimestamp = await getTimestamp(100);
       targetTimestamp = await getTimestamp(11000);
 
-      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
+      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
 
       await newToken.approve(poolController.address, b);
@@ -902,7 +902,7 @@ describe('PowerIndexPool', () => {
       assert.equal(await pool.isBound(newToken.address), false);
       assert.equal(await pool.getNumTokens(), '8');
 
-      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
+      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
 
       const duration = '10000';

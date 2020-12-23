@@ -8,6 +8,9 @@ require('./tasks/fetchPoolsData');
 require('./tasks/deployVestedLpMining');
 require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
+require('./tasks/testMainnetErc20PiptSwap');
+require('./tasks/deployPoolRestrictions');
+require('./tasks/deployMainnetYeti');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
@@ -63,14 +66,14 @@ const config = {
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
       accounts: getAccounts('mainnet'),
-      gasPrice: 24 * 10 ** 9,
+      gasPrice: 75 * 10 ** 9,
       gasMultiplier: 1.2,
       timeout: 2000000,
     },
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
       accounts: getAccounts('mainnet'),
-      gasPrice: 24 * 10 ** 9,
+      gasPrice: 75 * 10 ** 9,
       gasMultiplier: 2,
       timeout: 2000000,
     },
@@ -100,7 +103,7 @@ const config = {
     settings: {
       optimizer: {
         enabled: !!process.env.ETHERSCAN_KEY || process.env.COMPILE_TARGET === 'release',
-        runs: 1,
+        runs: 2,
       },
     },
     version: '0.6.12',

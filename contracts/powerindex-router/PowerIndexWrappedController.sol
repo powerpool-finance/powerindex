@@ -5,17 +5,15 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../PowerIndexAbstractController.sol";
 import "../interfaces/PowerIndexWrapperInterface.sol";
-import "./WrappedPiErc20.sol";
+import "../interfaces/WrappedPiErc20FactoryInterface.sol";
+import "../interfaces/WrappedPiErc20Interface.sol";
 
 contract PowerIndexWrappedController is PowerIndexAbstractController {
   event ReplacePoolTokenWithWrapped(
     address indexed existingToken,
     address indexed wrappedToken,
-    address indexed router,
     uint256 balance,
-    uint256 denormalizedWeight,
-    string name,
-    string symbol
+    uint256 denormalizedWeight
   );
 
   event ReplacePoolTokenWithNewVersion(
@@ -29,9 +27,15 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
   event SetPoolWrapper(address indexed bpoolWrapper);
 
   PowerIndexWrapperInterface public poolWrapper;
+  WrappedPiErc20FactoryInterface public wrapperFactory;
 
-  constructor(address _pool, address _poolWrapper) public PowerIndexAbstractController(_pool) {
+  constructor(
+    address _pool,
+    address _poolWrapper,
+    address _wrapperFactory
+  ) public PowerIndexAbstractController(_pool) {
     poolWrapper = PowerIndexWrapperInterface(_poolWrapper);
+    wrapperFactory = WrappedPiErc20FactoryInterface(_wrapperFactory);
   }
 
   function setPoolWrapper(address _poolWrapper) external onlyOwner {
@@ -39,37 +43,18 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     emit SetPoolWrapper(_poolWrapper);
   }
 
-  function replacePoolTokenWithWrapped(
+  function replacePoolTokenWithNewWrapped(
     address _token,
     address _router,
     string calldata _name,
     string calldata _symbol
   ) external onlyOwner {
-    WrappedPiErc20 wrappedToken = new WrappedPiErc20(_token, _router, _name, _symbol);
-    uint256 denormalizedWeight = pool.getDenormalizedWeight(_token);
-    uint256 balance = pool.getBalance(_token);
+    WrappedPiErc20Interface wrappedToken = wrapperFactory.build(_token, _router, _name, _symbol);
+    _replacePoolTokenWithWrapped(_token, wrappedToken);
+  }
 
-    pool.unbind(_token);
-
-    IERC20(_token).approve(address(wrappedToken), balance);
-    wrappedToken.deposit(balance);
-
-    wrappedToken.approve(address(pool), balance);
-    pool.bind(address(wrappedToken), balance, denormalizedWeight);
-
-    if (address(poolWrapper) != address(0)) {
-      poolWrapper.setTokenWrapper(_token, address(wrappedToken));
-    }
-
-    emit ReplacePoolTokenWithWrapped(
-      _token,
-      address(wrappedToken),
-      _router,
-      balance,
-      denormalizedWeight,
-      _name,
-      _symbol
-    );
+  function replacePoolTokenWithExistsWrapped(address _token, WrappedPiErc20Interface _wrappedToken) external onlyOwner {
+    _replacePoolTokenWithWrapped(_token, _wrappedToken);
   }
 
   function replacePoolTokenWithNewVersion(
@@ -96,5 +81,24 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     pool.bind(_newToken, balance, denormalizedWeight);
 
     emit ReplacePoolTokenWithNewVersion(_oldToken, _newToken, _migrator, balance, denormalizedWeight);
+  }
+
+  function _replacePoolTokenWithWrapped(address _token, WrappedPiErc20Interface _wrappedToken) internal {
+    uint256 denormalizedWeight = pool.getDenormalizedWeight(_token);
+    uint256 balance = pool.getBalance(_token);
+
+    pool.unbind(_token);
+
+    IERC20(_token).approve(address(_wrappedToken), balance);
+    _wrappedToken.deposit(balance);
+
+    _wrappedToken.approve(address(pool), balance);
+    pool.bind(address(_wrappedToken), balance, denormalizedWeight);
+
+    if (address(poolWrapper) != address(0)) {
+      poolWrapper.setTokenWrapper(_token, address(_wrappedToken));
+    }
+
+    emit ReplacePoolTokenWithWrapped(_token, address(_wrappedToken), balance, denormalizedWeight);
   }
 }

@@ -1,3 +1,15 @@
+/*
+https://powerpool.finance/
+
+          wrrrw r wrr
+         ppwr rrr wppr0       prwwwrp                                 prwwwrp                   wr0
+        rr 0rrrwrrprpwp0      pp   pr  prrrr0 pp   0r  prrrr0  0rwrrr pp   pr  prrrr0  prrrr0    r0
+        rrp pr   wr00rrp      prwww0  pp   wr pp w00r prwwwpr  0rw    prwww0  pp   wr pp   wr    r0
+        r0rprprwrrrp pr0      pp      wr   pr pp rwwr wr       0r     pp      wr   pr wr   pr    r0
+         prwr wrr0wpwr        00        www0   0w0ww    www0   0w     00        www0    www0   0www0
+          wrr ww0rrrr
+
+*/
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
@@ -31,7 +43,7 @@ contract Erc20PiptSwap is EthPiptSwap {
     address _swapToken,
     uint256 _swapAmount,
     uint256 _slippage
-  ) external {
+  ) external returns (uint256 poolAmountOut) {
     IERC20(_swapToken).safeTransferFrom(msg.sender, address(this), _swapAmount);
 
     IUniswapV2Pair tokenPair = _uniswapPairFor(_swapToken);
@@ -43,20 +55,20 @@ contract Erc20PiptSwap is EthPiptSwap {
 
     (, uint256 ethSwapAmount) = calcEthFee(ethAmount);
     address[] memory tokens = pipt.getCurrentTokens();
-    (, , uint256 poolAmountOut) = calcSwapEthToPiptInputs(ethSwapAmount, tokens, _slippage);
+    (, , poolAmountOut) = calcSwapEthToPiptInputs(ethSwapAmount, tokens, _slippage);
 
     _swapWethToPiptByPoolOut(ethAmount, poolAmountOut);
 
     emit Erc20ToPiptSwap(msg.sender, _swapToken, _swapAmount, ethAmount, poolAmountOut);
   }
 
-  function swapPiptToErc20(address _swapToken, uint256 _poolAmountIn) external {
+  function swapPiptToErc20(address _swapToken, uint256 _poolAmountIn) external returns (uint256 erc20Out) {
     uint256 ethOut = _swapPiptToWeth(_poolAmountIn);
 
     IUniswapV2Pair tokenPair = _uniswapPairFor(_swapToken);
 
     (uint256 tokenReserve, uint256 ethReserve, ) = tokenPair.getReserves();
-    uint256 erc20Out = UniswapV2Library.getAmountOut(ethOut, ethReserve, tokenReserve);
+    erc20Out = UniswapV2Library.getAmountOut(ethOut, ethReserve, tokenReserve);
 
     weth.safeTransfer(address(tokenPair), ethOut);
 
@@ -88,6 +100,16 @@ contract Erc20PiptSwap is EthPiptSwap {
       (, ethAmount) = calcEthFee(ethAmount);
     }
     return calcSwapEthToPiptInputs(ethAmount, _tokens, _slippage);
+  }
+
+  function calcNeedErc20ToPoolOut(
+    address _swapToken,
+    uint256 _poolAmountOut,
+    uint256 _slippage
+  ) external view returns (uint256) {
+    uint256 resultEth = calcNeedEthToPoolOut(_poolAmountOut, _slippage);
+    (uint256 tokenReserve, uint256 ethReserve, ) = _uniswapPairFor(_swapToken).getReserves();
+    return UniswapV2Library.getAmountIn(resultEth.mul(1003).div(1000), tokenReserve, ethReserve);
   }
 
   function calcSwapPiptToErc20Inputs(

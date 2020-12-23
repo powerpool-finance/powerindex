@@ -2,7 +2,7 @@ require('@nomiclabs/hardhat-truffle5');
 
 const pIteration = require('p-iteration');
 
-task('deploy-power-index-pool', 'Deploy PowerIndexPool').setAction(async () => {
+task('deploy-yeti', 'Deploy YETI').setAction(async () => {
   const PowerIndexPoolFactory = await artifacts.require('PowerIndexPoolFactory');
   const PowerIndexPoolActions = await artifacts.require('PowerIndexPoolActions');
   const PowerIndexPool = await artifacts.require('PowerIndexPool');
@@ -17,23 +17,23 @@ task('deploy-power-index-pool', 'Deploy PowerIndexPool').setAction(async () => {
 
   const admin = '0xb258302c3f209491d604165549079680708581cc';
 
-  const bFactory = await PowerIndexPoolFactory.new(sendOptions);
-  const bActions = await PowerIndexPoolActions.new(sendOptions);
+  const bFactory = await PowerIndexPoolFactory.at('0x0Ba2e75FE1368d8d517BE1Db5C39ca50a1429441');
+  const bActions = await PowerIndexPoolActions.at('0xC258754c7b2f77EB6c5B2C5e87569a9533dA16D2');
   console.log('bFactory', bFactory.address);
   console.log('bActions', bActions.address);
   const poolConfigs = [
     {
-      name: 'Power Index Pool Token',
-      symbol: 'PIPT',
+      name: 'Yearn Ecosystem Token Index',
+      symbol: 'YETI',
       tokens: [
-        '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9', //AAVE
-        '0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e', //YFI
-        '0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f', //SNX
-        '0x38e4adb44ef08f22f5b5b76a8f0c2d0dcbe7dca1', //CVP
-        '0xc00e94cb662c3520282e6f5717214004a7f26888', //COMP
-        '0x0d438f3b5175bebc262bf23753c1e53d03432bde', //wNXM
-        '0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2', //MKR
-        '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984', //UNI
+        {address: '0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e', denorm: ether('17.5')}, //YFI
+        {address: '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', denorm: ether('8.5')}, //SUSHI
+        {address: '0x2ba592F78dB6436527729929AAf6c908497cB200', denorm: ether('4')}, //CREAM
+        {address: '0x8ab7404063ec4dbcfd4598215992dc3f8ec853d7', denorm: ether('4')}, //AKRO
+        {address: '0x5D8d9F5b96f4438195BE9b99eee6118Ed4304286', denorm: ether('4')}, //COVER
+        {address: '0x1cEB5cB57C4D4E2b2433641b95Dd330A33185A44', denorm: ether('4')}, //KP3R
+        {address: '0x38e4adb44ef08f22f5b5b76a8f0c2d0dcbe7dca1', denorm: ether('4')}, //CVP
+        {address: '0x429881672B9AE42b8EbA0E26cD9C73711b891Ca5', denorm: ether('4')}, //PICKLE
       ],
       swapFee: 0.002,
       communitySwapFee: 0.001,
@@ -43,10 +43,14 @@ task('deploy-power-index-pool', 'Deploy PowerIndexPool').setAction(async () => {
     },
   ];
 
+  const minsOffset = 5;
+  const fromTimestamp = (Math.round(new Date().getTime() / 1000) + minsOffset * 60).toString();
+  const targetTimestamp = (parseInt(fromTimestamp) + 60).toString();
+
   await pIteration.forEachSeries(poolConfigs, async poolConfig => {
     const balances = [];
-    await pIteration.forEachSeries(poolConfig.tokens, async (tokenAddr, index) => {
-      const token = await MockERC20.at(tokenAddr);
+    await pIteration.forEachSeries(poolConfig.tokens, async (t, index) => {
+      const token = await MockERC20.at(t.address);
       balances[index] = (await callContract(token, 'balanceOf', [deployer])).toString(10);
       console.log('approve', token.address, balances[index]);
       await token.approve(bActions.address, balances[index], sendOptions);
@@ -57,8 +61,8 @@ task('deploy-power-index-pool', 'Deploy PowerIndexPool').setAction(async () => {
       poolConfig.name,
       poolConfig.symbol,
       {
-        minWeightPerSecond: ether('0.000005166997354497'),
-        maxWeightPerSecond: ether('0.000014467592592593'),
+        minWeightPerSecond: ether('0'),
+        maxWeightPerSecond: ether('1'),
         swapFee: ether(poolConfig.swapFee),
         communitySwapFee: ether(poolConfig.communitySwapFee),
         communityJoinFee: ether(poolConfig.communityJoinFee),
@@ -67,25 +71,20 @@ task('deploy-power-index-pool', 'Deploy PowerIndexPool').setAction(async () => {
         finalize: true,
       },
       poolConfig.tokens.map((token, index) => ({
-        token,
+        token: token.address,
         balance: balances[index],
-        targetDenorm: ether('6.25'),
-        fromTimestamp: '1606769514',
-        targetTimestamp: '1607201514'
+        targetDenorm: token.denorm,
+        fromTimestamp,
+        targetTimestamp
       })),
       sendOptions,
     );
     const logNewPool = PowerIndexPoolFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
     const pool = await PowerIndexPool.at(logNewPool.args.pool);
     console.log('pool.address', pool.address);
-    // await pool.setRestrictions(poolRestrictions.address);
-    // await poolRestrictions.setTotalRestrictions([pool.address], [ether(20000)]);
 
     await pool.setController(admin);
   })
-
-  // await pvpV1.transferOwnership(admin);
-  // await poolRestrictions.transferOwnership(admin);
 
   function ether(amount) {
     return toWei(amount.toString(), 'ether');

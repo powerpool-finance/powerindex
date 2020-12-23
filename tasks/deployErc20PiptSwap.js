@@ -10,7 +10,7 @@ task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async () => {
   console.log('deployer', deployer);
   const sendOptions = { from: deployer };
   const admin = '0xb258302c3f209491d604165549079680708581cc';
-  const poolAddress = '0x9FAc54B1ddAC9968Df67B31F217c63C4c118656d';
+  const poolAddress = '0x26607aC599266b21d13c7aCF7942c7701a8b699c';
   const uniswapFactoryAddress = '0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f';
 
   const pool = await PowerIndexPool.at(poolAddress);
@@ -29,9 +29,9 @@ task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async () => {
     '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', //USDC
     '0x6B175474E89094C44Da98b954EedeAC495271d0F', //DAI
     '0x1494CA1F11D487c2bBe4543E90080AeBa4BA3C2b', //DPI
+    '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', //WBTC
   ];
 
-  await erc20PiptSwap.setUniswapFactoryAllowed([uniswapFactoryAddress], [true], sendOptions);
   await erc20PiptSwap.fetchUnswapPairsFromFactory(
     uniswapFactoryAddress,
     (await callContract(pool, 'getCurrentTokens')).concat(swapCoins),
