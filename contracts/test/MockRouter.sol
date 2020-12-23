@@ -2,12 +2,15 @@
 
 pragma solidity 0.6.12;
 
-import "../powerindex-router/PowerIndexNaiveRouter.sol";
+import "../powerindex-router/PowerIndexBasicRouter.sol";
 
-contract MockRouter is PowerIndexNaiveRouter {
+contract MockRouter is PowerIndexBasicRouter {
   event MockWrapperCallback(uint256 withdrawAmount);
 
-  constructor() public PowerIndexNaiveRouter() {}
+  constructor(address _wrappedToken, address _poolRestrictions)
+    public
+    PowerIndexBasicRouter(_wrappedToken, _poolRestrictions)
+  {}
 
   function wrapperCallback(uint256 _withdrawAmount) external virtual override {
     emit MockWrapperCallback(_withdrawAmount);

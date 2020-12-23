@@ -5,6 +5,7 @@ const MockERC20 = artifacts.require('MockERC20');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexBasicRouter = artifacts.require('PowerIndexBasicRouter');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
+const MockLeakingRouter = artifacts.require('MockLeakingRouter');
 
 MockERC20.numberFormat = 'String';
 PowerIndexBasicRouter.numberFormat = 'String';
@@ -25,6 +26,24 @@ describe('PowerIndex BasicRouter Test', () => {
   before(async function () {
     [minter, bob, alice, stub] = await web3.eth.getAccounts();
     poolRestrictions = await PoolRestrictions.new();
+  });
+
+  describe('weighed underlying', () => {
+    let leakingRouter, wrapper, token;
+
+    beforeEach(async () => {
+      token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
+      wrapper = await WrappedPiErc20.new(token.address, stub, 'WToken', 'WTKN');
+      leakingRouter = await MockLeakingRouter.new(wrapper.address, poolRestrictions.address);
+
+      await wrapper.changeRouter(leakingRouter.address, { from: stub });
+    })
+
+    it('should', async () => {
+      await token.transfer(alice, ether('100'));
+      await token.approve(wrapper.address, ether('100'), { from: alice });
+      await wrapper.deposit(ether('100'), { from: alice });
+    })
   });
 
   describe('changeRouter()', () => {
@@ -66,6 +85,88 @@ describe('PowerIndex BasicRouter Test', () => {
       const token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
       const wrapper = await WrappedPiErc20.new(token.address, stub, 'WToken', 'WTKN');
       router = await PowerIndexBasicRouter.new(wrapper.address, poolRestrictions.address);
+    });
+
+    describe('getPiEquivalentFroUnderlyingPure()', async () => {
+      it('should calculate valid values', async () => {
+        // Case #1
+        assert.equal(
+          await router.getPiEquivalentFroUnderlyingPure(
+            // amount
+            ether(100),
+            // totalUnderlyingWrapped
+            ether(1000),
+            // piTotalSupply
+            ether(1200)
+          ),
+          ether(120)
+        );
+
+        // Case #2
+        assert.equal(
+          await router.getPiEquivalentFroUnderlyingPure(
+            // amount
+            ether(100),
+            // totalUnderlyingWrapped
+            ether(1000),
+            // piTotalSupply
+            ether(1000)
+          ),
+          ether(100)
+        );
+
+        // Case #3
+        assert.equal(
+          await router.getPiEquivalentFroUnderlyingPure(
+            // amount
+            ether(100),
+            // totalUnderlyingWrapped
+            ether(1600),
+            // piTotalSupply
+            ether(1000)
+          ),
+          ether(62.5)
+        );
+
+        // Case #4
+        assert.equal(
+          await router.getPiEquivalentFroUnderlyingPure(
+            // amount
+            ether(100),
+            // totalUnderlyingWrapped
+            ether(0),
+            // piTotalSupply
+            ether(0)
+          ),
+          ether(100)
+        );
+
+        // Case #5
+        assert.equal(
+          await router.getPiEquivalentFroUnderlyingPure(
+            // amount
+            ether(100),
+            // totalUnderlyingWrapped
+            ether(100),
+            // piTotalSupply
+            ether(100)
+          ),
+          ether(100)
+        );
+
+        // Case #6
+        assert.equal(
+          await router.getPiEquivalentFroUnderlyingPure(
+            // amount
+            ether(200),
+            // totalUnderlyingWrapped
+            ether(200),
+            // piTotalSupply
+            ether(100)
+          ),
+          ether(100)
+        );
+      });
     });
 
     describe('getExpectedReserveAmount()', async () => {

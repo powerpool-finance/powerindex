@@ -20,5 +20,5 @@ interface WrappedPiErc20Interface is IERC20 {
     uint256 value
   ) external;
 
-  function getWrappedBalance() external view returns (uint256);
+  function getUnderlyingBalance() external view returns (uint256);
 }

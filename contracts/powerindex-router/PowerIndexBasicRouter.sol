@@ -34,7 +34,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     emit SetVotingAndStaking(_voting, _staking);
   }
 
-  function setReserveRatio(uint256 _reserveRatio) external onlyOwner {
+  function setReserveRatio(uint256 _reserveRatio) external override onlyOwner {
     require(_reserveRatio <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
     reserveRatio = _reserveRatio;
     emit SetReserveRatio(_reserveRatio);
@@ -67,7 +67,34 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
       uint256 adjustedReserveAmount
     )
   {
-    return getReserveStatusPure(reserveRatio, wrappedToken.getWrappedBalance(), _stakedBalance, _withdrawAmount);
+    return getReserveStatusPure(reserveRatio, wrappedToken.getUnderlyingBalance(), _stakedBalance, _withdrawAmount);
+  }
+
+  function getPiEquivalentFroUnderlying(
+    uint256 _underlyingAmount,
+    IERC20 _underlyingToken,
+    uint256 _underlyingOnWrapper,
+    uint256 _piTotalSupply
+  ) external view override returns (uint256) {
+    return
+      getPiEquivalentFroUnderlyingPure(
+        _underlyingAmount,
+        // _underlyingOnWrapper + _underlyingToken.balanceOf(staking),
+        _underlyingOnWrapper.add(_underlyingToken.balanceOf(staking)),
+        _piTotalSupply
+      );
+  }
+
+  function getPiEquivalentFroUnderlyingPure(
+    uint256 _underlyingAmount,
+    uint256 _totalUnderlyingWrapped,
+    uint256 _piTotalSupply
+  ) public pure override returns (uint256) {
+    if (_totalUnderlyingWrapped == 0) {
+      return _underlyingAmount;
+    }
+    // return _piTotalSupply * _underlyingAmount / _totalUnderlyingWrapped;
+    return _piTotalSupply.mul(_underlyingAmount).div(_totalUnderlyingWrapped);
   }
 
   /**
