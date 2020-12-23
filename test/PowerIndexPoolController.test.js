@@ -279,7 +279,7 @@ describe('PowerIndexPoolController', () => {
     );
   });
 
-  it('should allow swapping a token with exists wrapped version', async () => {
+  it('should allow swapping a token with existing wrapped version', async () => {
     const poolRestrictions = await PoolRestrictions.new();
 
     let res = await wrapperFactory.build(this.token2.address, stub, 'WrappedTKN2', 'WTKN2');
@@ -287,7 +287,7 @@ describe('PowerIndexPoolController', () => {
     const router = await PowerIndexRouter.new(wToken2.address, poolRestrictions.address);
     wToken2.changeRouter(router.address, { from: stub });
 
-    res = await controller.replacePoolTokenWithExistsWrapped(this.token2.address, wToken2.address);
+    res = await controller.replacePoolTokenWithExistingWrapped(this.token2.address, wToken2.address);
     expectEvent(res, 'ReplacePoolTokenWithWrapped', {
       existingToken: this.token2.address,
       wrappedToken: wToken2.address,

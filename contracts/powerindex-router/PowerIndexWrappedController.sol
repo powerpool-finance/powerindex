@@ -57,7 +57,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     _replacePoolTokenWithWrapped(_token, wrappedToken);
   }
 
-  function replacePoolTokenWithExistsWrapped(address _token, WrappedPiErc20Interface _wrappedToken) external onlyOwner {
+  function replacePoolTokenWithExistingWrapped(address _token, WrappedPiErc20Interface _wrappedToken) external onlyOwner {
     _replacePoolTokenWithWrapped(_token, _wrappedToken);
   }
 
