@@ -292,7 +292,7 @@ describe('AaveRouter Tests', () => {
           '0x0',
         ).encodeABI();
         assert.equal(await aaveGovernanceV2.getProposalsCount(), '0');
-        let res = await aaveRouter.executeCreate(splitPayload(createProposalData).calldata, { from: alice });
+        let res = await aaveRouter.callCreate(splitPayload(createProposalData).calldata, { from: alice });
         assert.equal(await aaveGovernanceV2.getProposalsCount(), '1');
         await expectEvent.inTransaction(res.tx, AaveGovernanceV2, 'ProposalCreated', {
           id: '0',
@@ -306,7 +306,7 @@ describe('AaveRouter Tests', () => {
         });
 
         // Vote for the proposal...
-        res = await aaveRouter.executeSubmitVote(0, true, { from: alice });
+        res = await aaveRouter.callSubmitVote(0, true, { from: alice });
         await expectEvent.inTransaction(res.tx, AaveGovernanceV2, 'VoteEmitted', {
           id: '0',
           voter: aaveWrapper.address,

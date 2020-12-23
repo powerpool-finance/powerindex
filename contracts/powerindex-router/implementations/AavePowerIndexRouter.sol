@@ -23,12 +23,12 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   /*** THE PROXIED METHOD EXECUTORS FOR VOTING ***/
 
-  function executeCreate(bytes calldata _args) external {
+  function callCreate(bytes calldata _args) external {
     _checkVotingSenderAllowed();
     _callVoting(IAaveGovernanceV2(0).create.selector, _args);
   }
 
-  function executeSubmitVote(uint256 _proposalId, bool _support) external {
+  function callSubmitVote(uint256 _proposalId, bool _support) external {
     _checkVotingSenderAllowed();
     _callVoting(IAaveGovernanceV2(0).submitVote.selector, abi.encode(_proposalId, _support));
   }

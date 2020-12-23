@@ -22,27 +22,27 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
 
   /*** THE PROXIED METHOD EXECUTORS ***/
 
-  function executeRegister() external {
+  function callRegister() external {
     _checkVotingSenderAllowed();
     _callVoting(REGISTER_SIG, "");
   }
 
-  function executeExit() external {
+  function callExit() external {
     _checkVotingSenderAllowed();
     _callVoting(EXIT_SIG, "");
   }
 
-  function executePropose(address _executor, string calldata _hash) external {
+  function callPropose(address _executor, string calldata _hash) external {
     _checkVotingSenderAllowed();
     _callVoting(PROPOSE_SIG, abi.encode(_executor, _hash));
   }
 
-  function executeVoteFor(uint256 _id) external {
+  function callVoteFor(uint256 _id) external {
     _checkVotingSenderAllowed();
     _callVoting(VOTE_FOR_SIG, abi.encode(_id));
   }
 
-  function executeVoteAgainst(uint256 _id) external {
+  function callVoteAgainst(uint256 _id) external {
     _checkVotingSenderAllowed();
     _callVoting(VOTE_AGAINST_SIG, abi.encode(_id));
   }

@@ -54,9 +54,9 @@ describe('YearnRouter Tests', () => {
 
     await poolRestrictions.setVotingAllowedForSenders(yearnGovernance.address, [alice], [true]);
 
-    await yfiRouter.executeRegister({ from: alice });
-    await yfiRouter.executePropose(bob, proposalString, { from: alice });
-    await yfiRouter.executeVoteFor(0, { from: alice });
+    await yfiRouter.callRegister({ from: alice });
+    await yfiRouter.callPropose(bob, proposalString, { from: alice });
+    await yfiRouter.callVoteFor(0, { from: alice });
 
     await time.advanceBlockTo((await time.latestBlock()).toNumber() + 10);
 

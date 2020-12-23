@@ -36,7 +36,7 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
 
   /*** THE PROXIED METHOD EXECUTORS ***/
 
-  function executePropose(
+  function callPropose(
     bytes calldata _executionScript,
     string calldata _metadata,
     bool _castVote,
@@ -46,12 +46,12 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
     _callVoting(PROPOSE_SIG, abi.encode(_executionScript, _metadata, _castVote, _executesIfDecided));
   }
 
-  function executeVoteFor(uint256 _voteId, bool _executesIfDecided) external {
+  function callVoteFor(uint256 _voteId, bool _executesIfDecided) external {
     _checkVotingSenderAllowed();
     _callVoting(VOTE_SIG, abi.encode(_voteId, true, _executesIfDecided));
   }
 
-  function executeVoteAgainst(uint256 _voteId, bool _executesIfDecided) external {
+  function callVoteAgainst(uint256 _voteId, bool _executesIfDecided) external {
     _checkVotingSenderAllowed();
     _callVoting(VOTE_SIG, abi.encode(_voteId, false, _executesIfDecided));
   }

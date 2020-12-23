@@ -47,7 +47,7 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
   assert.equal(diff.lte(toBN(accuracyWei)), true, message);
 }
 
-describe.only('PowerIndexWrapper', () => {
+describe('PowerIndexWrapper', () => {
   const name = 'My Pool';
   const symbol = 'MP';
   const balances = [ether('10'), ether('20')];
