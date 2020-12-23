@@ -22,10 +22,10 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
   uint256 public minLockTime;
 
   constructor(
-    address _wrappedToken,
+    address _piToken,
     address _poolRestrictions,
     uint256 _minLockTime
-  ) public PowerIndexBasicRouter(_wrappedToken, _poolRestrictions) {
+  ) public PowerIndexBasicRouter(_piToken, _poolRestrictions) {
     minLockTime = _minLockTime;
   }
 

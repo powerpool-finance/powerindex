@@ -14,6 +14,7 @@ const MockErc20Migrator = artifacts.require('MockErc20Migrator');
 const PowerIndexRouter = artifacts.require('PowerIndexBasicRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
+const BasicPowerIndexRouterFactory = artifacts.require('BasicPowerIndexRouterFactory');
 
 MockERC20.numberFormat = 'String';
 MockErc20Migrator.numberFormat = 'String';
@@ -72,12 +73,13 @@ describe('PowerIndexPoolController', () => {
   let poolWrapper;
   let controller;
   let wrapperFactory;
+  let routerFactory;
 
-  let minter, alice, communityWallet;
+  let minter, alice, communityWallet, stub;
   let amountToSwap, amountCommunitySwapFee, amountAfterCommunitySwapFee, expectedSwapOut;
 
   before(async function () {
-    [minter, alice, communityWallet] = await web3.eth.getAccounts();
+    [minter, alice, communityWallet, stub] = await web3.eth.getAccounts();
   });
 
   beforeEach(async () => {
@@ -112,6 +114,7 @@ describe('PowerIndexPoolController', () => {
     poolWrapper = await PowerIndexWrapper.new(pool.address);
     wrapperFactory = await WrappedPiErc20Factory.new();
     controller = await PowerIndexPoolController.new(pool.address, zeroAddress, wrapperFactory.address);
+    routerFactory = await BasicPowerIndexRouterFactory.new();
 
     await pool.setWrapper(poolWrapper.address, true);
     await pool.setController(controller.address);
@@ -214,10 +217,12 @@ describe('PowerIndexPoolController', () => {
 
   it('should allow swapping a token with a new wrapped version', async () => {
     const poolRestrictions = await PoolRestrictions.new();
-    const router = await PowerIndexRouter.new(poolRestrictions.address);
 
-    let res = await controller.replacePoolTokenWithNewWrapped(this.token2.address, router.address, 'WrappedTKN2', 'WTKN2');
-    const wToken2 = await WrappedPiErc20.at(res.logs[0].args.wrappedToken);
+    let res = await controller.replacePoolTokenWithNewWrapped(this.token2.address, routerFactory.address, poolRestrictions.address, 'WrappedTKN2', 'WTKN2');
+    const wToken2 = await WrappedPiErc20.at(res.logs[1].args.wrappedToken);
+    expectEvent.inTransaction(res, BasicPowerIndexRouterFactory, 'BuildBasicRouter', {
+      builder: controller.address
+    });
     expectEvent(res, 'ReplacePoolTokenWithWrapped', {
       existingToken: this.token2.address,
       wrappedToken: wToken2.address,
@@ -276,10 +281,11 @@ describe('PowerIndexPoolController', () => {
 
   it('should allow swapping a token with exists wrapped version', async () => {
     const poolRestrictions = await PoolRestrictions.new();
-    const router = await PowerIndexRouter.new(poolRestrictions.address);
 
-    let res = await wrapperFactory.build(this.token2.address, router.address, 'WrappedTKN2', 'WTKN2');
+    let res = await wrapperFactory.build(this.token2.address, stub, 'WrappedTKN2', 'WTKN2');
     const wToken2 = await WrappedPiErc20.at(res.logs[0].args.wrappedToken);
+    const router = await PowerIndexRouter.new(wToken2.address, poolRestrictions.address);
+    wToken2.changeRouter(router.address, { from: stub });
 
     res = await controller.replacePoolTokenWithExistsWrapped(this.token2.address, wToken2.address);
     expectEvent(res, 'ReplacePoolTokenWithWrapped', {
@@ -340,10 +346,9 @@ describe('PowerIndexPoolController', () => {
 
   it('should allow making a wrapped token join and exit', async () => {
     const poolRestrictions = await PoolRestrictions.new();
-    const router = await PowerIndexRouter.new(poolRestrictions.address);
 
-    let res = await controller.replacePoolTokenWithNewWrapped(this.token2.address, router.address, 'WrappedTKN2', 'WTKN2');
-    const wToken2 = await WrappedPiErc20.at(res.logs[0].args.wrappedToken);
+    let res = await controller.replacePoolTokenWithNewWrapped(this.token2.address, routerFactory.address, poolRestrictions.address, 'WrappedTKN2', 'WTKN2');
+    const wToken2 = await WrappedPiErc20.at(res.logs[1].args.wrappedToken);
     assert.equal(await wToken2.balanceOf(pool.address), ether('20'));
 
     await this.token2.approve(wToken2.address, ether('0.2'), { from: alice });

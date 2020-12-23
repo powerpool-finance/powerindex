@@ -23,8 +23,8 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   address public staking;
   uint256 public reserveRatio;
 
-  constructor(address _wrappedToken, address _poolRestrictions) public PowerIndexNaiveRouter() Ownable() {
-    wrappedToken = WrappedPiErc20Interface(_wrappedToken);
+  constructor(address _piToken, address _poolRestrictions) public PowerIndexNaiveRouter() Ownable() {
+    wrappedToken = WrappedPiErc20Interface(_piToken);
     poolRestriction = IPoolRestrictions(_poolRestrictions);
   }
 

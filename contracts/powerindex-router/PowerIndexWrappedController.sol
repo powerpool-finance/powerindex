@@ -7,6 +7,7 @@ import "../PowerIndexAbstractController.sol";
 import "../interfaces/PowerIndexWrapperInterface.sol";
 import "../interfaces/WrappedPiErc20FactoryInterface.sol";
 import "../interfaces/WrappedPiErc20Interface.sol";
+import "../interfaces/IPiRouterFactory.sol";
 
 contract PowerIndexWrappedController is PowerIndexAbstractController {
   event ReplacePoolTokenWithWrapped(
@@ -45,11 +46,14 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
 
   function replacePoolTokenWithNewWrapped(
     address _token,
-    address _router,
+    address _routerFactory,
+    address _poolRestrictions,
     string calldata _name,
     string calldata _symbol
   ) external onlyOwner {
-    WrappedPiErc20Interface wrappedToken = wrapperFactory.build(_token, _router, _name, _symbol);
+    WrappedPiErc20Interface wrappedToken = wrapperFactory.build(_token, address(this), _name, _symbol);
+    address router = IPiRouterFactory(_routerFactory).buildRouter(address(wrappedToken), _poolRestrictions);
+    wrappedToken.changeRouter(router);
     _replacePoolTokenWithWrapped(_token, wrappedToken);
   }
 

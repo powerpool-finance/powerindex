@@ -16,10 +16,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   enum CoolDownStatus { NONE, COOLDOWN, UNSTAKE_WINDOW }
 
-  constructor(address _wrappedToken, address _poolRestrictions)
-    public
-    PowerIndexBasicRouter(_wrappedToken, _poolRestrictions)
-  {}
+  constructor(address _piToken, address _poolRestrictions) public PowerIndexBasicRouter(_piToken, _poolRestrictions) {}
 
   /*** THE PROXIED METHOD EXECUTORS FOR VOTING ***/
 

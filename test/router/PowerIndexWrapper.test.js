@@ -10,8 +10,8 @@ const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
-const PowerIndexBasicRouter = artifacts.require('PowerIndexBasicRouter');
 const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
+const BasicPowerIndexRouterFactory = artifacts.require('BasicPowerIndexRouterFactory');
 
 const { web3 } = BFactory;
 const { toBN } = web3.utils;
@@ -57,9 +57,9 @@ describe('PowerIndexWrapper', () => {
   const communityJoinFee = ether('0.04');
   const communityExitFee = ether('0.07');
 
-  let tokens, pool, poolWrapper, poolController, poolRouter, poolRestrictions;
+  let tokens, pool, poolWrapper, poolController, routerAddress, routerFactory;
 
-  let minter, alice, communityWallet;
+  let minter, alice, communityWallet, poolRestrictions;
   before(async function () {
     [minter, alice, communityWallet, poolRestrictions] = await web3.eth.getAccounts();
   });
@@ -96,18 +96,20 @@ describe('PowerIndexWrapper', () => {
     poolWrapper = await PowerIndexWrapper.new(pool.address);
 
     const wrapperFactory = await WrappedPiErc20Factory.new();
+    routerFactory = await BasicPowerIndexRouterFactory.new();
     poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, wrapperFactory.address);
-    poolRouter = await PowerIndexBasicRouter.new(poolRestrictions);
 
     await pool.setWrapper(poolWrapper.address, true);
 
     await poolWrapper.setController(poolController.address);
     await pool.setController(poolController.address);
 
-    res = await poolController.replacePoolTokenWithNewWrapped(this.token2.address, poolRouter.address, 'W T 2', 'WT2');
+    res = await poolController.replacePoolTokenWithNewWrapped(this.token2.address, routerFactory.address, poolRestrictions, 'W T 2', 'WT2');
     this.token2Wrapper = await WrappedPiErc20.at(
       res.receipt.logs.filter(l => l.event === 'ReplacePoolTokenWithWrapped')[0].args.wrappedToken,
     );
+    const routerLogs = BasicPowerIndexRouterFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'BuildBasicRouter')[0];
+    routerAddress = routerLogs.args.router;
 
     this.getTokensToJoinPoolAndApprove = async amountToMint => {
       const poolTotalSupply = (await pool.totalSupply()).toString(10);
@@ -123,8 +125,8 @@ describe('PowerIndexWrapper', () => {
   it('wrapper should be created successfully', async () => {
     assert.equal(await this.token2Wrapper.name(), 'W T 2');
     assert.equal(await this.token2Wrapper.symbol(), 'WT2');
-    assert.equal(await this.token2Wrapper.token(), this.token2.address);
-    assert.equal(await this.token2Wrapper.router(), poolRouter.address);
+    assert.equal(await this.token2Wrapper.underlying(), this.token2.address);
+    assert.equal(await this.token2Wrapper.router(), routerAddress);
     assert.equal(await pool.isBound(this.token2Wrapper.address), true);
     assert.equal(await pool.isBound(this.token2.address), false);
   });

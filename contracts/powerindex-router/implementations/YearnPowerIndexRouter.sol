@@ -15,10 +15,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   bytes4 public constant VOTE_FOR_SIG = bytes4(keccak256(bytes("voteFor(uint256)")));
   bytes4 public constant VOTE_AGAINST_SIG = bytes4(keccak256(bytes("voteAgainst(uint256)")));
 
-  constructor(address _wrappedToken, address _poolRestrictions)
-    public
-    PowerIndexBasicRouter(_wrappedToken, _poolRestrictions)
-  {}
+  constructor(address _piToken, address _poolRestrictions) public PowerIndexBasicRouter(_piToken, _poolRestrictions) {}
 
   /*** THE PROXIED METHOD EXECUTORS ***/
 
