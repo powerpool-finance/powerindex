@@ -1,4 +1,4 @@
-const { constants, time, ether: rEther, expectEvent } = require('@openzeppelin/test-helpers');
+const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
 const { ether, artifactFromBytecode, deployProxied, createOrGetProxyAdmin, splitPayload, advanceBlocks } = require('../../helpers');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
@@ -45,24 +45,18 @@ const COOLDOWN_STATUS = {
 };
 
 describe('AaveRouter Tests', () => {
-  let deployer, minter, ppGovernance, aaveDistributor, bob, alice, charlie, rewardsVault, emissionManager, lendToken,
-    stub, guardian, admin;
+  let deployer, aaveDistributor, bob, alice, rewardsVault, emissionManager, stub, guardian;
 
   before(async function() {
     [
       deployer,
-      minter,
-      ppGovernance,
       aaveDistributor,
       bob,
       alice,
-      charlie,
       rewardsVault,
       emissionManager,
-      lendToken,
       stub,
       guardian,
-      admin,
     ] = await web3.eth.getAccounts();
   });
 
