@@ -7,41 +7,33 @@ import "../../interfaces/YearnGovernanceInterface.sol";
 import "./../PowerIndexBasicRouter.sol";
 
 contract YearnPowerIndexRouter is PowerIndexBasicRouter {
-  bytes4 public constant REGISTER_SIG = bytes4(keccak256(bytes("register()")));
-  bytes4 public constant EXIT_SIG = bytes4(keccak256(bytes("exit()")));
-  bytes4 public constant PROPOSE_SIG = bytes4(keccak256(bytes("propose(address,string)")));
-  bytes4 public constant STAKE_SIG = bytes4(keccak256(bytes("stake(uint256)")));
-  bytes4 public constant WITHDRAW_SIG = bytes4(keccak256(bytes("withdraw(uint256)")));
-  bytes4 public constant VOTE_FOR_SIG = bytes4(keccak256(bytes("voteFor(uint256)")));
-  bytes4 public constant VOTE_AGAINST_SIG = bytes4(keccak256(bytes("voteAgainst(uint256)")));
-
   constructor(address _piToken, address _poolRestrictions) public PowerIndexBasicRouter(_piToken, _poolRestrictions) {}
 
   /*** THE PROXIED METHOD EXECUTORS ***/
 
   function callRegister() external {
     _checkVotingSenderAllowed();
-    _callVoting(REGISTER_SIG, "");
+    _callVoting(YearnGovernanceInterface(0).register.selector, "");
   }
 
   function callExit() external {
     _checkVotingSenderAllowed();
-    _callVoting(EXIT_SIG, "");
+    _callVoting(YearnGovernanceInterface(0).exit.selector, "");
   }
 
   function callPropose(address _executor, string calldata _hash) external {
     _checkVotingSenderAllowed();
-    _callVoting(PROPOSE_SIG, abi.encode(_executor, _hash));
+    _callVoting(YearnGovernanceInterface(0).propose.selector, abi.encode(_executor, _hash));
   }
 
   function callVoteFor(uint256 _id) external {
     _checkVotingSenderAllowed();
-    _callVoting(VOTE_FOR_SIG, abi.encode(_id));
+    _callVoting(YearnGovernanceInterface(0).voteFor.selector, abi.encode(_id));
   }
 
   function callVoteAgainst(uint256 _id) external {
     _checkVotingSenderAllowed();
-    _callVoting(VOTE_AGAINST_SIG, abi.encode(_id));
+    _callVoting(YearnGovernanceInterface(0).voteAgainst.selector, abi.encode(_id));
   }
 
   /*** OWNER METHODS ***/
@@ -82,11 +74,11 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   function _stake(uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
     wrappedToken.approveUnderlying(voting, _amount);
-    _callVoting(STAKE_SIG, abi.encode(_amount));
+    _callVoting(YearnGovernanceInterface(0).stake.selector, abi.encode(_amount));
   }
 
   function _redeem(uint256 _amount) internal {
     require(_amount > 0, "CANT_WITHDRAW_0");
-    _callVoting(WITHDRAW_SIG, abi.encode(_amount));
+    _callVoting(YearnGovernanceInterface(0).withdraw.selector, abi.encode(_amount));
   }
 }
