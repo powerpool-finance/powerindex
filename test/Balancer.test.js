@@ -642,7 +642,7 @@ describe('Balancer', () => {
   describe('PoolController', () => {
     let poolController;
     beforeEach(async () => {
-      poolController = await PowerIndexPoolController.new(pool.address, zeroAddress);
+      poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
     });
 
