@@ -1,8 +1,8 @@
-const { expectRevert, ether, expectEvent } = require('@openzeppelin/test-helpers');
+const { expectRevert, ether, expectEvent, time } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
-const BFactory = artifacts.require('BFactory');
-const BActions = artifacts.require('BActions');
-const BPool = artifacts.require('BPool');
+const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
+const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
+const PowerIndexPool = artifacts.require('PowerIndexPool');
 const MockERC20 = artifacts.require('MockERC20');
 const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
@@ -18,12 +18,12 @@ const BasicPowerIndexRouterFactory = artifacts.require('BasicPowerIndexRouterFac
 
 MockERC20.numberFormat = 'String';
 MockErc20Migrator.numberFormat = 'String';
-BPool.numberFormat = 'String';
+PowerIndexPool.numberFormat = 'String';
 PowerIndexPoolController.numberFormat = 'String';
 PowerIndexRouter.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 
-const { web3 } = BFactory;
+const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
 
 function mulScalarBN(bn1, bn2) {
@@ -57,16 +57,21 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
   assert.equal(diff.lte(toBN(accuracyWei)), true, message);
 }
 
+async function getTimestamp(shift = 0) {
+  const currentTimestamp = (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp;
+  return currentTimestamp + shift;
+}
+
 describe('PowerIndexPoolController', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const name = 'My Pool';
   const symbol = 'MP';
   const balances = [ether('10'), ether('20')];
   const weights = [ether('25'), ether('25')];
-  const swapFee = ether('0.01');
-  const communitySwapFee = ether('0.05');
-  const communityJoinFee = ether('0.04');
-  const communityExitFee = ether('0.07');
+  const swapFee = ether('0.01').toString();
+  const communitySwapFee = ether('0.05').toString();
+  const communityJoinFee = ether('0.04').toString();
+  const communityExitFee = ether('0.07').toString();
 
   let tokens;
   let pool;
@@ -77,6 +82,8 @@ describe('PowerIndexPoolController', () => {
 
   let minter, alice, communityWallet, stub;
   let amountToSwap, amountCommunitySwapFee, amountAfterCommunitySwapFee, expectedSwapOut;
+  const minWeightPerSecond = ether('0.00000001').toString();
+  const maxWeightPerSecond = ether('0.1').toString();
 
   before(async function () {
     [minter, alice, communityWallet, stub] = await web3.eth.getAccounts();
@@ -85,8 +92,8 @@ describe('PowerIndexPoolController', () => {
   beforeEach(async () => {
     this.weth = await WETH.new();
 
-    this.bFactory = await BFactory.new({ from: minter });
-    this.bActions = await BActions.new({ from: minter });
+    this.bFactory = await PowerIndexPoolFactory.new({ from: minter });
+    this.bActions = await PowerIndexPoolActions.new({ from: minter });
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: minter });
 
     this.token1 = await MockCvp.new();
@@ -96,20 +103,36 @@ describe('PowerIndexPoolController', () => {
     await this.token1.approve(this.bActions.address, balances[0]);
     await this.token2.approve(this.bActions.address, balances[1]);
 
-    const res = await this.bActions.create(
+    const fromTimestamps = [await getTimestamp(100), await getTimestamp(100)].map(w => w.toString());
+    const targetTimestamps = [await getTimestamp(11000), await getTimestamp(11000)].map(w => w.toString());
+
+    let res = await this.bActions.create(
       this.bFactory.address,
       name,
       symbol,
-      tokens,
-      balances,
-      weights,
-      [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
-      communityWallet,
-      true,
+      {
+        minWeightPerSecond,
+        maxWeightPerSecond,
+        swapFee,
+        communitySwapFee,
+        communityJoinFee,
+        communityExitFee,
+        communityFeeReceiver: communityWallet,
+        finalize: true,
+      },
+      tokens.map((t, i) => ({
+        token: t,
+        balance: balances[i].toString(),
+        targetDenorm: weights[i].toString(),
+        fromTimestamp: fromTimestamps[i].toString(),
+        targetTimestamp: targetTimestamps[i].toString(),
+      })),
     );
 
-    const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
-    pool = await BPool.at(logNewPool.args.pool);
+    const logNewPool = PowerIndexPoolFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
+    pool = await PowerIndexPool.at(logNewPool.args.pool);
+
+    await time.increase(11000);
 
     poolWrapper = await PowerIndexWrapper.new(pool.address);
     wrapperFactory = await WrappedPiErc20Factory.new();
@@ -118,6 +141,10 @@ describe('PowerIndexPoolController', () => {
 
     await pool.setWrapper(poolWrapper.address, true);
     await pool.setController(controller.address);
+    await poolWrapper.setController(controller.address);
+    await controller.setPoolWrapper(poolWrapper.address);
+
+    await time.increase(60);
 
     this.getTokensToJoinPoolAndApprove = async amountToMint => {
       const poolTotalSupply = (await pool.totalSupply()).toString(10);
@@ -165,6 +192,9 @@ describe('PowerIndexPoolController', () => {
       balance: ether('20'),
       denormalizedWeight: ether('25'),
     });
+
+    await time.increase(60);
+    await controller.finishReplace();
 
     const price = (
       await pool.calcSpotPrice(
@@ -219,7 +249,11 @@ describe('PowerIndexPoolController', () => {
     const poolRestrictions = await PoolRestrictions.new();
 
     let res = await controller.replacePoolTokenWithNewWrapped(this.token2.address, routerFactory.address, poolRestrictions.address, 'WrappedTKN2', 'WTKN2');
-    const wToken2 = await WrappedPiErc20.at(res.logs[1].args.wrappedToken);
+    const wToken2 = await WrappedPiErc20.at(res.logs.filter(l => l.event === 'ReplacePoolTokenWithWrapped')[0].args.wrappedToken);
+
+    await time.increase(60);
+    await controller.finishReplace();
+
     expectEvent.inTransaction(res, BasicPowerIndexRouterFactory, 'BuildBasicRouter', {
       builder: controller.address
     });
@@ -242,26 +276,14 @@ describe('PowerIndexPoolController', () => {
 
     assert.equal((await this.token1.balanceOf(alice)).toString(), amountToSwap.toString());
     const token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
-    const token2AliceBalanceBefore = (await wToken2.balanceOf(alice)).toString();
+    const token2AliceBalanceBefore = (await this.token2.balanceOf(alice)).toString();
 
     await this.token1.approve(poolWrapper.address, amountToSwap, { from: alice });
-    // TODO: A wrong error message due probably the Buidler EVM bug
-    await expectRevert(
-      poolWrapper.swapExactAmountIn(
-        this.token1.address,
-        amountToSwap,
-        this.token2.address,
-        expectedSwapOut,
-        mulScalarBN(price, ether('1.05')),
-        { from: alice },
-      ),
-      'NOT_BOUND'
-    );
 
     await poolWrapper.swapExactAmountIn(
       this.token1.address,
       amountToSwap,
-      wToken2.address,
+      this.token2.address,
       expectedSwapOut,
       mulScalarBN(price, ether('1.05')),
       { from: alice },
@@ -274,7 +296,7 @@ describe('PowerIndexPoolController', () => {
     );
 
     assert.equal(
-      (await wToken2.balanceOf(alice)).toString(),
+      (await this.token2.balanceOf(alice)).toString(),
       addBN(token2AliceBalanceBefore, expectedSwapOut).toString(),
     );
   });
@@ -295,6 +317,9 @@ describe('PowerIndexPoolController', () => {
       denormalizedWeight: ether('25'),
     });
 
+    await time.increase(60);
+    await controller.finishReplace();
+
     const price = (
       await pool.calcSpotPrice(
         addBN(balances[0], amountToSwap),
@@ -307,26 +332,14 @@ describe('PowerIndexPoolController', () => {
 
     assert.equal((await this.token1.balanceOf(alice)).toString(), amountToSwap.toString());
     const token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
-    const token2AliceBalanceBefore = (await wToken2.balanceOf(alice)).toString();
+    const token2AliceBalanceBefore = (await this.token2.balanceOf(alice)).toString();
 
     await this.token1.approve(poolWrapper.address, amountToSwap, { from: alice });
-    // TODO: A wrong error message due probably the Buidler EVM bug
-    await expectRevert(
-      poolWrapper.swapExactAmountIn(
-        this.token1.address,
-        amountToSwap,
-        this.token2.address,
-        expectedSwapOut,
-        mulScalarBN(price, ether('1.05')),
-        { from: alice },
-      ),
-      'NOT_BOUND'
-    );
 
     await poolWrapper.swapExactAmountIn(
       this.token1.address,
       amountToSwap,
-      wToken2.address,
+      this.token2.address,
       expectedSwapOut,
       mulScalarBN(price, ether('1.05')),
       { from: alice },
@@ -339,7 +352,7 @@ describe('PowerIndexPoolController', () => {
     );
 
     assert.equal(
-      (await wToken2.balanceOf(alice)).toString(),
+      (await this.token2.balanceOf(alice)).toString(),
       addBN(token2AliceBalanceBefore, expectedSwapOut).toString(),
     );
   });
@@ -348,11 +361,13 @@ describe('PowerIndexPoolController', () => {
     const poolRestrictions = await PoolRestrictions.new();
 
     let res = await controller.replacePoolTokenWithNewWrapped(this.token2.address, routerFactory.address, poolRestrictions.address, 'WrappedTKN2', 'WTKN2');
-    const wToken2 = await WrappedPiErc20.at(res.logs[1].args.wrappedToken);
+    const wToken2 = await WrappedPiErc20.at(res.logs.filter(l => l.event === 'ReplacePoolTokenWithWrapped')[0].args.wrappedToken);
     assert.equal(await wToken2.balanceOf(pool.address), ether('20'));
+    assert.equal(await pool.isBound(this.token2.address), false);
+    assert.equal(await pool.isBound(wToken2.address), true);
 
-    await this.token2.approve(wToken2.address, ether('0.2'), { from: alice });
-    await wToken2.deposit(ether('0.2'), { from: alice });
+    await time.increase(60);
+    await controller.finishReplace();
 
     const poolOutAmount = divScalarBN(
       mulScalarBN(amountToSwap, await pool.totalSupply()),
@@ -367,11 +382,11 @@ describe('PowerIndexPoolController', () => {
 
     await expectRevert(pool.joinPool(poolOutAmount, [token1InAmount, token2InAmount], { from: alice }), 'ONLY_WRAPPER');
 
-    await wToken2.approve(poolWrapper.address, ether(token2InAmount), { from: alice });
+    await this.token2.approve(poolWrapper.address, ether(token2InAmount), { from: alice });
     await poolWrapper.joinPool(poolOutAmount, [token1InAmount, token2InAmount], { from: alice });
 
     assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-    assert.equal((await wToken2.balanceOf(alice)).toString(), '0');
+    assert.equal((await this.token2.balanceOf(alice)).toString(), '0');
     assert.equal(await this.token1.balanceOf(pool.address), addBN(token1InAmount, balances[0]));
     assert.equal(await wToken2.balanceOf(pool.address), addBN(token2InAmount, balances[1]));
     assert.equal((await pool.balanceOf(alice)).toString(), poolOutAmountAfterFee.toString());
@@ -394,7 +409,7 @@ describe('PowerIndexPoolController', () => {
 
     assertEqualWithAccuracy((await pool.balanceOf(alice)).toString(), '0');
     assertEqualWithAccuracy((await this.token1.balanceOf(alice)).toString(), token1OutAmount);
-    assertEqualWithAccuracy((await wToken2.balanceOf(alice)).toString(), token2OutAmount);
+    assertEqualWithAccuracy((await this.token2.balanceOf(alice)).toString(), token2OutAmount);
     assertEqualWithAccuracy(
       await this.token1.balanceOf(pool.address),
       subBN(addBN(token1InAmount, balances[0]), token1OutAmount),

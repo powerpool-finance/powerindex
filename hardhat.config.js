@@ -11,6 +11,7 @@ require('./tasks/deployErc20PiptSwap');
 require('./tasks/testMainnetErc20PiptSwap');
 require('./tasks/deployPoolRestrictions');
 require('./tasks/deployMainnetYeti');
+// require('./tasks/deployAaveRouter');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
@@ -72,7 +73,7 @@ const config = {
     },
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
-      accounts: getAccounts('mainnet'),
+      // accounts: getAccounts('mainnet'),
       gasPrice: 75 * 10 ** 9,
       gasMultiplier: 2,
       timeout: 2000000,
