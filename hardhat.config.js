@@ -11,7 +11,7 @@ require('./tasks/deployErc20PiptSwap');
 require('./tasks/testMainnetErc20PiptSwap');
 require('./tasks/deployPoolRestrictions');
 require('./tasks/deployMainnetYeti');
-require('./tasks/deployAaveRouter');
+// require('./tasks/deployAaveRouter');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
