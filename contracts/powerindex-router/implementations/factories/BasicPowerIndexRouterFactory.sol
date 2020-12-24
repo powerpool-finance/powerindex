@@ -13,6 +13,8 @@ contract BasicPowerIndexRouterFactory is IPiRouterFactory {
 
     emit BuildBasicRouter(msg.sender, router);
 
+    Ownable(router).transferOwnership(msg.sender);
+
     return router;
   }
 }

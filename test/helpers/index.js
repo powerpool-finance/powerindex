@@ -3,6 +3,8 @@ const TruffleContract = require('@nomiclabs/truffle-contract');
 const template = artifacts.require('Migrations');
 const { promisify } = require('util');
 const { web3 } = template;
+const BigNumber = require('bignumber.js')
+const fs = require('fs')
 
 const AdminUpgradeabilityProxyArtifact = require('@openzeppelin/upgrades-core/artifacts/AdminUpgradeabilityProxy.json');
 const ProxyAdminArtifact = require('@openzeppelin/upgrades-core/artifacts/ProxyAdmin.json');
@@ -137,6 +139,39 @@ function ether(value) {
   return rEther(value.toString()).toString(10);
 }
 
+async function deployAndSaveArgs(Contract, args) {
+  const newInstance = await Contract.new.apply(Contract, args);
+  fs.writeFileSync(
+    `./tmp/${newInstance.address}-args.js`,
+    `module.exports = ${JSON.stringify(args, null, 2)}`
+  );
+  return newInstance;
+}
+
+async function impersonateAccount(ethers, adminAddress) {
+  await ethers.provider.getSigner().sendTransaction({
+    to: adminAddress,
+    value: '0x' + new BigNumber(ether('1')).toString(16)
+  })
+
+  await ethers.provider.send('hardhat_impersonateAccount', [adminAddress]);
+}
+
+async function forkContractUpgrade(ethers, adminAddress, proxyAdminAddress, proxyAddress, implAddress) {
+  const iface = new ethers.utils.Interface(['function upgrade(address proxy, address impl)']);
+
+  await impersonateAccount(ethers, adminAddress);
+
+  await ethers.provider.getSigner(adminAddress).sendTransaction({
+    to: proxyAdminAddress,
+    data: iface.encodeFunctionData('upgrade', [proxyAddress, implAddress])
+  })
+}
+
+async function increaseTime(ethers, time) {
+  return ethers.provider.send('evm_increaseTime', [time]);
+}
+
 module.exports = {
   deployProxied,
   createOrGetProxyAdmin,
@@ -145,5 +180,9 @@ module.exports = {
   advanceBlocks,
   splitPayload,
   fetchLogs,
-  ether
+  ether,
+  forkContractUpgrade,
+  deployAndSaveArgs,
+  increaseTime,
+  impersonateAccount
 }

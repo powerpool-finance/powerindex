@@ -31,4 +31,12 @@ interface PowerIndexPoolInterface is BPoolInterface {
     );
 
   function getMinWeight() external view override returns (uint256);
+
+  function getWeightPerSecondBounds() external view returns (uint256, uint256);
+
+  function setWeightPerSecondBounds(uint256, uint256) external;
+
+  function setWrapper(address, bool) external;
+
+  function getWrapperMode() external view returns (bool);
 }
