@@ -82,7 +82,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     )
   {
     IStakedAave _staking = IStakedAave(staking);
-    uint256 stakerCoolDown = _staking.stakersCooldowns(address(wrappedToken));
+    uint256 stakerCoolDown = _staking.stakersCooldowns(address(piToken));
     uint256 coolDownSeconds = _staking.COOLDOWN_SECONDS();
     uint256 unstakeWindow = _staking.UNSTAKE_WINDOW();
     uint256 current = block.timestamp;
@@ -111,9 +111,9 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   function _stake(uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
-    wrappedToken.approveUnderlying(staking, _amount);
+    piToken.approveUnderlying(staking, _amount);
 
-    _callStaking(IStakedAave(0).stake.selector, abi.encode(wrappedToken, _amount));
+    _callStaking(IStakedAave(0).stake.selector, abi.encode(piToken, _amount));
 
     emit Stake(_amount);
   }
@@ -122,7 +122,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     require(_amount > 0, "CANT_REDEEM_0");
 
     _callStaking(IERC20(0).approve.selector, abi.encode(staking, _amount));
-    _callStaking(IStakedAave(0).redeem.selector, abi.encode(address(wrappedToken), _amount));
+    _callStaking(IStakedAave(0).redeem.selector, abi.encode(address(piToken), _amount));
 
     emit Redeem(_amount);
   }

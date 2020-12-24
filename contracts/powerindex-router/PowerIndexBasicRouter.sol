@@ -16,7 +16,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
 
   enum ReserveStatus { EQUILIBRIUM, SHORTAGE, EXCESS }
 
-  WrappedPiErc20Interface public immutable wrappedToken;
+  WrappedPiErc20Interface public immutable piToken;
 
   IPoolRestrictions public poolRestriction;
   address public voting;
@@ -24,7 +24,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   uint256 public reserveRatio;
 
   constructor(address _piToken, address _poolRestrictions) public PowerIndexNaiveRouter() Ownable() {
-    wrappedToken = WrappedPiErc20Interface(_piToken);
+    piToken = WrappedPiErc20Interface(_piToken);
     poolRestriction = IPoolRestrictions(_poolRestrictions);
   }
 
@@ -41,11 +41,11 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   }
 
   function _callVoting(bytes4 _sig, bytes memory _data) internal {
-    wrappedToken.callExternal(voting, _sig, _data, 0);
+    piToken.callExternal(voting, _sig, _data, 0);
   }
 
   function _callStaking(bytes4 _sig, bytes memory _data) internal {
-    wrappedToken.callExternal(staking, _sig, _data, 0);
+    piToken.callExternal(staking, _sig, _data, 0);
   }
 
   function _checkVotingSenderAllowed() internal view {
@@ -53,9 +53,9 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   }
 
   /*
-   * * In case of deposit, the deposited amount is already accounted on the wrapper contract right away, no further
+   * * In case of deposit, the deposited amount is already accounted on the pi token contract right away, no further
    *   adjustment required.
-   * * In case of withdrawal, the withdrawAmount is deducted from the sum of wrapper and staked balances
+   * * In case of withdrawal, the withdrawAmount is deducted from the sum of pi token and staked balances
    *
    */
   function _getReserveStatus(uint256 _stakedBalance, uint256 _withdrawAmount)
@@ -67,7 +67,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
       uint256 adjustedReserveAmount
     )
   {
-    return getReserveStatusPure(reserveRatio, wrappedToken.getUnderlyingBalance(), _stakedBalance, _withdrawAmount);
+    return getReserveStatusPure(reserveRatio, piToken.getUnderlyingBalance(), _stakedBalance, _withdrawAmount);
   }
 
   function getPiEquivalentFroUnderlying(

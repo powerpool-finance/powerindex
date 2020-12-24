@@ -97,14 +97,14 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
     require(_amount > 0, "CANT_STAKE_0");
 
     CurveStakeInterface staking_ = CurveStakeInterface(staking);
-    (uint256 lockedAmount, uint256 lockedEnd) = staking_.locked(address(wrappedToken));
+    (uint256 lockedAmount, uint256 lockedEnd) = staking_.locked(address(piToken));
 
     if (lockedEnd != 0 && lockedEnd <= block.timestamp) {
       _redeem();
       lockedEnd = 0;
     }
 
-    wrappedToken.approveUnderlying(staking, _amount);
+    piToken.approveUnderlying(staking, _amount);
 
     if (lockedEnd == 0) {
       _callStaking(CREATE_STAKE_SIG, abi.encode(_amount, block.timestamp + WEEK));
