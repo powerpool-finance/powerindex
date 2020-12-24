@@ -70,12 +70,8 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     string calldata _name,
     string calldata _symbol
   ) external onlyOwner {
-    WrappedPiErc20Interface wrappedToken = wrapperFactory.build(_token, address(this), _name, _symbol);
-
-    address router = IPiRouterFactory(_routerFactory).buildRouter(address(wrappedToken), _poolRestrictions);
-    Ownable(router).transferOwnership(msg.sender);
-
-    wrappedToken.changeRouter(router);
+    WrappedPiErc20Interface wrappedToken =
+      _createWrappedToken(_token, _routerFactory, _poolRestrictions, _name, _symbol);
     _replacePoolTokenWithWrapped(_token, wrappedToken);
   }
 
@@ -173,6 +169,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
   ) internal returns (WrappedPiErc20Interface) {
     WrappedPiErc20Interface wrappedToken = wrapperFactory.build(_token, address(this), _name, _symbol);
     address router = IPiRouterFactory(_routerFactory).buildRouter(address(wrappedToken), _poolRestrictions);
+    Ownable(router).transferOwnership(msg.sender);
     wrappedToken.changeRouter(router);
     return wrappedToken;
   }
