@@ -38,10 +38,10 @@ async function buildUniswapPair(weth, yfi, usdc, lpTokensTo) {
 }
 
 describe('YearnRouter Tests', () => {
-  let deployer, bob, alice, yearnOwner, piOwner, stub, pvp, pool1, pool2, rewardDistributor;
+  let bob, alice, yearnOwner, piOwner, stub, pvp, pool1, pool2, rewardDistributor;
 
   before(async function () {
-    [deployer, bob, alice, yearnOwner, piOwner, stub, pvp, pool1, pool2, rewardDistributor] = await web3.eth.getAccounts();
+    [, bob, alice, yearnOwner, piOwner, stub, pvp, pool1, pool2, rewardDistributor] = await web3.eth.getAccounts();
   });
 
   let yfi, yCrv, usdc, weth, yDeposit, yearnGovernance, poolRestrictions, yfiWrapper, yfiRouter;
