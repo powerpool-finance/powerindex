@@ -6,7 +6,6 @@ import "../../interfaces/WrappedPiErc20Interface.sol";
 import "../../interfaces/aave/IAaveGovernanceV2.sol";
 import "../../interfaces/aave/IStakedAave.sol";
 import "../PowerIndexBasicRouter.sol";
-import "hardhat/console.sol";
 
 contract AavePowerIndexRouter is PowerIndexBasicRouter {
   event TriggerCooldown();

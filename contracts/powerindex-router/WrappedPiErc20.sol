@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "../interfaces/PowerIndexNaiveRouterInterface.sol";
 import "../interfaces/PowerIndexBasicRouterInterface.sol";
 import "../interfaces/WrappedPiErc20Interface.sol";
-import "hardhat/console.sol";
 
 contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
   using SafeMath for uint256;

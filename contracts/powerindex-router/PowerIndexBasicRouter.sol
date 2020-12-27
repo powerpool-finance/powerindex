@@ -6,7 +6,6 @@ import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/IPoolRestrictions.sol";
 import "../interfaces/PowerIndexBasicRouterInterface.sol";
 import "./PowerIndexNaiveRouter.sol";
-import "hardhat/console.sol";
 
 contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiveRouter {
   uint256 public constant HUNDRED_PCT = 1 ether;
