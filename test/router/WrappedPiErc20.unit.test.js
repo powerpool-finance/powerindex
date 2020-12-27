@@ -1,12 +1,14 @@
 const { expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
-const { ether } = require('../helpers/index');
+const { ether, expectExactRevert, splitPayload, toEvmBytes32 } = require('../helpers/index');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const MockYearnGovernance = artifacts.require('MockYearnGovernance');
 const MockRouter = artifacts.require('MockRouter');
+const MyContract = artifacts.require('MyContract');
 const MockLeakingRouter = artifacts.require('MockLeakingRouter');
 
+MyContract.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 MockYearnGovernance.numberFormat = 'String';
@@ -24,10 +26,11 @@ function signatureAndArgs(payload) {
 
 describe('WrappedPiErc20 Unit Tests', () => {
   let alice, bob, stub;
-  let yfi, router, yfiWrapper;
+  let yfi, router, yfiWrapper, myContract;
 
   before(async function () {
     [, alice, bob, stub] = await web3.eth.getAccounts();
+    myContract = await MyContract.new();
   });
 
   beforeEach(async function () {
@@ -43,6 +46,68 @@ describe('WrappedPiErc20 Unit Tests', () => {
     assert.equal(await yfiWrapper.underlying(), yfi.address);
     assert.equal(await yfiWrapper.router(), router.address);
     assert.equal(await yfiWrapper.totalSupply(), 0);
+  });
+
+  describe('callExternal', async () => {
+    beforeEach(async () => {
+      await router.migrateToNewRouter(yfiWrapper.address, alice);
+    });
+
+    it('should call the external methods', async () => {
+      await myContract.transferOwnership(yfiWrapper.address);
+      const payload = splitPayload(myContract.contract.methods.setAnswer(42).encodeABI());
+
+      assert.equal(await myContract.getAnswer(), 0);
+      const res = await yfiWrapper.callExternal(myContract.address, payload.signature, payload.calldata, 0, { from: alice });
+      assert.equal(await myContract.getAnswer(), 42);
+      expectEvent(res, 'CallExternal', {
+        destination: myContract.address,
+        inputSig: toEvmBytes32(payload.signature),
+        inputData: payload.calldata,
+        outputData: '0x000000000000000000000000000000000000000000000000000000000000007b'
+      })
+    });
+
+    it('should deny non-router calling the method', async () => {
+      const payload = splitPayload(myContract.contract.methods.setAnswer(42).encodeABI());
+
+      await expectExactRevert(
+        yfiWrapper.callExternal(myContract.address, payload.signature, payload.calldata, 0, { from: alice }),
+        'Ownable: caller is not the owner'
+      );
+    });
+
+    it('should use default revert message for an empty returndata', async () => {
+      const data = myContract.contract.methods.revert().encodeABI();
+      await expectExactRevert(
+        yfiWrapper.callExternal(myContract.address, data, '0x', 0, { from: alice }),
+        'REVERTED_WITH_NO_REASON_STRING'
+      );
+    });
+
+    it('should use the response revert message when reverting', async () => {
+      const data = myContract.contract.methods.revertWithString().encodeABI();
+      await expectExactRevert(
+        yfiWrapper.callExternal(myContract.address, data, '0x', 0, { from: alice }),
+        'some-unique-revert-string'
+      );
+    });
+
+    it('should use a long response revert message when reverting', async () => {
+      const data = myContract.contract.methods.revertWithLongString().encodeABI();
+      await expectExactRevert(
+        yfiWrapper.callExternal(myContract.address, data, '0x', 0, { from: alice }),
+        'some-unique-revert-string-that-is-a-bit-longer-than-a-single-evm-slot'
+      );
+    });
+
+    it('should use default revert message when getting invalid opcode', async () => {
+      const data = myContract.contract.methods.invalidOp().encodeABI();
+      await expectExactRevert(
+        yfiWrapper.callExternal(myContract.address, data, '0x', 0, { from: alice }),
+        'REVERTED_WITH_NO_REASON_STRING'
+      );
+    });
   });
 
   describe('deposit', async () => {

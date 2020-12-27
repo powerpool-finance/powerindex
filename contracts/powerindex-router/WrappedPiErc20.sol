@@ -21,13 +21,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
   event Withdraw(address indexed account, uint256 underlyingWithdrawn, uint256 piBurned);
   event Approve(address indexed to, uint256 amount);
   event ChangeRouter(address indexed newRouter);
-  event CallExternal(
-    address indexed voting,
-    bool indexed success,
-    bytes4 indexed inputSig,
-    bytes inputData,
-    bytes outputData
-  );
+  event CallExternal(address indexed destination, bytes4 indexed inputSig, bytes inputData, bytes outputData);
 
   modifier onlyRouter() {
     require(router == msg.sender, "ONLY_ROUTER");
@@ -108,16 +102,37 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
   }
 
   function callExternal(
-    address destination,
-    bytes4 signature,
-    bytes calldata args,
-    uint256 value
+    address _destination,
+    bytes4 _signature,
+    bytes calldata _args,
+    uint256 _value
   ) external override onlyRouter {
-    (bool success, bytes memory data) = destination.call{ value: value }(abi.encodePacked(signature, args));
-    require(success, string(data));
-    //    require(success, "CALL_EXTERNAL_REVERTED");
+    (bool success, bytes memory data) = _destination.call{ value: _value }(abi.encodePacked(_signature, _args));
 
-    emit CallExternal(destination, success, signature, args, data);
+    if (!success) {
+      assembly {
+        let output := mload(0x40)
+        let size := returndatasize()
+        switch size
+          case 0 {
+            // If there is no revert reason string, revert with the default `REVERTED_WITH_NO_REASON_STRING`
+            mstore(output, 0x08c379a000000000000000000000000000000000000000000000000000000000) // error identifier
+            mstore(add(output, 0x04), 0x0000000000000000000000000000000000000000000000000000000000000020) // starting offset
+            mstore(add(output, 0x24), 0x000000000000000000000000000000000000000000000000000000000000001e) // reason length
+            mstore(add(output, 0x44), 0x52455645525445445f574954485f4e4f5f524541534f4e5f535452494e470000) // reason
+            revert(output, 100) // 100 = 4 + 3 * 32 (error identifier + 3 words for the ABI encoded error)
+          }
+          default {
+            // If there is a revert reason string hijacked, revert with it
+            mstore(0x40, add(output, size))
+            returndatacopy(output, 0, size)
+            mstore(0x40, add(output, size))
+            revert(output, size)
+          }
+      }
+    }
+
+    emit CallExternal(_destination, _signature, _args, data);
   }
 
   function getUnderlyingBalance() external view override returns (uint256) {

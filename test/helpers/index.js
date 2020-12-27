@@ -2,6 +2,7 @@ const { ether: rEther } = require('@openzeppelin/test-helpers');
 const TruffleContract = require('@nomiclabs/truffle-contract');
 const template = artifacts.require('Migrations');
 const { promisify } = require('util');
+const { assert } = require('assert');
 const { web3 } = template;
 
 const AdminUpgradeabilityProxyArtifact = require('@openzeppelin/upgrades-core/artifacts/AdminUpgradeabilityProxy.json');
@@ -103,6 +104,23 @@ async function fetchLogs(contract, receipt) {
   return contract.decodeLogs(res.logs);
 }
 
+async function expectExactRevert(promise, expectedMsg) {
+  try {
+    await promise;
+  } catch (error) {
+    if (error.message !== expectedMsg) {
+      assert.equal(
+        error.message,
+        `VM Exception while processing transaction: revert ${expectedMsg}`,
+        'Wrong kind of exception received'
+      );
+    }
+    return;
+  }
+
+  assert.fail('Expected an exception but none was received');
+}
+
 /**
  * Creates a truffle contract from bytecode and abi
  * @param name of the contract along with path
@@ -150,5 +168,6 @@ module.exports = {
   splitPayload,
   fetchLogs,
   ether,
-  mwei
+  mwei,
+  expectExactRevert
 }
