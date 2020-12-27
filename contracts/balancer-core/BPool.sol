@@ -436,7 +436,7 @@ contract BPool is BToken, BMath, BPoolInterface {
 
     // Absorb any tokens that have been sent to this contract into the pool
     function gulp(address token)
-        external
+        external override
         _logs_
         _lock_
     {

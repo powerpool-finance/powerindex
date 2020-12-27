@@ -47,17 +47,20 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
   function replacePoolTokenWithNewWrapped(
     address _token,
     address _routerFactory,
-    address _poolRestrictions,
+    bytes calldata _routerArgs,
     string calldata _name,
     string calldata _symbol
   ) external onlyOwner {
     WrappedPiErc20Interface wrappedToken = wrapperFactory.build(_token, address(this), _name, _symbol);
-    address router = IPiRouterFactory(_routerFactory).buildRouter(address(wrappedToken), _poolRestrictions);
+    address router = IPiRouterFactory(_routerFactory).buildRouter(address(wrappedToken), _routerArgs);
     wrappedToken.changeRouter(router);
     _replacePoolTokenWithWrapped(_token, wrappedToken);
   }
 
-  function replacePoolTokenWithExistingWrapped(address _token, WrappedPiErc20Interface _wrappedToken) external onlyOwner {
+  function replacePoolTokenWithExistingWrapped(address _token, WrappedPiErc20Interface _wrappedToken)
+    external
+    onlyOwner
+  {
     _replacePoolTokenWithWrapped(_token, _wrappedToken);
   }
 

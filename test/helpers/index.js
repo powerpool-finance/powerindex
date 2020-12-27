@@ -137,6 +137,10 @@ function ether(value) {
   return rEther(value.toString()).toString(10);
 }
 
+function mwei(value) {
+  return web3.utils.toWei(value.toString(), 'mwei').toString(10);
+}
+
 module.exports = {
   deployProxied,
   createOrGetProxyAdmin,
@@ -145,5 +149,6 @@ module.exports = {
   advanceBlocks,
   splitPayload,
   fetchLogs,
-  ether
+  ether,
+  mwei
 }
