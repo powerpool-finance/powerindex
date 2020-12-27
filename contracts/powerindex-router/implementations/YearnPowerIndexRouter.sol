@@ -10,6 +10,10 @@ import "../../interfaces/IUniswapV2Router02.sol";
 import "./../PowerIndexBasicRouter.sol";
 
 contract YearnPowerIndexRouter is PowerIndexBasicRouter {
+  event SetRewardPools(uint256 len, address[] rewardPools);
+  event SetPvpFee(uint256 pvpFee);
+  event SetUniswapRouter(address uniswapRouter);
+  event SetUsdcYfiSwapPath(address[] usdcYfiSwapPath);
   event Stake(uint256 amount);
   event Redeem(uint256 amount);
   event IgnoreRedeemDueVoteLock(uint256 voteLockUntilBlock);
@@ -41,27 +45,6 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   address[] public rewardPools;
   address[] public usdcYfiSwapPath;
 
-  function setRewardPools(address[] calldata _rewardPools) external onlyOwner {
-    require(_rewardPools.length > 0, "AT_LEAST_ONE_EXPECTED");
-    rewardPools = _rewardPools;
-    // TODO: emit event
-  }
-
-  function setPvpFee(uint256 _pvpFee) external onlyOwner {
-    pvpFee = _pvpFee;
-    // TODO: emit event
-  }
-
-  function setUniswapRouter(address payable _unsiwapRouter) external onlyOwner {
-    uniswapRouter = _unsiwapRouter;
-    // TODO: emit event
-  }
-
-  function setUsdcYfiSwapPath(address[] calldata _usdcYfiSwapPath) external onlyOwner {
-    usdcYfiSwapPath = _usdcYfiSwapPath;
-    // TODO: emit event
-  }
-
   constructor(
     address _piToken,
     address _poolRestrictions,
@@ -92,6 +75,8 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     rewardPools = _rewardPools;
     usdcYfiSwapPath = _usdcYfiSwapPath;
   }
+
+  /*** PERMISSIONLESS METHODS ***/
 
   function claimRewards() external {
     uint256 poolsLen = rewardPools.length;
@@ -134,8 +119,11 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     require(yfiGain > 0, "NO_YFI_GAIN");
 
     // Step #5. Calculate pvpReward
-    uint256 pvpReward = yfiGain.mul(pvpFee).div(HUNDRED_PCT);
-    YFI.transfer(pvp, pvpReward);
+    uint256 pvpReward = 0;
+    if (pvpFee > 0) {
+      pvpReward = yfiGain.mul(pvpFee).div(HUNDRED_PCT);
+      YFI.transfer(pvp, pvpReward);
+    }
 
     uint256 poolRewards = yfiGain.sub(pvpReward);
     require(poolRewards > 0, "NO_POOL_REWARDS");
@@ -183,6 +171,30 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     );
 
     // NOTICE: it's ok to keep some YFI dust here for the future swaps
+  }
+
+  /*** OWNER METHODS ***/
+
+  function setRewardPools(address[] calldata _rewardPools) external onlyOwner {
+    require(_rewardPools.length > 0, "AT_LEAST_ONE_EXPECTED");
+    rewardPools = _rewardPools;
+    emit SetRewardPools(_rewardPools.length, _rewardPools);
+  }
+
+  function setPvpFee(uint256 _pvpFee) external onlyOwner {
+    require(_pvpFee < HUNDRED_PCT, "PVP_FEE_OVER_THE_LIMIT");
+    pvpFee = _pvpFee;
+    emit SetPvpFee(_pvpFee);
+  }
+
+  function setUniswapRouter(address payable _unsiwapRouter) external onlyOwner {
+    uniswapRouter = _unsiwapRouter;
+    emit SetUniswapRouter(_unsiwapRouter);
+  }
+
+  function setUsdcYfiSwapPath(address[] calldata _usdcYfiSwapPath) external onlyOwner {
+    usdcYfiSwapPath = _usdcYfiSwapPath;
+    emit SetUsdcYfiSwapPath(_usdcYfiSwapPath);
   }
 
   /*** THE PROXIED METHOD EXECUTORS ***/

@@ -38,10 +38,10 @@ async function buildUniswapPair(weth, yfi, usdc, lpTokensTo) {
 }
 
 describe('YearnRouter Tests', () => {
-  let bob, alice, yearnOwner, piOwner, piGov, stub, pvp, pool1, pool2, rewardDistributor;
+  let bob, alice, yearnOwner, piGov, stub, pvp, pool1, pool2, rewardDistributor;
 
   before(async function () {
-    [, bob, alice, yearnOwner, piOwner, piGov, stub, pvp, pool1, pool2, rewardDistributor] = await web3.eth.getAccounts();
+    [, bob, alice, yearnOwner, piGov, stub, pvp, pool1, pool2, rewardDistributor] = await web3.eth.getAccounts();
   });
 
   let yfi, yCrv, usdc, weth, yDeposit, yearnGovernance, poolRestrictions, yfiWrapper, yfiRouter;
@@ -75,14 +75,14 @@ describe('YearnRouter Tests', () => {
 
     await yfiWrapper.changeRouter(yfiRouter.address, { from: stub });
 
-    await yfiRouter.transferOwnership(piOwner);
+    await yfiRouter.transferOwnership(piGov);
     await yearnGovernance.transferOwnership(yearnOwner);
 
     await yearnGovernance.initialize(0, yearnOwner, yfi.address, yCrv.address);
-    await yfiRouter.setVotingAndStaking(yearnGovernance.address, yearnGovernance.address, { from: piOwner });
-    await yfiRouter.setReserveRatio(ether('0.2'), { from: piOwner });
+    await yfiRouter.setVotingAndStaking(yearnGovernance.address, yearnGovernance.address, { from: piGov });
+    await yfiRouter.setReserveRatio(ether('0.2'), { from: piGov });
 
-    assert.equal(await yfiRouter.owner(), piOwner);
+    assert.equal(await yfiRouter.owner(), piGov);
 
     // Hardcoded into the bytecode for the test sake
     assert.equal(await yearnGovernance.period(), 10);
@@ -121,6 +121,73 @@ describe('YearnRouter Tests', () => {
     assert.equal(proposal.totalForVotes, ether(8000));
     assert.equal(proposal.totalAgainstVotes, ether(0));
     assert.equal(proposal.hash, proposalString);
+  });
+
+  describe('owner methods', async () => {
+    beforeEach(async () => {
+      await yfiRouter.transferOwnership(piGov, { from: piGov });
+    })
+
+    describe('setRewardPools()', () => {
+      it('should allow the owner setting a new reward pool', async () => {
+        const res = await yfiRouter.setRewardPools([alice, bob], { from: piGov });
+        expectEvent(res, 'SetRewardPools', {
+          len: '2',
+          rewardPools: [alice, bob]
+        })
+      })
+
+      it('should deny setting an empty reward pool', async () => {
+        await expectRevert(yfiRouter.setRewardPools([], { from: piGov }), 'AT_LEAST_ONE_EXPECTED');
+      })
+
+      it('should deny non-owner setting a new reward pool', async () => {
+        await expectRevert(yfiRouter.setRewardPools([alice, bob], { from: alice }), 'Ownable: caller is not the owner');
+      })
+    });
+
+    describe('setPvpFee()', () => {
+      it('should allow the owner setting a new pvpFee', async () => {
+        const res = await yfiRouter.setPvpFee(ether('0.1'), { from: piGov });
+        expectEvent(res, 'SetPvpFee', {
+          pvpFee: ether('0.1')
+        })
+      })
+
+      it('should deny setting a fee greater or equal 100%', async () => {
+        await expectRevert(yfiRouter.setPvpFee(ether('1'), { from: piGov }), 'PVP_FEE_OVER_THE_LIMIT');
+      })
+
+      it('should deny non-owner setting a new pvpFee', async () => {
+        await expectRevert(yfiRouter.setPvpFee(ether('0'), { from: alice }), 'Ownable: caller is not the owner');
+      })
+    })
+
+    describe('setUniswapRouter()', () => {
+      it('should allow the owner setting a new uniswap router', async () => {
+        const res = await yfiRouter.setUniswapRouter(bob, { from: piGov });
+        expectEvent(res, 'SetUniswapRouter', {
+          uniswapRouter: bob
+        })
+      })
+
+      it('should deny non-owner setting a new uniswap router', async () => {
+        await expectRevert(yfiRouter.setUniswapRouter(bob, { from: alice }), 'Ownable: caller is not the owner');
+      })
+    })
+
+    describe('setUsdcYfiSwapPath()', () => {
+      it('should allow the owner setting a new pvpFee', async () => {
+        const res = await yfiRouter.setUsdcYfiSwapPath([alice, bob], { from: piGov });
+        expectEvent(res, 'SetUsdcYfiSwapPath', {
+          usdcYfiSwapPath: [alice, bob]
+        })
+      })
+
+      it('should deny non-owner setting a new uniswap router', async () => {
+        await expectRevert(yfiRouter.setUsdcYfiSwapPath([alice, bob], { from: alice }), 'Ownable: caller is not the owner');
+      })
+    })
   });
 
   describe('reserve management', () => {
@@ -207,13 +274,13 @@ describe('YearnRouter Tests', () => {
       poolB = await MockGulpingBPool.new();
       poolC = await MockGulpingBPool.new();
       poolD = await MockGulpingBPool.new();
-      await yfiRouter.setRewardPools([poolA.address, poolB.address, poolC.address], { from: piOwner });
+      await yfiRouter.setRewardPools([poolA.address, poolB.address, poolC.address], { from: piGov });
 
       await usdc.transfer(yDeposit.address, mwei(10000));
       await yCrv.transfer(yDeposit.address, ether(10000));
 
       const uniswapRouter = await buildUniswapPair(weth, yfi, usdc, alice);
-      await yfiRouter.setUniswapRouter(uniswapRouter.address, { from: piOwner });
+      await yfiRouter.setUniswapRouter(uniswapRouter.address, { from: piGov });
 
       await poolRestrictions.setVotingAllowedForSenders(yearnGovernance.address, [alice], [true]);
 
