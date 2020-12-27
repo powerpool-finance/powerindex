@@ -93,8 +93,6 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     usdcYfiSwapPath = _usdcYfiSwapPath;
   }
 
-  /*** THE PROXIED METHOD EXECUTORS ***/
-
   function claimRewards() external {
     uint256 poolsLen = rewardPools.length;
     require(poolsLen > 0, "MISSING_REWARD_POOLS");
@@ -186,6 +184,8 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
 
     // NOTICE: it's ok to keep some YFI dust here for the future swaps
   }
+
+  /*** THE PROXIED METHOD EXECUTORS ***/
 
   function callRegister() external {
     _checkVotingSenderAllowed();

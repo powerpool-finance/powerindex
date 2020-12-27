@@ -38,10 +38,10 @@ async function buildUniswapPair(weth, yfi, usdc, lpTokensTo) {
 }
 
 describe('YearnRouter Tests', () => {
-  let bob, alice, yearnOwner, piOwner, stub, pvp, pool1, pool2, rewardDistributor;
+  let bob, alice, yearnOwner, piOwner, piGov, stub, pvp, pool1, pool2, rewardDistributor;
 
   before(async function () {
-    [, bob, alice, yearnOwner, piOwner, stub, pvp, pool1, pool2, rewardDistributor] = await web3.eth.getAccounts();
+    [, bob, alice, yearnOwner, piOwner, piGov, stub, pvp, pool1, pool2, rewardDistributor] = await web3.eth.getAccounts();
   });
 
   let yfi, yCrv, usdc, weth, yDeposit, yearnGovernance, poolRestrictions, yfiWrapper, yfiRouter;
@@ -83,9 +83,13 @@ describe('YearnRouter Tests', () => {
     await yfiRouter.setReserveRatio(ether('0.2'), { from: piOwner });
 
     assert.equal(await yfiRouter.owner(), piOwner);
+
+    // Hardcoded into the bytecode for the test sake
+    assert.equal(await yearnGovernance.period(), 10);
+    assert.equal(await yearnGovernance.lock(), 10);
   });
 
-  it('should allow creating a proposal in YFI', async () => {
+  it('should allow creating a proposal in YearnGovernance', async () => {
     await yfi.transfer(alice, ether('10000'));
     await yfi.approve(yfiWrapper.address, ether('10000'), { from: alice });
     await yfiWrapper.deposit(ether('10000'), { from: alice });
@@ -117,6 +121,82 @@ describe('YearnRouter Tests', () => {
     assert.equal(proposal.totalForVotes, ether(8000));
     assert.equal(proposal.totalAgainstVotes, ether(0));
     assert.equal(proposal.hash, proposalString);
+  });
+
+  describe('reserve management', () => {
+    beforeEach(async () => {
+      await yfi.transfer(alice, ether(100000));
+      await yfi.approve(yfiWrapper.address, ether(10000), { from: alice })
+      await yfiWrapper.deposit(ether(10000), { from: alice });
+
+      assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8000));
+      assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(2000));
+    })
+
+    it('should increase reserve on deposit', async () => {
+      await yfi.approve(yfiWrapper.address, ether(1000), { from: alice })
+      await yfiWrapper.deposit(ether(1000), { from: alice });
+
+      assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8800));
+      assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(2200));
+    })
+
+    it('should decrease reserve on withdrawal', async () => {
+      await yfiWrapper.approve(yfiWrapper.address, ether(1000), { from: alice })
+      await yfiWrapper.withdraw(ether(1000), { from: alice });
+
+      assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(7200));
+      assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(1800));
+    })
+
+    describe('on vote lock', async () => {
+      beforeEach(async () => {
+        await poolRestrictions.setVotingAllowedForSenders(yearnGovernance.address, [piGov], [true]);
+
+        await yfiRouter.callRegister({ from: piGov });
+        await yfiRouter.callPropose(bob, 'buzz', { from: piGov });
+        await yfiRouter.callVoteFor(0, { from: piGov });
+      });
+
+      it('should not decrease reserve if vote is locked', async () => {
+        await yfiWrapper.approve(yfiWrapper.address, ether(1000), { from: alice })
+        const res = await yfiWrapper.withdraw(ether(1000), { from: alice });
+
+        await expectEvent.inTransaction(res.tx, yfiRouter, 'IgnoreRedeemDueVoteLock')
+
+        assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8000));
+        assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(1000));
+      })
+
+      it('should revert if there is not enough funds in reserve', async () => {
+        await yfiWrapper.approve(yfiWrapper.address, ether(3000), { from: alice })
+        await expectRevert(
+          yfiWrapper.withdraw(ether(3000), { from: alice }),
+          'ERC20: transfer amount exceeds balance'
+        );
+      });
+    });
+
+    describe('on poke', async () => {
+      it('should do nothing when nothing has changed', async () => {
+        await yfiWrapper.pokeRouter({ from: bob });
+
+        assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8000));
+        assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(2000));
+      });
+
+      it('should increase reserve if required', async () => {
+        await yfi.transfer(yfiWrapper.address, ether(1000), { from: alice });
+
+        assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8000));
+        assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(3000));
+
+        await yfiWrapper.pokeRouter({ from: bob });
+
+        assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8800));
+        assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(2200));
+      })
+    });
   });
 
   describe('reward distribution', async () => {
