@@ -38,14 +38,17 @@ describe.skip('CrvRouter Tests', () => {
     // https://etherscan.io/address/0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2
     const CrvStackingContract = await contract({
       abi: getFileContent('CrvVotingAbi.json'),
-      bytecode: getFileContent('CrvVoting', {encoding: 'utf8'}).replace('d533a949740bb3306d119cc777fa900ba034cd52', crv.address.replace('0x', ''))
+      bytecode: getFileContent('CrvVoting', { encoding: 'utf8' }).replace(
+        'd533a949740bb3306d119cc777fa900ba034cd52',
+        crv.address.replace('0x', ''),
+      ),
     });
 
     CrvStackingContract.setProvider(web3.currentProvider);
 
-    const crvStacking = await CrvStackingContract.new({from: minter});
+    const crvStacking = await CrvStackingContract.new({ from: minter });
 
-    console.log('crvStacking.contract.methods', crvStacking.contract.methods)
+    console.log('crvStacking.contract.methods', crvStacking.contract.methods);
 
     const crvVoting = await AragonVoting.new(
       crvStacking.address,
@@ -57,7 +60,7 @@ describe.skip('CrvRouter Tests', () => {
       '2500000000000000000000',
       '50000000000000000000000',
       '43200',
-      '1209600'
+      '1209600',
     );
 
     const poolRestrictions = await PoolRestrictions.new();
@@ -107,5 +110,5 @@ describe.skip('CrvRouter Tests', () => {
 });
 
 function getFileContent(fileName) {
-  return fs.readFileSync('contracts/test/curve/' + fileName, {encoding: 'utf8'});
+  return fs.readFileSync('contracts/test/curve/' + fileName, { encoding: 'utf8' });
 }

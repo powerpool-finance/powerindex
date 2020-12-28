@@ -10,9 +10,9 @@ import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/IPiRouterFactory.sol";
 
 contract PowerIndexWrappedController is PowerIndexAbstractController {
-  event ReplacePoolTokenWithWrapped(
-    address indexed existingToken,
-    address indexed wrappedToken,
+  event ReplacePoolTokenWithPiToken(
+    address indexed underlyingToken,
+    address indexed piToken,
     uint256 balance,
     uint256 denormalizedWeight
   );
@@ -26,24 +26,23 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
   );
 
   event ReplacePoolTokenFinish();
-
   event SetPoolWrapper(address indexed bpoolWrapper);
-  event CreateWrappedToken(address indexed token, address indexed wrappedToken);
+  event CreatePiToken(address indexed underlyingToken, address indexed piToken);
 
   PowerIndexWrapperInterface public poolWrapper;
-  WrappedPiErc20FactoryInterface public wrapperFactory;
+  WrappedPiErc20FactoryInterface public piTokenFactory;
 
-  uint256 lastMaxWeightPerSecond;
-  bool lastWrapperMode;
-  uint256 replaceFinishTimestamp;
+  uint256 public lastMaxWeightPerSecond;
+  bool public lastWrapperMode;
+  uint256 public replaceFinishTimestamp;
 
   constructor(
     address _pool,
     address _poolWrapper,
-    address _wrapperFactory
+    address _piTokenFactory
   ) public PowerIndexAbstractController(_pool) {
     poolWrapper = PowerIndexWrapperInterface(_poolWrapper);
-    wrapperFactory = WrappedPiErc20FactoryInterface(_wrapperFactory);
+    piTokenFactory = WrappedPiErc20FactoryInterface(_piTokenFactory);
   }
 
   function setPoolWrapper(address _poolWrapper) external onlyOwner {
@@ -51,35 +50,33 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     emit SetPoolWrapper(_poolWrapper);
   }
 
-  function createWrappedToken(
-    address _token,
+  function createPiToken(
+    address _underlyingToken,
     address _routerFactory,
-    address _poolRestrictions,
+    bytes memory _routerArgs,
     string calldata _name,
     string calldata _symbol
   ) external onlyOwner {
-    WrappedPiErc20Interface wrappedToken =
-      _createWrappedToken(_token, _routerFactory, _poolRestrictions, _name, _symbol);
-    emit CreateWrappedToken(_token, address(wrappedToken));
+    WrappedPiErc20Interface piToken = _createPiToken(_underlyingToken, _routerFactory, _routerArgs, _name, _symbol);
+    emit CreatePiToken(_underlyingToken, address(piToken));
   }
 
-  function replacePoolTokenWithNewWrapped(
-    address _token,
+  function replacePoolTokenWithNewPiToken(
+    address _underlyingToken,
     address _routerFactory,
-    address _poolRestrictions,
+    bytes calldata _routerArgs,
     string calldata _name,
     string calldata _symbol
   ) external onlyOwner {
-    WrappedPiErc20Interface wrappedToken =
-      _createWrappedToken(_token, _routerFactory, _poolRestrictions, _name, _symbol);
-    _replacePoolTokenWithWrapped(_token, wrappedToken);
+    WrappedPiErc20Interface piToken = _createPiToken(_underlyingToken, _routerFactory, _routerArgs, _name, _symbol);
+    _replacePoolTokenWithPiToken(_underlyingToken, piToken);
   }
 
-  function replacePoolTokenWithExistingWrapped(address _token, WrappedPiErc20Interface _wrappedToken)
+  function replacePoolTokenWithExistingPiToken(address _underlyingToken, WrappedPiErc20Interface _piToken)
     external
     onlyOwner
   {
-    _replacePoolTokenWithWrapped(_token, _wrappedToken);
+    _replacePoolTokenWithPiToken(_underlyingToken, _piToken);
   }
 
   function replacePoolTokenWithNewVersion(
@@ -111,26 +108,26 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     emit ReplacePoolTokenWithNewVersion(_oldToken, _newToken, _migrator, balance, denormalizedWeight);
   }
 
-  function _replacePoolTokenWithWrapped(address _token, WrappedPiErc20Interface _wrappedToken) internal {
-    uint256 denormalizedWeight = pool.getDenormalizedWeight(_token);
-    uint256 balance = pool.getBalance(_token);
+  function _replacePoolTokenWithPiToken(address _underlyingToken, WrappedPiErc20Interface _piToken) internal {
+    uint256 denormalizedWeight = pool.getDenormalizedWeight(_underlyingToken);
+    uint256 balance = pool.getBalance(_underlyingToken);
 
-    pool.unbind(_token);
+    pool.unbind(_underlyingToken);
 
-    IERC20(_token).approve(address(_wrappedToken), balance);
-    _wrappedToken.deposit(balance);
+    IERC20(_underlyingToken).approve(address(_piToken), balance);
+    _piToken.deposit(balance);
 
-    _wrappedToken.approve(address(pool), balance);
+    _piToken.approve(address(pool), balance);
 
     _initiateReplace(denormalizedWeight);
 
-    pool.bind(address(_wrappedToken), balance, denormalizedWeight, block.timestamp + 1, replaceFinishTimestamp);
+    pool.bind(address(_piToken), balance, denormalizedWeight, block.timestamp + 1, replaceFinishTimestamp);
 
     if (address(poolWrapper) != address(0)) {
-      poolWrapper.setTokenWrapper(_token, address(_wrappedToken));
+      poolWrapper.setPiTokenForUnderlying(_underlyingToken, address(_piToken));
     }
 
-    emit ReplacePoolTokenWithWrapped(_token, address(_wrappedToken), balance, denormalizedWeight);
+    emit ReplacePoolTokenWithPiToken(_underlyingToken, address(_piToken), balance, denormalizedWeight);
   }
 
   function _initiateReplace(uint256 denormalizedWeight) internal {
@@ -160,17 +157,17 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     emit ReplacePoolTokenFinish();
   }
 
-  function _createWrappedToken(
-    address _token,
+  function _createPiToken(
+    address _underlyingToken,
     address _routerFactory,
-    address _poolRestrictions,
+    bytes memory _routerArgs,
     string calldata _name,
     string calldata _symbol
   ) internal returns (WrappedPiErc20Interface) {
-    WrappedPiErc20Interface wrappedToken = wrapperFactory.build(_token, address(this), _name, _symbol);
-    address router = IPiRouterFactory(_routerFactory).buildRouter(address(wrappedToken), _poolRestrictions);
+    WrappedPiErc20Interface piToken = piTokenFactory.build(_underlyingToken, address(this), _name, _symbol);
+    address router = IPiRouterFactory(_routerFactory).buildRouter(address(piToken), _routerArgs);
     Ownable(router).transferOwnership(msg.sender);
-    wrappedToken.changeRouter(router);
-    return wrappedToken;
+    piToken.changeRouter(router);
+    return piToken;
   }
 }

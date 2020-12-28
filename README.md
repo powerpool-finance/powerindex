@@ -8,6 +8,7 @@ This repository contains PowerIndex smart contracs. PowerIndex is the main produ
 ✅🚨 Security review status: **partially audited**
 
 More details in 👉:
+
 - [`PowerIndexPool.sol` and `PoolRestrictions.sol` Security Audit by MixBytes](https://github.com/powerpool-finance/powerpool-docs/blob/master/audits/PowerIndexPoolSecurityAuditScope1.pdf)
 - [`VestedLPMining.sol` and `PowerIndexPoolController.sol` Security Audit by Pessimistic](https://github.com/powerpool-finance/powerpool-docs/blob/master/audits/PowerIndexPool_SecurityAudit_Scope1_Pessimistic.pdf)
 
@@ -18,7 +19,6 @@ Use `yarn` or `npm` to run the following npm tasks:
 - `yarn compile` - compile contracts
 - `yarn test` - run tests
 - `yarn coverage` - generate test coverage report
-
 
 ## Contracts on Ethereum Main Network
 

@@ -2,6 +2,7 @@ const { ether: rEther } = require('@openzeppelin/test-helpers');
 const TruffleContract = require('@nomiclabs/truffle-contract');
 const template = artifacts.require('Migrations');
 const { promisify } = require('util');
+const { assert } = require('chai');
 const { web3 } = template;
 const BigNumber = require('bignumber.js')
 const fs = require('fs')
@@ -28,11 +29,13 @@ async function advanceBlocks(n) {
   const send = promisify(web3.currentProvider.send).bind(web3.currentProvider);
   const requests = [];
   for (let i = 0; i < n; i++) {
-    requests.push(send({
-      jsonrpc: '2.0',
-      method: 'evm_mine',
-      id: `${new Date().getTime()}-${Math.random()}`,
-    }));
+    requests.push(
+      send({
+        jsonrpc: '2.0',
+        method: 'evm_mine',
+        id: `${new Date().getTime()}-${Math.random()}`,
+      }),
+    );
   }
   await Promise.all(requests);
 }
@@ -48,11 +51,7 @@ async function advanceBlocks(n) {
  * @param {string} opts.proxyAdminOwner
  * @returns {Promise<any>}
  */
-async function deployProxied(
-  contract,
-  args = [],
-  opts = {}
-) {
+async function deployProxied(contract, args = [], opts = {}) {
   const impl = await contract.new();
   const adminContract = await createOrGetProxyAdmin(opts.proxyAdminOwner);
   const data = getInitializerData(impl, args, opts.initializer);
@@ -78,7 +77,6 @@ async function createOrGetProxyAdmin(proxyOwner) {
   return proxyAdmin;
 }
 
-
 function getInitializerData(impl, args, initializer) {
   const allowNoInitialization = initializer === undefined && args.length === 0;
   initializer = initializer || 'initialize';
@@ -103,6 +101,23 @@ function getInitializerData(impl, args, initializer) {
 async function fetchLogs(contract, receipt) {
   const res = await web3.eth.getTransactionReceipt(receipt.tx);
   return contract.decodeLogs(res.logs);
+}
+
+async function expectExactRevert(promise, expectedMsg) {
+  try {
+    await promise;
+  } catch (error) {
+    if (error.message !== expectedMsg) {
+      assert.equal(
+        error.message,
+        `VM Exception while processing transaction: revert ${expectedMsg}`,
+        'Wrong kind of exception received',
+      );
+    }
+    return;
+  }
+
+  assert.fail('Expected an exception but none was received');
 }
 
 /**
@@ -131,12 +146,24 @@ function toEvmBytes32(bytes32) {
 function splitPayload(payload) {
   return {
     signature: payload.substring(0, 10),
-    calldata: `0x${payload.substring(10)}`
-  }
+    calldata: `0x${payload.substring(10)}`,
+  };
 }
 
 function ether(value) {
   return rEther(value.toString()).toString(10);
+}
+
+function mwei(value) {
+  return web3.utils.toWei(value.toString(), 'mwei').toString(10);
+}
+
+async function getResTimestamp(res) {
+  return (await web3.eth.getBlock(res.receipt.blockNumber)).timestamp.toString();
+}
+
+async function increaseTime(ethers, time) {
+  return ethers.provider.send('evm_increaseTime', [time]);
 }
 
 async function deployAndSaveArgs(Contract, args) {
@@ -168,10 +195,6 @@ async function forkContractUpgrade(ethers, adminAddress, proxyAdminAddress, prox
   })
 }
 
-async function increaseTime(ethers, time) {
-  return ethers.provider.send('evm_increaseTime', [time]);
-}
-
 module.exports = {
   deployProxied,
   createOrGetProxyAdmin,
@@ -181,6 +204,9 @@ module.exports = {
   splitPayload,
   fetchLogs,
   ether,
+  mwei,
+  expectExactRevert,
+  getResTimestamp,
   forkContractUpgrade,
   deployAndSaveArgs,
   increaseTime,

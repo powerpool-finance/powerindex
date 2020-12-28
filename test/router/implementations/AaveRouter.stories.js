@@ -1,5 +1,6 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
 const { artifactFromBytecode, ether } = require('../../helpers');
+const { buildBasicRouterConfig } = require('../../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
@@ -21,17 +22,10 @@ const COOLDOWN_STATUS = {
 
 describe('AaveRouter Tests', () => {
   let minter, bob, alice, rewardsVault, emissionManager, stub;
-  let aave, stakedAave, aaveWrapper, aaveRouter, poolRestrictions;
+  let aave, stakedAave, piAave, aaveRouter, poolRestrictions;
 
   before(async function () {
-    [
-      minter,
-      bob,
-      alice,
-      rewardsVault,
-      emissionManager,
-      stub,
-    ] = await web3.eth.getAccounts();
+    [minter, bob, alice, rewardsVault, emissionManager, stub] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function () {
@@ -54,16 +48,17 @@ describe('AaveRouter Tests', () => {
       'stkAAVE',
       18,
       // governance
-      constants.ZERO_ADDRESS
+      constants.ZERO_ADDRESS,
     );
     poolRestrictions = await PoolRestrictions.new();
-    aaveWrapper = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'WAAVE');
-    aaveRouter = await AavePowerIndexRouter.new(aaveWrapper.address, poolRestrictions.address);
+    piAave = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'piAAVE');
+    aaveRouter = await AavePowerIndexRouter.new(
+      piAave.address,
+      buildBasicRouterConfig(poolRestrictions.address, stub, stakedAave.address, ether('0.2'), '0'),
+    );
 
     // Setting up...
-    await aaveWrapper.changeRouter(aaveRouter.address, { from: stub });
-    await aaveRouter.setVotingAndStaking(stub, stakedAave.address);
-    await aaveRouter.setReserveRatio(ether('0.2'));
+    await piAave.changeRouter(aaveRouter.address, { from: stub });
 
     // Checks...
     assert.equal(await aaveRouter.owner(), minter);
@@ -76,8 +71,8 @@ describe('AaveRouter Tests', () => {
 
       ///////////////////////
       // Step #1. Deposit 10K
-      await aave.approve(aaveWrapper.address, ether(10000), { from: alice });
-      let res = await aaveWrapper.deposit(ether('10000'), { from: alice });
+      await aave.approve(piAave.address, ether(10000), { from: alice });
+      let res = await piAave.deposit(ether('10000'), { from: alice });
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
@@ -86,33 +81,33 @@ describe('AaveRouter Tests', () => {
         amount: ether(8000),
       });
 
-      assert.equal(await aaveWrapper.totalSupply(), ether(10000));
-      assert.equal(await aaveWrapper.balanceOf(alice), ether(10000));
+      assert.equal(await piAave.totalSupply(), ether(10000));
+      assert.equal(await piAave.balanceOf(alice), ether(10000));
 
       // The router has partially staked the deposit with regard to the reserve ration value (20/80)
-      assert.equal(await aave.balanceOf(aaveWrapper.address), ether(2000));
+      assert.equal(await aave.balanceOf(piAave.address), ether(2000));
       assert.equal(await aave.balanceOf(stakedAave.address), ether(8000));
 
       // The stakeAave are allocated on the aaveWrapper contract
-      assert.equal(await stakedAave.balanceOf(aaveWrapper.address), ether(8000));
+      assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
 
       res = await aaveRouter.getCoolDownStatus();
       assert.equal(res.status, COOLDOWN_STATUS.NONE);
 
       //////////////////////////
       // Step #2. Withdraw 0.5K
-      await aaveWrapper.approve(aaveWrapper.address, ether(500), { from: alice });
-      res = await aaveWrapper.withdraw(ether(500), { from: alice });
+      await piAave.approve(piAave.address, ether(500), { from: alice });
+      res = await piAave.withdraw(ether(500), { from: alice });
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'IgnoreRedeemDueCoolDown');
       await expectEvent.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown', {});
       await expectEvent.inTransaction(res.tx, StakedAave, 'Cooldown', {
-        user: aaveWrapper.address,
+        user: piAave.address,
       });
 
-      assert.equal(await aave.balanceOf(aaveWrapper.address), ether(1500));
+      assert.equal(await aave.balanceOf(piAave.address), ether(1500));
       assert.equal(await aave.balanceOf(stakedAave.address), ether(8000));
 
       res = await aaveRouter.getCoolDownStatus();
@@ -120,8 +115,8 @@ describe('AaveRouter Tests', () => {
 
       ///////////////////////////////////////////////////////
       // Step #3. Withdraw 0.5K - waiting for a COOLDOWN ends
-      await aaveWrapper.approve(aaveWrapper.address, ether(500), { from: alice });
-      res = await aaveWrapper.withdraw(ether(500), { from: alice });
+      await piAave.approve(piAave.address, ether(500), { from: alice });
+      res = await piAave.withdraw(ether(500), { from: alice });
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem');
@@ -129,7 +124,7 @@ describe('AaveRouter Tests', () => {
       await expectEvent.notEmitted.inTransaction(res.tx, StakedAave, 'Cooldown');
       await expectEvent.inTransaction(res.tx, AavePowerIndexRouter, 'IgnoreRedeemDueCoolDown', {});
 
-      assert.equal(await aave.balanceOf(aaveWrapper.address), ether(1000));
+      assert.equal(await aave.balanceOf(piAave.address), ether(1000));
       assert.equal(await aave.balanceOf(stakedAave.address), ether(8000));
 
       // Jump to the end of the already triggered COOLDOWN period
@@ -140,8 +135,8 @@ describe('AaveRouter Tests', () => {
 
       //////////////////////////////////////////////////////////
       // Step #4. Withdraw 0.5K - while within an UNSTAKE_WINDOW
-      await aaveWrapper.approve(aaveWrapper.address, ether(500), { from: alice });
-      res = await aaveWrapper.withdraw(ether(500), { from: alice });
+      await piAave.approve(piAave.address, ether(500), { from: alice });
+      res = await piAave.withdraw(ether(500), { from: alice });
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
@@ -150,13 +145,13 @@ describe('AaveRouter Tests', () => {
         amount: ether(1200),
       });
 
-      assert.equal(await aave.balanceOf(aaveWrapper.address), ether(1700));
+      assert.equal(await aave.balanceOf(piAave.address), ether(1700));
       assert.equal(await aave.balanceOf(stakedAave.address), ether(6800));
 
       //////////////////////////////////////////////////////////
       // Step #5. Withdraw 0.5K - while within an UNSTAKE_WINDOW
-      await aaveWrapper.approve(aaveWrapper.address, ether(500), { from: alice });
-      res = await aaveWrapper.withdraw(ether(500), { from: alice });
+      await piAave.approve(piAave.address, ether(500), { from: alice });
+      res = await piAave.withdraw(ether(500), { from: alice });
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
@@ -165,13 +160,13 @@ describe('AaveRouter Tests', () => {
         amount: ether(400),
       });
 
-      assert.equal(await aave.balanceOf(aaveWrapper.address), ether(1600));
+      assert.equal(await aave.balanceOf(piAave.address), ether(1600));
       assert.equal(await aave.balanceOf(stakedAave.address), ether(6400));
 
       ///////////////////////////////////////////////////////
       // Step #6. Deposit 3K - while within an UNSTAKE_WINDOW
-      await aave.approve(aaveWrapper.address, ether(3000), { from: bob });
-      res = await aaveWrapper.deposit(ether(3000), { from: bob });
+      await aave.approve(piAave.address, ether(3000), { from: bob });
+      res = await piAave.deposit(ether(3000), { from: bob });
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
@@ -180,8 +175,8 @@ describe('AaveRouter Tests', () => {
         amount: ether(2400),
       });
 
-      assert.equal(await aaveWrapper.totalSupply(), ether(11000));
-      assert.equal(await aave.balanceOf(aaveWrapper.address), ether(2200));
+      assert.equal(await piAave.totalSupply(), ether(11000));
+      assert.equal(await aave.balanceOf(piAave.address), ether(2200));
       assert.equal(await aave.balanceOf(stakedAave.address), ether(8800));
     });
   });

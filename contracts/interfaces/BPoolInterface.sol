@@ -115,6 +115,8 @@ interface BPoolInterface is IERC20, BMathInterface {
 
   function unbind(address) external;
 
+  function gulp(address) external;
+
   function callVoting(
     address voting,
     bytes4 signature,

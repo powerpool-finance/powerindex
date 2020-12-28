@@ -3,7 +3,8 @@
 pragma solidity 0.6.12;
 
 interface PowerIndexWrapperInterface {
-  function setTokenWrapperList(address[] calldata _tokens, address[] calldata _wrappers) external;
+  function setPiTokenForUnderlyingsMultiple(address[] calldata _underlyingTokens, address[] calldata _piTokens)
+    external;
 
-  function setTokenWrapper(address _token, address _wrapper) external;
+  function setPiTokenForUnderlying(address _underlyingTokens, address _piToken) external;
 }

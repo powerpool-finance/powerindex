@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "../../interfaces/WrappedPiErc20Interface.sol";
 import "../PowerIndexBasicRouter.sol";
@@ -23,9 +24,9 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
 
   constructor(
     address _piToken,
-    address _poolRestrictions,
+    BasicConfig memory _basicConfig,
     uint256 _minLockTime
-  ) public PowerIndexBasicRouter(_piToken, _poolRestrictions) {
+  ) public PowerIndexBasicRouter(_piToken, _basicConfig) {
     minLockTime = _minLockTime;
   }
 
@@ -66,10 +67,10 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
     _redeem();
   }
 
-  /*** WRAPPED TOKEN CALLBACK ***/
+  /*** PI TOKEN CALLBACK ***/
 
-  function wrapperCallback(uint256 _withdrawAmount) external override {
-    address wrappedToken_ = msg.sender;
+  function piTokenCallback(uint256 _withdrawAmount) external override onlyPiToken {
+    address piToken_ = msg.sender;
 
     // Ignore the tokens without a voting assigned
     if (staking == address(0)) {
@@ -78,10 +79,10 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
 
     CurveStakeInterface staking_ = CurveStakeInterface(staking);
     (ReserveStatus status, uint256 diff, uint256 reserveAmount) =
-      _getReserveStatus(staking_.balanceOf(wrappedToken_), _withdrawAmount);
+      _getReserveStatus(staking_.balanceOf(piToken_), _withdrawAmount);
 
     if (status == ReserveStatus.SHORTAGE) {
-      (, uint256 end) = staking_.locked(wrappedToken_);
+      (, uint256 end) = staking_.locked(piToken_);
       if (end < block.timestamp) {
         _redeem();
         _stake(reserveAmount);
@@ -97,14 +98,14 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
     require(_amount > 0, "CANT_STAKE_0");
 
     CurveStakeInterface staking_ = CurveStakeInterface(staking);
-    (uint256 lockedAmount, uint256 lockedEnd) = staking_.locked(address(wrappedToken));
+    (uint256 lockedAmount, uint256 lockedEnd) = staking_.locked(address(piToken));
 
     if (lockedEnd != 0 && lockedEnd <= block.timestamp) {
       _redeem();
       lockedEnd = 0;
     }
 
-    wrappedToken.approveUnderlying(staking, _amount);
+    piToken.approveUnderlying(staking, _amount);
 
     if (lockedEnd == 0) {
       _callStaking(CREATE_STAKE_SIG, abi.encode(_amount, block.timestamp + WEEK));

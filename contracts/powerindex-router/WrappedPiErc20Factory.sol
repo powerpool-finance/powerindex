@@ -9,15 +9,15 @@ contract WrappedPiErc20Factory is WrappedPiErc20FactoryInterface {
   constructor() public {}
 
   function build(
-    address _token,
+    address _underlyingToken,
     address _router,
     string calldata _name,
     string calldata _symbol
   ) external override returns (WrappedPiErc20Interface) {
-    WrappedPiErc20 wrappedToken = new WrappedPiErc20(_token, _router, _name, _symbol);
+    WrappedPiErc20 piToken = new WrappedPiErc20(_underlyingToken, _router, _name, _symbol);
 
-    emit NewWrappedPiErc20(_token, address(wrappedToken), msg.sender);
+    emit NewWrappedPiErc20(_underlyingToken, address(piToken), msg.sender);
 
-    return wrappedToken;
+    return piToken;
   }
 }

@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "../../interfaces/WrappedPiErc20Interface.sol";
 import "../../interfaces/aave/IAaveGovernanceV2.sol";
 import "../../interfaces/aave/IStakedAave.sol";
 import "../PowerIndexBasicRouter.sol";
-import "hardhat/console.sol";
 
 contract AavePowerIndexRouter is PowerIndexBasicRouter {
   event TriggerCooldown();
   event Stake(uint256 amount);
   event Redeem(uint256 amount);
   event IgnoreRedeemDueCoolDown(uint256 coolDownFinishesAt, uint256 unstakeFinishesAt);
+  event IgnoreDueMissingStaking();
 
   enum CoolDownStatus { NONE, COOLDOWN, UNSTAKE_WINDOW }
 
-  constructor(address _piToken, address _poolRestrictions) public PowerIndexBasicRouter(_piToken, _poolRestrictions) {}
+  constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexBasicRouter(_piToken, _basicConfig) {}
 
   /*** THE PROXIED METHOD EXECUTORS FOR VOTING ***/
 
@@ -42,18 +43,23 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     _redeem(_amount);
   }
 
-  /*** WRAPPED TOKEN CALLBACK ***/
+  /*** PI TOKEN CALLBACK ***/
 
-  function wrapperCallback(uint256 _withdrawAmount) external override {
-    address wrappedToken_ = msg.sender;
+  function piTokenCallback(uint256 _withdrawAmount) external override onlyPiToken {
+    address piToken_ = msg.sender;
 
     // Ignore the tokens without a voting assigned
-    if (voting == address(0)) {
+    if (staking == address(0)) {
+      emit IgnoreDueMissingStaking();
+      return;
+    }
+
+    if (!_rebalanceHook()) {
       return;
     }
 
     (ReserveStatus reserveStatus, uint256 diff, ) =
-      _getReserveStatus(IERC20(staking).balanceOf(wrappedToken_), _withdrawAmount);
+      _getReserveStatus(IERC20(staking).balanceOf(piToken_), _withdrawAmount);
 
     // TODO: add lastUpdated constraint
     if (reserveStatus == ReserveStatus.SHORTAGE) {
@@ -82,7 +88,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     )
   {
     IStakedAave _staking = IStakedAave(staking);
-    uint256 stakerCoolDown = _staking.stakersCooldowns(address(wrappedToken));
+    uint256 stakerCoolDown = _staking.stakersCooldowns(address(piToken));
     uint256 coolDownSeconds = _staking.COOLDOWN_SECONDS();
     uint256 unstakeWindow = _staking.UNSTAKE_WINDOW();
     uint256 current = block.timestamp;
@@ -111,9 +117,9 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   function _stake(uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
-    wrappedToken.approveUnderlying(staking, _amount);
+    piToken.approveUnderlying(staking, _amount);
 
-    _callStaking(IStakedAave(0).stake.selector, abi.encode(wrappedToken, _amount));
+    _callStaking(IStakedAave(0).stake.selector, abi.encode(piToken, _amount));
 
     emit Stake(_amount);
   }
@@ -122,7 +128,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     require(_amount > 0, "CANT_REDEEM_0");
 
     _callStaking(IERC20(0).approve.selector, abi.encode(staking, _amount));
-    _callStaking(IStakedAave(0).redeem.selector, abi.encode(address(wrappedToken), _amount));
+    _callStaking(IStakedAave(0).redeem.selector, abi.encode(address(piToken), _amount));
 
     emit Redeem(_amount);
   }

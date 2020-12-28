@@ -1,5 +1,13 @@
-const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
-const { ether, artifactFromBytecode, deployProxied, createOrGetProxyAdmin, splitPayload, advanceBlocks } = require('../../helpers');
+const { constants, time, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
+const {
+  ether,
+  artifactFromBytecode,
+  deployProxied,
+  createOrGetProxyAdmin,
+  splitPayload,
+  advanceBlocks,
+} = require('../../helpers');
+const { buildBasicRouterConfig } = require('../../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
@@ -35,7 +43,7 @@ const ProposalState = {
   Succeeded: 4,
   Queued: 5,
   Expired: 6,
-  Executed :7
+  Executed: 7,
 };
 
 const COOLDOWN_STATUS = {
@@ -47,7 +55,7 @@ const COOLDOWN_STATUS = {
 describe('AaveRouter Tests', () => {
   let deployer, aaveDistributor, bob, alice, rewardsVault, emissionManager, stub, guardian;
 
-  before(async function() {
+  before(async function () {
     [
       deployer,
       aaveDistributor,
@@ -60,20 +68,24 @@ describe('AaveRouter Tests', () => {
     ] = await web3.eth.getAccounts();
   });
 
-  let aave, stakedAave, aaveWrapper, aaveRouter, poolRestrictions;
+  let aave, stakedAave, piAave, aaveRouter, poolRestrictions;
 
   // https://github.com/aave/aave-stake-v2
   describe('staking', async () => {
     beforeEach(async () => {
       // 0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9
-      aave = await deployProxied(AaveToken, [
-        // migrator
-        aaveDistributor,
-        // distributor
-        aaveDistributor,
-        // governance
-        constants.ZERO_ADDRESS,
-      ], { deployer, proxyAdminOwner: deployer, initializer: 'initialize' });
+      aave = await deployProxied(
+        AaveToken,
+        [
+          // migrator
+          aaveDistributor,
+          // distributor
+          aaveDistributor,
+          // governance
+          constants.ZERO_ADDRESS,
+        ],
+        { deployer, proxyAdminOwner: deployer, initializer: 'initialize' },
+      );
       const proxyAdmin = await createOrGetProxyAdmin();
       const aave2 = await AaveTokenV2.new();
       await proxyAdmin.upgrade(aave.address, aave2.address);
@@ -101,20 +113,24 @@ describe('AaveRouter Tests', () => {
       );
 
       poolRestrictions = await PoolRestrictions.new();
-      aaveWrapper = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'WAAVE');
-      aaveRouter = await AavePowerIndexRouter.new(aaveWrapper.address, poolRestrictions.address);
+      piAave = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'piAAVE');
+      aaveRouter = await AavePowerIndexRouter.new(
+        piAave.address,
+        buildBasicRouterConfig(poolRestrictions.address, stub, stakedAave.address, ether('0.2'), '0'),
+      );
 
       // Setting up...
-      await aaveWrapper.changeRouter(aaveRouter.address, { from: stub });
-      await aaveRouter.setVotingAndStaking(stub, stakedAave.address);
-      await aaveRouter.setReserveRatio(ether('0.2'));
+      await piAave.changeRouter(aaveRouter.address, { from: stub });
 
       // Checks...
       assert.equal(await aaveRouter.owner(), deployer);
     });
 
-    it('should allow depositing Aave and staking it in a StakedAave contract', async () => {
+    it('should deny non-piToken calling piTokenCallback', async () => {
+      await expectRevert(aaveRouter.piTokenCallback(0), 'ONLY_PI_TOKEN_ALLOWED');
     });
+
+    it('should allow depositing Aave and staking it in a StakedAave contract', async () => {});
 
     describe('stake', async () => {
       beforeEach(async () => {
@@ -123,76 +139,76 @@ describe('AaveRouter Tests', () => {
       });
 
       it('it should initially stake the excess of funds to the staking contract immediately', async () => {
-        await aave.approve(aaveWrapper.address, ether(10000), { from: alice });
-        await aaveWrapper.deposit(ether('10000'), { from: alice });
+        await aave.approve(piAave.address, ether(10000), { from: alice });
+        await piAave.deposit(ether('10000'), { from: alice });
 
-        assert.equal(await aaveWrapper.totalSupply(), ether(10000));
-        assert.equal(await aaveWrapper.balanceOf(alice), ether(10000));
+        assert.equal(await piAave.totalSupply(), ether(10000));
+        assert.equal(await piAave.balanceOf(alice), ether(10000));
 
         // The router has partially staked the deposit with regard to the reserve ration value (20/80)
-        assert.equal(await aave.balanceOf(aaveWrapper.address), ether(2000));
+        assert.equal(await aave.balanceOf(piAave.address), ether(2000));
         assert.equal(await aave.balanceOf(stakedAave.address), ether(8000));
 
         // The stakeAave are allocated on the aaveWrapper contract
-        assert.equal(await stakedAave.balanceOf(aaveWrapper.address), ether(8000));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
       });
 
       describe('with some funds already deposited', async () => {
         beforeEach(async () => {
-          await aave.approve(aaveWrapper.address, ether(10000), { from: alice });
-          await aaveWrapper.deposit(ether(10000), { from: alice });
+          await aave.approve(piAave.address, ether(10000), { from: alice });
+          await piAave.deposit(ether(10000), { from: alice });
         });
 
         it('it should stake the excess of funds to the staking contract immediately', async () => {
           // 2nd
-          await aave.approve(aaveWrapper.address, ether(10000), { from: bob });
-          await aaveWrapper.deposit(ether(10000), { from: bob });
+          await aave.approve(piAave.address, ether(10000), { from: bob });
+          await piAave.deposit(ether(10000), { from: bob });
 
-          assert.equal(await aaveWrapper.totalSupply(), ether(20000));
-          assert.equal(await aaveWrapper.balanceOf(alice), ether(10000));
-          assert.equal(await aaveWrapper.balanceOf(bob), ether(10000));
+          assert.equal(await piAave.totalSupply(), ether(20000));
+          assert.equal(await piAave.balanceOf(alice), ether(10000));
+          assert.equal(await piAave.balanceOf(bob), ether(10000));
 
           // The router has partially staked the deposit with regard to the reserve ration value (20/80)
-          assert.equal(await aave.balanceOf(aaveWrapper.address), ether(4000));
+          assert.equal(await aave.balanceOf(piAave.address), ether(4000));
           assert.equal(await aave.balanceOf(stakedAave.address), ether(16000));
 
           // The stakeAave are allocated on the aaveWrapper contract
-          assert.equal(await stakedAave.balanceOf(aaveWrapper.address), ether(16000));
+          assert.equal(await stakedAave.balanceOf(piAave.address), ether(16000));
         });
 
         it('it should stake the excess of funds while in the COOLDOWN period', async () => {
-          await aaveWrapper.approve(aaveWrapper.address, ether(500), { from: alice });
-          await aaveWrapper.withdraw(ether(500), { from: alice });
-          await aaveWrapper.approve(aaveWrapper.address, ether(500), { from: alice });
-          await aaveWrapper.withdraw(ether(500), { from: alice });
-          await aaveWrapper.approve(aaveWrapper.address, ether(500), { from: alice });
-          await aaveWrapper.withdraw(ether(500), { from: alice });
-          await aaveWrapper.approve(aaveWrapper.address, ether(500), { from: alice });
-          await aaveWrapper.withdraw(ether(500), { from: alice });
+          await piAave.approve(piAave.address, ether(500), { from: alice });
+          await piAave.withdraw(ether(500), { from: alice });
+          await piAave.approve(piAave.address, ether(500), { from: alice });
+          await piAave.withdraw(ether(500), { from: alice });
+          await piAave.approve(piAave.address, ether(500), { from: alice });
+          await piAave.withdraw(ether(500), { from: alice });
+          await piAave.approve(piAave.address, ether(500), { from: alice });
+          await piAave.withdraw(ether(500), { from: alice });
 
           assert.equal((await aaveRouter.getCoolDownStatus()).status, COOLDOWN_STATUS.COOLDOWN);
 
-          await aave.approve(aaveWrapper.address, ether(10000), { from: bob });
-          await aaveWrapper.deposit(ether(10000), { from: bob });
+          await aave.approve(piAave.address, ether(10000), { from: bob });
+          await piAave.deposit(ether(10000), { from: bob });
         });
       });
     });
 
     describe('do nothing', async () => {
-      it('it should do nothing if the stake hasn\'t changed', async () => {
+      it("it should do nothing if the stake hasn't changed", async () => {
         await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
-        await aave.approve(aaveWrapper.address, ether(1000), { from: alice });
-        await aaveWrapper.deposit(ether(1000), { from: alice });
-        await aave.transfer(aaveWrapper.address, ether(50), { from: alice })
-        assert.equal(await aave.balanceOf(aaveWrapper.address), ether(250));
+        await aave.approve(piAave.address, ether(1000), { from: alice });
+        await piAave.deposit(ether(1000), { from: alice });
+        await aave.transfer(piAave.address, ether(50), { from: alice });
+        assert.equal(await aave.balanceOf(piAave.address), ether(250));
         assert.equal(await aave.balanceOf(stakedAave.address), ether(800));
 
         // 2nd
-        await aaveWrapper.approve(aaveWrapper.address, ether(50), { from: alice });
-        await aaveWrapper.withdraw(ether(50), { from: alice });
+        await piAave.approve(piAave.address, ether(50), { from: alice });
+        await piAave.withdraw(ether(50), { from: alice });
 
         // The router has partially staked the deposit with regard to the reserve ration value (20/80)
-        assert.equal(await aave.balanceOf(aaveWrapper.address), ether(200));
+        assert.equal(await aave.balanceOf(piAave.address), ether(200));
         assert.equal(await aave.balanceOf(stakedAave.address), ether(800));
       });
     });
@@ -252,45 +268,47 @@ describe('AaveRouter Tests', () => {
         await myContract.transferOwnership(executor.address);
 
         await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
-        await aave.approve(aaveWrapper.address, ether('10000'), { from: alice });
-        await aaveWrapper.deposit(ether('10000'), { from: alice });
+        await aave.approve(piAave.address, ether('10000'), { from: alice });
+        await piAave.deposit(ether('10000'), { from: alice });
 
-        assert.equal(await aaveWrapper.totalSupply(), ether('10000'));
-        assert.equal(await aaveWrapper.balanceOf(alice), ether('10000'));
+        assert.equal(await piAave.totalSupply(), ether('10000'));
+        assert.equal(await piAave.balanceOf(alice), ether('10000'));
 
         // The router has partially staked the deposit with regard to the reserve ration value (20/80)
-        assert.equal(await aave.balanceOf(aaveWrapper.address), ether(2000));
+        assert.equal(await aave.balanceOf(piAave.address), ether(2000));
         assert.equal(await aave.balanceOf(stakedAave.address), ether(8000));
 
         // The stakeAave are allocated on the aaveWrapper contract
-        assert.equal(await stakedAave.balanceOf(aaveWrapper.address), ether(8000));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
 
         /// Stake....
         await aave.transfer(alice, ether(12300000), { from: aaveDistributor });
-        await aave.approve(aaveWrapper.address, ether(12300000), { from: alice });
-        await aaveWrapper.deposit(ether(12300000), { from: alice });
-        assert.equal(await stakedAave.balanceOf(aaveWrapper.address), ether(9848000));
-        assert.equal(await aave.balanceOf(aaveWrapper.address), ether(2462000));
+        await aave.approve(piAave.address, ether(12300000), { from: alice });
+        await piAave.deposit(ether(12300000), { from: alice });
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(9848000));
+        assert.equal(await aave.balanceOf(piAave.address), ether(2462000));
 
         await poolRestrictions.setVotingAllowedForSenders(aaveGovernanceV2.address, [alice], [true]);
 
         /// Create a proposal...
         const setAnswerData = myContract.contract.methods.setAnswer(42).encodeABI();
-        const createProposalData = aaveGovernanceV2.contract.methods.create(
-          executor.address,
-          [myContract.address],
-          [0],
-          ['setAnswer(uint256)'],
-          [splitPayload(setAnswerData).calldata],
-          [false],
-          '0x0',
-        ).encodeABI();
+        const createProposalData = aaveGovernanceV2.contract.methods
+          .create(
+            executor.address,
+            [myContract.address],
+            [0],
+            ['setAnswer(uint256)'],
+            [splitPayload(setAnswerData).calldata],
+            [false],
+            '0x0',
+          )
+          .encodeABI();
         assert.equal(await aaveGovernanceV2.getProposalsCount(), '0');
         let res = await aaveRouter.callCreate(splitPayload(createProposalData).calldata, { from: alice });
         assert.equal(await aaveGovernanceV2.getProposalsCount(), '1');
         await expectEvent.inTransaction(res.tx, AaveGovernanceV2, 'ProposalCreated', {
           id: '0',
-          creator: aaveWrapper.address,
+          creator: piAave.address,
           values: ['0'],
           targets: [myContract.address],
           signatures: ['setAnswer(uint256)'],
@@ -303,7 +321,7 @@ describe('AaveRouter Tests', () => {
         res = await aaveRouter.callSubmitVote(0, true, { from: alice });
         await expectEvent.inTransaction(res.tx, AaveGovernanceV2, 'VoteEmitted', {
           id: '0',
-          voter: aaveWrapper.address,
+          voter: piAave.address,
           support: true,
           votingPower: ether(12310000),
         });

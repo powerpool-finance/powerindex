@@ -3,6 +3,8 @@
 pragma solidity 0.6.12;
 
 interface YearnGovernanceInterface {
+  function getReward() external;
+
   function stake(uint256 amount) external;
 
   function withdraw(uint256 amount) external;
