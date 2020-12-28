@@ -101,11 +101,11 @@ describe('PowerIndexPoolController', () => {
     );
     defaultFactoryArgs = web3.eth.abi.encodeParameter({
       BasicConfig: {
-        poolRestrictions: "address",
-        voting: "address",
-        staking: "address",
-        reserveRatio: "uint256",
-        rebalancingInterval: "uint256",
+        poolRestrictions: 'address',
+        voting: 'address',
+        staking: 'address',
+        reserveRatio: 'uint256',
+        rebalancingInterval: 'uint256',
       }
     }, defaultBasicConfig);
   });

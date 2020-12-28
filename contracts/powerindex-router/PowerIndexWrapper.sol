@@ -214,7 +214,10 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     return piToken;
   }
 
-  function _processUnderlyingOrPiTokenIn(address underlyingOrPiToken, uint256 amount) internal returns (address factToken) {
+  function _processUnderlyingOrPiTokenIn(address underlyingOrPiToken, uint256 amount)
+    internal
+    returns (address factToken)
+  {
     address underlyingToken = underlyingByPiToken[underlyingOrPiToken];
     if (underlyingToken == address(0)) {
       return _processUnderlyingTokenIn(underlyingOrPiToken, amount);
@@ -251,7 +254,10 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     if (underlyingToken == address(0)) {
       _processUnderlyingTokenOut(underlyingOrPiToken, IERC20(underlyingOrPiToken).balanceOf(address(this)));
     } else {
-      _processUnderlyingTokenOut(underlyingToken, WrappedPiErc20Interface(underlyingOrPiToken).balanceOf(address(this)));
+      _processUnderlyingTokenOut(
+        underlyingToken,
+        WrappedPiErc20Interface(underlyingOrPiToken).balanceOf(address(this))
+      );
     }
   }
 

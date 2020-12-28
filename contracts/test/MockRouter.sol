@@ -8,10 +8,7 @@ import "../powerindex-router/PowerIndexBasicRouter.sol";
 contract MockRouter is PowerIndexBasicRouter {
   event MockWrapperCallback(uint256 withdrawAmount);
 
-  constructor(address _piToken, BasicConfig memory _basicConfig)
-    public
-    PowerIndexBasicRouter(_piToken, _basicConfig)
-  {}
+  constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexBasicRouter(_piToken, _basicConfig) {}
 
   function piTokenCallback(uint256 _withdrawAmount) external virtual override {
     emit MockWrapperCallback(_withdrawAmount);

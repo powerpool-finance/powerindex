@@ -57,8 +57,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     string calldata _name,
     string calldata _symbol
   ) external onlyOwner {
-    WrappedPiErc20Interface piToken =
-      _createPiToken(_underlyingToken, _routerFactory, _routerArgs, _name, _symbol);
+    WrappedPiErc20Interface piToken = _createPiToken(_underlyingToken, _routerFactory, _routerArgs, _name, _symbol);
     emit CreatePiToken(_underlyingToken, address(piToken));
   }
 
