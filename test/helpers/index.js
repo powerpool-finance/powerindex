@@ -107,7 +107,8 @@ async function expectExactRevert(promise, expectedMsg) {
   try {
     await promise;
   } catch (error) {
-    if (error.message !== expectedMsg) {
+    const coverageTailoredError = `Returned error: VM Exception while processing transaction: revert ${expectedMsg}`;
+    if (error.message !== expectedMsg && error.message !== coverageTailoredError) {
       assert.equal(
         error.message,
         `VM Exception while processing transaction: revert ${expectedMsg}`,

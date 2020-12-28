@@ -1,9 +1,9 @@
 const { time, constants, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
-const { ether, mwei, getResTimestamp } = require('../../helpers');
+const { ether, mwei, getResTimestamp,fetchLogs } = require('../../helpers');
 const { buildBasicRouterConfig, buildYearnRouterConfig } = require('../../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
-const PowerIndexRouter = artifacts.require('YearnPowerIndexRouter');
+const YearnPowerIndexRouter = artifacts.require('YearnPowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const MockYearnGovernance = artifacts.require('MockYearnGovernance');
@@ -14,7 +14,7 @@ const MockWETH = artifacts.require('MockWETH');
 const MockGulpingBPool = artifacts.require('MockGulpingBPool');
 
 MockERC20.numberFormat = 'String';
-PowerIndexRouter.numberFormat = 'String';
+YearnPowerIndexRouter.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 MockYearnGovernance.numberFormat = 'String';
 
@@ -64,7 +64,7 @@ describe('YearnRouter Tests', () => {
 
     poolRestrictions = await PoolRestrictions.new();
     piYfi = await WrappedPiErc20.new(yfi.address, stub, 'wrapped.yearn.finance', 'piYFI');
-    yfiRouter = await PowerIndexRouter.new(
+    yfiRouter = await YearnPowerIndexRouter.new(
       piYfi.address,
       buildBasicRouterConfig(
         poolRestrictions.address,
@@ -424,7 +424,7 @@ describe('YearnRouter Tests', () => {
     });
 
     it('should revert when missing reward pools config', async () => {
-      const router = await PowerIndexRouter.new(
+      const router = await YearnPowerIndexRouter.new(
         piYfi.address,
         buildBasicRouterConfig(
           poolRestrictions.address,
@@ -449,7 +449,7 @@ describe('YearnRouter Tests', () => {
     });
 
     it('should revert when missing reward swap path', async () => {
-      const router = await PowerIndexRouter.new(
+      const router = await YearnPowerIndexRouter.new(
         piYfi.address,
         buildBasicRouterConfig(
           poolRestrictions.address,

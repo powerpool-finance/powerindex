@@ -79,7 +79,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 lastRebalancedAt_ = lastRebalancedAt;
     uint256 rebalancingInterval_ = rebalancingInterval;
 
-    if (blockTimestamp_ <= lastRebalancedAt_.add(rebalancingInterval)) {
+    if (blockTimestamp_ < lastRebalancedAt_.add(rebalancingInterval)) {
       emit IgnoreRebalancing(blockTimestamp_, lastRebalancedAt_, rebalancingInterval_);
       return false;
     }
