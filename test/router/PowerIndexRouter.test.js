@@ -38,51 +38,51 @@ describe('PowerIndex BasicRouter Test', () => {
   });
 
   describe('weighed underlying', () => {
-    let leakingRouter, wrapper, token;
+    let leakingRouter, piToken, token;
 
     beforeEach(async () => {
       token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
-      wrapper = await WrappedPiErc20.new(token.address, stub, 'WToken', 'WTKN');
-      leakingRouter = await MockLeakingRouter.new(wrapper.address, defaultBasicConfig);
+      piToken = await WrappedPiErc20.new(token.address, stub, 'piToken', 'piTKN');
+      leakingRouter = await MockLeakingRouter.new(piToken.address, defaultBasicConfig);
 
-      await wrapper.changeRouter(leakingRouter.address, { from: stub });
+      await piToken.changeRouter(leakingRouter.address, { from: stub });
     });
 
     it('should', async () => {
       await token.transfer(alice, ether('100'));
-      await token.approve(wrapper.address, ether('100'), { from: alice });
-      await wrapper.deposit(ether('100'), { from: alice });
+      await token.approve(piToken.address, ether('100'), { from: alice });
+      await piToken.deposit(ether('100'), { from: alice });
     });
   });
 
   describe('changeRouter()', () => {
     it('should allow swapping a token with a new version', async () => {
       const token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
-      const wrapper = await WrappedPiErc20.new(token.address, stub, 'WToken', 'WTKN');
-      const router = await PowerIndexBasicRouter.new(wrapper.address, defaultBasicConfig);
-      const router2 = await PowerIndexBasicRouter.new(wrapper.address, defaultBasicConfig);
+      const piToken = await WrappedPiErc20.new(token.address, stub, 'piToken', 'piTKN');
+      const router = await PowerIndexBasicRouter.new(piToken.address, defaultBasicConfig);
+      const router2 = await PowerIndexBasicRouter.new(piToken.address, defaultBasicConfig);
 
-      await wrapper.changeRouter(router.address, { from: stub });
+      await piToken.changeRouter(router.address, { from: stub });
 
       assert.equal(await router.owner(), minter);
 
       await token.transfer(alice, ether('100'));
-      await token.approve(wrapper.address, ether('100'), { from: alice });
-      await wrapper.deposit(ether('100'), { from: alice });
+      await token.approve(piToken.address, ether('100'), { from: alice });
+      await piToken.deposit(ether('100'), { from: alice });
 
-      assert.equal(await wrapper.totalSupply(), ether('100'));
-      assert.equal(await wrapper.balanceOf(alice), ether('100'));
+      assert.equal(await piToken.totalSupply(), ether('100'));
+      assert.equal(await piToken.balanceOf(alice), ether('100'));
 
-      await expectRevert(wrapper.changeRouter(bob), 'ONLY_ROUTER');
-      await router.migrateToNewRouter(wrapper.address, router2.address);
+      await expectRevert(piToken.changeRouter(bob), 'ONLY_ROUTER');
+      await router.migrateToNewRouter(piToken.address, router2.address);
 
-      assert.equal(await wrapper.router(), router2.address);
+      assert.equal(await piToken.router(), router2.address);
 
-      await wrapper.approve(wrapper.address, ether('100'), { from: alice });
-      await wrapper.withdraw(ether('100'), { from: alice });
+      await piToken.approve(piToken.address, ether('100'), { from: alice });
+      await piToken.withdraw(ether('100'), { from: alice });
 
-      assert.equal(await wrapper.totalSupply(), ether('0'));
-      assert.equal(await wrapper.balanceOf(alice), ether('0'));
+      assert.equal(await piToken.totalSupply(), ether('0'));
+      assert.equal(await piToken.balanceOf(alice), ether('0'));
       assert.equal(await token.balanceOf(alice), ether('100'));
     });
   });
@@ -92,8 +92,8 @@ describe('PowerIndex BasicRouter Test', () => {
 
     before(async () => {
       const token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
-      const wrapper = await WrappedPiErc20.new(token.address, stub, 'WToken', 'WTKN');
-      router = await PowerIndexBasicRouter.new(wrapper.address, defaultBasicConfig);
+      const piToken = await WrappedPiErc20.new(token.address, stub, 'piToken', 'piTKN');
+      router = await PowerIndexBasicRouter.new(piToken.address, defaultBasicConfig);
     });
 
     describe('getPiEquivalentForUnderlyingPure()', async () => {
