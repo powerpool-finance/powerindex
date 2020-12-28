@@ -12,32 +12,32 @@ import "../lib/ControllerOwnable.sol";
 contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
   using SafeMath for uint256;
 
-  event SetWrapper(address indexed token, address indexed wrapper);
+  event SetPiTokenForUnderlying(address indexed underlyingToken, address indexed piToken);
 
   BPoolInterface public immutable bpool;
 
-  mapping(address => address) public wrapperByToken;
-  mapping(address => address) public tokenByWrapper;
+  mapping(address => address) public piTokenByUnderlying;
+  mapping(address => address) public underlyingByPiToken;
 
   constructor(address _bpool) public ControllerOwnable() {
     bpool = BPoolInterface(_bpool);
   }
 
-  function setTokenWrapperList(address[] calldata _tokens, address[] calldata _wrappers)
+  function setPiTokenForUnderlyingsMultiple(address[] calldata _underlyingTokens, address[] calldata _piTokens)
     external
     override
     onlyController
   {
-    uint256 len = _tokens.length;
-    require(len == _wrappers.length, "LENGTH_DONT_MATCH");
+    uint256 len = _underlyingTokens.length;
+    require(len == _piTokens.length, "LENGTH_DONT_MATCH");
 
     for (uint256 i = 0; i < len; i++) {
-      _setTokenWrapper(_tokens[i], _wrappers[i]);
+      _setPiTokenForUnderlying(_underlyingTokens[i], _piTokens[i]);
     }
   }
 
-  function setTokenWrapper(address _token, address _wrapper) external override onlyController {
-    _setTokenWrapper(_token, _wrapper);
+  function setPiTokenForUnderlying(address _underlyingToken, address _piToken) external override onlyController {
+    _setPiTokenForUnderlying(_underlyingToken, _piToken);
   }
 
   function swapExactAmountOut(
@@ -47,7 +47,7 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     uint256 tokenAmountOut,
     uint256 maxPrice
   ) external returns (uint256 tokenAmountIn, uint256 spotPriceAfter) {
-    address factTokenIn = _processTokenIn(tokenIn, maxAmountIn);
+    address factTokenIn = _processUnderlyingTokenIn(tokenIn, maxAmountIn);
     address factTokenOut = _getFactToken(tokenOut);
 
     (tokenAmountIn, spotPriceAfter) = bpool.swapExactAmountOut(
@@ -58,8 +58,8 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
       maxPrice
     );
 
-    _processTokenOut(tokenIn, maxAmountIn.sub(tokenAmountIn));
-    _processTokenOutBalance(tokenOut);
+    _processUnderlyingTokenOut(tokenIn, maxAmountIn.sub(tokenAmountIn));
+    _processUnderlyingTokenOutBalance(tokenOut);
 
     return (tokenAmountIn, spotPriceAfter);
   }
@@ -71,7 +71,7 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     uint256 minAmountOut,
     uint256 maxPrice
   ) external returns (uint256 tokenAmountOut, uint256 spotPriceAfter) {
-    address factTokenIn = _processTokenIn(tokenIn, tokenAmountIn);
+    address factTokenIn = _processUnderlyingTokenIn(tokenIn, tokenAmountIn);
     address factTokenOut = _getFactToken(tokenOut);
 
     (tokenAmountOut, spotPriceAfter) = bpool.swapExactAmountIn(
@@ -82,7 +82,7 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
       maxPrice
     );
 
-    _processTokenOutBalance(tokenOut);
+    _processUnderlyingTokenOutBalance(tokenOut);
 
     return (tokenAmountOut, spotPriceAfter);
   }
@@ -92,11 +92,11 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     require(maxAmountsIn.length == tokens.length, "ERR_LENGTH_MISMATCH");
 
     for (uint256 i = 0; i < tokens.length; i++) {
-      _processTokenOrWrapperIn(tokens[i], maxAmountsIn[i]);
+      _processUnderlyingOrPiTokenIn(tokens[i], maxAmountsIn[i]);
     }
     bpool.joinPool(poolAmountOut, maxAmountsIn);
     for (uint256 i = 0; i < tokens.length; i++) {
-      _processTokenOrWrapperOutBalance(tokens[i]);
+      _processUnderlyingOrPiTokenOutBalance(tokens[i]);
     }
     require(bpool.transfer(msg.sender, bpool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
   }
@@ -110,7 +110,7 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     bpool.exitPool(poolAmountIn, minAmountsOut);
 
     for (uint256 i = 0; i < tokens.length; i++) {
-      _processTokenOrWrapperOutBalance(tokens[i]);
+      _processUnderlyingOrPiTokenOutBalance(tokens[i]);
     }
   }
 
@@ -119,7 +119,7 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     uint256 tokenAmountIn,
     uint256 minPoolAmountOut
   ) external returns (uint256 poolAmountOut) {
-    address factTokenIn = _processTokenIn(tokenIn, tokenAmountIn);
+    address factTokenIn = _processUnderlyingTokenIn(tokenIn, tokenAmountIn);
     poolAmountOut = bpool.joinswapExternAmountIn(factTokenIn, tokenAmountIn, minPoolAmountOut);
     require(bpool.transfer(msg.sender, bpool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
     return poolAmountOut;
@@ -130,9 +130,9 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     uint256 poolAmountOut,
     uint256 maxAmountIn
   ) external returns (uint256 tokenAmountIn) {
-    address factTokenIn = _processTokenIn(tokenIn, maxAmountIn);
+    address factTokenIn = _processUnderlyingTokenIn(tokenIn, maxAmountIn);
     tokenAmountIn = bpool.joinswapPoolAmountOut(factTokenIn, poolAmountOut, maxAmountIn);
-    _processTokenOut(tokenIn, maxAmountIn.sub(tokenAmountIn));
+    _processUnderlyingTokenOut(tokenIn, maxAmountIn.sub(tokenAmountIn));
     require(bpool.transfer(msg.sender, bpool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
     return tokenAmountIn;
   }
@@ -147,7 +147,7 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
 
     address factTokenOut = _getFactToken(tokenOut);
     tokenAmountOut = bpool.exitswapPoolAmountIn(factTokenOut, poolAmountIn, minAmountOut);
-    _processTokenOutBalance(tokenOut);
+    _processUnderlyingTokenOutBalance(tokenOut);
     return tokenAmountOut;
   }
 
@@ -161,7 +161,7 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
 
     address factTokenOut = _getFactToken(tokenOut);
     poolAmountIn = bpool.exitswapExternAmountOut(factTokenOut, tokenAmountOut, maxPoolAmountIn);
-    _processTokenOutBalance(tokenOut);
+    _processUnderlyingTokenOutBalance(tokenOut);
     require(bpool.transfer(msg.sender, maxPoolAmountIn.sub(poolAmountIn)), "ERR_TRANSFER_FAILED");
     return poolAmountIn;
   }
@@ -190,85 +190,85 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     return bpool.getSwapFee();
   }
 
-  function _processTokenIn(address token, uint256 amount) internal returns (address factToken) {
+  function _processUnderlyingTokenIn(address underlyingToken, uint256 amount) internal returns (address factToken) {
     if (amount == 0) {
-      return token;
+      return underlyingToken;
     }
-    require(IERC20(token).transferFrom(msg.sender, address(this), amount), "ERR_TRANSFER_FAILED");
+    require(IERC20(underlyingToken).transferFrom(msg.sender, address(this), amount), "ERR_TRANSFER_FAILED");
 
-    address wrapper = wrapperByToken[token];
-    if (wrapper == address(0)) {
-      if (IERC20(token).allowance(address(this), address(bpool)) > 0) {
-        IERC20(token).approve(address(bpool), 0);
+    address piToken = piTokenByUnderlying[underlyingToken];
+    if (piToken == address(0)) {
+      if (IERC20(underlyingToken).allowance(address(this), address(bpool)) > 0) {
+        IERC20(underlyingToken).approve(address(bpool), 0);
       }
-      IERC20(token).approve(address(bpool), amount);
-      return token;
+      IERC20(underlyingToken).approve(address(bpool), amount);
+      return underlyingToken;
     }
 
-    if (IERC20(token).allowance(address(this), wrapper) > 0) {
-      IERC20(token).approve(wrapper, 0);
+    if (IERC20(underlyingToken).allowance(address(this), piToken) > 0) {
+      IERC20(underlyingToken).approve(piToken, 0);
     }
-    IERC20(token).approve(wrapper, amount);
-    WrappedPiErc20Interface(wrapper).deposit(amount);
-    WrappedPiErc20Interface(wrapper).approve(address(bpool), amount);
-    return wrapper;
+    IERC20(underlyingToken).approve(piToken, amount);
+    WrappedPiErc20Interface(piToken).deposit(amount);
+    WrappedPiErc20Interface(piToken).approve(address(bpool), amount);
+    return piToken;
   }
 
-  function _processTokenOrWrapperIn(address tokenOrWrapper, uint256 amount) internal returns (address factToken) {
-    address token = tokenByWrapper[tokenOrWrapper];
-    if (token == address(0)) {
-      return _processTokenIn(tokenOrWrapper, amount);
+  function _processUnderlyingOrPiTokenIn(address underlyingOrPiToken, uint256 amount) internal returns (address factToken) {
+    address underlyingToken = underlyingByPiToken[underlyingOrPiToken];
+    if (underlyingToken == address(0)) {
+      return _processUnderlyingTokenIn(underlyingOrPiToken, amount);
     } else {
-      return _processTokenIn(token, amount);
+      return _processUnderlyingTokenIn(underlyingToken, amount);
     }
   }
 
-  function _processTokenOut(address token, uint256 amount) internal {
+  function _processUnderlyingTokenOut(address underlyingToken, uint256 amount) internal {
     if (amount == 0) {
       return;
     }
-    address wrapper = wrapperByToken[token];
+    address piToken = piTokenByUnderlying[underlyingToken];
 
-    if (wrapper != address(0)) {
-      WrappedPiErc20Interface(wrapper).approve(wrapper, amount);
-      WrappedPiErc20Interface(wrapper).withdraw(amount);
+    if (piToken != address(0)) {
+      WrappedPiErc20Interface(piToken).approve(piToken, amount);
+      WrappedPiErc20Interface(piToken).withdraw(amount);
     }
 
-    require(IERC20(token).transfer(msg.sender, amount), "ERR_TRANSFER_FAILED");
+    require(IERC20(underlyingToken).transfer(msg.sender, amount), "ERR_TRANSFER_FAILED");
   }
 
-  function _processTokenOutBalance(address token) internal {
-    address wrapper = wrapperByToken[token];
-    if (wrapper == address(0)) {
-      _processTokenOut(token, IERC20(token).balanceOf(address(this)));
+  function _processUnderlyingTokenOutBalance(address underlyingToken) internal {
+    address piToken = piTokenByUnderlying[underlyingToken];
+    if (piToken == address(0)) {
+      _processUnderlyingTokenOut(underlyingToken, IERC20(underlyingToken).balanceOf(address(this)));
     } else {
-      _processTokenOut(token, WrappedPiErc20Interface(wrapper).balanceOf(address(this)));
+      _processUnderlyingTokenOut(underlyingToken, WrappedPiErc20Interface(piToken).balanceOf(address(this)));
     }
   }
 
-  function _processTokenOrWrapperOutBalance(address tokenOrWrapper) internal {
-    address token = tokenByWrapper[tokenOrWrapper];
-    if (token == address(0)) {
-      _processTokenOut(tokenOrWrapper, IERC20(tokenOrWrapper).balanceOf(address(this)));
+  function _processUnderlyingOrPiTokenOutBalance(address underlyingOrPiToken) internal {
+    address underlyingToken = underlyingByPiToken[underlyingOrPiToken];
+    if (underlyingToken == address(0)) {
+      _processUnderlyingTokenOut(underlyingOrPiToken, IERC20(underlyingOrPiToken).balanceOf(address(this)));
     } else {
-      _processTokenOut(token, WrappedPiErc20Interface(tokenOrWrapper).balanceOf(address(this)));
+      _processUnderlyingTokenOut(underlyingToken, WrappedPiErc20Interface(underlyingOrPiToken).balanceOf(address(this)));
     }
   }
 
   function _getFactToken(address token) internal view returns (address) {
-    address wrapper = wrapperByToken[token];
-    if (wrapper == address(0)) {
+    address piToken = piTokenByUnderlying[token];
+    if (piToken == address(0)) {
       return token;
     } else {
-      return wrapper;
+      return piToken;
     }
   }
 
-  function _setTokenWrapper(address token, address wrapper) internal {
-    wrapperByToken[token] = wrapper;
-    if (wrapper != address(0)) {
-      tokenByWrapper[wrapper] = token;
+  function _setPiTokenForUnderlying(address underlyingToken, address piToken) internal {
+    piTokenByUnderlying[underlyingToken] = piToken;
+    if (piToken != address(0)) {
+      underlyingByPiToken[piToken] = underlyingToken;
     }
-    emit SetWrapper(token, wrapper);
+    emit SetPiTokenForUnderlying(underlyingToken, piToken);
   }
 }
