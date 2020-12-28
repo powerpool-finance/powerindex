@@ -50,7 +50,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
   it('should initialize correctly', async () => {
     assert.equal(await piYfi.name(), 'wrapped.yearn.finance');
-    assert.equal(await piYfi.symbol(), 'WYFI');
+    assert.equal(await piYfi.symbol(), 'piYFI');
     assert.equal(await piYfi.underlying(), yfi.address);
     assert.equal(await piYfi.router(), router.address);
     assert.equal(await piYfi.totalSupply(), 0);
@@ -88,7 +88,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
     });
 
     it('should use default revert message for an empty returndata', async () => {
-      const data = myContract.contract.methods.revert().encodeABI();
+      const data = myContract.contract.methods.revertWithoutString().encodeABI();
       await expectExactRevert(
         piYfi.callExternal(myContract.address, data, '0x', 0, { from: alice }),
         'REVERTED_WITH_NO_REASON_STRING',
