@@ -67,10 +67,10 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
     _redeem();
   }
 
-  /*** WRAPPED TOKEN CALLBACK ***/
+  /*** PI TOKEN CALLBACK ***/
 
-  function wrapperCallback(uint256 _withdrawAmount) external override {
-    address wrappedToken_ = msg.sender;
+  function piTokenCallback(uint256 _withdrawAmount) external override {
+    address piToken_ = msg.sender;
 
     // Ignore the tokens without a voting assigned
     if (staking == address(0)) {
@@ -79,10 +79,10 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
 
     CurveStakeInterface staking_ = CurveStakeInterface(staking);
     (ReserveStatus status, uint256 diff, uint256 reserveAmount) =
-      _getReserveStatus(staking_.balanceOf(wrappedToken_), _withdrawAmount);
+      _getReserveStatus(staking_.balanceOf(piToken_), _withdrawAmount);
 
     if (status == ReserveStatus.SHORTAGE) {
-      (, uint256 end) = staking_.locked(wrappedToken_);
+      (, uint256 end) = staking_.locked(piToken_);
       if (end < block.timestamp) {
         _redeem();
         _stake(reserveAmount);

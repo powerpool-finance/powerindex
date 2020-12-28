@@ -101,22 +101,22 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     return getReserveStatusPure(reserveRatio, piToken.getUnderlyingBalance(), _stakedBalance, _withdrawAmount);
   }
 
-  function getPiEquivalentFroUnderlying(
+  function getPiEquivalentForUnderlying(
     uint256 _underlyingAmount,
     IERC20 _underlyingToken,
-    uint256 _underlyingOnWrapper,
+    uint256 _underlyingOnPiToken,
     uint256 _piTotalSupply
   ) external view override returns (uint256) {
     return
-      getPiEquivalentFroUnderlyingPure(
+      getPiEquivalentForUnderlyingPure(
         _underlyingAmount,
-        // _underlyingOnWrapper + _underlyingToken.balanceOf(staking),
-        _underlyingOnWrapper.add(_underlyingToken.balanceOf(staking)),
+        // _underlyingOnPiToken + _underlyingToken.balanceOf(staking),
+        _underlyingOnPiToken.add(_underlyingToken.balanceOf(staking)),
         _piTotalSupply
       );
   }
 
-  function getPiEquivalentFroUnderlyingPure(
+  function getPiEquivalentForUnderlyingPure(
     uint256 _underlyingAmount,
     uint256 _totalUnderlyingWrapped,
     uint256 _piTotalSupply
@@ -131,7 +131,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   /**
    * @notice Calculates the desired reserve status
    * @param _reserveRatioPct The reserve ratio in %, 1 ether == 100 ether
-   * @param _leftOnWrapper The amount of origin tokens left on the token-wrapper (WrappedPiErc20) contract
+   * @param _leftOnPiToken The amount of origin tokens left on the piToken (WrappedPiErc20) contract
    * @param _stakedBalance The amount of original tokens staked on the staking contract
    * @param _withdrawAmount The amount to be withdrawn within the current transaction
    *                        (could be negative in a case of deposit)
@@ -147,7 +147,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
    */
   function getReserveStatusPure(
     uint256 _reserveRatioPct,
-    uint256 _leftOnWrapper,
+    uint256 _leftOnPiToken,
     uint256 _stakedBalance,
     uint256 _withdrawAmount
   )
@@ -160,14 +160,14 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     )
   {
     require(_reserveRatioPct <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
-    expectedReserveAmount = getExpectedReserveAmount(_reserveRatioPct, _leftOnWrapper, _stakedBalance, _withdrawAmount);
+    expectedReserveAmount = getExpectedReserveAmount(_reserveRatioPct, _leftOnPiToken, _stakedBalance, _withdrawAmount);
 
-    if (expectedReserveAmount > _leftOnWrapper) {
+    if (expectedReserveAmount > _leftOnPiToken) {
       status = ReserveStatus.SHORTAGE;
-      diff = expectedReserveAmount.sub(_leftOnWrapper);
-    } else if (expectedReserveAmount < _leftOnWrapper) {
+      diff = expectedReserveAmount.sub(_leftOnPiToken);
+    } else if (expectedReserveAmount < _leftOnPiToken) {
       status = ReserveStatus.EXCESS;
-      diff = _leftOnWrapper.sub(expectedReserveAmount);
+      diff = _leftOnPiToken.sub(expectedReserveAmount);
     } else {
       status = ReserveStatus.EQUILIBRIUM;
       diff = 0;
@@ -177,24 +177,24 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   /**
    * @notice Calculates an expected reserve amount after the transaction taking into an account the withdrawAmount
    * @param _reserveRatioPct % of a reserve ratio, 1 ether == 100%
-   * @param _leftOnWrapper The amount of origin tokens left on the token-wrapper (WrappedPiErc20) contract
+   * @param _leftOnPiToken The amount of origin tokens left on the piToken (WrappedPiErc20) contract
    * @param _stakedBalance The amount of original tokens staked on the staking contract
    * @param _withdrawAmount The amount to be withdrawn within the current transaction
    *                        (could be negative in a case of deposit)
    * @return expectedReserveAmount The expected reserve amount
    *
-   *                           / %reserveRatio * (staked + leftOnWrapper - withdrawAmount) \
+   *                           / %reserveRatio * (staked + _leftOnPiToken - withdrawAmount) \
    * expectedReserveAmount =  | ------------------------------------------------------------| + withdrawAmount
    *                           \                         100%                              /
    */
   function getExpectedReserveAmount(
     uint256 _reserveRatioPct,
-    uint256 _leftOnWrapper,
+    uint256 _leftOnPiToken,
     uint256 _stakedBalance,
     uint256 _withdrawAmount
   ) public pure returns (uint256) {
     return
-      _reserveRatioPct.mul(_stakedBalance.add(_leftOnWrapper).sub(_withdrawAmount)).div(HUNDRED_PCT).add(
+      _reserveRatioPct.mul(_stakedBalance.add(_leftOnPiToken).sub(_withdrawAmount)).div(HUNDRED_PCT).add(
         _withdrawAmount
       );
   }

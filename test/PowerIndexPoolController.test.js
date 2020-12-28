@@ -267,18 +267,18 @@ describe('PowerIndexPoolController', () => {
   });
 
   it('should allow swapping a token with a new wrapped version', async () => {
-    let res = await controller.replacePoolTokenWithNewWrapped(this.token2.address, routerFactory.address, defaultFactoryArgs, 'WrappedTKN2', 'WTKN2');
-    const wToken2 = await WrappedPiErc20.at(res.logs.filter(l => l.event === 'ReplacePoolTokenWithWrapped')[0].args.wrappedToken);
+    let res = await controller.replacePoolTokenWithNewPiToken(this.token2.address, routerFactory.address, defaultFactoryArgs, 'WrappedTKN2', 'WTKN2');
+    const wToken2 = await WrappedPiErc20.at(res.logs.filter(l => l.event === 'ReplacePoolTokenWithPiToken')[0].args.piToken);
 
     await time.increase(60);
     await controller.finishReplace();
 
-    expectEvent.inTransaction(res, BasicPowerIndexRouterFactory, 'BuildBasicRouter', {
+    await expectEvent.inTransaction(res.tx, BasicPowerIndexRouterFactory, 'BuildBasicRouter', {
       builder: controller.address
     });
-    expectEvent(res, 'ReplacePoolTokenWithWrapped', {
-      existingToken: this.token2.address,
-      wrappedToken: wToken2.address,
+    expectEvent(res, 'ReplacePoolTokenWithPiToken', {
+      underlyingToken: this.token2.address,
+      piToken: wToken2.address,
       balance: ether('20'),
       denormalizedWeight: ether('25'),
     });
@@ -326,10 +326,10 @@ describe('PowerIndexPoolController', () => {
     const router = await PowerIndexRouter.new(wToken2.address, defaultBasicConfig);
     wToken2.changeRouter(router.address, { from: stub });
 
-    res = await controller.replacePoolTokenWithExistingWrapped(this.token2.address, wToken2.address);
-    expectEvent(res, 'ReplacePoolTokenWithWrapped', {
-      existingToken: this.token2.address,
-      wrappedToken: wToken2.address,
+    res = await controller.replacePoolTokenWithExistingPiToken(this.token2.address, wToken2.address);
+    expectEvent(res, 'ReplacePoolTokenWithPiToken', {
+      underlyingToken: this.token2.address,
+      piToken: wToken2.address,
       balance: ether('20'),
       denormalizedWeight: ether('25'),
     });
@@ -375,8 +375,8 @@ describe('PowerIndexPoolController', () => {
   });
 
   it('should allow making a wrapped token join and exit', async () => {
-    let res = await controller.replacePoolTokenWithNewWrapped(this.token2.address, routerFactory.address, defaultFactoryArgs, 'WrappedTKN2', 'WTKN2');
-    const wToken2 = await WrappedPiErc20.at(res.logs.filter(l => l.event === 'ReplacePoolTokenWithWrapped')[0].args.wrappedToken);
+    let res = await controller.replacePoolTokenWithNewPiToken(this.token2.address, routerFactory.address, defaultFactoryArgs, 'WrappedTKN2', 'WTKN2');
+    const wToken2 = await WrappedPiErc20.at(res.logs.filter(l => l.event === 'ReplacePoolTokenWithPiToken')[0].args.piToken);
     assert.equal(await wToken2.balanceOf(pool.address), ether('20'));
     assert.equal(await pool.isBound(this.token2.address), false);
     assert.equal(await pool.isBound(wToken2.address), true);

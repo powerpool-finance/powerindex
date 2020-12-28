@@ -43,10 +43,10 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     _redeem(_amount);
   }
 
-  /*** WRAPPED TOKEN CALLBACK ***/
+  /*** PI TOKEN CALLBACK ***/
 
-  function wrapperCallback(uint256 _withdrawAmount) external override {
-    address wrappedToken_ = msg.sender;
+  function piTokenCallback(uint256 _withdrawAmount) external override {
+    address piToken_ = msg.sender;
 
     // Ignore the tokens without a voting assigned
     if (staking == address(0)) {
@@ -59,7 +59,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     }
 
     (ReserveStatus reserveStatus, uint256 diff, ) =
-      _getReserveStatus(IERC20(staking).balanceOf(wrappedToken_), _withdrawAmount);
+      _getReserveStatus(IERC20(staking).balanceOf(piToken_), _withdrawAmount);
 
     // TODO: add lastUpdated constraint
     if (reserveStatus == ReserveStatus.SHORTAGE) {

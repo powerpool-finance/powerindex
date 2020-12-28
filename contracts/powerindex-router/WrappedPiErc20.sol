@@ -38,18 +38,18 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
   }
 
   function pokeRouter() external {
-    PowerIndexNaiveRouterInterface(router).wrapperCallback(0);
+    PowerIndexNaiveRouterInterface(router).piTokenCallback(0);
   }
 
   /**
-   * @notice Deposits underlying token to the wrapper
+   * @notice Deposits underlying token to the piToken
    * @param _depositAmount The amount to deposit in underlying tokens
    */
   function deposit(uint256 _depositAmount) external override {
     require(_depositAmount > 0, "ZERO_DEPOSIT");
 
     uint256 mintAmount =
-      PowerIndexBasicRouterInterface(router).getPiEquivalentFroUnderlying(
+      PowerIndexBasicRouterInterface(router).getPiEquivalentForUnderlying(
         _depositAmount,
         underlying,
         underlying.balanceOf(address(this)),
@@ -62,20 +62,20 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
 
     emit Deposit(_msgSender(), _depositAmount, mintAmount);
 
-    PowerIndexNaiveRouterInterface(router).wrapperCallback(0);
+    PowerIndexNaiveRouterInterface(router).piTokenCallback(0);
   }
 
   /**
-   * @notice Withdraws underlying token from the wrapper
+   * @notice Withdraws underlying token from the piToken
    * @param _withdrawAmount The amount to withdraw in underlying tokens
    */
   function withdraw(uint256 _withdrawAmount) external override {
     require(_withdrawAmount > 0, "ZERO_WITHDRAWAL");
 
-    PowerIndexNaiveRouterInterface(router).wrapperCallback(_withdrawAmount);
+    PowerIndexNaiveRouterInterface(router).piTokenCallback(_withdrawAmount);
 
     uint256 burnAmount =
-      PowerIndexBasicRouterInterface(router).getPiEquivalentFroUnderlying(
+      PowerIndexBasicRouterInterface(router).getPiEquivalentForUnderlying(
         _withdrawAmount,
         underlying,
         underlying.balanceOf(address(this)),

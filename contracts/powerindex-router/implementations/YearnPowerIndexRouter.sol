@@ -240,9 +240,9 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     _redeem(_amount);
   }
 
-  /*** WRAPPED TOKEN CALLBACK ***/
+  /*** PI TOKEN CALLBACK ***/
 
-  function wrapperCallback(uint256 _withdrawAmount) external override {
+  function piTokenCallback(uint256 _withdrawAmount) external override {
     address piToken_ = msg.sender;
 
     // Ignore the tokens without a voting assigned

@@ -96,11 +96,11 @@ describe('PowerIndex BasicRouter Test', () => {
       router = await PowerIndexBasicRouter.new(wrapper.address, defaultBasicConfig);
     });
 
-    describe('getPiEquivalentFroUnderlyingPure()', async () => {
+    describe('getPiEquivalentForUnderlyingPure()', async () => {
       it('should calculate valid values', async () => {
         // Case #1
         assert.equal(
-          await router.getPiEquivalentFroUnderlyingPure(
+          await router.getPiEquivalentForUnderlyingPure(
             // amount
             ether(100),
             // totalUnderlyingWrapped
@@ -113,7 +113,7 @@ describe('PowerIndex BasicRouter Test', () => {
 
         // Case #2
         assert.equal(
-          await router.getPiEquivalentFroUnderlyingPure(
+          await router.getPiEquivalentForUnderlyingPure(
             // amount
             ether(100),
             // totalUnderlyingWrapped
@@ -126,7 +126,7 @@ describe('PowerIndex BasicRouter Test', () => {
 
         // Case #3
         assert.equal(
-          await router.getPiEquivalentFroUnderlyingPure(
+          await router.getPiEquivalentForUnderlyingPure(
             // amount
             ether(100),
             // totalUnderlyingWrapped
@@ -139,7 +139,7 @@ describe('PowerIndex BasicRouter Test', () => {
 
         // Case #4
         assert.equal(
-          await router.getPiEquivalentFroUnderlyingPure(
+          await router.getPiEquivalentForUnderlyingPure(
             // amount
             ether(100),
             // totalUnderlyingWrapped
@@ -152,7 +152,7 @@ describe('PowerIndex BasicRouter Test', () => {
 
         // Case #5
         assert.equal(
-          await router.getPiEquivalentFroUnderlyingPure(
+          await router.getPiEquivalentForUnderlyingPure(
             // amount
             ether(100),
             // totalUnderlyingWrapped
@@ -165,7 +165,7 @@ describe('PowerIndex BasicRouter Test', () => {
 
         // Case #6
         assert.equal(
-          await router.getPiEquivalentFroUnderlyingPure(
+          await router.getPiEquivalentForUnderlyingPure(
             // amount
             ether(200),
             // totalUnderlyingWrapped

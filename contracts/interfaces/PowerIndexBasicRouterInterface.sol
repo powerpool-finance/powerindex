@@ -9,14 +9,14 @@ interface PowerIndexBasicRouterInterface {
 
   function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) external;
 
-  function getPiEquivalentFroUnderlying(
+  function getPiEquivalentForUnderlying(
     uint256 _underlyingAmount,
     IERC20 _underlyingToken,
     uint256 _underlyingOnWrapper,
     uint256 _piTotalSupply
   ) external view returns (uint256);
 
-  function getPiEquivalentFroUnderlyingPure(
+  function getPiEquivalentForUnderlyingPure(
     uint256 _underlyingAmount,
     uint256 _totalUnderlyingWrapped,
     uint256 _piTotalSupply
