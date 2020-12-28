@@ -14,6 +14,7 @@ task('deploy-aave-router', 'Deploy AAVE Router')
     const AavePowerIndexRouter = await artifacts.require('AavePowerIndexRouter');
 
     const {impersonateAccount, deployAndSaveArgs, increaseTime} = require('../test/helpers');
+    const {buildBasicRouterArgs} = require('../test/helpers/builders');
     const {web3} = PowerIndexPoolController;
     const {toWei} = web3.utils;
 
@@ -23,7 +24,7 @@ task('deploy-aave-router', 'Deploy AAVE Router')
 
     const aave = '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9';
     const aaveVoting = '0xb7e383ef9b1e9189fc0f71fb30af8aa14377429e';
-    const aaveStaker = '0x4da27a545c0c5B758a6BA100e3a049001de870f5';
+    const aaveStaking = '0x4da27a545c0c5B758a6BA100e3a049001de870f5';
     const admin = '0xb258302c3f209491d604165549079680708581cc';
     const poolAddress = '0x26607ac599266b21d13c7acf7942c7701a8b699c';
     const poolRestrictionsAddress = '0x3885c4e1107b445dd370d09008d90b5153132fff';
@@ -42,10 +43,10 @@ task('deploy-aave-router', 'Deploy AAVE Router')
 
     await controller.transferOwnership(admin);
 
-    const networkId = await web3.eth.net.getId();
-    if (networkId === 1) {
-      return;
-    }
+    // const networkId = await web3.eth.net.getId();
+    // if (networkId === 1) {
+    //   return;
+    // }
     const MockERC20 = await artifacts.require('MockERC20');
     const IStakedAave = await artifacts.require('IStakedAave');
     const aaveToken = await MockERC20.at(aave);
@@ -54,10 +55,16 @@ task('deploy-aave-router', 'Deploy AAVE Router')
 
     await pool.setController(controller.address, {from: admin});
 
-    const res = await controller.replacePoolTokenWithNewWrapped(
+    const res = await controller.replacePoolTokenWithNewPiToken(
       aave,
       aaveRouterFactory.address,
-      poolRestrictionsAddress,
+      buildBasicRouterArgs(web3, {
+        poolRestrictions: poolRestrictionsAddress,
+        voting: aaveVoting,
+        staking: aaveStaking,
+        reserveRatio: ether(0.8),
+        rebalancingInterval: '3600',
+      }),
       'Wrapped AAVE',
       'WAAVE',
       {from: admin}
@@ -78,9 +85,6 @@ task('deploy-aave-router', 'Deploy AAVE Router')
     console.log('await callContract(pool, "isBound", [aave])', await callContract(pool, "isBound", [aave]));
     console.log('await callContract(pool, "isBound", [wrappedTokenAddress])', await callContract(pool, "isBound", [wrappedTokenAddress]));
 
-    await router.setReserveRatio(ether(1), {from: admin});
-    await router.setVotingAndStaking(aaveVoting, aaveStaker, {from: admin});
-
     await wrappedToken.pokeRouter();
     console.log('wrapped balance ratio 100%', await callContract(aaveToken, 'balanceOf', [wrappedToken.address]));
 
@@ -91,7 +95,7 @@ task('deploy-aave-router', 'Deploy AAVE Router')
     await increaseTime(ethers, 60 * 60 * 24);
     await wrappedToken.pokeRouter();
 
-    const staker = await IStakedAave.at(aaveStaker);
+    const staker = await IStakedAave.at(aaveStaking);
     console.log('staker.balanceOf(wrappedToken.address)', await callContract(staker, 'balanceOf', [wrappedToken.address]));
     console.log('getUserAssetData', await callContract(staker, 'getUserAssetData', [wrappedToken.address, aave]));
     console.log('getTotalRewardsBalance', await callContract(staker, 'getTotalRewardsBalance', [wrappedToken.address]));
