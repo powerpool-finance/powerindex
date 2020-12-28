@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "../../interfaces/WrappedPiErc20Interface.sol";
 import "../../interfaces/YearnGovernanceInterface.sol";
@@ -30,6 +31,19 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     address[] pools
   );
   event RewardPool(address indexed pool, uint256 amount);
+  event IgnoreDueMissingVoting();
+
+  struct YearnConfig {
+    address YCRV;
+    address USDC;
+    address YFI;
+    address payable uniswapRouter;
+    address curveYDeposit;
+    address pvp;
+    uint256 pvpFee;
+    address[] rewardPools;
+    address[] usdcYfiSwapPath;
+  }
 
   int128 internal constant USDC_CURVE_Y_INDEX = 1;
 
@@ -47,33 +61,25 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
 
   constructor(
     address _piToken,
-    address _poolRestrictions,
-    address _YCRV,
-    address _USDC,
-    address _YFI,
-    address payable _uniswapRouter,
-    address _curveYDeposit,
-    address _pvp,
-    uint256 _pvpFee,
-    address[] memory _rewardPools,
-    address[] memory _usdcYfiSwapPath
-  ) public PowerIndexBasicRouter(_piToken, _poolRestrictions) {
-    require(_pvpFee < HUNDRED_PCT, "PVP_FEE_OVER_THE_LIMIT");
-    require(_curveYDeposit != address(0), "INVALID_YDEPOSIT_ADDR");
-    require(_pvp != address(0), "INVALID_PVP_ADDR");
-    require(_YCRV != address(0), "INVALID_YCRV_ADDR");
-    require(_USDC != address(0), "INVALID_USDC_ADDR");
-    require(_YFI != address(0), "INVALID_YFI_ADDR");
+    BasicConfig memory _basicConfig,
+    YearnConfig memory _yearnConfig
+  ) public PowerIndexBasicRouter(_piToken, _basicConfig) {
+    require(_yearnConfig.pvpFee < HUNDRED_PCT, "PVP_FEE_OVER_THE_LIMIT");
+    require(_yearnConfig.curveYDeposit != address(0), "INVALID_YDEPOSIT_ADDR");
+    require(_yearnConfig.pvp != address(0), "INVALID_PVP_ADDR");
+    require(_yearnConfig.YCRV != address(0), "INVALID_YCRV_ADDR");
+    require(_yearnConfig.USDC != address(0), "INVALID_USDC_ADDR");
+    require(_yearnConfig.YFI != address(0), "INVALID_YFI_ADDR");
 
-    YCRV = IERC20(_YCRV);
-    USDC = IERC20(_USDC);
-    YFI = IERC20(_YFI);
-    uniswapRouter = _uniswapRouter;
-    curveYDeposit = _curveYDeposit;
-    pvp = _pvp;
-    pvpFee = _pvpFee;
-    rewardPools = _rewardPools;
-    usdcYfiSwapPath = _usdcYfiSwapPath;
+    YCRV = IERC20(_yearnConfig.YCRV);
+    USDC = IERC20(_yearnConfig.USDC);
+    YFI = IERC20(_yearnConfig.YFI);
+    uniswapRouter = _yearnConfig.uniswapRouter;
+    curveYDeposit = _yearnConfig.curveYDeposit;
+    pvp = _yearnConfig.pvp;
+    pvpFee = _yearnConfig.pvpFee;
+    rewardPools = _yearnConfig.rewardPools;
+    usdcYfiSwapPath = _yearnConfig.usdcYfiSwapPath;
   }
 
   /*** PERMISSIONLESS METHODS ***/
@@ -241,6 +247,11 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
 
     // Ignore the tokens without a voting assigned
     if (voting == address(0)) {
+      emit IgnoreDueMissingVoting();
+      return;
+    }
+
+    if (!_rebalanceHook()) {
       return;
     }
 

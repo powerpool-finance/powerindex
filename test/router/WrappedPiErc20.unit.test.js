@@ -1,5 +1,6 @@
-const { expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
+const { expectEvent, expectRevert, constants } = require('@openzeppelin/test-helpers');
 const { ether, expectExactRevert, splitPayload, toEvmBytes32 } = require('../helpers/index');
+const { buildBasicRouterConfig } = require('../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
@@ -26,17 +27,24 @@ function signatureAndArgs(payload) {
 
 describe('WrappedPiErc20 Unit Tests', () => {
   let alice, bob, stub;
-  let yfi, router, yfiWrapper, myContract;
+  let yfi, router, yfiWrapper, myContract, defaultBasicConfig;
 
   before(async function () {
     [, alice, bob, stub] = await web3.eth.getAccounts();
     myContract = await MyContract.new();
+    defaultBasicConfig = buildBasicRouterConfig(
+      stub,
+      constants.ZERO_ADDRESS,
+      constants.ZERO_ADDRESS,
+      ether('0.2'),
+      '0'
+    );
   });
 
   beforeEach(async function () {
     yfi = await MockERC20.new('yearn.finance', 'YFI', 18, ether('1000000'));
     yfiWrapper = await WrappedPiErc20.new(yfi.address, stub, 'wrapped.yearn.finance', 'WYFI');
-    router = await MockRouter.new(yfiWrapper.address, stub);
+    router = await MockRouter.new(yfiWrapper.address, defaultBasicConfig);
     await yfiWrapper.changeRouter(router.address, { from: stub });
   });
 
@@ -161,7 +169,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
       let leakingRouter;
 
       beforeEach(async () => {
-        leakingRouter = await MockLeakingRouter.new(yfiWrapper.address, stub);
+        leakingRouter = await MockLeakingRouter.new(yfiWrapper.address, defaultBasicConfig);
         await router.migrateToNewRouter(yfiWrapper.address, leakingRouter.address);
 
         assert.equal(await yfi.balanceOf(alice), ether(10000))
@@ -284,7 +292,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
       let leakingRouter;
 
       beforeEach(async () => {
-        leakingRouter = await MockLeakingRouter.new(yfiWrapper.address, stub);
+        leakingRouter = await MockLeakingRouter.new(yfiWrapper.address, defaultBasicConfig);
         await router.migrateToNewRouter(yfiWrapper.address, leakingRouter.address);
 
         assert.equal(await yfi.balanceOf(bob), ether(0))
@@ -440,10 +448,9 @@ describe('WrappedPiErc20 Unit Tests', () => {
         const res = await router.execute(yfiWrapper.address, data2);
 
         await expectEvent.inTransaction(res.tx, WrappedPiErc20, 'CallExternal', {
-          voting: router.address,
+          destination: router.address,
           inputSig: web3.utils.padRight(signature, 64),
           inputData: args,
-          success: true,
         })
 
         await expectEvent.inTransaction(res.tx, MockRouter, 'MockWrapperCallback', {

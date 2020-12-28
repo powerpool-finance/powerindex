@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 interface PowerIndexBasicRouterInterface {
   function setVotingAndStaking(address _voting, address _staking) external;
 
-  function setReserveRatio(uint256 _reserveRatio) external;
+  function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) external;
 
   function getPiEquivalentFroUnderlying(
     uint256 _underlyingAmount,

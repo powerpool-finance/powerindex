@@ -2,7 +2,7 @@ const { ether: rEther } = require('@openzeppelin/test-helpers');
 const TruffleContract = require('@nomiclabs/truffle-contract');
 const template = artifacts.require('Migrations');
 const { promisify } = require('util');
-const { assert } = require('assert');
+const { assert } = require('chai');
 const { web3 } = template;
 
 const AdminUpgradeabilityProxyArtifact = require('@openzeppelin/upgrades-core/artifacts/AdminUpgradeabilityProxy.json');
@@ -159,6 +159,10 @@ function mwei(value) {
   return web3.utils.toWei(value.toString(), 'mwei').toString(10);
 }
 
+async function getResTimestamp(res) {
+  return (await web3.eth.getBlock(res.receipt.blockNumber)).timestamp.toString();
+}
+
 module.exports = {
   deployProxied,
   createOrGetProxyAdmin,
@@ -169,5 +173,6 @@ module.exports = {
   fetchLogs,
   ether,
   mwei,
-  expectExactRevert
+  expectExactRevert,
+  getResTimestamp
 }

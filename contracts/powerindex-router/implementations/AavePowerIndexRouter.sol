@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "../../interfaces/WrappedPiErc20Interface.sol";
 import "../../interfaces/aave/IAaveGovernanceV2.sol";
@@ -12,10 +13,11 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   event Stake(uint256 amount);
   event Redeem(uint256 amount);
   event IgnoreRedeemDueCoolDown(uint256 coolDownFinishesAt, uint256 unstakeFinishesAt);
+  event IgnoreDueMissingStaking();
 
   enum CoolDownStatus { NONE, COOLDOWN, UNSTAKE_WINDOW }
 
-  constructor(address _piToken, address _poolRestrictions) public PowerIndexBasicRouter(_piToken, _poolRestrictions) {}
+  constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexBasicRouter(_piToken, _basicConfig) {}
 
   /*** THE PROXIED METHOD EXECUTORS FOR VOTING ***/
 
@@ -47,7 +49,12 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     address wrappedToken_ = msg.sender;
 
     // Ignore the tokens without a voting assigned
-    if (voting == address(0)) {
+    if (staking == address(0)) {
+      emit IgnoreDueMissingStaking();
+      return;
+    }
+
+    if (!_rebalanceHook()) {
       return;
     }
 

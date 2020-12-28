@@ -1,5 +1,6 @@
-const { expectRevert } = require('@openzeppelin/test-helpers');
+const { expectRevert, constants } = require('@openzeppelin/test-helpers');
 const { ether } = require('../helpers/index');
+const { buildBasicRouterConfig } = require('../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
@@ -22,10 +23,12 @@ const ReserveStatus = {
 describe('PowerIndex BasicRouter Test', () => {
   let minter, bob, alice, stub;
   let poolRestrictions;
+  let defaultBasicConfig;
 
   before(async function () {
     [minter, bob, alice, stub] = await web3.eth.getAccounts();
     poolRestrictions = await PoolRestrictions.new();
+    defaultBasicConfig = buildBasicRouterConfig(poolRestrictions.address, constants.ZERO_ADDRESS, constants.ZERO_ADDRESS, ether(0), 0)
   });
 
   describe('weighed underlying', () => {
@@ -34,7 +37,7 @@ describe('PowerIndex BasicRouter Test', () => {
     beforeEach(async () => {
       token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
       wrapper = await WrappedPiErc20.new(token.address, stub, 'WToken', 'WTKN');
-      leakingRouter = await MockLeakingRouter.new(wrapper.address, poolRestrictions.address);
+      leakingRouter = await MockLeakingRouter.new(wrapper.address, defaultBasicConfig);
 
       await wrapper.changeRouter(leakingRouter.address, { from: stub });
     })
@@ -50,8 +53,8 @@ describe('PowerIndex BasicRouter Test', () => {
     it('should allow swapping a token with a new version', async () => {
       const token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
       const wrapper = await WrappedPiErc20.new(token.address, stub, 'WToken', 'WTKN');
-      const router = await PowerIndexBasicRouter.new(wrapper.address, poolRestrictions.address);
-      const router2 = await PowerIndexBasicRouter.new(wrapper.address, poolRestrictions.address);
+      const router = await PowerIndexBasicRouter.new(wrapper.address, defaultBasicConfig);
+      const router2 = await PowerIndexBasicRouter.new(wrapper.address, defaultBasicConfig);
 
       await wrapper.changeRouter(router.address, { from: stub });
 
@@ -84,7 +87,7 @@ describe('PowerIndex BasicRouter Test', () => {
     before(async () => {
       const token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
       const wrapper = await WrappedPiErc20.new(token.address, stub, 'WToken', 'WTKN');
-      router = await PowerIndexBasicRouter.new(wrapper.address, poolRestrictions.address);
+      router = await PowerIndexBasicRouter.new(wrapper.address, defaultBasicConfig);
     });
 
     describe('getPiEquivalentFroUnderlyingPure()', async () => {

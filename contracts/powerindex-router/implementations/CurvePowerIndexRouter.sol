@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "../../interfaces/WrappedPiErc20Interface.sol";
 import "../PowerIndexBasicRouter.sol";
@@ -23,9 +24,9 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
 
   constructor(
     address _piToken,
-    address _poolRestrictions,
+    BasicConfig memory _basicConfig,
     uint256 _minLockTime
-  ) public PowerIndexBasicRouter(_piToken, _poolRestrictions) {
+  ) public PowerIndexBasicRouter(_piToken, _basicConfig) {
     minLockTime = _minLockTime;
   }
 

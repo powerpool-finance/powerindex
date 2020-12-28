@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/IPoolRestrictions.sol";
@@ -11,9 +12,19 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   uint256 public constant HUNDRED_PCT = 1 ether;
 
   event SetVotingAndStaking(address indexed voting, address indexed staking);
-  event SetReserveRatio(uint256 ratio);
+  event SetReserveRatio(uint256 ratio, uint256 rebalancingInterval);
+  event SetRebalancingInterval(uint256 rebalancingInterval);
+  event IgnoreRebalancing(uint256 blockTimestamp, uint256 lastRebalancedAt, uint256 rebalancingInterval);
 
   enum ReserveStatus { EQUILIBRIUM, SHORTAGE, EXCESS }
+
+  struct BasicConfig {
+    address poolRestrictions;
+    address voting;
+    address staking;
+    uint256 reserveRatio;
+    uint256 rebalancingInterval;
+  }
 
   WrappedPiErc20Interface public immutable piToken;
 
@@ -21,10 +32,16 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   address public voting;
   address public staking;
   uint256 public reserveRatio;
+  uint256 public rebalancingInterval;
+  uint256 public lastRebalancedAt;
 
-  constructor(address _piToken, address _poolRestrictions) public PowerIndexNaiveRouter() Ownable() {
+  constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexNaiveRouter() Ownable() {
     piToken = WrappedPiErc20Interface(_piToken);
-    poolRestriction = IPoolRestrictions(_poolRestrictions);
+    poolRestriction = IPoolRestrictions(_basicConfig.poolRestrictions);
+    voting = _basicConfig.voting;
+    staking = _basicConfig.staking;
+    reserveRatio = _basicConfig.reserveRatio;
+    rebalancingInterval = _basicConfig.rebalancingInterval;
   }
 
   function setVotingAndStaking(address _voting, address _staking) external override onlyOwner {
@@ -33,10 +50,11 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     emit SetVotingAndStaking(_voting, _staking);
   }
 
-  function setReserveRatio(uint256 _reserveRatio) external override onlyOwner {
+  function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) external override onlyOwner {
     require(_reserveRatio <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
     reserveRatio = _reserveRatio;
-    emit SetReserveRatio(_reserveRatio);
+    rebalancingInterval = _rebalancingInterval;
+    emit SetReserveRatio(_reserveRatio, _rebalancingInterval);
   }
 
   function _callVoting(bytes4 _sig, bytes memory _data) internal {
@@ -49,6 +67,20 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
 
   function _checkVotingSenderAllowed() internal view {
     require(poolRestriction.isVotingSenderAllowed(voting, msg.sender), "SENDER_NOT_ALLOWED");
+  }
+
+  function _rebalanceHook() internal returns (bool) {
+    uint256 blockTimestamp_ = block.timestamp;
+    uint256 lastRebalancedAt_ = lastRebalancedAt;
+    uint256 rebalancingInterval_ = rebalancingInterval;
+
+    if (blockTimestamp_ <= lastRebalancedAt_.add(rebalancingInterval)) {
+      emit IgnoreRebalancing(blockTimestamp_, lastRebalancedAt_, rebalancingInterval_);
+      return false;
+    }
+
+    lastRebalancedAt = blockTimestamp_;
+    return true;
   }
 
   /*
