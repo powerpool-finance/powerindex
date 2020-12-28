@@ -18,19 +18,19 @@ contract MyContract is Ownable {
     return theAnswer;
   }
 
-  function invalidOp() external {
+  function invalidOp() external pure {
     assert(false);
   }
 
-  function revert() external {
+  function revert() external pure {
     revert();
   }
 
-  function revertWithString() external {
+  function revertWithString() external pure {
     revert("some-unique-revert-string");
   }
 
-  function revertWithLongString() external {
+  function revertWithLongString() external pure {
     revert("some-unique-revert-string-that-is-a-bit-longer-than-a-single-evm-slot");
   }
 }
