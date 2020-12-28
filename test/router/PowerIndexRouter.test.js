@@ -17,8 +17,8 @@ const { web3 } = MockERC20;
 const ReserveStatus = {
   EQUILIBRIUM: 0,
   SHORTAGE: 1,
-  EXCESS: 2
-}
+  EXCESS: 2,
+};
 
 describe('PowerIndex BasicRouter Test', () => {
   let minter, bob, alice, stub;
@@ -28,7 +28,13 @@ describe('PowerIndex BasicRouter Test', () => {
   before(async function () {
     [minter, bob, alice, stub] = await web3.eth.getAccounts();
     poolRestrictions = await PoolRestrictions.new();
-    defaultBasicConfig = buildBasicRouterConfig(poolRestrictions.address, constants.ZERO_ADDRESS, constants.ZERO_ADDRESS, ether(0), 0)
+    defaultBasicConfig = buildBasicRouterConfig(
+      poolRestrictions.address,
+      constants.ZERO_ADDRESS,
+      constants.ZERO_ADDRESS,
+      ether(0),
+      0,
+    );
   });
 
   describe('weighed underlying', () => {
@@ -40,13 +46,13 @@ describe('PowerIndex BasicRouter Test', () => {
       leakingRouter = await MockLeakingRouter.new(wrapper.address, defaultBasicConfig);
 
       await wrapper.changeRouter(leakingRouter.address, { from: stub });
-    })
+    });
 
     it('should', async () => {
       await token.transfer(alice, ether('100'));
       await token.approve(wrapper.address, ether('100'), { from: alice });
       await wrapper.deposit(ether('100'), { from: alice });
-    })
+    });
   });
 
   describe('changeRouter()', () => {
@@ -100,9 +106,9 @@ describe('PowerIndex BasicRouter Test', () => {
             // totalUnderlyingWrapped
             ether(1000),
             // piTotalSupply
-            ether(1200)
+            ether(1200),
           ),
-          ether(120)
+          ether(120),
         );
 
         // Case #2
@@ -113,9 +119,9 @@ describe('PowerIndex BasicRouter Test', () => {
             // totalUnderlyingWrapped
             ether(1000),
             // piTotalSupply
-            ether(1000)
+            ether(1000),
           ),
-          ether(100)
+          ether(100),
         );
 
         // Case #3
@@ -126,9 +132,9 @@ describe('PowerIndex BasicRouter Test', () => {
             // totalUnderlyingWrapped
             ether(1600),
             // piTotalSupply
-            ether(1000)
+            ether(1000),
           ),
-          ether(62.5)
+          ether(62.5),
         );
 
         // Case #4
@@ -139,9 +145,9 @@ describe('PowerIndex BasicRouter Test', () => {
             // totalUnderlyingWrapped
             ether(0),
             // piTotalSupply
-            ether(0)
+            ether(0),
           ),
-          ether(100)
+          ether(100),
         );
 
         // Case #5
@@ -152,9 +158,9 @@ describe('PowerIndex BasicRouter Test', () => {
             // totalUnderlyingWrapped
             ether(100),
             // piTotalSupply
-            ether(100)
+            ether(100),
           ),
-          ether(100)
+          ether(100),
         );
 
         // Case #6
@@ -165,9 +171,9 @@ describe('PowerIndex BasicRouter Test', () => {
             // totalUnderlyingWrapped
             ether(200),
             // piTotalSupply
-            ether(100)
+            ether(100),
           ),
-          ether(100)
+          ether(100),
         );
       });
     });
@@ -183,41 +189,41 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(200),
             // withdrawnAmount
-            ether(50)
+            ether(50),
           ),
-          ether(240)
-        )
+          ether(240),
+        );
         assert.equal(
           await router.getExpectedReserveAmount(ether('0.2'), ether(800), ether(250), ether(50)),
-          ether(250)
-        )
+          ether(250),
+        );
         assert.equal(
           await router.getExpectedReserveAmount(ether('0.2'), ether(800), ether(150), ether(50)),
-          ether(230)
-        )
-      })
+          ether(230),
+        );
+      });
 
       it('should correctly calculated with 0 RR', async () => {
-        assert.equal(
-          await router.getExpectedReserveAmount(ether(0), ether(800), ether(200), ether(50)),
-          ether(50)
-        )
-      })
-    })
+        assert.equal(await router.getExpectedReserveAmount(ether(0), ether(800), ether(200), ether(50)), ether(50));
+      });
+    });
 
     describe('getReserveStatusPure()', async () => {
       it('should deny calling with an invalid reserve ratio', async function () {
-        await expectRevert(router.getReserveStatusPure(
-          // reserveRatio, 1 eth == 100%
-          ether('1.1'),
-          // leftOnWrapper
-          ether(200),
-          // stakedBalance
-          ether(800),
-          // withdrawnAmount
-          ether(50)
-        ), 'RR_GREATER_THAN_100_PCT');
-      })
+        await expectRevert(
+          router.getReserveStatusPure(
+            // reserveRatio, 1 eth == 100%
+            ether('1.1'),
+            // leftOnWrapper
+            ether(200),
+            // stakedBalance
+            ether(800),
+            // withdrawnAmount
+            ether(50),
+          ),
+          'RR_GREATER_THAN_100_PCT',
+        );
+      });
 
       describe('SHORTAGE', async () => {
         it('should return with a shortage of the reserve', async () => {
@@ -230,7 +236,7 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(800),
             // withdrawnAmount
-            ether(50)
+            ether(50),
           );
           assert.equal(res.status, ReserveStatus.SHORTAGE);
           assert.equal(res.diff, ether(40));
@@ -245,7 +251,7 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(850),
             // withdrawnAmount
-            ether(50)
+            ether(50),
           );
           assert.equal(res.status, ReserveStatus.SHORTAGE);
           assert.equal(res.diff, ether(50));
@@ -260,7 +266,7 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(800),
             // withdrawnAmount
-            ether(500)
+            ether(500),
           );
           assert.equal(res.status, ReserveStatus.SHORTAGE);
           assert.equal(res.diff, ether(400));
@@ -275,13 +281,13 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(1000),
             // withdrawnAmount
-            ether(0)
+            ether(0),
           );
           assert.equal(res.status, ReserveStatus.SHORTAGE);
           assert.equal(res.diff, ether(160));
           assert.equal(res.expectedReserveAmount, ether(210));
         });
-      })
+      });
 
       describe('EXCESS', async () => {
         it('should return with a excess of the reserve', async () => {
@@ -294,7 +300,7 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(150),
             // withdrawnAmount
-            ether(50)
+            ether(50),
           );
           assert.equal(res.status, ReserveStatus.EXCESS);
           assert.equal(res.diff, ether(570));
@@ -309,7 +315,7 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(0),
             // withdrawnAmount
-            ether(50)
+            ether(50),
           );
           assert.equal(res.status, ReserveStatus.EXCESS);
           assert.equal(res.diff, ether(760));
@@ -324,7 +330,7 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(0),
             // withdrawnAmount
-            ether(500)
+            ether(500),
           );
           assert.equal(res.status, ReserveStatus.EXCESS);
           assert.equal(res.diff, ether(1200));
@@ -339,7 +345,7 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(800),
             // withdrawnAmount
-            ether(0)
+            ether(0),
           );
           assert.equal(res.status, ReserveStatus.EXCESS);
           assert.equal(res.diff, ether(40));
@@ -354,7 +360,7 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(800),
             // withdrawnAmount
-            ether(0)
+            ether(0),
           );
           assert.equal(res.status, ReserveStatus.EXCESS);
           assert.equal(res.diff, ether(80));
@@ -369,7 +375,7 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(150),
             // withdrawnAmount
-            ether(0)
+            ether(0),
           );
           assert.equal(res.status, ReserveStatus.EXCESS);
           assert.equal(res.diff, ether(650));
@@ -384,13 +390,13 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(0),
             // withdrawnAmount
-            ether(0)
+            ether(0),
           );
           assert.equal(res.status, ReserveStatus.EXCESS);
           assert.equal(res.diff, ether(840));
           assert.equal(res.expectedReserveAmount, ether(210));
         });
-      })
+      });
 
       describe('EQUILIBRIUM', async () => {
         it('should return with an equlibrium for a deposit', async () => {
@@ -402,7 +408,7 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(800),
             // withdrawnAmount
-            ether(0)
+            ether(0),
           );
           assert.equal(res.status, ReserveStatus.EQUILIBRIUM);
           assert.equal(res.diff, ether(0));
@@ -418,13 +424,13 @@ describe('PowerIndex BasicRouter Test', () => {
             // stakedBalance
             ether(800),
             // withdrawnAmount
-            ether(50)
+            ether(50),
           );
           assert.equal(res.status, ReserveStatus.EQUILIBRIUM);
           assert.equal(res.diff, ether(0));
           assert.equal(res.expectedReserveAmount, ether(250));
         });
-      })
+      });
     });
   });
 });

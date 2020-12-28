@@ -28,12 +28,16 @@ async function buildUniswapPair(weth, yfi, usdc, lpTokensTo) {
   // YFI
   const yfiAmount = ether(1e6);
   await yfi.approve(router.address, yfiAmount);
-  await router.addLiquidityETH(yfi.address, yfiAmount, ether(1), ether(1), lpTokensTo, deadline, { value: ether(1666)});
+  await router.addLiquidityETH(yfi.address, yfiAmount, ether(1), ether(1), lpTokensTo, deadline, {
+    value: ether(1666),
+  });
 
   // USDC
   const usdcAmount = mwei(1e6);
   await usdc.approve(router.address, usdcAmount);
-  await router.addLiquidityETH(usdc.address, usdcAmount, ether(1), ether(1), lpTokensTo, deadline, { value: ether(1666)});
+  await router.addLiquidityETH(usdc.address, usdcAmount, ether(1), ether(1), lpTokensTo, deadline, {
+    value: ether(1666),
+  });
 
   return router;
 }
@@ -67,7 +71,7 @@ describe('YearnRouter Tests', () => {
         yearnGovernance.address,
         yearnGovernance.address,
         ether('0.2'),
-        '0'
+        '0',
       ),
       buildYearnRouterConfig(
         yCrv.address,
@@ -78,8 +82,8 @@ describe('YearnRouter Tests', () => {
         pvp,
         ether('0.15'),
         [pool1, pool2],
-        [usdc.address, weth.address, yfi.address]
-      )
+        [usdc.address, weth.address, yfi.address],
+      ),
     );
 
     await yfiWrapper.changeRouter(yfiRouter.address, { from: stub });
@@ -133,68 +137,71 @@ describe('YearnRouter Tests', () => {
   describe('owner methods', async () => {
     beforeEach(async () => {
       await yfiRouter.transferOwnership(piGov, { from: piGov });
-    })
+    });
 
     describe('setRewardPools()', () => {
       it('should allow the owner setting a new reward pool', async () => {
         const res = await yfiRouter.setRewardPools([alice, bob], { from: piGov });
         expectEvent(res, 'SetRewardPools', {
           len: '2',
-          rewardPools: [alice, bob]
-        })
-      })
+          rewardPools: [alice, bob],
+        });
+      });
 
       it('should deny setting an empty reward pool', async () => {
         await expectRevert(yfiRouter.setRewardPools([], { from: piGov }), 'AT_LEAST_ONE_EXPECTED');
-      })
+      });
 
       it('should deny non-owner setting a new reward pool', async () => {
         await expectRevert(yfiRouter.setRewardPools([alice, bob], { from: alice }), 'Ownable: caller is not the owner');
-      })
+      });
     });
 
     describe('setPvpFee()', () => {
       it('should allow the owner setting a new pvpFee', async () => {
         const res = await yfiRouter.setPvpFee(ether('0.1'), { from: piGov });
         expectEvent(res, 'SetPvpFee', {
-          pvpFee: ether('0.1')
-        })
-      })
+          pvpFee: ether('0.1'),
+        });
+      });
 
       it('should deny setting a fee greater or equal 100%', async () => {
         await expectRevert(yfiRouter.setPvpFee(ether('1'), { from: piGov }), 'PVP_FEE_OVER_THE_LIMIT');
-      })
+      });
 
       it('should deny non-owner setting a new pvpFee', async () => {
         await expectRevert(yfiRouter.setPvpFee(ether('0'), { from: alice }), 'Ownable: caller is not the owner');
-      })
-    })
+      });
+    });
 
     describe('setUniswapRouter()', () => {
       it('should allow the owner setting a new uniswap router', async () => {
         const res = await yfiRouter.setUniswapRouter(bob, { from: piGov });
         expectEvent(res, 'SetUniswapRouter', {
-          uniswapRouter: bob
-        })
-      })
+          uniswapRouter: bob,
+        });
+      });
 
       it('should deny non-owner setting a new uniswap router', async () => {
         await expectRevert(yfiRouter.setUniswapRouter(bob, { from: alice }), 'Ownable: caller is not the owner');
-      })
-    })
+      });
+    });
 
     describe('setUsdcYfiSwapPath()', () => {
       it('should allow the owner setting a new pvpFee', async () => {
         const res = await yfiRouter.setUsdcYfiSwapPath([alice, bob], { from: piGov });
         expectEvent(res, 'SetUsdcYfiSwapPath', {
-          usdcYfiSwapPath: [alice, bob]
-        })
-      })
+          usdcYfiSwapPath: [alice, bob],
+        });
+      });
 
       it('should deny non-owner setting a new uniswap router', async () => {
-        await expectRevert(yfiRouter.setUsdcYfiSwapPath([alice, bob], { from: alice }), 'Ownable: caller is not the owner');
-      })
-    })
+        await expectRevert(
+          yfiRouter.setUsdcYfiSwapPath([alice, bob], { from: alice }),
+          'Ownable: caller is not the owner',
+        );
+      });
+    });
   });
 
   describe('reserve management', () => {
@@ -202,29 +209,29 @@ describe('YearnRouter Tests', () => {
 
     beforeEach(async () => {
       await yfi.transfer(alice, ether(100000));
-      await yfi.approve(yfiWrapper.address, ether(10000), { from: alice })
+      await yfi.approve(yfiWrapper.address, ether(10000), { from: alice });
       const res = await yfiWrapper.deposit(ether(10000), { from: alice });
       firstDepositAt = await getResTimestamp(res);
 
       assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8000));
       assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(2000));
-    })
+    });
 
     it('should increase reserve on deposit', async () => {
-      await yfi.approve(yfiWrapper.address, ether(1000), { from: alice })
+      await yfi.approve(yfiWrapper.address, ether(1000), { from: alice });
       await yfiWrapper.deposit(ether(1000), { from: alice });
 
       assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8800));
       assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(2200));
-    })
+    });
 
     it('should decrease reserve on withdrawal', async () => {
-      await yfiWrapper.approve(yfiWrapper.address, ether(1000), { from: alice })
+      await yfiWrapper.approve(yfiWrapper.address, ether(1000), { from: alice });
       await yfiWrapper.withdraw(ether(1000), { from: alice });
 
       assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(7200));
       assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(1800));
-    })
+    });
 
     describe('when interval enabled', () => {
       beforeEach(async () => {
@@ -234,56 +241,56 @@ describe('YearnRouter Tests', () => {
       it('should DO rebalance on deposit if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(61));
 
-        await yfi.approve(yfiWrapper.address, ether(1000), { from: alice })
+        await yfi.approve(yfiWrapper.address, ether(1000), { from: alice });
         const res = await yfiWrapper.deposit(ether(1000), { from: alice });
         await expectEvent.notEmitted.inTransaction(res.tx, yfiRouter, 'IgnoreRebalancing');
 
         assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8800));
         assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(2200));
-      })
+      });
 
       it('should DO rebalance on withdrawal if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(61));
 
-        await yfiWrapper.approve(yfiWrapper.address, ether(1000), { from: alice })
+        await yfiWrapper.approve(yfiWrapper.address, ether(1000), { from: alice });
         const res = await yfiWrapper.withdraw(ether(1000), { from: alice });
         await expectEvent.notEmitted.inTransaction(res.tx, yfiRouter, 'IgnoreRebalancing');
 
         assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(7200));
         assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(1800));
-      })
+      });
 
       it('should NOT rebalance on deposit if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(59));
 
-        await yfi.approve(yfiWrapper.address, ether(1000), { from: alice })
+        await yfi.approve(yfiWrapper.address, ether(1000), { from: alice });
         const res = await yfiWrapper.deposit(ether(1000), { from: alice });
         const now = await getResTimestamp(res);
         await expectEvent.inTransaction(res.tx, yfiRouter, 'IgnoreRebalancing', {
           blockTimestamp: now,
           lastRebalancedAt: firstDepositAt,
-          rebalancingInterval: time.duration.hours(1)
-        })
+          rebalancingInterval: time.duration.hours(1),
+        });
 
         assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8000));
         assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(3000));
-      })
+      });
 
       it('should NOT rebalance on withdrawal if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(59));
 
-        await yfiWrapper.approve(yfiWrapper.address, ether(1000), { from: alice })
+        await yfiWrapper.approve(yfiWrapper.address, ether(1000), { from: alice });
         const res = await yfiWrapper.withdraw(ether(1000), { from: alice });
         const now = await getResTimestamp(res);
         await expectEvent.inTransaction(res.tx, yfiRouter, 'IgnoreRebalancing', {
           blockTimestamp: now,
           lastRebalancedAt: firstDepositAt,
-          rebalancingInterval: time.duration.hours(1)
-        })
+          rebalancingInterval: time.duration.hours(1),
+        });
 
         assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8000));
         assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(1000));
-      })
+      });
     });
 
     describe('on vote lock', async () => {
@@ -296,21 +303,18 @@ describe('YearnRouter Tests', () => {
       });
 
       it('should not decrease reserve if vote is locked', async () => {
-        await yfiWrapper.approve(yfiWrapper.address, ether(1000), { from: alice })
+        await yfiWrapper.approve(yfiWrapper.address, ether(1000), { from: alice });
         const res = await yfiWrapper.withdraw(ether(1000), { from: alice });
 
-        await expectEvent.inTransaction(res.tx, yfiRouter, 'IgnoreRedeemDueVoteLock')
+        await expectEvent.inTransaction(res.tx, yfiRouter, 'IgnoreRedeemDueVoteLock');
 
         assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8000));
         assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(1000));
-      })
+      });
 
       it('should revert if there is not enough funds in reserve', async () => {
-        await yfiWrapper.approve(yfiWrapper.address, ether(3000), { from: alice })
-        await expectRevert(
-          yfiWrapper.withdraw(ether(3000), { from: alice }),
-          'ERC20: transfer amount exceeds balance'
-        );
+        await yfiWrapper.approve(yfiWrapper.address, ether(3000), { from: alice });
+        await expectRevert(yfiWrapper.withdraw(ether(3000), { from: alice }), 'ERC20: transfer amount exceeds balance');
       });
     });
 
@@ -332,14 +336,14 @@ describe('YearnRouter Tests', () => {
 
         assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(8800));
         assert.equal(await yfi.balanceOf(yfiWrapper.address), ether(2200));
-      })
+      });
     });
   });
 
   describe('reward distribution', async () => {
     let poolA, poolB, poolC, poolD;
 
-    beforeEach(async function() {
+    beforeEach(async function () {
       poolA = await MockGulpingBPool.new();
       poolB = await MockGulpingBPool.new();
       poolC = await MockGulpingBPool.new();
@@ -363,8 +367,8 @@ describe('YearnRouter Tests', () => {
       assert.equal(await yfiWrapper.balanceOf(alice), ether('10000'));
       assert.equal(await yearnGovernance.totalSupply(), ether('8000'));
 
-      await yfiWrapper.transfer(poolA.address, 10, { from: alice })
-      await yfiWrapper.transfer(poolB.address, 20, { from: alice })
+      await yfiWrapper.transfer(poolA.address, 10, { from: alice });
+      await yfiWrapper.transfer(poolB.address, 20, { from: alice });
 
       await yearnGovernance.setRewardDistribution(rewardDistributor, { from: yearnOwner });
       await yearnGovernance.setBreaker(true, { from: yearnOwner });
@@ -374,7 +378,7 @@ describe('YearnRouter Tests', () => {
     it('should allow withdrawing rewards from the governance', async () => {
       await yearnGovernance.notifyRewardAmount(ether(2000), { from: rewardDistributor });
 
-      await time.increase(time.duration.days(8))
+      await time.increase(time.duration.days(8));
       const res = await yfiRouter.claimRewards({ from: alice });
 
       expectEvent(res, 'ClaimRewards', {
@@ -388,14 +392,14 @@ describe('YearnRouter Tests', () => {
         piYfiBalance: '1515402843896626728605',
         uniswapSwapPath: [usdc.address, weth.address, yfi.address],
         pools: [poolA.address, poolB.address, poolC.address],
-      })
+      });
 
       await expectEvent.inTransaction(res.tx, poolA, 'Gulp');
       await expectEvent.inTransaction(res.tx, poolB, 'Gulp');
       await expectEvent.notEmitted.inTransaction(res.tx, poolC, 'Gulp');
       await expectEvent.notEmitted.inTransaction(res.tx, poolD, 'Gulp');
 
-      assert.equal(res.logs.length, 4)
+      assert.equal(res.logs.length, 4);
       assert.equal(res.logs[1].args.pool, poolA.address);
       assert.equal(res.logs[1].args.amount, '505134281298875576201');
       assert.equal(res.logs[2].args.pool, poolB.address);
@@ -409,7 +413,7 @@ describe('YearnRouter Tests', () => {
       assert.equal(await yCrv.balanceOf(yfiRouter.address), '0');
       assert.equal(await usdc.balanceOf(yfiRouter.address), '0');
       assert.equal(await yfi.balanceOf(yfiRouter.address), '0');
-    })
+    });
 
     it('should revert if there is no reward available', async () => {
       await expectRevert(yfiRouter.claimRewards({ from: alice }), 'NO_YCRV_REWARD');
@@ -423,7 +427,7 @@ describe('YearnRouter Tests', () => {
           yearnGovernance.address,
           yearnGovernance.address,
           ether('0.2'),
-          '0'
+          '0',
         ),
         buildYearnRouterConfig(
           yCrv.address,
@@ -434,8 +438,8 @@ describe('YearnRouter Tests', () => {
           pvp,
           ether('0.2'),
           [],
-          [usdc.address, weth.address, yfi.address]
-        )
+          [usdc.address, weth.address, yfi.address],
+        ),
       );
       await expectRevert(router.claimRewards({ from: alice }), 'MISSING_REWARD_POOLS');
     });
@@ -448,7 +452,7 @@ describe('YearnRouter Tests', () => {
           yearnGovernance.address,
           yearnGovernance.address,
           ether('0.2'),
-          '0'
+          '0',
         ),
         buildYearnRouterConfig(
           yCrv.address,
@@ -459,8 +463,8 @@ describe('YearnRouter Tests', () => {
           pvp,
           ether('0.2'),
           [pool1, pool2],
-          []
-        )
+          [],
+        ),
       );
       await expectRevert(router.claimRewards({ from: alice }), 'MISSING_REWARD_SWAP_PATH');
     });

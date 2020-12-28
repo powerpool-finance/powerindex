@@ -56,7 +56,7 @@ const config = {
       allowUnlimitedContractSize: true,
       gas: 12000000,
       loggingEnabled: false,
-      blockGasLimit: 12000000
+      blockGasLimit: 12000000,
     },
     ganache: {
       url: 'http://127.0.0.1:8945',
@@ -113,8 +113,8 @@ const config = {
     target: 'ethers-v5',
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_KEY
-  }
+    apiKey: process.env.ETHERSCAN_KEY,
+  },
 };
 
 module.exports = config;

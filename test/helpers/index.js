@@ -27,11 +27,13 @@ async function advanceBlocks(n) {
   const send = promisify(web3.currentProvider.send).bind(web3.currentProvider);
   const requests = [];
   for (let i = 0; i < n; i++) {
-    requests.push(send({
-      jsonrpc: '2.0',
-      method: 'evm_mine',
-      id: `${new Date().getTime()}-${Math.random()}`,
-    }));
+    requests.push(
+      send({
+        jsonrpc: '2.0',
+        method: 'evm_mine',
+        id: `${new Date().getTime()}-${Math.random()}`,
+      }),
+    );
   }
   await Promise.all(requests);
 }
@@ -47,11 +49,7 @@ async function advanceBlocks(n) {
  * @param {string} opts.proxyAdminOwner
  * @returns {Promise<any>}
  */
-async function deployProxied(
-  contract,
-  args = [],
-  opts = {}
-) {
+async function deployProxied(contract, args = [], opts = {}) {
   const impl = await contract.new();
   const adminContract = await createOrGetProxyAdmin(opts.proxyAdminOwner);
   const data = getInitializerData(impl, args, opts.initializer);
@@ -76,7 +74,6 @@ async function createOrGetProxyAdmin(proxyOwner) {
   }
   return proxyAdmin;
 }
-
 
 function getInitializerData(impl, args, initializer) {
   const allowNoInitialization = initializer === undefined && args.length === 0;
@@ -112,7 +109,7 @@ async function expectExactRevert(promise, expectedMsg) {
       assert.equal(
         error.message,
         `VM Exception while processing transaction: revert ${expectedMsg}`,
-        'Wrong kind of exception received'
+        'Wrong kind of exception received',
       );
     }
     return;
@@ -147,8 +144,8 @@ function toEvmBytes32(bytes32) {
 function splitPayload(payload) {
   return {
     signature: payload.substring(0, 10),
-    calldata: `0x${payload.substring(10)}`
-  }
+    calldata: `0x${payload.substring(10)}`,
+  };
 }
 
 function ether(value) {
@@ -174,5 +171,5 @@ module.exports = {
   ether,
   mwei,
   expectExactRevert,
-  getResTimestamp
-}
+  getResTimestamp,
+};

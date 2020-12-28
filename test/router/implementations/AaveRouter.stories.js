@@ -25,14 +25,7 @@ describe('AaveRouter Tests', () => {
   let aave, stakedAave, aaveWrapper, aaveRouter, poolRestrictions;
 
   before(async function () {
-    [
-      minter,
-      bob,
-      alice,
-      rewardsVault,
-      emissionManager,
-      stub,
-    ] = await web3.eth.getAccounts();
+    [minter, bob, alice, rewardsVault, emissionManager, stub] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function () {
@@ -55,18 +48,13 @@ describe('AaveRouter Tests', () => {
       'stkAAVE',
       18,
       // governance
-      constants.ZERO_ADDRESS
+      constants.ZERO_ADDRESS,
     );
     poolRestrictions = await PoolRestrictions.new();
     aaveWrapper = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'WAAVE');
-    aaveRouter = await AavePowerIndexRouter.new(aaveWrapper.address,
-      buildBasicRouterConfig(
-        poolRestrictions.address,
-        stub,
-        stakedAave.address,
-        ether('0.2'),
-        '0'
-      ),
+    aaveRouter = await AavePowerIndexRouter.new(
+      aaveWrapper.address,
+      buildBasicRouterConfig(poolRestrictions.address, stub, stakedAave.address, ether('0.2'), '0'),
     );
 
     // Setting up...
