@@ -28,7 +28,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
 
   WrappedPiErc20Interface public immutable piToken;
 
-  IPoolRestrictions public poolRestriction;
+  IPoolRestrictions public poolRestrictions;
   address public voting;
   address public staking;
   uint256 public reserveRatio;
@@ -37,7 +37,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
 
   constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexNaiveRouter() Ownable() {
     piToken = WrappedPiErc20Interface(_piToken);
-    poolRestriction = IPoolRestrictions(_basicConfig.poolRestrictions);
+    poolRestrictions = IPoolRestrictions(_basicConfig.poolRestrictions);
     voting = _basicConfig.voting;
     staking = _basicConfig.staking;
     reserveRatio = _basicConfig.reserveRatio;
@@ -66,7 +66,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   }
 
   function _checkVotingSenderAllowed() internal view {
-    require(poolRestriction.isVotingSenderAllowed(voting, msg.sender), "SENDER_NOT_ALLOWED");
+    require(poolRestrictions.isVotingSenderAllowed(voting, msg.sender), "SENDER_NOT_ALLOWED");
   }
 
   function _rebalanceHook() internal returns (bool) {

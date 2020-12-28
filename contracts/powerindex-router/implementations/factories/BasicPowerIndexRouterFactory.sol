@@ -7,14 +7,14 @@ import "../../../interfaces/IPiRouterFactory.sol";
 import "../../PowerIndexBasicRouter.sol";
 
 contract BasicPowerIndexRouterFactory is IPiRouterFactory {
-  event BuildBasicRouter(address indexed builder, address indexed router);
+  event BuildBasicRouter(address indexed builder, address indexed piToken, address indexed router);
 
   function buildRouter(address _piToken, bytes calldata _args) external override returns (address) {
     PowerIndexBasicRouter.BasicConfig memory _basicConfig = abi.decode(_args, (PowerIndexBasicRouter.BasicConfig));
 
     address router = address(new PowerIndexBasicRouter(_piToken, _basicConfig));
 
-    emit BuildBasicRouter(msg.sender, router);
+    emit BuildBasicRouter(msg.sender, _piToken, router);
 
     Ownable(router).transferOwnership(msg.sender);
 

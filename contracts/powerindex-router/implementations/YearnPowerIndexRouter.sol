@@ -270,6 +270,16 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     }
   }
 
+  /*** VIEWERS ***/
+
+  function getRewardPools() external view returns (address[] memory) {
+    return rewardPools;
+  }
+
+  function getUsdcYfiSwapPath() external view returns (address[] memory) {
+    return usdcYfiSwapPath;
+  }
+
   /*** INTERNALS ***/
 
   function _stake(uint256 _amount) internal {

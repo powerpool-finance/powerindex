@@ -7,14 +7,14 @@ import "../../../interfaces/IPiRouterFactory.sol";
 import "../AavePowerIndexRouter.sol";
 
 contract AavePowerIndexRouterFactory is IPiRouterFactory {
-  event BuildAaveRouter(address indexed builder, address indexed router);
+  event BuildAaveRouter(address indexed builder, address indexed piToken, address indexed router);
 
   function buildRouter(address _piToken, bytes calldata _args) external override returns (address) {
     PowerIndexBasicRouter.BasicConfig memory _basicConfig = abi.decode(_args, (PowerIndexBasicRouter.BasicConfig));
 
     address router = address(new AavePowerIndexRouter(_piToken, _basicConfig));
 
-    emit BuildAaveRouter(msg.sender, router);
+    emit BuildAaveRouter(msg.sender, _piToken, router);
 
     Ownable(router).transferOwnership(msg.sender);
 
