@@ -18,6 +18,8 @@ contract YearnPowerIndexRouterFactory is IPiRouterFactory {
 
     emit BuildYearnRouter(msg.sender, router);
 
+    Ownable(router).transferOwnership(msg.sender);
+
     return router;
   }
 }

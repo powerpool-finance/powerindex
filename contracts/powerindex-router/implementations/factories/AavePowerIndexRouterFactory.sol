@@ -16,6 +16,8 @@ contract AavePowerIndexRouterFactory is IPiRouterFactory {
 
     emit BuildAaveRouter(msg.sender, router);
 
+    Ownable(router).transferOwnership(msg.sender);
+
     return router;
   }
 }
