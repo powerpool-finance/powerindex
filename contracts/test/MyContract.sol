@@ -22,7 +22,7 @@ contract MyContract is Ownable {
     assert(false);
   }
 
-  function revert() external pure {
+  function revertWithoutString() external pure {
     revert();
   }
 
