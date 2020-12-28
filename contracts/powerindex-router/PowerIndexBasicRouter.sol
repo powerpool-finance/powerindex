@@ -35,6 +35,11 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   uint256 public rebalancingInterval;
   uint256 public lastRebalancedAt;
 
+  modifier onlyPiToken() {
+    require(msg.sender == address(piToken), "ONLY_PI_TOKEN_ALLOWED");
+    _;
+  }
+
   constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexNaiveRouter() Ownable() {
     piToken = WrappedPiErc20Interface(_piToken);
     poolRestrictions = IPoolRestrictions(_basicConfig.poolRestrictions);

@@ -100,6 +100,10 @@ describe('YearnRouter Tests', () => {
     assert.equal(await yearnGovernance.lock(), 10);
   });
 
+  it('should deny non-piToken calling piTokenCallback', async () => {
+    await expectRevert(yfiRouter.piTokenCallback(0), 'ONLY_PI_TOKEN_ALLOWED');
+  });
+
   it('should allow creating a proposal in YearnGovernance', async () => {
     await yfi.transfer(alice, ether('10000'));
     await yfi.approve(yfiWrapper.address, ether('10000'), { from: alice });

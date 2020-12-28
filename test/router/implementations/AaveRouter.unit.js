@@ -1,4 +1,4 @@
-const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
+const { constants, time, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 const {
   ether,
   artifactFromBytecode,
@@ -124,6 +124,10 @@ describe('AaveRouter Tests', () => {
 
       // Checks...
       assert.equal(await aaveRouter.owner(), deployer);
+    });
+
+    it('should deny non-piToken calling piTokenCallback', async () => {
+      await expectRevert(aaveRouter.piTokenCallback(0), 'ONLY_PI_TOKEN_ALLOWED');
     });
 
     it('should allow depositing Aave and staking it in a StakedAave contract', async () => {});

@@ -5,11 +5,12 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/PowerIndexNaiveRouterInterface.sol";
 import "../interfaces/PowerIndexBasicRouterInterface.sol";
 import "../interfaces/WrappedPiErc20Interface.sol";
 
-contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
+contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
@@ -37,7 +38,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
     router = _router;
   }
 
-  function pokeRouter() external {
+  function pokeRouter() external nonReentrant {
     PowerIndexNaiveRouterInterface(router).piTokenCallback(0);
   }
 
@@ -45,7 +46,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
    * @notice Deposits underlying token to the piToken
    * @param _depositAmount The amount to deposit in underlying tokens
    */
-  function deposit(uint256 _depositAmount) external override {
+  function deposit(uint256 _depositAmount) external override nonReentrant {
     require(_depositAmount > 0, "ZERO_DEPOSIT");
 
     uint256 mintAmount = _getPiEquivalentForUnderlying(_depositAmount);
@@ -63,7 +64,7 @@ contract WrappedPiErc20 is ERC20, WrappedPiErc20Interface {
    * @notice Withdraws underlying token from the piToken
    * @param _withdrawAmount The amount to withdraw in underlying tokens
    */
-  function withdraw(uint256 _withdrawAmount) external override {
+  function withdraw(uint256 _withdrawAmount) external override nonReentrant {
     require(_withdrawAmount > 0, "ZERO_WITHDRAWAL");
 
     PowerIndexNaiveRouterInterface(router).piTokenCallback(_withdrawAmount);

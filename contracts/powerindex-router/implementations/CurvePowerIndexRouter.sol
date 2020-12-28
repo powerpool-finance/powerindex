@@ -69,7 +69,7 @@ contract CurvePowerIndexRouter is PowerIndexBasicRouter {
 
   /*** PI TOKEN CALLBACK ***/
 
-  function piTokenCallback(uint256 _withdrawAmount) external override {
+  function piTokenCallback(uint256 _withdrawAmount) external override onlyPiToken {
     address piToken_ = msg.sender;
 
     // Ignore the tokens without a voting assigned
