@@ -80,12 +80,13 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
   }
 
   function _getPiEquivalentForUnderlying(uint256 _amount) internal view returns (uint256) {
-    return PowerIndexBasicRouterInterface(router).getPiEquivalentForUnderlying(
-      _amount,
-      underlying,
-      underlying.balanceOf(address(this)),
-      IERC20(this).totalSupply()
-    );
+    return
+      PowerIndexBasicRouterInterface(router).getPiEquivalentForUnderlying(
+        _amount,
+        underlying,
+        underlying.balanceOf(address(this)),
+        IERC20(this).totalSupply()
+      );
   }
 
   function changeRouter(address _newRouter) external override onlyRouter {
@@ -114,8 +115,8 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
           case 0 {
             // If there is no revert reason string, revert with the default `REVERTED_WITH_NO_REASON_STRING`
             mstore(output, 0x08c379a000000000000000000000000000000000000000000000000000000000) // error identifier
-            mstore(add(output, 0x04), 0x0000000000000000000000000000000000000000000000000000000000000020) // starting offset
-            mstore(add(output, 0x24), 0x000000000000000000000000000000000000000000000000000000000000001e) // reason length
+            mstore(add(output, 0x04), 0x0000000000000000000000000000000000000000000000000000000000000020) // offset
+            mstore(add(output, 0x24), 0x000000000000000000000000000000000000000000000000000000000000001e) // length
             mstore(add(output, 0x44), 0x52455645525445445f574954485f4e4f5f524541534f4e5f535452494e470000) // reason
             revert(output, 100) // 100 = 4 + 3 * 32 (error identifier + 3 words for the ABI encoded error)
           }
