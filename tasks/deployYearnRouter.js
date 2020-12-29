@@ -3,7 +3,7 @@ require('@nomiclabs/hardhat-ethers');
 
 const pIteration = require('p-iteration');
 
-task('deploy-aave-router', 'Deploy AAVE Router')
+task('deploy-yearn-router', 'Deploy Yearn Router')
   .setAction(async (__, {ethers}) => {
     const PowerIndexPoolController = await artifacts.require('PowerIndexPoolController');
     const PowerIndexWrapper = await artifacts.require('PowerIndexWrapper');
@@ -21,7 +21,7 @@ task('deploy-aave-router', 'Deploy AAVE Router')
     console.log('deployer', deployer);
     const sendOptions = {from: deployer};
 
-    const aave = '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9';
+    const yfi = '0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e';
     const aaveVoting = '0xb7e383ef9b1e9189fc0f71fb30af8aa14377429e';
     const aaveStaking = '0x4da27a545c0c5B758a6BA100e3a049001de870f5';
     const admin = '0xb258302c3f209491d604165549079680708581cc';
@@ -53,7 +53,7 @@ task('deploy-aave-router', 'Deploy AAVE Router')
       artifacts,
       ethers,
       controller,
-      aave,
+      yfi,
       aaveRouterFactory.address,
       buildBasicRouterArgs(web3, {
         poolRestrictions: poolRestrictionsAddress,
@@ -65,8 +65,8 @@ task('deploy-aave-router', 'Deploy AAVE Router')
       admin
     );
 
-    console.log('aave balance after', await callContract(token, 'balanceOf', [pool.address]));
-    console.log('aave wrapper balance after', await callContract(token, 'balanceOf', [wrappedToken.address]));
+    console.log('yfi balance after', await callContract(token, 'balanceOf', [pool.address]));
+    console.log('yfi wrapper balance after', await callContract(token, 'balanceOf', [wrappedToken.address]));
     console.log('wrapped balance', await callContract(wrappedToken, 'balanceOf', [pool.address]));
 
     await wrappedToken.pokeRouter();
@@ -81,7 +81,7 @@ task('deploy-aave-router', 'Deploy AAVE Router')
 
     const staker = await IStakedAave.at(aaveStaking);
     console.log('staker.balanceOf(wrappedToken.address)', await callContract(staker, 'balanceOf', [wrappedToken.address]));
-    console.log('getUserAssetData', await callContract(staker, 'getUserAssetData', [wrappedToken.address, aave]));
+    console.log('getUserAssetData', await callContract(staker, 'getUserAssetData', [wrappedToken.address, yfi]));
     console.log('getTotalRewardsBalance', await callContract(staker, 'getTotalRewardsBalance', [wrappedToken.address]));
     console.log('stakerRewardsToClaim', await callContract(staker, 'stakerRewardsToClaim', [wrappedToken.address]));
 

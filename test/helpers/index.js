@@ -3,6 +3,7 @@ const TruffleContract = require('@nomiclabs/truffle-contract');
 const template = artifacts.require('Migrations');
 const { promisify } = require('util');
 const { assert } = require('chai');
+const { buildBasicRouterArgs } = require('./builders');
 const { web3 } = template;
 const BigNumber = require('bignumber.js')
 const fs = require('fs')
@@ -195,6 +196,59 @@ async function forkContractUpgrade(ethers, adminAddress, proxyAdminAddress, prox
   })
 }
 
+async function forkReplacePoolTokenWithNewPiToken(
+  artifacts,
+  ethers,
+  controller,
+  tokenAddress,
+  factoryAddress,
+  routerArgs,
+  admin
+) {
+  const MockERC20 = await artifacts.require('MockERC20');
+  const token = await MockERC20.at(tokenAddress);
+  const PowerIndexPool = await artifacts.require('PowerIndexPool');
+  const WrappedPiErc20 = await artifacts.require('WrappedPiErc20');
+  const AavePowerIndexRouter = await artifacts.require('AavePowerIndexRouter');
+  const pool = await PowerIndexPool.at(await callContract(controller, 'pool'))
+  console.log('aave balance before', await callContract(token, 'balanceOf', [pool.address]));
+
+  await pool.setController(controller.address, {from: admin});
+
+  const res = await controller.replacePoolTokenWithNewPiToken(
+    tokenAddress,
+    factoryAddress,
+    routerArgs,
+    'Wrapped TOKEN',
+    'WTOKEN',
+    {from: admin}
+  );
+
+  const wrappedTokenAddress = res.logs.filter(l => l.event === 'ReplacePoolTokenWithWrapped')[0].args.wrappedToken;
+  const wrappedToken = await WrappedPiErc20.at(wrappedTokenAddress);
+  const router = await AavePowerIndexRouter.at(await callContract(wrappedToken, 'router', []));
+
+  await increaseTime(ethers, 60);
+
+  await controller.finishReplace();
+
+  await wrappedToken.pokeRouter();
+
+  console.log('await callContract(pool, "isBound", [aave])', await callContract(pool, "isBound", [tokenAddress]));
+  console.log('await callContract(pool, "isBound", [wrappedTokenAddress])', await callContract(pool, "isBound", [wrappedTokenAddress]));
+
+  return {
+    token,
+    wrappedToken,
+    router
+  }
+}
+
+function callContract(contract, method, args = []) {
+  console.log(method, args);
+  return contract.contract.methods[method].apply(contract.contract, args).call();
+}
+
 module.exports = {
   deployProxied,
   createOrGetProxyAdmin,
@@ -210,5 +264,7 @@ module.exports = {
   forkContractUpgrade,
   deployAndSaveArgs,
   increaseTime,
-  impersonateAccount
+  impersonateAccount,
+  callContract,
+  forkReplacePoolTokenWithNewPiToken
 }
