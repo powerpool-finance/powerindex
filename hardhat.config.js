@@ -82,7 +82,7 @@ const config = {
     kovan: {
       url: 'https://kovan-eth.compound.finance',
       accounts: getAccounts('kovan'),
-      gasPrice: 1000000000,
+      gasPrice: 10 ** 9,
       gasMultiplier: 2,
     },
     coverage: {

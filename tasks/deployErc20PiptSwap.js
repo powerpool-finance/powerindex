@@ -15,8 +15,6 @@ task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async () => {
   const wethAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
   const cvpAddress = '0x38e4adb44ef08f22f5b5b76a8f0c2d0dcbe7dca1';
 
-  const pool = await PowerIndexPool.at(poolAddress);
-
   const erc20PiptSwap = await Erc20PiptSwap.new(
     wethAddress,
     cvpAddress,
@@ -26,6 +24,8 @@ task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async () => {
   );
   console.log('erc20PiptSwap', erc20PiptSwap.address);
 
+  const pool = await PowerIndexPool.at(poolAddress);
+
   const swapCoins = [
     '0xdAC17F958D2ee523a2206206994597C13D831ec7', //USDT
     '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', //USDC
@@ -34,7 +34,6 @@ task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async () => {
     '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', //WBTC
     '0xc944e90c64b2c07662a292be6244bdf05cda44a7', //GRT
   ];
-
   await erc20PiptSwap.fetchUnswapPairsFromFactory(
     uniswapFactoryAddress,
     (await callContract(pool, 'getCurrentTokens')).concat(swapCoins),
