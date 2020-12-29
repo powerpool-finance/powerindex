@@ -4,7 +4,7 @@ const fs = require('fs');
 
 task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
   const wethAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
-  const balancerPoolAddress = '0x26607aC599266b21d13c7aCF7942c7701a8b699c';
+  const balancerPoolAddress = '0x26607ac599266b21d13c7acf7942c7701a8b699c';
   const uniswapFactoryAddress = '0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f';
 
   const BPool = artifacts.require('BPool');
@@ -28,7 +28,17 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
     const token = await MockERC20.at(tokensAddresses[i]);
     const pairAddress = await callContract(factory, 'getPair', [tokensAddresses[i], wethAddress]);
     const pair = await UniswapV2Pair.at(pairAddress);
-    const { _reserve0: tokenReserve, _reserve1: ethReserve } = await callContract(pair, 'getReserves');
+    const { _reserve0, _reserve1 } = await callContract(pair, 'getReserves');
+    const token0 = await callContract(pair, 'token0');
+    let ethReserve, tokenReserve;
+    let isReverse = token0.toLowerCase() === wethAddress.toLowerCase();
+    if (isReverse) {
+      ethReserve = _reserve0;
+      tokenReserve = _reserve1;
+    } else {
+      ethReserve = _reserve1;
+      tokenReserve = _reserve0;
+    }
     const balancerBalance = await callContract(pool, 'getBalance', [tokensAddresses[i]]).catch(() => '0');
 
     tokens.push({
@@ -40,6 +50,7 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
         address: pairAddress,
         tokenReserve,
         ethReserve,
+        isReverse,
       },
     });
   }
