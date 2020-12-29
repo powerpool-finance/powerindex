@@ -15,10 +15,10 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   event SetPvpFee(uint256 pvpFee);
   event SetUniswapRouter(address uniswapRouter);
   event SetUsdcYfiSwapPath(address[] usdcYfiSwapPath);
-  event Stake(uint256 amount);
-  event Redeem(uint256 amount);
+  event Stake(address indexed sender, uint256 amount);
+  event Redeem(address indexed sender, uint256 amount);
   event IgnoreRedeemDueVoteLock(uint256 voteLockUntilBlock);
-  event ClaimRewards(
+  event DistributeRewards(
     address indexed caller,
     uint256 yCrvReward,
     uint256 usdcConverted,
@@ -31,7 +31,9 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     address[] pools
   );
   event RewardPool(address indexed pool, uint256 amount);
-  event IgnoreDueMissingVoting();
+  event IgnoreDueMissingStaking();
+  event ClaimRewards(address indexed sender, uint256 yCrvAmount);
+  event Exit(address indexed sender, uint256 redeemAmount, uint256 yCrvAmount);
 
   struct YearnConfig {
     address YCRV;
@@ -85,21 +87,45 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   /*** PERMISSIONLESS METHODS ***/
 
   function claimRewards() external {
+    // Step #1. Claim yCrv reward from YFI governance pool
+    _callVoting(YearnGovernanceInterface(0).getReward.selector, "");
+
+    uint256 yCrvReward = YCRV.balanceOf(address(piToken));
+    require(yCrvReward > 0, "NO_YCRV_REWARD_ON_PI");
+
+    // Step #2. Transfer yCrv reward to the router
+    piToken.callExternal(address(YCRV), YCRV.transfer.selector, abi.encode(address(this), yCrvReward), 0);
+
+    emit ClaimRewards(msg.sender, yCrvReward);
+  }
+
+  function exit() external {
+    _checkVotingSenderAllowed();
+
+    uint256 yfiBalanceBefore = YFI.balanceOf(address(piToken));
+
+    // Step #1. Exit (get all the stake back) and claim yCrv reward from YFI governance pool
+    _callVoting(YearnGovernanceInterface(0).exit.selector, "");
+
+    uint256 yfiBalanceAfter = YFI.balanceOf(address(piToken));
+
+    // Step #2. Transfer yCrv reward to the router
+    uint256 yCrvReward = YCRV.balanceOf(address(piToken));
+    if (yCrvReward > 0) {
+      piToken.callExternal(address(YCRV), YCRV.transfer.selector, abi.encode(address(this), yCrvReward), 0);
+    }
+
+    emit Exit(msg.sender, yfiBalanceAfter - yfiBalanceBefore, yCrvReward);
+  }
+
+  function distributeRewards() external {
     uint256 poolsLen = rewardPools.length;
     require(poolsLen > 0, "MISSING_REWARD_POOLS");
     require(usdcYfiSwapPath.length > 0, "MISSING_REWARD_SWAP_PATH");
 
     uint256 yfiBalanceBefore = YFI.balanceOf(address(this));
-
-    // Step #1. Claim yCrv reward from YFI governance pool
-    _checkVotingSenderAllowed();
-    _callVoting(YearnGovernanceInterface(0).getReward.selector, "");
-
-    uint256 yCrvReward = YCRV.balanceOf(address(piToken));
-    require(yCrvReward > 0, "NO_YCRV_REWARD");
-
-    // Step #2. Transfer yCrv reward to the router
-    piToken.callExternal(address(YCRV), YCRV.transfer.selector, abi.encode(address(this), yCrvReward), 0);
+    uint256 yCrvReward = YCRV.balanceOf(address(this));
+    require(yCrvReward > 0, "NO_YCRV_REWARD_ON_ROUTER");
 
     // Step #3. Unwrap yCrv -> USDC @ yDeposit
     YCRV.approve(curveYDeposit, yCrvReward);
@@ -163,7 +189,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
       emit RewardPool(pool, poolReward);
     }
 
-    emit ClaimRewards(
+    emit DistributeRewards(
       msg.sender,
       yCrvReward,
       usdcConverted,
@@ -210,11 +236,6 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     _callVoting(YearnGovernanceInterface(0).register.selector, "");
   }
 
-  function callExit() external {
-    _checkVotingSenderAllowed();
-    _callVoting(YearnGovernanceInterface(0).exit.selector, "");
-  }
-
   function callPropose(address _executor, string calldata _hash) external {
     _checkVotingSenderAllowed();
     _callVoting(YearnGovernanceInterface(0).propose.selector, abi.encode(_executor, _hash));
@@ -245,9 +266,9 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   function piTokenCallback(uint256 _withdrawAmount) external override onlyPiToken {
     address piToken_ = msg.sender;
 
-    // Ignore the tokens without a voting assigned
-    if (voting == address(0)) {
-      emit IgnoreDueMissingVoting();
+    // Ignore the tokens without a staking assigned
+    if (staking == address(0)) {
+      emit IgnoreDueMissingStaking();
       return;
     }
 
@@ -288,14 +309,14 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     piToken.approveUnderlying(voting, _amount);
     _callVoting(YearnGovernanceInterface(0).stake.selector, abi.encode(_amount));
 
-    emit Stake(_amount);
+    emit Stake(msg.sender, _amount);
   }
 
   function _redeem(uint256 _amount) internal {
-    require(_amount > 0, "CANT_WITHDRAW_0");
+    require(_amount > 0, "CANT_REDEEM_0");
 
     _callVoting(YearnGovernanceInterface(0).withdraw.selector, abi.encode(_amount));
 
-    emit Redeem(_amount);
+    emit Redeem(msg.sender, _amount);
   }
 }

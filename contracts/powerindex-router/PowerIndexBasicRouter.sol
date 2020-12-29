@@ -12,7 +12,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   uint256 public constant HUNDRED_PCT = 1 ether;
 
   event SetVotingAndStaking(address indexed voting, address indexed staking);
-  event SetReserveRatio(uint256 ratio, uint256 rebalancingInterval);
+  event SetReserveConfig(uint256 ratio, uint256 rebalancingInterval);
   event SetRebalancingInterval(uint256 rebalancingInterval);
   event IgnoreRebalancing(uint256 blockTimestamp, uint256 lastRebalancedAt, uint256 rebalancingInterval);
 
@@ -49,6 +49,10 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     rebalancingInterval = _basicConfig.rebalancingInterval;
   }
 
+  /**
+   * @dev Changing the staking address with a positive underlying stake will break `getPiEquivalentForUnderlying`
+   *      formula. Consider moving all the reserves to the piToken contract before doing this.
+   */
   function setVotingAndStaking(address _voting, address _staking) external override onlyOwner {
     voting = _voting;
     staking = _staking;
@@ -59,7 +63,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     require(_reserveRatio <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
     reserveRatio = _reserveRatio;
     rebalancingInterval = _rebalancingInterval;
-    emit SetReserveRatio(_reserveRatio, _rebalancingInterval);
+    emit SetReserveConfig(_reserveRatio, _rebalancingInterval);
   }
 
   function _callVoting(bytes4 _sig, bytes memory _data) internal {

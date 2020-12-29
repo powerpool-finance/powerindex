@@ -10,8 +10,8 @@ import "../PowerIndexBasicRouter.sol";
 
 contract AavePowerIndexRouter is PowerIndexBasicRouter {
   event TriggerCooldown();
-  event Stake(uint256 amount);
-  event Redeem(uint256 amount);
+  event Stake(address indexed sender, uint256 amount);
+  event Redeem(address indexed sender, uint256 amount);
   event IgnoreRedeemDueCoolDown(uint256 coolDownFinishesAt, uint256 unstakeFinishesAt);
   event IgnoreDueMissingStaking();
 
@@ -121,7 +121,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
     _callStaking(IStakedAave(0).stake.selector, abi.encode(piToken, _amount));
 
-    emit Stake(_amount);
+    emit Stake(msg.sender, _amount);
   }
 
   function _redeem(uint256 _amount) internal {
@@ -130,6 +130,6 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     _callStaking(IERC20(0).approve.selector, abi.encode(staking, _amount));
     _callStaking(IStakedAave(0).redeem.selector, abi.encode(address(piToken), _amount));
 
-    emit Redeem(_amount);
+    emit Redeem(msg.sender, _amount);
   }
 }
