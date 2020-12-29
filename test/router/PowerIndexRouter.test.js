@@ -21,12 +21,12 @@ const ReserveStatus = {
 };
 
 describe('PowerIndex BasicRouter Test', () => {
-  let deployer, bob, alice, charlie, stub, piGov;
+  let deployer, bob, alice, stub, piGov;
   let poolRestrictions;
   let defaultBasicConfig;
 
   before(async function () {
-    [deployer, bob, alice, charlie, stub, piGov] = await web3.eth.getAccounts();
+    [deployer, bob, alice, stub, piGov] = await web3.eth.getAccounts();
     poolRestrictions = await PoolRestrictions.new();
     defaultBasicConfig = buildBasicRouterConfig(
       poolRestrictions.address,

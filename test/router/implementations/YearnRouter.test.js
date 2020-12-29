@@ -1,5 +1,5 @@
 const { time, constants, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
-const { ether, mwei, getResTimestamp,fetchLogs } = require('../../helpers');
+const { ether, mwei, getResTimestamp } = require('../../helpers');
 const { buildBasicRouterConfig, buildYearnRouterConfig } = require('../../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
