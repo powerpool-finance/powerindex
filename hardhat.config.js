@@ -71,7 +71,7 @@ const config = {
     },
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
-      accounts: getAccounts('mainnet'),
+      // accounts: getAccounts('mainnet'),
       gasPrice: 75 * 10 ** 9,
       gasMultiplier: 2,
       timeout: 2000000,
@@ -82,7 +82,7 @@ const config = {
     kovan: {
       url: 'https://kovan-eth.compound.finance',
       accounts: getAccounts('kovan'),
-      gasPrice: 1000000000,
+      gasPrice: 10 ** 9,
       gasMultiplier: 2,
     },
     coverage: {
