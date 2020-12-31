@@ -19,6 +19,8 @@ ProxyAdmin.defaults(template.class_defaults);
 
 let proxyAdmin;
 
+const getCounter = (n => () => n++)(1);
+
 /**
  * Rewinds ganache by n blocks
  * @param {number} n
@@ -163,10 +165,6 @@ async function getResTimestamp(res) {
   return (await web3.eth.getBlock(res.receipt.blockNumber)).timestamp.toString();
 }
 
-async function increaseTime(ethers, time) {
-  return ethers.provider.send('evm_increaseTime', [time]);
-}
-
 async function deployAndSaveArgs(Contract, args) {
   const newInstance = await Contract.new.apply(Contract, args);
   fs.writeFileSync(
@@ -196,6 +194,54 @@ async function forkContractUpgrade(ethers, adminAddress, proxyAdminAddress, prox
   })
 }
 
+const { BN } = web3.utils;
+
+const increaseTime = buildEndpoint('evm_increaseTime');
+
+async function latestBlock () {
+  const block = await web3.eth.getBlock('latest');
+  return new BN(block.timestamp);
+}
+
+async function increaseTimeTo (target) {
+  if (!BN.isBN(target)) {
+    target = new BN(target);
+  }
+
+  const now = (await latestBlock());
+
+  if (target.lt(now)) throw Error(`Cannot increase current time (${now}) to a moment in the past (${target})`);
+  const diff = target.sub(now);
+  return increaseTime(diff.toNumber());
+}
+
+function buildEndpoint(endpoint) {
+    return async function(...args) {
+      return new Promise((resolve, reject) => {
+        web3.currentProvider.send(
+          {
+            jsonrpc: '2.0',
+            method: endpoint,
+            params: args,
+            id: getCounter(),
+          },
+          async (err, res) => {
+            if (err) {
+              return reject(err);
+            }
+            if (res.error && res.error.message && res.error.message.length > 0) {
+              let err = new Error(`'${endpoint}' call failed`);
+              err.stack = res.error.data.stack;
+              err.name = res.error.data.name;
+              return reject(err);
+            }
+            return resolve(res.result);
+          },
+        );
+      });
+    }
+  }
+
 module.exports = {
   deployProxied,
   createOrGetProxyAdmin,
@@ -210,6 +256,8 @@ module.exports = {
   getResTimestamp,
   forkContractUpgrade,
   deployAndSaveArgs,
+  impersonateAccount,
   increaseTime,
-  impersonateAccount
+  increaseTimeTo,
+  evmSetNextBlockTimestamp: buildEndpoint('evm_setNextBlockTimestamp')
 }

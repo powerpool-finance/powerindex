@@ -98,6 +98,9 @@ describe('PowerIndexPoolController', () => {
       constants.ZERO_ADDRESS,
       ether(0),
       '0',
+      stub,
+      ether(0),
+      []
     );
     defaultFactoryArgs = web3.eth.abi.encodeParameter({
       BasicConfig: {
@@ -106,6 +109,9 @@ describe('PowerIndexPoolController', () => {
         staking: 'address',
         reserveRatio: 'uint256',
         rebalancingInterval: 'uint256',
+        pvp: 'address',
+        pvpFee: 'uint256',
+        rewardPools: 'address[]',
       }
     }, defaultBasicConfig);
   });

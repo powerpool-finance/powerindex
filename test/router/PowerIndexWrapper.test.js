@@ -72,15 +72,18 @@ describe('PowerIndexWrapper', () => {
   let defaultBasicConfig;
   let defaultFactoryArguments;
 
-  let minter, alice, communityWallet, poolRestrictions;
+  let minter, alice, communityWallet, poolRestrictions, stub;
   before(async function () {
-    [minter, alice, communityWallet, poolRestrictions] = await web3.eth.getAccounts();
+    [minter, alice, communityWallet, poolRestrictions, stub] = await web3.eth.getAccounts();
     defaultBasicConfig = buildBasicRouterConfig(
       poolRestrictions,
       constants.ZERO_ADDRESS,
       constants.ZERO_ADDRESS,
       ether(0),
       '0',
+      stub,
+      ether(0),
+      []
     );
     defaultFactoryArguments = web3.eth.abi.encodeParameter({
       BasicConfig: {
@@ -89,6 +92,9 @@ describe('PowerIndexWrapper', () => {
         staking: 'address',
         reserveRatio: 'uint256',
         rebalancingInterval: 'uint256',
+        pvp: 'address',
+        pvpFee: 'uint256',
+        rewardPools: 'address[]',
       }
     }, defaultBasicConfig);
   });

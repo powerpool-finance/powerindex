@@ -6,15 +6,20 @@ const {
   createOrGetProxyAdmin,
   splitPayload,
   advanceBlocks,
+  increaseTimeTo,
+  getResTimestamp,
+  evmSetNextBlockTimestamp,
 } = require('../../helpers');
-const { buildBasicRouterConfig } = require('../../helpers/builders');
+const { buildBasicRouterConfig, buildAaveRouterConfig, buildAaveAssetConfigInput } = require('../../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const MyContract = artifacts.require('MyContract');
+const MockGulpingBPool = artifacts.require('MockGulpingBPool');
 const { web3 } = MockERC20;
+const { BN } = web3.utils;
 
 const AaveToken = artifactFromBytecode('aave/AaveToken');
 const AaveTokenV2 = artifactFromBytecode('aave/AaveTokenV2');
@@ -26,6 +31,7 @@ const AaveExecutor = artifactFromBytecode('aave/AaveExecutor');
 MockERC20.numberFormat = 'String';
 AavePowerIndexRouter.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
+StakedAaveV2.numberFormat = 'String';
 
 // in blocks
 const VOTE_DURATION = 5;
@@ -53,9 +59,22 @@ const COOLDOWN_STATUS = {
 };
 
 describe('AaveRouter Tests', () => {
-  let deployer, aaveDistributor, bob, alice, rewardsVault, emissionManager, stub, guardian;
+  let deployer,
+    aaveDistributor,
+    bob,
+    alice,
+    rewardsVault,
+    emissionManager,
+    stub,
+    guardian,
+    piGov,
+    pvp,
+    pool1,
+    pool2,
+    pool3,
+    pool4;
 
-  before(async function () {
+  before(async function() {
     [
       deployer,
       aaveDistributor,
@@ -65,6 +84,12 @@ describe('AaveRouter Tests', () => {
       emissionManager,
       stub,
       guardian,
+      piGov,
+      pvp,
+      pool1,
+      pool2,
+      pool4,
+      pool3,
     ] = await web3.eth.getAccounts();
   });
 
@@ -116,15 +141,26 @@ describe('AaveRouter Tests', () => {
       piAave = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'piAAVE');
       aaveRouter = await AavePowerIndexRouter.new(
         piAave.address,
-        buildBasicRouterConfig(poolRestrictions.address, stub, stakedAave.address, ether('0.2'), '0'),
+        buildBasicRouterConfig(
+          poolRestrictions.address,
+          constants.ZERO_ADDRESS,
+          stakedAave.address,
+          ether('0.2'),
+          '0',
+          pvp,
+          ether('0.2'),
+          [],
+        ),
+        buildAaveRouterConfig(aave.address),
       );
 
       // Setting up...
       await piAave.changeRouter(aaveRouter.address, { from: stub });
       await aave.transfer(stakedAave.address, ether(42000), { from: aaveDistributor });
+      await aaveRouter.transferOwnership(piGov);
 
       // Checks...
-      assert.equal(await aaveRouter.owner(), deployer);
+      assert.equal(await aaveRouter.owner(), piGov);
     });
 
     it('should deny non-piToken calling piTokenCallback', async () => {
@@ -216,6 +252,128 @@ describe('AaveRouter Tests', () => {
       });
     });
 
+    describe('rewards distribution', async () => {
+      let poolA, poolB, poolC, poolD;
+      let last;
+
+      beforeEach(async () => {
+        poolA = await MockGulpingBPool.new();
+        poolB = await MockGulpingBPool.new();
+        poolC = await MockGulpingBPool.new();
+        poolD = await MockGulpingBPool.new();
+
+        await aaveRouter.setRewardPools([poolA.address, poolB.address, poolC.address], { from: piGov})
+
+        await aave.transfer(alice, ether('11000'), { from: aaveDistributor });
+        let res = await aave.transfer(alice, ether('100000'), { from: aaveDistributor });
+        last = await getResTimestamp(res);
+
+        await stakedAave.configureAssets(
+          [buildAaveAssetConfigInput(ether(1), `${last}000000000000`, stakedAave.address)],
+          { from: emissionManager },
+        );
+
+        await aave.approve(piAave.address, ether(10000), { from: alice });
+        await piAave.deposit(ether('10000'), { from: alice });
+
+        await piAave.transfer(poolA.address, 10, { from: alice });
+        await piAave.transfer(poolB.address, 20, { from: alice });
+
+        await aave.approve(stakedAave.address, ether(10000000), { from: rewardsVault });
+        await aave.transfer(rewardsVault, ether(10000000), { from: aaveDistributor });
+
+        assert.equal(await stakedAave.totalSupply(), ether(8000));
+      });
+
+      it('should allow claiming rewards', async () => {
+        const increaseTo = new BN(last).add(new BN(100));
+        try {
+          // hardhat network could explicitly set the next block timestamp
+          await evmSetNextBlockTimestamp(increaseTo.toNumber());
+        } catch (e) {
+          // while ganache (when running coverage) sets it roughly
+          await increaseTimeTo(increaseTo);
+        }
+
+        const claimRes = await aaveRouter.claimRewards({ from: bob });
+        const distributeRes = await aaveRouter.distributeRewards({ from: bob });
+
+        // The following assertions will fail when running coverage
+        expectEvent(claimRes, 'ClaimRewards', {
+          sender: bob,
+          aaveReward: '97000000000000000000'
+        });
+        await expectEvent.inTransaction(claimRes.tx, stakedAave, 'RewardsClaimed', {
+          from: piAave.address,
+          to: aaveRouter.address,
+          amount: '97000000000000000000'
+        });
+
+        expectEvent(distributeRes, 'DistributeRewards', {
+          sender: bob,
+          aaveReward: '97000000000000000000',
+          pvpReward: '19400000000000000000',
+          poolRewardsUnderlying: '77600000000000000000',
+          poolRewardsPi: '77600000000000000000',
+          pools: [poolA.address, poolB.address, poolC.address],
+        });
+
+        await expectEvent.inTransaction(distributeRes.tx, poolA, 'Gulp');
+        await expectEvent.inTransaction(distributeRes.tx, poolB, 'Gulp');
+        await expectEvent.notEmitted.inTransaction(distributeRes.tx, poolC, 'Gulp');
+        await expectEvent.notEmitted.inTransaction(distributeRes.tx, poolD, 'Gulp');
+
+        assert.equal(distributeRes.logs.length, 4);
+        assert.equal(distributeRes.logs[1].args.pool, poolA.address);
+        assert.equal(distributeRes.logs[1].args.amount, '25866666666666666666');
+        assert.equal(distributeRes.logs[2].args.pool, poolB.address);
+        assert.equal(distributeRes.logs[2].args.amount, '51733333333333333333');
+
+        assert.equal(await piAave.balanceOf(poolA.address), 25866666666666666666 + 10);
+        assert.equal(await piAave.balanceOf(poolB.address), 51733333333333333333 + 20);
+        assert.equal(await piAave.balanceOf(poolC.address), '0');
+        assert.equal(await piAave.balanceOf(poolD.address), '0');
+
+        assert.equal(await aave.balanceOf(aaveRouter.address), '0');
+        assert.equal(await piAave.balanceOf(aaveRouter.address), '1');
+      });
+
+      it('should revert claimRewards() if there is no reward available', async () => {
+        await stakedAave.configureAssets(
+          [buildAaveAssetConfigInput(0, `0`, stakedAave.address)],
+          { from: emissionManager },
+        );
+        await expectRevert(aaveRouter.claimRewards({ from: alice }), 'NOTING_TO_CLAIM');
+      });
+
+      it('should revert distribute rewards() if there is no yCrv on the balance', async () => {
+        await expectRevert(aaveRouter.distributeRewards({ from: bob }), 'NO_PENDING_REWARD');
+      });
+
+      it('should revert distributing rewards when missing reward pools config', async () => {
+        const router = await AavePowerIndexRouter.new(
+          piAave.address,
+          buildBasicRouterConfig(
+            poolRestrictions.address,
+            constants.ZERO_ADDRESS,
+            stakedAave.address,
+            ether('0.2'),
+            '0',
+            pvp,
+            ether('0.2'),
+            [],
+          ),
+          buildAaveRouterConfig(
+            aave.address
+          ),
+        );
+        await aaveRouter.migrateToNewRouter(piAave.address, router.address, { from: piGov });
+        await time.increase(1);
+        await router.claimRewards({ from: bob });
+        await expectRevert(router.distributeRewards({ from: bob }), 'MISSING_REWARD_POOLS');
+      });
+    });
+
     // https://github.com/aave/governance-v2
     describe('voting', async () => {
       // let votingStrategy, aavePropositionPower, weightProvider, paramsProvider, aaveGovernance;
@@ -262,7 +420,7 @@ describe('AaveRouter Tests', () => {
         );
 
         await aaveGovernanceV2.authorizeExecutors([executor.address]);
-        await aaveRouter.setVotingAndStaking(aaveGovernanceV2.address, stakedAave.address);
+        await aaveRouter.setVotingAndStaking(aaveGovernanceV2.address, stakedAave.address, { from: piGov });
       });
 
       it('should allow depositing Aave and staking it in a StakedAave contract', async () => {

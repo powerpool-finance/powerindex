@@ -14,10 +14,31 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   event Redeem(address indexed sender, uint256 amount);
   event IgnoreRedeemDueCoolDown(uint256 coolDownFinishesAt, uint256 unstakeFinishesAt);
   event IgnoreDueMissingStaking();
+  event ClaimRewards(address indexed sender, uint256 aaveReward);
+  event DistributeRewards(
+    address indexed sender,
+    uint256 aaveReward,
+    uint256 pvpReward,
+    uint256 poolRewardsUnderlying,
+    uint256 poolRewardsPi,
+    address[] pools
+  );
 
   enum CoolDownStatus { NONE, COOLDOWN, UNSTAKE_WINDOW }
 
-  constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexBasicRouter(_piToken, _basicConfig) {}
+  struct AaveConfig {
+    address AAVE;
+  }
+
+  IERC20 internal immutable AAVE;
+
+  constructor(
+    address _piToken,
+    BasicConfig memory _basicConfig,
+    AaveConfig memory _aaveConfig
+  ) public PowerIndexBasicRouter(_piToken, _basicConfig) {
+    AAVE = IERC20(_aaveConfig.AAVE);
+  }
 
   /*** THE PROXIED METHOD EXECUTORS FOR VOTING ***/
 
@@ -31,7 +52,34 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     _callVoting(IAaveGovernanceV2(0).submitVote.selector, abi.encode(_proposalId, _support));
   }
 
-  /*** THE PROXIED METHOD EXECUTORS FOR STAKING ***/
+  /*** PERMISSIONLESS REWARD CLAIMING AND DISTRIBUTION ***/
+
+  function claimRewards() external {
+    uint256 rewardsPending = IStakedAave(staking).getTotalRewardsBalance(address(piToken));
+    require(rewardsPending > 0, "NOTING_TO_CLAIM");
+
+    _callStaking(IStakedAave.claimRewards.selector, abi.encode(address(this), rewardsPending));
+
+    emit ClaimRewards(msg.sender, rewardsPending);
+  }
+
+  function distributeRewards() external {
+    uint256 pendingReward = AAVE.balanceOf(address(this));
+    require(pendingReward > 0, "NO_PENDING_REWARD");
+
+    // Step #1. Distribute pvpReward
+    (uint256 pvpReward, uint256 poolRewardsUnderlying) = _distributeRewardToPvp(pendingReward, AAVE);
+    require(poolRewardsUnderlying > 0, "NO_POOL_REWARDS_UNDERLYING");
+
+    // Step #2. Wrap AAVE into piAAVE
+    AAVE.approve(address(piToken), poolRewardsUnderlying);
+    piToken.deposit(poolRewardsUnderlying);
+
+    // Step #3. Distribute piAAVE over the pools
+    (uint256 poolRewardsPi, address[] memory pools) = _distributePiRemainderToPools(piToken);
+
+    emit DistributeRewards(msg.sender, pendingReward, pvpReward, poolRewardsUnderlying, poolRewardsPi, pools);
+  }
 
   /*** OWNER METHODS ***/
 

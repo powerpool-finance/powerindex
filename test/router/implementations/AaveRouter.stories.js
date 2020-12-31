@@ -1,6 +1,6 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
 const { artifactFromBytecode, ether } = require('../../helpers');
-const { buildBasicRouterConfig } = require('../../helpers/builders');
+const { buildBasicRouterConfig, buildAaveRouterConfig } = require('../../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
@@ -54,7 +54,17 @@ describe('AaveRouter Tests', () => {
     piAave = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'piAAVE');
     aaveRouter = await AavePowerIndexRouter.new(
       piAave.address,
-      buildBasicRouterConfig(poolRestrictions.address, stub, stakedAave.address, ether('0.2'), '0'),
+      buildBasicRouterConfig(
+        poolRestrictions.address,
+        stub,
+        stakedAave.address,
+        ether('0.2'),
+        '0',
+        stub,
+        ether('0.2'),
+        [],
+      ),
+      buildAaveRouterConfig(aave.address)
     );
 
     // Setting up...

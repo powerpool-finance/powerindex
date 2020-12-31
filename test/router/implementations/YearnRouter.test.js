@@ -72,6 +72,9 @@ describe('YearnRouter Tests', () => {
         yearnGovernance.address,
         ether('0.2'),
         '0',
+        pvp,
+        ether('0.15'),
+        [pool1, pool2],
       ),
       buildYearnRouterConfig(
         yCrv.address,
@@ -79,9 +82,6 @@ describe('YearnRouter Tests', () => {
         yfi.address,
         constants.ZERO_ADDRESS,
         yDeposit.address,
-        pvp,
-        ether('0.15'),
-        [pool1, pool2],
         [usdc.address, weth.address, yfi.address],
       ),
     );
@@ -502,14 +502,14 @@ describe('YearnRouter Tests', () => {
       res = await yfiRouter.distributeRewards({ from: bob });
 
       expectEvent(res, 'DistributeRewards', {
-        caller: bob,
+        sender: bob,
         yCrvReward: '1999999999999999464000',
         usdcConverted: '1799999999',
         yfiConverted: '1782826875172502033652',
         yfiGain: '1782826875172502033652',
         pvpReward: '267424031275875305047',
-        poolRewards: '1515402843896626728605',
-        piYfiBalance: '1515402843896626728605',
+        poolRewardsUnderlying: '1515402843896626728605',
+        poolRewardsPi: '1515402843896626728605',
         uniswapSwapPath: [usdc.address, weth.address, yfi.address],
         pools: [poolA.address, poolB.address, poolC.address],
       });
@@ -561,14 +561,14 @@ describe('YearnRouter Tests', () => {
       res = await yfiRouter.distributeRewards({ from: bob });
 
       expectEvent(res, 'DistributeRewards', {
-        caller: bob,
+        sender: bob,
         yCrvReward: '1999999999999999464000',
         usdcConverted: '1799999999',
         yfiConverted: '1782826875172502033652',
         yfiGain: '1782826875172502033652',
         pvpReward: '267424031275875305047',
-        poolRewards: '1515402843896626728605',
-        piYfiBalance: '1515402843896626728605',
+        poolRewardsUnderlying: '1515402843896626728605',
+        poolRewardsPi: '1515402843896626728605',
         uniswapSwapPath: [usdc.address, weth.address, yfi.address],
         pools: [poolA.address, poolB.address, poolC.address],
       });
@@ -611,6 +611,9 @@ describe('YearnRouter Tests', () => {
           yearnGovernance.address,
           ether('0.2'),
           '0',
+          pvp,
+          ether('0.2'),
+          [],
         ),
         buildYearnRouterConfig(
           yCrv.address,
@@ -618,9 +621,6 @@ describe('YearnRouter Tests', () => {
           yfi.address,
           constants.ZERO_ADDRESS,
           yDeposit.address,
-          pvp,
-          ether('0.2'),
-          [],
           [usdc.address, weth.address, yfi.address],
         ),
       );
@@ -640,6 +640,9 @@ describe('YearnRouter Tests', () => {
           yearnGovernance.address,
           ether('0.2'),
           '0',
+          pvp,
+          ether('0.2'),
+          [pool1, pool2],
         ),
         buildYearnRouterConfig(
           yCrv.address,
@@ -647,9 +650,6 @@ describe('YearnRouter Tests', () => {
           yfi.address,
           constants.ZERO_ADDRESS,
           yDeposit.address,
-          pvp,
-          ether('0.2'),
-          [pool1, pool2],
           [],
         ),
       );

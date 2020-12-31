@@ -6,31 +6,27 @@ pragma experimental ABIEncoderV2;
 import "../../interfaces/WrappedPiErc20Interface.sol";
 import "../../interfaces/YearnGovernanceInterface.sol";
 import "../../interfaces/IYDeposit.sol";
-import "../../interfaces/BPoolInterface.sol";
 import "../../interfaces/IUniswapV2Router02.sol";
 import "./../PowerIndexBasicRouter.sol";
 
 contract YearnPowerIndexRouter is PowerIndexBasicRouter {
-  event SetRewardPools(uint256 len, address[] rewardPools);
-  event SetPvpFee(uint256 pvpFee);
   event SetUniswapRouter(address uniswapRouter);
   event SetUsdcYfiSwapPath(address[] usdcYfiSwapPath);
   event Stake(address indexed sender, uint256 amount);
   event Redeem(address indexed sender, uint256 amount);
   event IgnoreRedeemDueVoteLock(uint256 voteLockUntilBlock);
   event DistributeRewards(
-    address indexed caller,
+    address indexed sender,
     uint256 yCrvReward,
     uint256 usdcConverted,
     uint256 yfiConverted,
     uint256 yfiGain,
     uint256 pvpReward,
-    uint256 poolRewards,
-    uint256 piYfiBalance,
+    uint256 poolRewardsUnderlying,
+    uint256 poolRewardsPi,
     address[] uniswapSwapPath,
     address[] pools
   );
-  event RewardPool(address indexed pool, uint256 amount);
   event IgnoreDueMissingStaking();
   event ClaimRewards(address indexed sender, uint256 yCrvAmount);
   event Exit(address indexed sender, uint256 redeemAmount, uint256 yCrvAmount);
@@ -41,24 +37,17 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     address YFI;
     address payable uniswapRouter;
     address curveYDeposit;
-    address pvp;
-    uint256 pvpFee;
-    address[] rewardPools;
     address[] usdcYfiSwapPath;
   }
 
   int128 internal constant USDC_CURVE_Y_INDEX = 1;
 
   address public immutable curveYDeposit;
-  address public immutable pvp;
   IERC20 public immutable YCRV;
   IERC20 public immutable USDC;
   IERC20 public immutable YFI;
 
   address payable public uniswapRouter;
-  // 1 ether == 100%
-  uint256 public pvpFee;
-  address[] public rewardPools;
   address[] public usdcYfiSwapPath;
 
   constructor(
@@ -66,9 +55,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     BasicConfig memory _basicConfig,
     YearnConfig memory _yearnConfig
   ) public PowerIndexBasicRouter(_piToken, _basicConfig) {
-    require(_yearnConfig.pvpFee < HUNDRED_PCT, "PVP_FEE_OVER_THE_LIMIT");
     require(_yearnConfig.curveYDeposit != address(0), "INVALID_YDEPOSIT_ADDR");
-    require(_yearnConfig.pvp != address(0), "INVALID_PVP_ADDR");
     require(_yearnConfig.YCRV != address(0), "INVALID_YCRV_ADDR");
     require(_yearnConfig.USDC != address(0), "INVALID_USDC_ADDR");
     require(_yearnConfig.YFI != address(0), "INVALID_YFI_ADDR");
@@ -78,9 +65,6 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     YFI = IERC20(_yearnConfig.YFI);
     uniswapRouter = _yearnConfig.uniswapRouter;
     curveYDeposit = _yearnConfig.curveYDeposit;
-    pvp = _yearnConfig.pvp;
-    pvpFee = _yearnConfig.pvpFee;
-    rewardPools = _yearnConfig.rewardPools;
     usdcYfiSwapPath = _yearnConfig.usdcYfiSwapPath;
   }
 
@@ -150,44 +134,16 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     uint256 yfiGain = yfiConverted.sub(yfiBalanceBefore);
     require(yfiGain > 0, "NO_YFI_GAIN");
 
-    // Step #5. Calculate pvpReward
-    uint256 pvpReward = 0;
-    if (pvpFee > 0) {
-      pvpReward = yfiGain.mul(pvpFee).div(HUNDRED_PCT);
-      YFI.transfer(pvp, pvpReward);
-    }
-
-    uint256 poolRewards = yfiGain.sub(pvpReward);
+    // Step #5. Distribute pvpReward
+    (uint256 pvpReward, uint256 poolRewards) = _distributeRewardToPvp(yfiGain, YFI);
     require(poolRewards > 0, "NO_POOL_REWARDS");
 
     // Step #6. Wrap gained yfi into piYfi
     YFI.approve(address(piToken), poolRewards);
     piToken.deposit(poolRewards);
 
-    uint256 piYfiBalance = piToken.balanceOf(address(this));
-    require(piYfiBalance > 0, "NO_PI_YFI");
-
-    // Step #8. Distribute yfi leftovers over the pool
-    uint256 totalPiYfiOnPools = 0;
-    for (uint256 i = 0; i < poolsLen; i++) {
-      totalPiYfiOnPools = totalPiYfiOnPools.add(piToken.balanceOf(rewardPools[i]));
-    }
-    require(totalPiYfiOnPools > 0, "TOTAL_PIYFI_IS_0");
-
-    for (uint256 i = 0; i < poolsLen; i++) {
-      address pool = rewardPools[i];
-      uint256 poolPiYfiBalance = piToken.balanceOf(pool);
-      if (poolPiYfiBalance == 0) {
-        continue;
-      }
-
-      uint256 poolReward = piYfiBalance.mul(poolPiYfiBalance) / totalPiYfiOnPools;
-
-      piToken.transfer(pool, poolReward);
-
-      BPoolInterface(pool).gulp(address(piToken));
-      emit RewardPool(pool, poolReward);
-    }
+    // Step #7. Distribute piYfi leftovers over the pools
+    (uint256 piBalanceToDistribute, address[] memory pools) = _distributePiRemainderToPools(piToken);
 
     emit DistributeRewards(
       msg.sender,
@@ -197,27 +153,15 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
       yfiGain,
       pvpReward,
       poolRewards,
-      piYfiBalance,
+      piBalanceToDistribute,
       usdcYfiSwapPath,
-      rewardPools
+      pools
     );
 
     // NOTICE: it's ok to keep some YFI dust here for the future swaps
   }
 
   /*** OWNER METHODS ***/
-
-  function setRewardPools(address[] calldata _rewardPools) external onlyOwner {
-    require(_rewardPools.length > 0, "AT_LEAST_ONE_EXPECTED");
-    rewardPools = _rewardPools;
-    emit SetRewardPools(_rewardPools.length, _rewardPools);
-  }
-
-  function setPvpFee(uint256 _pvpFee) external onlyOwner {
-    require(_pvpFee < HUNDRED_PCT, "PVP_FEE_OVER_THE_LIMIT");
-    pvpFee = _pvpFee;
-    emit SetPvpFee(_pvpFee);
-  }
 
   function setUniswapRouter(address payable _unsiwapRouter) external onlyOwner {
     uniswapRouter = _unsiwapRouter;
@@ -292,10 +236,6 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   }
 
   /*** VIEWERS ***/
-
-  function getRewardPools() external view returns (address[] memory) {
-    return rewardPools;
-  }
 
   function getUsdcYfiSwapPath() external view returns (address[] memory) {
     return usdcYfiSwapPath;
