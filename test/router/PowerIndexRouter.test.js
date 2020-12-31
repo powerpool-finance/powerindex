@@ -6,7 +6,7 @@ const MockERC20 = artifacts.require('MockERC20');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexBasicRouter = artifacts.require('PowerIndexBasicRouter');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
-const MockLeakingRouter = artifacts.require('MockLeakingRouter');
+const MockRouter = artifacts.require('MockRouter');
 
 MockERC20.numberFormat = 'String';
 PowerIndexBasicRouter.numberFormat = 'String';
@@ -43,7 +43,7 @@ describe('PowerIndex BasicRouter Test', () => {
     beforeEach(async () => {
       token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
       piToken = await WrappedPiErc20.new(token.address, stub, 'piToken', 'piTKN');
-      leakingRouter = await MockLeakingRouter.new(piToken.address, defaultBasicConfig);
+      leakingRouter = await MockRouter.new(piToken.address, defaultBasicConfig);
 
       await piToken.changeRouter(leakingRouter.address, { from: stub });
     });

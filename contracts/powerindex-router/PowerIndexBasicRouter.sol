@@ -110,17 +110,25 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     return getReserveStatusPure(reserveRatio, piToken.getUnderlyingBalance(), _stakedBalance, _withdrawAmount);
   }
 
+  // NOTICE: could/should be changed depending on implementation
+  function _getUnderlyingStaked() internal view virtual returns (uint256) {
+    if (staking == address(0)) {
+      return 0;
+    }
+    return IERC20(staking).balanceOf(address(piToken));
+  }
+
   function getPiEquivalentForUnderlying(
     uint256 _underlyingAmount,
     IERC20 _underlyingToken,
     uint256 _underlyingOnPiToken,
     uint256 _piTotalSupply
-  ) external view override returns (uint256) {
+  ) public view override returns (uint256) {
     return
       getPiEquivalentForUnderlyingPure(
         _underlyingAmount,
-        // _underlyingOnPiToken + _underlyingToken.balanceOf(staking),
-        _underlyingOnPiToken.add(_underlyingToken.balanceOf(staking)),
+        // _underlyingOnPiToken + underlyingOnStaking,
+        _underlyingOnPiToken.add(_getUnderlyingStaked()),
         _piTotalSupply
       );
   }
@@ -130,7 +138,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 _totalUnderlyingWrapped,
     uint256 _piTotalSupply
   ) public pure override returns (uint256) {
-    if (_totalUnderlyingWrapped == 0) {
+    if (_piTotalSupply == 0) {
       return _underlyingAmount;
     }
     // return _piTotalSupply * _underlyingAmount / _totalUnderlyingWrapped;

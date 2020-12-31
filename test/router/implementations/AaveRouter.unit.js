@@ -121,6 +121,7 @@ describe('AaveRouter Tests', () => {
 
       // Setting up...
       await piAave.changeRouter(aaveRouter.address, { from: stub });
+      await aave.transfer(stakedAave.address, ether(42000), { from: aaveDistributor });
 
       // Checks...
       assert.equal(await aaveRouter.owner(), deployer);
@@ -147,7 +148,8 @@ describe('AaveRouter Tests', () => {
 
         // The router has partially staked the deposit with regard to the reserve ration value (20/80)
         assert.equal(await aave.balanceOf(piAave.address), ether(2000));
-        assert.equal(await aave.balanceOf(stakedAave.address), ether(8000));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
 
         // The stakeAave are allocated on the aaveWrapper contract
         assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
@@ -170,7 +172,8 @@ describe('AaveRouter Tests', () => {
 
           // The router has partially staked the deposit with regard to the reserve ration value (20/80)
           assert.equal(await aave.balanceOf(piAave.address), ether(4000));
-          assert.equal(await aave.balanceOf(stakedAave.address), ether(16000));
+          assert.equal(await aave.balanceOf(stakedAave.address), ether(58000));
+          assert.equal(await stakedAave.balanceOf(piAave.address), ether(16000));
 
           // The stakeAave are allocated on the aaveWrapper contract
           assert.equal(await stakedAave.balanceOf(piAave.address), ether(16000));
@@ -201,7 +204,7 @@ describe('AaveRouter Tests', () => {
         await piAave.deposit(ether(1000), { from: alice });
         await aave.transfer(piAave.address, ether(50), { from: alice });
         assert.equal(await aave.balanceOf(piAave.address), ether(250));
-        assert.equal(await aave.balanceOf(stakedAave.address), ether(800));
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(42800));
 
         // 2nd
         await piAave.approve(piAave.address, ether(50), { from: alice });
@@ -209,7 +212,7 @@ describe('AaveRouter Tests', () => {
 
         // The router has partially staked the deposit with regard to the reserve ration value (20/80)
         assert.equal(await aave.balanceOf(piAave.address), ether(200));
-        assert.equal(await aave.balanceOf(stakedAave.address), ether(800));
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(42800));
       });
     });
 
@@ -276,7 +279,7 @@ describe('AaveRouter Tests', () => {
 
         // The router has partially staked the deposit with regard to the reserve ration value (20/80)
         assert.equal(await aave.balanceOf(piAave.address), ether(2000));
-        assert.equal(await aave.balanceOf(stakedAave.address), ether(8000));
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
 
         // The stakeAave are allocated on the aaveWrapper contract
         assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
