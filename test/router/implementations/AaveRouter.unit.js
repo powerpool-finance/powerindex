@@ -68,11 +68,7 @@ describe('AaveRouter Tests', () => {
     stub,
     guardian,
     piGov,
-    pvp,
-    pool1,
-    pool2,
-    pool3,
-    pool4;
+    pvp;
 
   before(async function() {
     [
@@ -85,11 +81,7 @@ describe('AaveRouter Tests', () => {
       stub,
       guardian,
       piGov,
-      pvp,
-      pool1,
-      pool2,
-      pool4,
-      pool3,
+      pvp
     ] = await web3.eth.getAccounts();
   });
 
@@ -234,7 +226,7 @@ describe('AaveRouter Tests', () => {
     });
 
     describe('do nothing', async () => {
-      it("it should do nothing if the stake hasn't changed", async () => {
+      it('it should do nothing if the stake hasn\'t changed', async () => {
         await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
         await aave.approve(piAave.address, ether(1000), { from: alice });
         await piAave.deposit(ether(1000), { from: alice });
@@ -340,7 +332,7 @@ describe('AaveRouter Tests', () => {
 
       it('should revert claimRewards() if there is no reward available', async () => {
         await stakedAave.configureAssets(
-          [buildAaveAssetConfigInput(0, `0`, stakedAave.address)],
+          [buildAaveAssetConfigInput(0, '0', stakedAave.address)],
           { from: emissionManager },
         );
         await expectRevert(aaveRouter.claimRewards({ from: alice }), 'NOTING_TO_CLAIM');
