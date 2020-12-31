@@ -24,11 +24,13 @@ Use `yarn` or `npm` to run the following npm tasks:
 
 ### Active
 
-- `PowerIndexPool` - [0x26607aC599266b21d13c7aCF7942c7701a8b699c](https://etherscan.io/address/0x26607aC599266b21d13c7aCF7942c7701a8b699c). PowerIndex is a smart pool based on Balancer AMM with upgraded functionality. It contains 8 Defi governance tokens, enables voting with underlying tokens, and dynamically changes token weights if decided. The community of CVP token holders entirely governs Power Index;
+- `Power Index(PIPT)` - [0x26607aC599266b21d13c7aCF7942c7701a8b699c](https://etherscan.io/address/0x26607aC599266b21d13c7aCF7942c7701a8b699c). PowerIndex is a smart pool based on Balancer AMM with upgraded functionality. It contains 8 Defi governance tokens, enables voting with underlying tokens, and dynamically changes token weights if decided. The community of CVP token holders entirely governs Power Index;
+- `Yearn Ecosystem Token Index(YETI)` - [0xb4bebd34f6daafd808f73de0d10235a92fbb6c3d](https://etherscan.io/address/0xb4bebd34f6daafd808f73de0d10235a92fbb6c3d);
 - `PoolRestrictions` - [0x3885c4e1107b445dd370D09008D90b5153132FFF](https://etherscan.io/address/0x3885c4e1107b445dd370D09008D90b5153132FFF). The contract sets optional restrictions on pool capitalization, method calls in other contracts, etc;
 - `VestedLPMining`(ProxyAdmin - [0x4bb5A5b7E10C98884960bbDB9540cD1BaBdEac68](https://etherscan.io/address/0x4bb5A5b7E10C98884960bbDB9540cD1BaBdEac68#code), Proxy - [0xf09232320ebeac33fae61b24bb8d7ca192e58507](https://etherscan.io/address/0xf09232320ebeac33fae61b24bb8d7ca192e58507#code), Implementation - [0x5ccbf7b7a89ec43bd83f4b70871d02f700df3335](https://etherscan.io/address/0x5ccbf7b7a89ec43bd83f4b70871d02f700df3335)) is a reward contract developed to allow liquidity providers to vote and claim LP rewards. Liquidity providers (Power Index, Uniswap, Balancer) can deposit pool tokens and receive a reward in CVP and as well as voting rights, based on stake of these tokens. The accrued CVP tokens have a specified vesting period;
 - `Reservoir` - [0x8EbC56A13Ae7e3cE27B960b16AA57efed3F4e79E](https://etherscan.io/address/0x8EbC56A13Ae7e3cE27B960b16AA57efed3F4e79E). Contract allocating CVP tokens to `LP Mining` contract;
-- `Erc20PiptSwap` - [0xa600524F0c73647476D269AAAebe4F9b86eA3D7d](https://etherscan.io/address/0xa600524F0c73647476D269AAAebe4F9b86eA3D7d). The contract for supplying liquidity to the Power Index. ETH or ERC20 tokens(USDC, DAI, DPI, wBTC etc.) sent to the contract are automatically converted into index tokens (AAVE, YFI, SNX, CVP, COMP, wNXM, MKR, UNI) via Uniswap and put into the pool.
+- `Erc20PiptSwap` - [0x471868211e03f0da24f8576cb546d4276623c67d](https://etherscan.io/address/0x471868211e03f0da24f8576cb546d4276623c67d). The contract for supplying liquidity to `PIPT`. ETH or ERC20 tokens(USDC, DAI, DPI, wBTC etc.) sent to the contract are automatically converted into index tokens (AAVE, YFI, SNX, CVP, COMP, wNXM, MKR, UNI) via Uniswap and put into the pool;
+- `Erc20PiptSwap` - [0x56FA426e08afce7A9dfddDd42FeDFa64a7ccf7Cb](https://etherscan.io/address/0x56FA426e08afce7A9dfddDd42FeDFa64a7ccf7Cb). The contract for supplying liquidity to `YETI`. ETH or ERC20 tokens(USDC, DAI, DPI, wBTC etc.) sent to the contract are automatically converted into index tokens (AAVE, YFI, SNX, CVP, COMP, wNXM, MKR, UNI) via Uniswap and put into the pool.
 
 ### Deprecated
 
@@ -38,5 +40,6 @@ Use `yarn` or `npm` to run the following npm tasks:
 - `EthPiptSwap` - [0x91AA1D4294FD16629Fe64C570574A550827b832f](https://etherscan.io/address/0x91AA1D4294FD16629Fe64C570574A550827b832f). The old version;
 - `Erc20PiptSwap` - [0x57a47A8D522c32e8d4515F8936Ee9d1A699284d1](https://etherscan.io/address/0x57a47A8D522c32e8d4515F8936Ee9d1A699284d1). The old version;
 - `Erc20PiptSwap` - [0xe65040F61701940B62e18DA7A53126A58525588B](https://etherscan.io/address/0xe65040F61701940B62e18DA7A53126A58525588B). The old version;
+- `Erc20PiptSwap` - [0xa600524F0c73647476D269AAAebe4F9b86eA3D7d](https://etherscan.io/address/0xa600524F0c73647476D269AAAebe4F9b86eA3D7d). The old version;
 - `PowerIndexPool` - [0xb2B9335791346E94245DCd316A9C9ED486E6dD7f](https://etherscan.io/address/0xb2B9335791346E94245DCd316A9C9ED486E6dD7f). The baby version;
 - `PoolRestrictions` - [0x698967cA2fB85A6D9a7D2BeD4D2F6D32Bbc5fCdc](https://etherscan.io/address/0x698967cA2fB85A6D9a7D2BeD4D2F6D32Bbc5fCdc). The old version.
