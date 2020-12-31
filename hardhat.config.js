@@ -11,6 +11,7 @@ require('./tasks/deployErc20PiptSwap');
 require('./tasks/testMainnetErc20PiptSwap');
 require('./tasks/deployPoolRestrictions');
 require('./tasks/deployMainnetYeti');
+require('./tasks/deployYearnRouter');
 require('./tasks/deployAaveRouter');
 
 const fs = require('fs');

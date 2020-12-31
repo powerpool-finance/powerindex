@@ -31,8 +31,39 @@ function buildBasicRouterArgs(web3, config) {
   );
 }
 
+function buildYearnRouterArgs(web3, basicConfig, yearnConfig) {
+  return web3.eth.abi.encodeParameters(
+      [
+        {
+          BasicConfig: {
+            poolRestrictions: 'address',
+            voting: 'address',
+            staking: 'address',
+            reserveRatio: 'uint256',
+            rebalancingInterval: 'uint256',
+          },
+        },
+        {
+          YearnConfig: {
+            YCRV: 'address',
+            USDC: 'address',
+            YFI: 'address',
+            uniswapRouter: 'address',
+            curveYDeposit: 'address',
+            pvp: 'address',
+            pvpFee: 'uint256',
+            rewardPools: 'address[]',
+            usdcYfiSwapPath: 'address[]',
+          },
+        },
+      ],
+      [basicConfig, yearnConfig],
+  );
+}
+
 module.exports = {
   buildYearnRouterConfig,
   buildBasicRouterConfig,
   buildBasicRouterArgs,
+  buildYearnRouterArgs,
 };

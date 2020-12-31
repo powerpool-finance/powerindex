@@ -211,7 +211,7 @@ async function forkReplacePoolTokenWithNewPiToken(
   const WrappedPiErc20 = await artifacts.require('WrappedPiErc20');
   const AavePowerIndexRouter = await artifacts.require('AavePowerIndexRouter');
   const pool = await PowerIndexPool.at(await callContract(controller, 'pool'))
-  console.log('aave balance before', await callContract(token, 'balanceOf', [pool.address]));
+  console.log('pool getBalance before', await callContract(pool, 'getBalance', [token.address]));
 
   await pool.setController(controller.address, {from: admin});
 
@@ -234,7 +234,7 @@ async function forkReplacePoolTokenWithNewPiToken(
 
   await wrappedToken.pokeRouter();
 
-  console.log('await callContract(pool, "isBound", [aave])', await callContract(pool, "isBound", [tokenAddress]));
+  console.log('await callContract(pool, "isBound", [token])', await callContract(pool, "isBound", [tokenAddress]));
   console.log('await callContract(pool, "isBound", [wrappedTokenAddress])', await callContract(pool, "isBound", [wrappedTokenAddress]));
 
   return {
