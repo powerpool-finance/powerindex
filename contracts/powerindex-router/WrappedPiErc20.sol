@@ -49,7 +49,7 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
   function deposit(uint256 _depositAmount) external override nonReentrant {
     require(_depositAmount > 0, "ZERO_DEPOSIT");
 
-    uint256 mintAmount = _getPiEquivalentForUnderlying(_depositAmount);
+    uint256 mintAmount = getPiEquivalentForUnderlying(_depositAmount);
     require(mintAmount > 0, "ZERO_PI_FOR_MINT");
 
     underlying.safeTransferFrom(_msgSender(), address(this), _depositAmount);
@@ -69,7 +69,7 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
 
     PowerIndexNaiveRouterInterface(router).piTokenCallback(_withdrawAmount);
 
-    uint256 burnAmount = _getPiEquivalentForUnderlying(_withdrawAmount);
+    uint256 burnAmount = getPiEquivalentForUnderlying(_withdrawAmount);
     require(burnAmount > 0, "ZERO_PI_FOR_BURN");
 
     ERC20(address(this)).transferFrom(_msgSender(), address(this), burnAmount);
@@ -79,10 +79,10 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
     emit Withdraw(_msgSender(), _withdrawAmount, burnAmount);
   }
 
-  function _getPiEquivalentForUnderlying(uint256 _amount) internal view returns (uint256) {
+  function getPiEquivalentForUnderlying(uint256 _underlyingAmount) public view returns (uint256) {
     return
       PowerIndexBasicRouterInterface(router).getPiEquivalentForUnderlying(
-        _amount,
+        _underlyingAmount,
         underlying,
         underlying.balanceOf(address(this)),
         IERC20(this).totalSupply()

@@ -55,7 +55,16 @@ describe('PowerIndex Implementation Factories Test', () => {
       curveYDeposit,
       pvp,
     ] = await web3.eth.getAccounts();
-    defaultBasicConfig = buildBasicRouterConfig(poolRestrictions, voting, staking, ether('0.3'), 4);
+    defaultBasicConfig = buildBasicRouterConfig(
+      poolRestrictions,
+      voting,
+      staking,
+      ether('0.3'),
+      4,
+      pvp,
+      ether('0.15'),
+      [alice, bob],
+    );
     defaultFactoryArguments = web3.eth.abi.encodeParameter(
       {
         BasicConfig: {
@@ -64,6 +73,9 @@ describe('PowerIndex Implementation Factories Test', () => {
           staking: 'address',
           reserveRatio: 'uint256',
           rebalancingInterval: 'uint256',
+          pvp: 'address',
+          pvpFee: 'uint256',
+          rewardPools: 'address[]',
         },
       },
       defaultBasicConfig,
@@ -86,6 +98,9 @@ describe('PowerIndex Implementation Factories Test', () => {
     assert.equal(await router.rebalancingInterval(), 4);
     assert.equal(await router.staking(), staking);
     assert.equal(await router.poolRestrictions(), poolRestrictions);
+    assert.equal(await router.pvp(), pvp);
+    assert.equal(await router.pvpFee(), ether('0.15'));
+    assert.sameMembers(await router.getRewardPools(), [alice, bob]);
   });
 
   it('should build yearn router correctly', async () => {
@@ -97,9 +112,6 @@ describe('PowerIndex Implementation Factories Test', () => {
       yfi,
       uniswapRouter,
       curveYDeposit,
-      pvp,
-      ether('0.4'),
-      [alice, bob],
       [charlie, stub],
     );
     const yearnFactoryArguments = web3.eth.abi.encodeParameters(
@@ -111,6 +123,9 @@ describe('PowerIndex Implementation Factories Test', () => {
             staking: 'address',
             reserveRatio: 'uint256',
             rebalancingInterval: 'uint256',
+            pvp: 'address',
+            pvpFee: 'uint256',
+            rewardPools: 'address[]',
           },
         },
         {
@@ -120,9 +135,6 @@ describe('PowerIndex Implementation Factories Test', () => {
             YFI: 'address',
             uniswapRouter: 'address',
             curveYDeposit: 'address',
-            pvp: 'address',
-            pvpFee: 'uint256',
-            rewardPools: 'address[]',
             usdcYfiSwapPath: 'address[]',
           },
         },
@@ -143,15 +155,15 @@ describe('PowerIndex Implementation Factories Test', () => {
     assert.equal(await router.rebalancingInterval(), 4);
     assert.equal(await router.staking(), staking);
     assert.equal(await router.poolRestrictions(), poolRestrictions);
+    assert.equal(await router.pvp(), pvp);
+    assert.equal(await router.pvpFee(), ether('0.15'));
+    assert.sameMembers(await router.getRewardPools(), [alice, bob]);
 
     assert.equal(await router.YCRV(), ycrv);
     assert.equal(await router.USDC(), usdc);
     assert.equal(await router.YFI(), yfi);
     assert.equal(await router.uniswapRouter(), uniswapRouter);
     assert.equal(await router.curveYDeposit(), curveYDeposit);
-    assert.equal(await router.pvp(), pvp);
-    assert.equal(await router.pvpFee(), ether('0.4'));
-    assert.sameMembers(await router.getRewardPools(), [alice, bob]);
     assert.sameMembers(await router.getUsdcYfiSwapPath(), [charlie, stub]);
   });
 
@@ -171,5 +183,8 @@ describe('PowerIndex Implementation Factories Test', () => {
     assert.equal(await router.rebalancingInterval(), 4);
     assert.equal(await router.staking(), staking);
     assert.equal(await router.poolRestrictions(), poolRestrictions);
+    assert.equal(await router.pvp(), pvp);
+    assert.equal(await router.pvpFee(), ether('0.15'));
+    assert.sameMembers(await router.getRewardPools(), [alice, bob]);
   });
 });

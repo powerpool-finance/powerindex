@@ -1,4 +1,4 @@
-const { expectRevert, constants } = require('@openzeppelin/test-helpers');
+const { expectRevert, constants, expectEvent } = require('@openzeppelin/test-helpers');
 const { ether } = require('../helpers/index');
 const { buildBasicRouterConfig } = require('../helpers/builders');
 const assert = require('chai').assert;
@@ -6,7 +6,7 @@ const MockERC20 = artifacts.require('MockERC20');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexBasicRouter = artifacts.require('PowerIndexBasicRouter');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
-const MockLeakingRouter = artifacts.require('MockLeakingRouter');
+const MockRouter = artifacts.require('MockRouter');
 
 MockERC20.numberFormat = 'String';
 PowerIndexBasicRouter.numberFormat = 'String';
@@ -21,12 +21,12 @@ const ReserveStatus = {
 };
 
 describe('PowerIndex BasicRouter Test', () => {
-  let minter, bob, alice, stub;
+  let deployer, bob, alice, stub, piGov;
   let poolRestrictions;
   let defaultBasicConfig;
 
   before(async function () {
-    [minter, bob, alice, stub] = await web3.eth.getAccounts();
+    [deployer, bob, alice, stub, piGov] = await web3.eth.getAccounts();
     poolRestrictions = await PoolRestrictions.new();
     defaultBasicConfig = buildBasicRouterConfig(
       poolRestrictions.address,
@@ -34,6 +34,9 @@ describe('PowerIndex BasicRouter Test', () => {
       constants.ZERO_ADDRESS,
       ether(0),
       0,
+      stub,
+      ether(0),
+      []
     );
   });
 
@@ -43,7 +46,7 @@ describe('PowerIndex BasicRouter Test', () => {
     beforeEach(async () => {
       token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
       piToken = await WrappedPiErc20.new(token.address, stub, 'piToken', 'piTKN');
-      leakingRouter = await MockLeakingRouter.new(piToken.address, defaultBasicConfig);
+      leakingRouter = await MockRouter.new(piToken.address, defaultBasicConfig);
 
       await piToken.changeRouter(leakingRouter.address, { from: stub });
     });
@@ -64,7 +67,7 @@ describe('PowerIndex BasicRouter Test', () => {
 
       await piToken.changeRouter(router.address, { from: stub });
 
-      assert.equal(await router.owner(), minter);
+      assert.equal(await router.owner(), deployer);
 
       await token.transfer(alice, ether('100'));
       await token.approve(piToken.address, ether('100'), { from: alice });
@@ -84,6 +87,38 @@ describe('PowerIndex BasicRouter Test', () => {
       assert.equal(await piToken.totalSupply(), ether('0'));
       assert.equal(await piToken.balanceOf(alice), ether('0'));
       assert.equal(await token.balanceOf(alice), ether('100'));
+    });
+  });
+
+  describe('owner methods', () => {
+    let underlying, piToken, router;
+
+    beforeEach(async () => {
+      underlying = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
+      piToken = await WrappedPiErc20.new(underlying.address, stub, 'piToken', 'piTKN');
+      router = await PowerIndexBasicRouter.new(piToken.address, defaultBasicConfig);
+      await piToken.changeRouter(router.address, { from: stub });
+      await router.transferOwnership(piGov);
+    })
+
+    describe('setReserveConfig()', () => {
+      it('should allow the owner setting a reserve config', async () => {
+        const res = await router.setReserveConfig(ether('0.2'), 3600, { from: piGov });
+        expectEvent(res, 'SetReserveConfig', {
+          ratio: ether('0.2'),
+          rebalancingInterval: '3600'
+        });
+        assert.equal(await router.reserveRatio(), ether('0.2'))
+        assert.equal(await router.rebalancingInterval(), 3600)
+      });
+
+      it('should deny setting a reserve ratio greater or equal 100%', async () => {
+        await expectRevert(router.setReserveConfig(ether('1.01'), 0, { from: piGov }), 'RR_GREATER_THAN_100_PCT');
+      });
+
+      it('should deny non-owner setting reserve config', async () => {
+        await expectRevert(router.setReserveConfig(ether('0.2'), 3600, { from: alice }), 'Ownable: caller is not the owner');
+      });
     });
   });
 

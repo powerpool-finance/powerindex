@@ -1,6 +1,6 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
 const { artifactFromBytecode, ether } = require('../../helpers');
-const { buildBasicRouterConfig } = require('../../helpers/builders');
+const { buildBasicRouterConfig, buildAaveRouterConfig } = require('../../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
@@ -54,11 +54,22 @@ describe('AaveRouter Tests', () => {
     piAave = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'piAAVE');
     aaveRouter = await AavePowerIndexRouter.new(
       piAave.address,
-      buildBasicRouterConfig(poolRestrictions.address, stub, stakedAave.address, ether('0.2'), '0'),
+      buildBasicRouterConfig(
+        poolRestrictions.address,
+        stub,
+        stakedAave.address,
+        ether('0.2'),
+        '0',
+        stub,
+        ether('0.2'),
+        [],
+      ),
+      buildAaveRouterConfig(aave.address)
     );
 
     // Setting up...
     await piAave.changeRouter(aaveRouter.address, { from: stub });
+    await aave.transfer(stakedAave.address, ether(42000));
 
     // Checks...
     assert.equal(await aaveRouter.owner(), minter);
@@ -86,7 +97,7 @@ describe('AaveRouter Tests', () => {
 
       // The router has partially staked the deposit with regard to the reserve ration value (20/80)
       assert.equal(await aave.balanceOf(piAave.address), ether(2000));
-      assert.equal(await aave.balanceOf(stakedAave.address), ether(8000));
+      assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
 
       // The stakeAave are allocated on the aaveWrapper contract
       assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
@@ -108,7 +119,8 @@ describe('AaveRouter Tests', () => {
       });
 
       assert.equal(await aave.balanceOf(piAave.address), ether(1500));
-      assert.equal(await aave.balanceOf(stakedAave.address), ether(8000));
+      assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
+      assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
 
       res = await aaveRouter.getCoolDownStatus();
       assert.equal(res.status, COOLDOWN_STATUS.COOLDOWN);
@@ -125,7 +137,8 @@ describe('AaveRouter Tests', () => {
       await expectEvent.inTransaction(res.tx, AavePowerIndexRouter, 'IgnoreRedeemDueCoolDown', {});
 
       assert.equal(await aave.balanceOf(piAave.address), ether(1000));
-      assert.equal(await aave.balanceOf(stakedAave.address), ether(8000));
+      assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
+      assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
 
       // Jump to the end of the already triggered COOLDOWN period
       await time.increase(time.duration.days(10));
@@ -146,7 +159,8 @@ describe('AaveRouter Tests', () => {
       });
 
       assert.equal(await aave.balanceOf(piAave.address), ether(1700));
-      assert.equal(await aave.balanceOf(stakedAave.address), ether(6800));
+      assert.equal(await stakedAave.balanceOf(piAave.address), ether(6800));
+      assert.equal(await aave.balanceOf(stakedAave.address), ether(48800));
 
       //////////////////////////////////////////////////////////
       // Step #5. Withdraw 0.5K - while within an UNSTAKE_WINDOW
@@ -161,7 +175,8 @@ describe('AaveRouter Tests', () => {
       });
 
       assert.equal(await aave.balanceOf(piAave.address), ether(1600));
-      assert.equal(await aave.balanceOf(stakedAave.address), ether(6400));
+      assert.equal(await stakedAave.balanceOf(piAave.address), ether(6400));
+      assert.equal(await aave.balanceOf(stakedAave.address), ether(48400));
 
       ///////////////////////////////////////////////////////
       // Step #6. Deposit 3K - while within an UNSTAKE_WINDOW
@@ -177,7 +192,8 @@ describe('AaveRouter Tests', () => {
 
       assert.equal(await piAave.totalSupply(), ether(11000));
       assert.equal(await aave.balanceOf(piAave.address), ether(2200));
-      assert.equal(await aave.balanceOf(stakedAave.address), ether(8800));
+      assert.equal(await stakedAave.balanceOf(piAave.address), ether(8800));
+      assert.equal(await aave.balanceOf(stakedAave.address), ether(50800));
     });
   });
 });

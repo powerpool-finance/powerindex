@@ -3,18 +3,25 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/IPoolRestrictions.sol";
 import "../interfaces/PowerIndexBasicRouterInterface.sol";
+import "../interfaces/BPoolInterface.sol";
 import "./PowerIndexNaiveRouter.sol";
 
 contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiveRouter {
+  using SafeERC20 for IERC20;
+
   uint256 public constant HUNDRED_PCT = 1 ether;
 
   event SetVotingAndStaking(address indexed voting, address indexed staking);
-  event SetReserveRatio(uint256 ratio, uint256 rebalancingInterval);
+  event SetReserveConfig(uint256 ratio, uint256 rebalancingInterval);
   event SetRebalancingInterval(uint256 rebalancingInterval);
   event IgnoreRebalancing(uint256 blockTimestamp, uint256 lastRebalancedAt, uint256 rebalancingInterval);
+  event RewardPool(address indexed pool, uint256 amount);
+  event SetRewardPools(uint256 len, address[] rewardPools);
+  event SetPvpFee(uint256 pvpFee);
 
   enum ReserveStatus { EQUILIBRIUM, SHORTAGE, EXCESS }
 
@@ -24,9 +31,13 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     address staking;
     uint256 reserveRatio;
     uint256 rebalancingInterval;
+    address pvp;
+    uint256 pvpFee;
+    address[] rewardPools;
   }
 
   WrappedPiErc20Interface public immutable piToken;
+  address public immutable pvp;
 
   IPoolRestrictions public poolRestrictions;
   address public voting;
@@ -34,6 +45,10 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   uint256 public reserveRatio;
   uint256 public rebalancingInterval;
   uint256 public lastRebalancedAt;
+  // 1 ether == 100%
+  uint256 public pvpFee;
+
+  address[] public rewardPools;
 
   modifier onlyPiToken() {
     require(msg.sender == address(piToken), "ONLY_PI_TOKEN_ALLOWED");
@@ -41,14 +56,27 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   }
 
   constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexNaiveRouter() Ownable() {
+    require(_piToken != address(0), "INVALID_PI_TOKEN");
+    require(_basicConfig.pvpFee < HUNDRED_PCT, "PVP_FEE_OVER_THE_LIMIT");
+    require(_basicConfig.pvp != address(0), "INVALID_PVP_ADD");
+
     piToken = WrappedPiErc20Interface(_piToken);
     poolRestrictions = IPoolRestrictions(_basicConfig.poolRestrictions);
     voting = _basicConfig.voting;
     staking = _basicConfig.staking;
     reserveRatio = _basicConfig.reserveRatio;
     rebalancingInterval = _basicConfig.rebalancingInterval;
+    pvp = _basicConfig.pvp;
+    pvpFee = _basicConfig.pvpFee;
+    rewardPools = _basicConfig.rewardPools;
   }
 
+  /*** OWNER METHODS ***/
+
+  /**
+   * @dev Changing the staking address with a positive underlying stake will break `getPiEquivalentForUnderlying`
+   *      formula. Consider moving all the reserves to the piToken contract before doing this.
+   */
   function setVotingAndStaking(address _voting, address _staking) external override onlyOwner {
     voting = _voting;
     staking = _staking;
@@ -59,7 +87,19 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     require(_reserveRatio <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
     reserveRatio = _reserveRatio;
     rebalancingInterval = _rebalancingInterval;
-    emit SetReserveRatio(_reserveRatio, _rebalancingInterval);
+    emit SetReserveConfig(_reserveRatio, _rebalancingInterval);
+  }
+
+  function setRewardPools(address[] calldata _rewardPools) external onlyOwner {
+    require(_rewardPools.length > 0, "AT_LEAST_ONE_EXPECTED");
+    rewardPools = _rewardPools;
+    emit SetRewardPools(_rewardPools.length, _rewardPools);
+  }
+
+  function setPvpFee(uint256 _pvpFee) external onlyOwner {
+    require(_pvpFee < HUNDRED_PCT, "PVP_FEE_OVER_THE_LIMIT");
+    pvpFee = _pvpFee;
+    emit SetPvpFee(_pvpFee);
   }
 
   function _callVoting(bytes4 _sig, bytes memory _data) internal {
@@ -79,13 +119,60 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 lastRebalancedAt_ = lastRebalancedAt;
     uint256 rebalancingInterval_ = rebalancingInterval;
 
-    if (blockTimestamp_ <= lastRebalancedAt_.add(rebalancingInterval)) {
+    if (blockTimestamp_ < lastRebalancedAt_.add(rebalancingInterval)) {
       emit IgnoreRebalancing(blockTimestamp_, lastRebalancedAt_, rebalancingInterval_);
       return false;
     }
 
     lastRebalancedAt = blockTimestamp_;
     return true;
+  }
+
+  function _distributeRewardToPvp(uint256 _totalReward, IERC20 _underlying)
+    internal
+    returns (uint256 pvpReward, uint256 remainder)
+  {
+    pvpReward = 0;
+    remainder = 0;
+
+    if (pvpFee > 0) {
+      pvpReward = _totalReward.mul(pvpFee).div(HUNDRED_PCT);
+      remainder = _totalReward.sub(pvpReward);
+      _underlying.safeTransfer(pvp, pvpReward);
+    }
+  }
+
+  function _distributePiRemainderToPools(IERC20 _piToken)
+    internal
+    returns (uint256 piBalanceToDistribute, address[] memory pools)
+  {
+    pools = rewardPools;
+    uint256 poolsLen = pools.length;
+    require(poolsLen > 0, "MISSING_REWARD_POOLS");
+
+    piBalanceToDistribute = piToken.balanceOf(address(this));
+    require(piBalanceToDistribute > 0, "NO_POOL_REWARDS_PI");
+
+    uint256 totalPiOnPools = 0;
+    for (uint256 i = 0; i < poolsLen; i++) {
+      totalPiOnPools = totalPiOnPools.add(_piToken.balanceOf(pools[i]));
+    }
+    require(totalPiOnPools > 0, "TOTAL_PI_IS_0");
+
+    for (uint256 i = 0; i < poolsLen; i++) {
+      address pool = pools[i];
+      uint256 poolPiBalance = piToken.balanceOf(pool);
+      if (poolPiBalance == 0) {
+        continue;
+      }
+
+      uint256 poolReward = piBalanceToDistribute.mul(poolPiBalance) / totalPiOnPools;
+
+      piToken.transfer(pool, poolReward);
+
+      BPoolInterface(pool).gulp(address(piToken));
+      emit RewardPool(pool, poolReward);
+    }
   }
 
   /*
@@ -106,17 +193,29 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     return getReserveStatusPure(reserveRatio, piToken.getUnderlyingBalance(), _stakedBalance, _withdrawAmount);
   }
 
+  // NOTICE: could/should be changed depending on implementation
+  function _getUnderlyingStaked() internal view virtual returns (uint256) {
+    if (staking == address(0)) {
+      return 0;
+    }
+    return IERC20(staking).balanceOf(address(piToken));
+  }
+
+  function getRewardPools() external view returns (address[] memory) {
+    return rewardPools;
+  }
+
   function getPiEquivalentForUnderlying(
     uint256 _underlyingAmount,
     IERC20 _underlyingToken,
     uint256 _underlyingOnPiToken,
     uint256 _piTotalSupply
-  ) external view override returns (uint256) {
+  ) public view override returns (uint256) {
     return
       getPiEquivalentForUnderlyingPure(
         _underlyingAmount,
-        // _underlyingOnPiToken + _underlyingToken.balanceOf(staking),
-        _underlyingOnPiToken.add(_underlyingToken.balanceOf(staking)),
+        // _underlyingOnPiToken + underlyingOnStaking,
+        _underlyingOnPiToken.add(_getUnderlyingStaked()),
         _piTotalSupply
       );
   }
@@ -126,7 +225,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 _totalUnderlyingWrapped,
     uint256 _piTotalSupply
   ) public pure override returns (uint256) {
-    if (_totalUnderlyingWrapped == 0) {
+    if (_piTotalSupply == 0) {
       return _underlyingAmount;
     }
     // return _piTotalSupply * _underlyingAmount / _totalUnderlyingWrapped;

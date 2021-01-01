@@ -7,7 +7,6 @@ const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const MockYearnGovernance = artifacts.require('MockYearnGovernance');
 const MockRouter = artifacts.require('MockRouter');
 const MyContract = artifacts.require('MyContract');
-const MockLeakingRouter = artifacts.require('MockLeakingRouter');
 
 MyContract.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
@@ -26,11 +25,11 @@ function signatureAndArgs(payload) {
 }
 
 describe('WrappedPiErc20 Unit Tests', () => {
-  let alice, bob, stub;
+  let alice, bob, stub, mockStaking;
   let yfi, router, piYfi, myContract, defaultBasicConfig;
 
   before(async function () {
-    [, alice, bob, stub] = await web3.eth.getAccounts();
+    [, alice, bob, stub, mockStaking] = await web3.eth.getAccounts();
     myContract = await MyContract.new();
     defaultBasicConfig = buildBasicRouterConfig(
       stub,
@@ -38,6 +37,9 @@ describe('WrappedPiErc20 Unit Tests', () => {
       constants.ZERO_ADDRESS,
       ether('0.2'),
       '0',
+      stub,
+      ether(0),
+      []
     );
   });
 
@@ -46,6 +48,9 @@ describe('WrappedPiErc20 Unit Tests', () => {
     piYfi = await WrappedPiErc20.new(yfi.address, stub, 'wrapped.yearn.finance', 'piYFI');
     router = await MockRouter.new(piYfi.address, defaultBasicConfig);
     await piYfi.changeRouter(router.address, { from: stub });
+
+    await router.setMockStaking(yfi.address, mockStaking);
+    await yfi.transfer(mockStaking, ether(50));
   });
 
   it('should initialize correctly', async () => {
@@ -162,12 +167,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
     });
 
     describe('imbalanced router', () => {
-      let leakingRouter;
-
       beforeEach(async () => {
-        leakingRouter = await MockLeakingRouter.new(piYfi.address, defaultBasicConfig);
-        await router.migrateToNewRouter(piYfi.address, leakingRouter.address);
-
         assert.equal(await yfi.balanceOf(alice), ether(10000));
         assert.equal(await yfi.balanceOf(bob), ether(0));
 
@@ -179,7 +179,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
         // Drain 200 yfi from the wrapper token
         await yfi.approve(piYfi.address, ether(1200), { from: alice });
         await piYfi.deposit(ether(1200), { from: alice });
-        await leakingRouter.drip(stub, ether(200));
+        await router.drip(stub, ether(200));
         assert.equal(await yfi.balanceOf(piYfi.address), ether(1000));
         assert.equal(await piYfi.totalSupply(), ether(1200));
         await yfi.transfer(bob, ether(100), { from: alice });
@@ -279,12 +279,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
     });
 
     describe('imbalanced wrapper', () => {
-      let leakingRouter;
-
       beforeEach(async () => {
-        leakingRouter = await MockLeakingRouter.new(piYfi.address, defaultBasicConfig);
-        await router.migrateToNewRouter(piYfi.address, leakingRouter.address);
-
         assert.equal(await yfi.balanceOf(bob), ether(0));
       });
 
@@ -292,7 +287,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
         await yfi.approve(piYfi.address, ether(1200), { from: alice });
         await piYfi.deposit(ether(1200), { from: alice });
         // Drain 200 yfi from the wrapper token
-        await leakingRouter.drip(stub, ether(200));
+        await router.drip(stub, ether(200));
         assert.equal(await yfi.balanceOf(piYfi.address), ether(1000));
         assert.equal(await piYfi.totalSupply(), ether(1200));
         await piYfi.transfer(bob, ether(120), { from: alice });
@@ -342,7 +337,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
       it('should allow draining a negatively imbalanced router', async () => {
         await yfi.approve(piYfi.address, ether(200), { from: alice });
         await piYfi.deposit(ether(200), { from: alice });
-        await leakingRouter.drip(stub, ether(100));
+        await router.drip(stub, ether(100));
         assert.equal(await yfi.balanceOf(piYfi.address), ether(100));
         assert.equal(await piYfi.totalSupply(), ether(200));
 
