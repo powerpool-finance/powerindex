@@ -65,34 +65,34 @@ task('deploy-yearn-router', 'Deploy Yearn Router')
         staking: stakingAddr,
         reserveRatio: ether(0.8).toString(),
         rebalancingInterval: '3600',
+        pvp: '0xd132973eaebbd6d7ca7b88e9170f2cca058de430',
+        pvpFee: '0',
+        rewardPools: ['0x26607ac599266b21d13c7acf7942c7701a8b699c', '0xb4bebd34f6daafd808f73de0d10235a92fbb6c3d'],
       }, {
         YCRV: '0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8',
         USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
         YFI: yfiAddr,
         uniswapRouter: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
         curveYDeposit: '0xbbc81d23ea2c3ec7e56d39296f0cbb648873a5d3',
-        pvp: '0xd132973eaebbd6d7ca7b88e9170f2cca058de430',
-        pvpFee: '0',
-        rewardPools: ['0x26607ac599266b21d13c7acf7942c7701a8b699c', '0xb4bebd34f6daafd808f73de0d10235a92fbb6c3d'],
         usdcYfiSwapPath: ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', yfiAddr],
       }),
       admin
     );
 
     console.log('yfi balance after', await callContract(token, 'balanceOf', [pool.address]));
-    return;
     console.log('yfi wrapper balance after', await callContract(token, 'balanceOf', [wrappedToken.address]));
     console.log('wrapped balance', await callContract(wrappedToken, 'balanceOf', [pool.address]));
 
     await wrappedToken.pokeRouter();
-    console.log('wrapped balance ratio 100%', await callContract(token, 'balanceOf', [wrappedToken.address]));
+    console.log('wrapped balance ratio 80%', await callContract(token, 'balanceOf', [wrappedToken.address]));
 
-    await router.setReserveRatio(ether(0.2), {from: admin});
+    await router.setReserveConfig(ether(0.2), '3600', {from: admin});
+    await increaseTime(60 * 60 * 24);
     await wrappedToken.pokeRouter();
     console.log('wrapped balance ratio 20%', await callContract(token, 'balanceOf', [wrappedToken.address]));
 
-    await increaseTime(ethers, 60 * 60 * 24);
-    await wrappedToken.pokeRouter();
+    // await increaseTime(60 * 60 * 24);
+    // await wrappedToken.pokeRouter();
 
     // const staker = await IStakedAave.at(stakingAddr);
     // console.log('staker.balanceOf(wrappedToken.address)', await callContract(staker, 'balanceOf', [wrappedToken.address]));

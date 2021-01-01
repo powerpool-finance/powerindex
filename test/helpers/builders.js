@@ -24,18 +24,39 @@ function buildYearnRouterConfig(
   return { YCRV, USDC, YFI, uniswapRouter, curveYDeposit, usdcYfiSwapPath };
 }
 
+const BasicConfig = {
+  poolRestrictions: 'address',
+  voting: 'address',
+  staking: 'address',
+  reserveRatio: 'uint256',
+  rebalancingInterval: 'uint256',
+  pvp: 'address',
+  pvpFee: 'uint256',
+  rewardPools: 'address[]',
+};
+
 function buildBasicRouterArgs(web3, config) {
   return web3.eth.abi.encodeParameter(
     {
-      BasicConfig: {
-        poolRestrictions: 'address',
-        voting: 'address',
-        staking: 'address',
-        reserveRatio: 'uint256',
-        rebalancingInterval: 'uint256',
-      },
+      BasicConfig,
     },
     config,
+  );
+}
+
+function buildAaveRouterArgs(web3, basicConfig, aaveConfig) {
+  return web3.eth.abi.encodeParameters(
+    [
+      {
+        BasicConfig,
+      },
+      {
+        AaveConfig: {
+          AAVE: 'address'
+        },
+      },
+    ],
+    [basicConfig, aaveConfig],
   );
 }
 
@@ -43,13 +64,7 @@ function buildYearnRouterArgs(web3, basicConfig, yearnConfig) {
   return web3.eth.abi.encodeParameters(
       [
         {
-          BasicConfig: {
-            poolRestrictions: 'address',
-            voting: 'address',
-            staking: 'address',
-            reserveRatio: 'uint256',
-            rebalancingInterval: 'uint256',
-          },
+          BasicConfig,
         },
         {
           YearnConfig: {
@@ -58,9 +73,6 @@ function buildYearnRouterArgs(web3, basicConfig, yearnConfig) {
             YFI: 'address',
             uniswapRouter: 'address',
             curveYDeposit: 'address',
-            pvp: 'address',
-            pvpFee: 'uint256',
-            rewardPools: 'address[]',
             usdcYfiSwapPath: 'address[]',
           },
         },
@@ -76,4 +88,5 @@ module.exports = {
   buildAaveAssetConfigInput,
   buildBasicRouterArgs,
   buildYearnRouterArgs,
+  buildAaveRouterArgs,
 };

@@ -27,7 +27,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
 
   event ReplacePoolTokenFinish();
   event SetPoolWrapper(address indexed bpoolWrapper);
-  event CreatePiToken(address indexed underlyingToken, address indexed piToken);
+  event CreatePiToken(address indexed underlyingToken, address indexed piToken, address indexed router);
 
   PowerIndexWrapperInterface public poolWrapper;
   WrappedPiErc20FactoryInterface public piTokenFactory;
@@ -57,8 +57,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     string calldata _name,
     string calldata _symbol
   ) external onlyOwner {
-    WrappedPiErc20Interface piToken = _createPiToken(_underlyingToken, _routerFactory, _routerArgs, _name, _symbol);
-    emit CreatePiToken(_underlyingToken, address(piToken));
+    _createPiToken(_underlyingToken, _routerFactory, _routerArgs, _name, _symbol);
   }
 
   function replacePoolTokenWithNewPiToken(
@@ -168,6 +167,8 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     address router = IPiRouterFactory(_routerFactory).buildRouter(address(piToken), _routerArgs);
     Ownable(router).transferOwnership(msg.sender);
     piToken.changeRouter(router);
+
+    emit CreatePiToken(_underlyingToken, address(piToken), router);
     return piToken;
   }
 }

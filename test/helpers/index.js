@@ -271,11 +271,11 @@ async function forkReplacePoolTokenWithNewPiToken(
     {from: admin}
   );
 
-  const wrappedTokenAddress = res.logs.filter(l => l.event === 'ReplacePoolTokenWithWrapped')[0].args.wrappedToken;
+  const wrappedTokenAddress = res.logs.filter(l => l.event === 'CreatePiToken')[0].args.piToken;
   const wrappedToken = await WrappedPiErc20.at(wrappedTokenAddress);
   const router = await AavePowerIndexRouter.at(await callContract(wrappedToken, 'router', []));
 
-  await increaseTime(ethers, 60);
+  await increaseTime(60);
 
   await controller.finishReplace();
 

@@ -13,7 +13,7 @@ task('deploy-aave-router', 'Deploy AAVE Router')
     const PowerIndexRouter = await artifacts.require('AavePowerIndexRouter');
 
     const {impersonateAccount, callContract, increaseTime, forkReplacePoolTokenWithNewPiToken} = require('../test/helpers');
-    const {buildBasicRouterArgs} = require('../test/helpers/builders');
+    const {buildAaveRouterArgs} = require('../test/helpers/builders');
     const {web3} = PowerIndexPoolController;
     const {toWei} = web3.utils;
 
@@ -55,12 +55,17 @@ task('deploy-aave-router', 'Deploy AAVE Router')
       controller,
       aave,
       aaveRouterFactory.address,
-      buildBasicRouterArgs(web3, {
+      buildAaveRouterArgs(web3, {
         poolRestrictions: poolRestrictionsAddress,
         voting: votingAddr,
         staking: stakingAddr,
         reserveRatio: ether(0.8),
         rebalancingInterval: '3600',
+        pvp: '0xd132973eaebbd6d7ca7b88e9170f2cca058de430',
+        pvpFee: '0',
+        rewardPools: ['0x26607ac599266b21d13c7acf7942c7701a8b699c', '0xb4bebd34f6daafd808f73de0d10235a92fbb6c3d'],
+      }, {
+        AAVE: aave,
       }),
       admin
     );
@@ -70,13 +75,13 @@ task('deploy-aave-router', 'Deploy AAVE Router')
     console.log('wrapped balance', await callContract(wrappedToken, 'balanceOf', [pool.address]));
 
     await wrappedToken.pokeRouter();
-    console.log('wrapped balance ratio 100%', await callContract(token, 'balanceOf', [wrappedToken.address]));
+    console.log('wrapped balance ratio 80%', await callContract(token, 'balanceOf', [wrappedToken.address]));
 
-    await router.setReserveRatio(ether(0.2), {from: admin});
+    await router.setReserveConfig(ether(0.2), '3600', {from: admin});
     await wrappedToken.pokeRouter();
     console.log('wrapped balance ratio 20%', await callContract(token, 'balanceOf', [wrappedToken.address]));
 
-    await increaseTime(ethers, 60 * 60 * 24);
+    await increaseTime(60 * 60 * 24);
     await wrappedToken.pokeRouter();
 
     const staker = await IStakedAave.at(stakingAddr);
