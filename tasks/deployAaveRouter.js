@@ -62,7 +62,7 @@ task('deploy-aave-router', 'Deploy AAVE Router')
         reserveRatio: ether(0.8),
         rebalancingInterval: '3600',
         pvp: '0xd132973eaebbd6d7ca7b88e9170f2cca058de430',
-        pvpFee: '0',
+        pvpFee: ether(0.003),
         rewardPools: ['0x26607ac599266b21d13c7acf7942c7701a8b699c', '0xb4bebd34f6daafd808f73de0d10235a92fbb6c3d'],
       }, {
         AAVE: aave,
@@ -89,6 +89,15 @@ task('deploy-aave-router', 'Deploy AAVE Router')
     console.log('getUserAssetData', await callContract(staker, 'getUserAssetData', [wrappedToken.address, aave]));
     console.log('getTotalRewardsBalance', await callContract(staker, 'getTotalRewardsBalance', [wrappedToken.address]));
     console.log('stakerRewardsToClaim', await callContract(staker, 'stakerRewardsToClaim', [wrappedToken.address]));
+
+    console.log('balance of router before', await callContract(token, 'balanceOf', [router.address]));
+    await router.claimRewards();
+    console.log('stakerRewardsToClaim', await callContract(staker, 'stakerRewardsToClaim', [wrappedToken.address]));
+    console.log('wrapped balance before', await callContract(pool, 'getBalance', [wrappedToken.address]));
+    console.log('balance of router after', await callContract(token, 'balanceOf', [router.address]));
+    await router.distributeRewards();
+    console.log('balance of router after 2', await callContract(token, 'balanceOf', [router.address]));
+    console.log('wrapped balance after', await callContract(pool, 'getBalance', [wrappedToken.address]));
 
     function ether(amount) {
       return toWei(amount.toString(), 'ether');
