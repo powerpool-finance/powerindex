@@ -330,6 +330,31 @@ describe('AaveRouter Tests', () => {
       });
     });
 
+    it('should ignore rebalancing if the staking address is 0', async () => {
+      await aave.transfer(alice, ether(100000), { from: aaveDistributor });
+      await aave.approve(piAave.address, ether(10000), { from: alice });
+      await piAave.deposit(ether(10000), { from: alice });
+
+      await aaveRouter.triggerCooldown({ from: piGov });
+      await time.increase(cooldownPeriod + 1);
+
+      await aaveRouter.redeem(ether(8000), { from: piGov });
+      await aaveRouter.setVotingAndStaking(stakedAave.address, constants.ZERO_ADDRESS, { from: piGov });
+
+      assert.equal(await aave.balanceOf(stakedAave.address), ether(42000));
+      assert.equal(await aave.balanceOf(piAave.address), ether(10000));
+      assert.equal(await piAave.balanceOf(alice), ether(10000));
+      assert.equal(await piAave.totalSupply(), ether(10000));
+
+      await piAave.approve(piAave.address, ether(1000), { from: alice });
+      const res = await piAave.withdraw(ether(1000), { from: alice });
+      await expectEvent.inTransaction(res.tx, aaveRouter, 'IgnoreDueMissingStaking');
+
+      assert.equal(await aave.balanceOf(stakedAave.address), ether(42000));
+      assert.equal(await stakedAave.balanceOf(piAave.address), ether(0));
+      assert.equal(await aave.balanceOf(piAave.address), ether(9000));
+    });
+
     describe('when interval enabled', () => {
       let firstDepositAt;
 
