@@ -86,6 +86,7 @@ describe('AaveRouter Tests', () => {
   });
 
   let aave, stakedAave, piAave, aaveRouter, poolRestrictions;
+  let cooldownPeriod, unstakeWindow;
 
   // https://github.com/aave/aave-stake-v2
   describe('staking', async () => {
@@ -151,6 +152,9 @@ describe('AaveRouter Tests', () => {
       await aave.transfer(stakedAave.address, ether(42000), { from: aaveDistributor });
       await aaveRouter.transferOwnership(piGov);
 
+      cooldownPeriod = parseInt(await stakedAave.COOLDOWN_SECONDS());
+      unstakeWindow = parseInt(await stakedAave.UNSTAKE_WINDOW());
+
       // Checks...
       assert.equal(await aaveRouter.owner(), piGov);
     });
@@ -160,6 +164,88 @@ describe('AaveRouter Tests', () => {
     });
 
     it('should allow depositing Aave and staking it in a StakedAave contract', async () => {});
+
+    describe('owner methods', async () => {
+      describe('stake()/redeem()', () => {
+        beforeEach(async () => {
+          await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
+          await aave.approve(piAave.address, ether('10000'), { from: alice });
+          await piAave.deposit(ether('10000'), { from: alice });
+
+          assert.equal(await aave.balanceOf(piAave.address), ether(2000));
+          assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
+          assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
+        });
+
+        describe('stake()', () => {
+          it('should allow the owner staking any amount of reserve tokens', async () => {
+            const res = await aaveRouter.stake(ether(2000), { from: piGov });
+            expectEvent(res, 'Stake', {
+              sender: piGov,
+              amount: ether(2000),
+            });
+            assert.equal(await aave.balanceOf(piAave.address), ether(0));
+            assert.equal(await aave.balanceOf(stakedAave.address), ether(52000));
+            assert.equal(await stakedAave.balanceOf(piAave.address), ether(10000));
+          });
+
+          it('should deny staking 0', async () => {
+            await expectRevert(aaveRouter.stake(ether(0), { from: piGov }), 'CANT_STAKE_0');
+          });
+
+          it('should deny non-owner staking any amount of reserve tokens', async () => {
+            await expectRevert(aaveRouter.stake(ether(1), { from: alice }), 'Ownable: caller is not the owner');
+          });
+        })
+
+        describe('redeem()', () => {
+          beforeEach(async () => {
+            await aaveRouter.triggerCooldown({ from: piGov });
+            await time.increase(cooldownPeriod + 1);
+          });
+
+          it('should allow the owner redeeming any amount of reserve tokens', async () => {
+            const res = await aaveRouter.redeem(ether(3000), { from: piGov });
+            expectEvent(res, 'Redeem', {
+              sender: piGov,
+              amount: ether(3000),
+            });
+            assert.equal(await aave.balanceOf(piAave.address), ether(5000));
+            assert.equal(await stakedAave.balanceOf(piAave.address), ether(5000));
+            assert.equal(await aave.balanceOf(stakedAave.address), ether(47000));
+          });
+
+          it('should deny staking 0', async () => {
+            await expectRevert(aaveRouter.redeem(ether(0), { from: piGov }), 'CANT_REDEEM_0');
+          });
+
+          it('should deny non-owner staking any amount of reserve tokens', async () => {
+            await expectRevert(aaveRouter.redeem(ether(1), { from: alice }), 'Ownable: caller is not the owner');
+          });
+        });
+
+        describe('triggerCooldown()', () => {
+          it('should allow the owner triggering cooldown', async () => {
+            let res = await aaveRouter.triggerCooldown({ from: piGov });
+            expectEvent(res, 'TriggerCooldown');
+            await expectEvent.inTransaction(res.tx, StakedAaveV2, 'Cooldown', {
+              user: piAave.address
+            });
+            const cooldownTriggeredAt = parseInt(await getResTimestamp(res));
+
+            res = await aaveRouter.getCoolDownStatus();
+            assert.equal(res.status, COOLDOWN_STATUS.COOLDOWN);
+            assert.equal(res.coolDownFinishesAt, cooldownTriggeredAt + cooldownPeriod);
+            assert.equal(res.unstakeFinishesAt, cooldownTriggeredAt + cooldownPeriod + unstakeWindow);
+          })
+
+          it('should deny non-owner triggering the cooldown', async () => {
+            await expectRevert(aaveRouter.triggerCooldown({ from: alice }), 'Ownable: caller is not the owner');
+          });
+        });
+      });
+    });
+
 
     describe('stake', async () => {
       beforeEach(async () => {
@@ -245,13 +331,9 @@ describe('AaveRouter Tests', () => {
     });
 
     describe('cooldownPeriod()', async () => {
-      let cooldownPeriod, unstakeWindow;
-
       beforeEach(async () => {
         await aave.transfer(alice, ether(10000), { from: aaveDistributor });
         await aave.approve(piAave.address, ether(1000), { from: alice });
-        cooldownPeriod = parseInt(await stakedAave.COOLDOWN_SECONDS());
-        unstakeWindow = parseInt(await stakedAave.UNSTAKE_WINDOW());
       });
 
       it('should be NONE when a cooldown request has never issued', async () => {

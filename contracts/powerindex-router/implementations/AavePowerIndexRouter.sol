@@ -91,6 +91,10 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     _redeem(_amount);
   }
 
+  function triggerCooldown() external onlyOwner {
+    _triggerCoolDown();
+  }
+
   /*** PI TOKEN CALLBACK ***/
 
   function piTokenCallback(uint256 _withdrawAmount) external override onlyPiToken {
