@@ -244,6 +244,64 @@ describe('AaveRouter Tests', () => {
       });
     });
 
+    describe('cooldownPeriod()', async () => {
+      let cooldownPeriod, unstakeWindow;
+
+      beforeEach(async () => {
+        await aave.transfer(alice, ether(10000), { from: aaveDistributor });
+        await aave.approve(piAave.address, ether(1000), { from: alice });
+        cooldownPeriod = parseInt(await stakedAave.COOLDOWN_SECONDS());
+        unstakeWindow = parseInt(await stakedAave.UNSTAKE_WINDOW());
+      });
+
+      it('should be NONE when a cooldown request has never issued', async () => {
+        const res = await aaveRouter.getCoolDownStatus();
+        assert.equal(res.status, COOLDOWN_STATUS.NONE);
+        assert.equal(res.coolDownFinishesAt, '0');
+        assert.equal(res.unstakeFinishesAt, '0');
+      });
+
+      describe('for at least 1 interaction with piToken', () => {
+        let cooldownActivatedAt;
+
+        beforeEach(async () => {
+          await piAave.deposit(ether(1000), { from: alice });
+          await time.increase(1);
+
+          await piAave.approve(piAave.address, ether(200), { from: alice });
+          let res = await piAave.withdraw(ether(200), { from: alice });
+          await expectEvent.inTransaction(res.tx, StakedAaveV2, 'Cooldown', {
+            user: piAave.address
+          });
+          cooldownActivatedAt = parseInt(await getResTimestamp(res));
+        });
+
+        it('should be NONE when a cooldown and unstake window request have finished', async () => {
+          await time.increase(cooldownPeriod + unstakeWindow + 1);
+          const res = await aaveRouter.getCoolDownStatus();
+          assert.equal(res.status, COOLDOWN_STATUS.NONE);
+          assert.equal(res.coolDownFinishesAt, cooldownActivatedAt + cooldownPeriod);
+          assert.equal(res.unstakeFinishesAt, cooldownActivatedAt + cooldownPeriod + unstakeWindow);
+        });
+
+        it('should be UNSTAKE_WINDOW after passing cooldown', async () => {
+          await time.increase(cooldownPeriod + 1)
+          const res = await aaveRouter.getCoolDownStatus();
+          assert.equal(res.status, COOLDOWN_STATUS.UNSTAKE_WINDOW);
+          assert.equal(res.coolDownFinishesAt, cooldownActivatedAt + cooldownPeriod);
+          assert.equal(res.unstakeFinishesAt, cooldownActivatedAt + cooldownPeriod + unstakeWindow);
+        });
+
+        it('should be COOLDOWN immediately after activating cooldown', async () => {
+          await time.increase(1)
+          const res = await aaveRouter.getCoolDownStatus();
+          assert.equal(res.status, COOLDOWN_STATUS.COOLDOWN);
+          assert.equal(res.coolDownFinishesAt, cooldownActivatedAt + cooldownPeriod);
+          assert.equal(res.unstakeFinishesAt, cooldownActivatedAt + cooldownPeriod + unstakeWindow);
+        });
+      });
+    });
+
     describe('rewards distribution', async () => {
       let poolA, poolB, poolC, poolD;
       let last;

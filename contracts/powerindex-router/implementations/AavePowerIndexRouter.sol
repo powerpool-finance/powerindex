@@ -135,23 +135,24 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
       uint256 unstakeFinishesAt
     )
   {
-    IStakedAave _staking = IStakedAave(staking);
-    uint256 stakerCoolDown = _staking.stakersCooldowns(address(piToken));
-    uint256 coolDownSeconds = _staking.COOLDOWN_SECONDS();
-    uint256 unstakeWindow = _staking.UNSTAKE_WINDOW();
-    uint256 current = block.timestamp;
+    IStakedAave staking_ = IStakedAave(staking);
+    uint256 stakerCoolDown = staking_.stakersCooldowns(address(piToken));
+    uint256 now_ = block.timestamp;
 
     if (stakerCoolDown == 0) {
       return (CoolDownStatus.NONE, 0, 0);
     }
 
+    uint256 coolDownSeconds = staking_.COOLDOWN_SECONDS();
+    uint256 unstakeWindow = staking_.UNSTAKE_WINDOW();
+
     coolDownFinishesAt = stakerCoolDown.add(coolDownSeconds);
     unstakeFinishesAt = coolDownFinishesAt.add(unstakeWindow);
 
-    if (current <= coolDownFinishesAt) {
+    if (now_ <= coolDownFinishesAt) {
       status = CoolDownStatus.COOLDOWN;
       // current > coolDownFinishesAt && ...
-    } else if (current < unstakeFinishesAt) {
+    } else if (now_ < unstakeFinishesAt) {
       status = CoolDownStatus.UNSTAKE_WINDOW;
     } // else { status = CoolDownStatus.NONE; }
   }
