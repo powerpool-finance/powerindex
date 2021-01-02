@@ -619,6 +619,42 @@ describe('AaveRouter Tests', () => {
         await router.claimRewards({ from: bob });
         await expectRevert(router.distributeRewards({ from: bob }), 'MISSING_REWARD_POOLS');
       });
+
+      it('should correctly distribute pvpFee', async () => {
+        const poolA = await MockGulpingBPool.new();
+        const poolB = await MockGulpingBPool.new();
+        const router = await AavePowerIndexRouter.new(
+          piAave.address,
+          buildBasicRouterConfig(
+            poolRestrictions.address,
+            constants.ZERO_ADDRESS,
+            stakedAave.address,
+            ether('0.2'),
+            '0',
+            pvp,
+            0,
+            [poolA.address, poolB.address],
+          ),
+          buildAaveRouterConfig(
+            aave.address
+          ),
+        );
+
+        await piAave.transfer(poolA.address, 10, { from: alice });
+        await piAave.transfer(poolB.address, 20, { from: alice });
+
+        await aaveRouter.migrateToNewRouter(piAave.address, router.address, { from: piGov });
+        await time.increase(1);
+        await router.claimRewards({ from: bob });
+        const res = await router.distributeRewards({ from: bob });
+
+        expectEvent(res, 'DistributeRewards', {
+          sender: bob,
+          pvpReward: '0',
+        });
+        assert.isTrue(parseInt(res.logs[3].args.poolRewardsUnderlying) > 1);
+        assert.isTrue(parseInt(res.logs[3].args.poolRewardsPi.length) > 1);
+      });
     });
 
     // https://github.com/aave/governance-v2

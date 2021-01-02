@@ -139,6 +139,8 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
       pvpReward = _totalReward.mul(pvpFee).div(HUNDRED_PCT);
       remainder = _totalReward.sub(pvpReward);
       _underlying.safeTransfer(pvp, pvpReward);
+    } else {
+      remainder = _totalReward;
     }
   }
 
