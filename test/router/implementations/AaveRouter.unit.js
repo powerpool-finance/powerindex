@@ -330,6 +330,96 @@ describe('AaveRouter Tests', () => {
       });
     });
 
+    describe('when interval enabled', () => {
+      let firstDepositAt;
+
+      beforeEach(async () => {
+        await aave.transfer(alice, ether(100000), { from: aaveDistributor });
+        await aave.approve(piAave.address, ether(10000), { from: alice });
+        const res = await piAave.deposit(ether(10000), { from: alice });
+        firstDepositAt = await getResTimestamp(res);
+
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
+        assert.equal(await aave.balanceOf(piAave.address), ether(2000));
+
+        await aaveRouter.setReserveConfig(ether('0.2'), time.duration.hours(1), { from: piGov });
+      });
+
+      it('should DO rebalance on deposit if the rebalancing interval has passed', async () => {
+        await time.increase(time.duration.minutes(61));
+
+        await aave.approve(piAave.address, ether(1000), { from: alice });
+        const res = await piAave.deposit(ether(1000), { from: alice });
+        await expectEvent.notEmitted.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing');
+
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(50800));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(8800));
+        assert.equal(await aave.balanceOf(piAave.address), ether(2200));
+      });
+
+      it('should trigger cooldown on withdrawal if the rebalancing interval has passed', async () => {
+        await time.increase(time.duration.minutes(61));
+
+        await piAave.approve(piAave.address, ether(1000), { from: alice });
+        const res = await piAave.withdraw(ether(1000), { from: alice });
+        await expectEvent.notEmitted.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing');
+        await expectEvent.inTransaction(res.tx, stakedAave, 'Cooldown', {
+          user: piAave.address
+        });
+
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
+        assert.equal(await aave.balanceOf(piAave.address), ether(1000));
+      });
+
+      it('should DO rebalance on withdrawal if the rebalancing interval AND cooldown have passed', async () => {
+        await aaveRouter.triggerCooldown({ from: piGov });
+        await time.increase(cooldownPeriod + 1);
+
+        await piAave.approve(piAave.address, ether(1000), { from: alice });
+        const res = await piAave.withdraw(ether(1000), { from: alice });
+        await expectEvent.notEmitted.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing');
+
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(49200));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(7200));
+        assert.equal(await aave.balanceOf(piAave.address), ether(1800));
+      });
+
+      it('should NOT rebalance on deposit if the rebalancing interval has not passed', async () => {
+        await time.increase(time.duration.minutes(59));
+
+        await aave.approve(piAave.address, ether(1000), { from: alice });
+        const res = await piAave.deposit(ether(1000), { from: alice });
+        const now = await getResTimestamp(res);
+        await expectEvent.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing', {
+          blockTimestamp: now,
+          lastRebalancedAt: firstDepositAt,
+          rebalancingInterval: time.duration.hours(1),
+        });
+
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
+        assert.equal(await aave.balanceOf(piAave.address), ether(3000));
+      });
+
+      it('should NOT rebalance on withdrawal if the rebalancing interval has not passed', async () => {
+        await time.increase(time.duration.minutes(59));
+
+        await piAave.approve(piAave.address, ether(1000), { from: alice });
+        const res = await piAave.withdraw(ether(1000), { from: alice });
+        const now = await getResTimestamp(res);
+        await expectEvent.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing', {
+          blockTimestamp: now,
+          lastRebalancedAt: firstDepositAt,
+          rebalancingInterval: time.duration.hours(1),
+        });
+
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
+        assert.equal(await aave.balanceOf(piAave.address), ether(1000));
+      });
+    });
+
     describe('cooldownPeriod()', async () => {
       beforeEach(async () => {
         await aave.transfer(alice, ether(10000), { from: aaveDistributor });
