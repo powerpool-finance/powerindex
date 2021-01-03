@@ -3,7 +3,6 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "../../interfaces/WrappedPiErc20Interface.sol";
 import "../../interfaces/YearnGovernanceInterface.sol";
 import "../../interfaces/IYDeposit.sol";
 import "../../interfaces/IUniswapV2Router02.sol";

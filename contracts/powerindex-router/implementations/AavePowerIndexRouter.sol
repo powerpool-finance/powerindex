@@ -3,7 +3,6 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "../../interfaces/WrappedPiErc20Interface.sol";
 import "../../interfaces/aave/IAaveGovernanceV2.sol";
 import "../../interfaces/aave/IStakedAave.sol";
 import "../PowerIndexBasicRouter.sol";
@@ -169,8 +168,8 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   function _stake(uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
-    piToken.approveUnderlying(staking, _amount);
 
+    piToken.approveUnderlying(staking, _amount);
     _callStaking(IStakedAave(0).stake.selector, abi.encode(piToken, _amount));
 
     emit Stake(msg.sender, _amount);
