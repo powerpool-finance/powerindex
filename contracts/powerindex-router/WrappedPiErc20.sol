@@ -84,7 +84,6 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
       PowerIndexBasicRouterInterface(router).getPiEquivalentForUnderlying(
         _underlyingAmount,
         underlying,
-        underlying.balanceOf(address(this)),
         IERC20(this).totalSupply()
       );
   }

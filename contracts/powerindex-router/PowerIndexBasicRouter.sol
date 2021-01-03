@@ -210,14 +210,14 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   function getPiEquivalentForUnderlying(
     uint256 _underlyingAmount,
     IERC20 _underlyingToken,
-    uint256 _underlyingOnPiToken,
     uint256 _piTotalSupply
   ) public view override returns (uint256) {
+    uint256 underlyingOnPiToken = _underlyingToken.balanceOf(address(piToken));
     return
       getPiEquivalentForUnderlyingPure(
         _underlyingAmount,
-        // _underlyingOnPiToken + underlyingOnStaking,
-        _underlyingOnPiToken.add(_getUnderlyingStaked()),
+        // underlyingOnPiToken + underlyingOnStaking,
+        underlyingOnPiToken.add(_getUnderlyingStaked()),
         _piTotalSupply
       );
   }
