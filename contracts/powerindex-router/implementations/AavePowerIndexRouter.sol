@@ -113,7 +113,6 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     (ReserveStatus reserveStatus, uint256 diff, ) =
       _getReserveStatus(IERC20(staking).balanceOf(piToken_), _withdrawAmount);
 
-    // TODO: add lastUpdated constraint
     if (reserveStatus == ReserveStatus.SHORTAGE) {
       (CoolDownStatus coolDownStatus, uint256 coolDownFinishesAt, uint256 unstakeFinishesAt) = getCoolDownStatus();
       if (coolDownStatus == CoolDownStatus.NONE) {
