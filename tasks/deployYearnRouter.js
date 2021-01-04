@@ -1,8 +1,6 @@
 require('@nomiclabs/hardhat-truffle5');
 require('@nomiclabs/hardhat-ethers');
 
-const pIteration = require('p-iteration');
-
 task('deploy-yearn-router', 'Deploy Yearn Router')
   .setAction(async (__, {ethers, network}) => {
     const PowerIndexPoolController = await artifacts.require('PowerIndexPoolController');
@@ -10,11 +8,10 @@ task('deploy-yearn-router', 'Deploy Yearn Router')
     const WrappedPiErc20Factory = await artifacts.require('WrappedPiErc20Factory');
     const PowerIndexPool = await artifacts.require('PowerIndexPool');
     const PowerIndexRouterFactory = await artifacts.require('YearnPowerIndexRouterFactory');
-    const PowerIndexRouter = await artifacts.require('YearnPowerIndexRouter');
     const MockERC20 = await artifacts.require('MockERC20');
 
     const {impersonateAccount, callContract, increaseTime, forkReplacePoolTokenWithNewPiToken} = require('../test/helpers');
-    const {buildBasicRouterArgs, buildYearnRouterArgs} = require('../test/helpers/builders');
+    const {buildYearnRouterArgs} = require('../test/helpers/builders');
     const {web3} = PowerIndexPoolController;
     const {toWei} = web3.utils;
 

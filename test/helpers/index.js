@@ -3,7 +3,6 @@ const TruffleContract = require('@nomiclabs/truffle-contract');
 const template = artifacts.require('Migrations');
 const { promisify } = require('util');
 const { assert } = require('chai');
-const { buildBasicRouterArgs } = require('./builders');
 const { web3 } = template;
 const BigNumber = require('bignumber.js')
 const fs = require('fs')
@@ -281,8 +280,8 @@ async function forkReplacePoolTokenWithNewPiToken(
 
   await wrappedToken.pokeRouter();
 
-  console.log('await callContract(pool, "isBound", [token])', await callContract(pool, "isBound", [tokenAddress]));
-  console.log('await callContract(pool, "isBound", [wrappedTokenAddress])', await callContract(pool, "isBound", [wrappedTokenAddress]));
+  console.log('await callContract(pool, "isBound", [token])', await callContract(pool, 'isBound', [tokenAddress]));
+  console.log('await callContract(pool, "isBound", [wrappedTokenAddress])', await callContract(pool, 'isBound', [wrappedTokenAddress]));
 
   return {
     token,
@@ -310,7 +309,6 @@ module.exports = {
   getResTimestamp,
   forkContractUpgrade,
   deployAndSaveArgs,
-  impersonateAccount,
   increaseTime,
   increaseTimeTo,
   evmSetNextBlockTimestamp: buildEndpoint('evm_setNextBlockTimestamp'),

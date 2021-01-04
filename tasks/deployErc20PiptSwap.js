@@ -1,6 +1,6 @@
 require('@nomiclabs/hardhat-truffle5');
 
-task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async (__, {ethers, network}) => {
+task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async (__, { network }) => {
   const Erc20PiptSwap = await artifacts.require('Erc20PiptSwap');
   const PowerIndexPool = await artifacts.require('PowerIndexPool');
 

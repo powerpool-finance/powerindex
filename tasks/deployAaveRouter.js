@@ -1,8 +1,6 @@
 require('@nomiclabs/hardhat-truffle5');
 require('@nomiclabs/hardhat-ethers');
 
-const pIteration = require('p-iteration');
-
 task('deploy-aave-router', 'Deploy AAVE Router')
   .setAction(async (__, {ethers, network}) => {
     const PowerIndexPoolController = await artifacts.require('PowerIndexPoolController');
@@ -10,7 +8,6 @@ task('deploy-aave-router', 'Deploy AAVE Router')
     const WrappedPiErc20Factory = await artifacts.require('WrappedPiErc20Factory');
     const PowerIndexPool = await artifacts.require('PowerIndexPool');
     const PowerIndexRouterFactory = await artifacts.require('AavePowerIndexRouterFactory');
-    const PowerIndexRouter = await artifacts.require('AavePowerIndexRouter');
 
     const {impersonateAccount, callContract, increaseTime, forkReplacePoolTokenWithNewPiToken} = require('../test/helpers');
     const {buildAaveRouterArgs} = require('../test/helpers/builders');
