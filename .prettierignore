@@ -12,6 +12,9 @@ contracts/balancer-core/
 contracts/bactions-proxy/
 contracts/lib/
 contracts/test/uniswapv2/
+contracts/interfaces/IUniswapV2Router01.sol
+contracts/interfaces/IUniswapV2Router02.sol
+contracts/interfaces/aave/
 contracts/test/MockWETH.sol
 contracts/test/MockYearnGovernance.sol
 contracts/test/AragonVoting.sol

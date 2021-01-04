@@ -1,8 +1,10 @@
-const { expectRevert, ether } = require('@openzeppelin/test-helpers');
+const { expectRevert, time, constants } = require('@openzeppelin/test-helpers');
+const { buildBasicRouterConfig } = require('../helpers/builders');
+const { ether } = require('../helpers');
 const assert = require('chai').assert;
-const BFactory = artifacts.require('BFactory');
-const BActions = artifacts.require('BActions');
-const BPool = artifacts.require('BPool');
+const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
+const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
+const PowerIndexPool = artifacts.require('PowerIndexPool');
 const MockERC20 = artifacts.require('MockERC20');
 const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
@@ -10,10 +12,10 @@ const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
-const PowerIndexSimpleRouter = artifacts.require('PowerIndexSimpleRouter');
 const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
+const BasicPowerIndexRouterFactory = artifacts.require('BasicPowerIndexRouterFactory');
 
-const { web3 } = BFactory;
+const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
 
 function mulScalarBN(bn1, bn2) {
@@ -47,28 +49,61 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
   assert.equal(diff.lte(toBN(accuracyWei)), true, message);
 }
 
+async function getTimestamp(shift = 0) {
+  const currentTimestamp = (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp;
+  return currentTimestamp + shift;
+}
+
+PowerIndexPool.numberFormat = 'String';
+
 describe('PowerIndexWrapper', () => {
   const name = 'My Pool';
   const symbol = 'MP';
   const balances = [ether('10'), ether('20')];
   const weights = [ether('25'), ether('25')];
-  const swapFee = ether('0.01');
-  const communitySwapFee = ether('0.05');
-  const communityJoinFee = ether('0.04');
-  const communityExitFee = ether('0.07');
+  const swapFee = ether('0.01').toString();
+  const communitySwapFee = ether('0.05').toString();
+  const communityJoinFee = ether('0.04').toString();
+  const communityExitFee = ether('0.07').toString();
+  const minWeightPerSecond = ether('0.00000001').toString();
+  const maxWeightPerSecond = ether('0.1').toString();
 
-  let tokens, pool, poolWrapper, poolController, poolRouter, poolRestrictions;
+  let tokens, pool, poolWrapper, poolController, routerAddress, routerFactory;
+  let defaultBasicConfig;
+  let defaultFactoryArguments;
 
-  let minter, alice, communityWallet;
+  let minter, alice, communityWallet, poolRestrictions, stub;
   before(async function () {
-    [minter, alice, communityWallet, poolRestrictions] = await web3.eth.getAccounts();
+    [minter, alice, communityWallet, poolRestrictions, stub] = await web3.eth.getAccounts();
+    defaultBasicConfig = buildBasicRouterConfig(
+      poolRestrictions,
+      constants.ZERO_ADDRESS,
+      constants.ZERO_ADDRESS,
+      ether(0),
+      '0',
+      stub,
+      ether(0),
+      []
+    );
+    defaultFactoryArguments = web3.eth.abi.encodeParameter({
+      BasicConfig: {
+        poolRestrictions: 'address',
+        voting: 'address',
+        staking: 'address',
+        reserveRatio: 'uint256',
+        rebalancingInterval: 'uint256',
+        pvp: 'address',
+        pvpFee: 'uint256',
+        rewardPools: 'address[]',
+      }
+    }, defaultBasicConfig);
   });
 
   beforeEach(async () => {
     this.weth = await WETH.new();
 
-    this.bFactory = await BFactory.new({ from: minter });
-    this.bActions = await BActions.new({ from: minter });
+    this.bFactory = await PowerIndexPoolFactory.new({ from: minter });
+    this.bActions = await PowerIndexPoolActions.new({ from: minter });
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: minter });
 
     this.token1 = await MockCvp.new();
@@ -78,35 +113,60 @@ describe('PowerIndexWrapper', () => {
     await this.token1.approve(this.bActions.address, balances[0]);
     await this.token2.approve(this.bActions.address, balances[1]);
 
+    const fromTimestamps = [await getTimestamp(100), await getTimestamp(100)].map(w => w.toString());
+    const targetTimestamps = [await getTimestamp(11000), await getTimestamp(11000)].map(w => w.toString());
+
     let res = await this.bActions.create(
       this.bFactory.address,
       name,
       symbol,
-      tokens,
-      balances,
-      weights,
-      [swapFee, communitySwapFee, communityJoinFee, communityExitFee],
-      communityWallet,
-      true,
+      {
+        minWeightPerSecond,
+        maxWeightPerSecond,
+        swapFee,
+        communitySwapFee,
+        communityJoinFee,
+        communityExitFee,
+        communityFeeReceiver: communityWallet,
+        finalize: true,
+      },
+      tokens.map((t, i) => ({
+        token: t,
+        balance: balances[i].toString(),
+        targetDenorm: weights[i].toString(),
+        fromTimestamp: fromTimestamps[i].toString(),
+        targetTimestamp: targetTimestamps[i].toString(),
+      })),
     );
 
-    const logNewPool = BFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
-    pool = await BPool.at(logNewPool.args.pool);
+    const logNewPool = PowerIndexPoolFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_NEW_POOL')[0];
+    pool = await PowerIndexPool.at(logNewPool.args.pool);
 
     poolWrapper = await PowerIndexWrapper.new(pool.address);
-    const wrapperFactory = await WrappedPiErc20Factory.new();
-    poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, wrapperFactory.address);
-    poolRouter = await PowerIndexSimpleRouter.new(poolRestrictions);
+
+    const piTokenFactory = await WrappedPiErc20Factory.new();
+    routerFactory = await BasicPowerIndexRouterFactory.new();
+    poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, piTokenFactory.address);
 
     await pool.setWrapper(poolWrapper.address, true);
 
     await poolWrapper.setController(poolController.address);
     await pool.setController(poolController.address);
 
-    res = await poolController.replacePoolTokenWithNewWrapped(this.token2.address, poolRouter.address, 'W T 2', 'WT2');
-    this.token2Wrapper = await WrappedPiErc20.at(
-      res.receipt.logs.filter(l => l.event === 'ReplacePoolTokenWithWrapped')[0].args.wrappedToken,
+    await time.increase(11000);
+
+    res = await poolController.createPiToken(this.token2.address, routerFactory.address, defaultFactoryArguments, 'W T 2', 'WT2');
+    this.underlying2pi = await WrappedPiErc20.at(
+      res.receipt.logs.filter(l => l.event === 'CreatePiToken')[0].args.piToken,
     );
+    const routerLogs = BasicPowerIndexRouterFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'BuildBasicRouter')[0];
+    routerAddress = routerLogs.args.router;
+
+    await poolController.replacePoolTokenWithExistingPiToken(this.token2.address, this.underlying2pi.address);
+
+    await time.increase(60);
+
+    await poolController.finishReplace();
 
     this.getTokensToJoinPoolAndApprove = async amountToMint => {
       const poolTotalSupply = (await pool.totalSupply()).toString(10);
@@ -120,12 +180,14 @@ describe('PowerIndexWrapper', () => {
   });
 
   it('wrapper should be created successfully', async () => {
-    assert.equal(await this.token2Wrapper.name(), 'W T 2');
-    assert.equal(await this.token2Wrapper.symbol(), 'WT2');
-    assert.equal(await this.token2Wrapper.token(), this.token2.address);
-    assert.equal(await this.token2Wrapper.router(), poolRouter.address);
-    assert.equal(await pool.isBound(this.token2Wrapper.address), true);
+    assert.equal(await this.underlying2pi.name(), 'W T 2');
+    assert.equal(await this.underlying2pi.symbol(), 'WT2');
+    assert.equal(await this.underlying2pi.underlying(), this.token2.address);
+    assert.equal(await this.underlying2pi.router(), routerAddress);
+    assert.equal(await pool.isBound(this.underlying2pi.address), true);
     assert.equal(await pool.isBound(this.token2.address), false);
+    assert.equal(await pool.getDenormalizedWeight(this.underlying2pi.address), weights[1]);
+    assert.equal(await pool.getBalance(this.underlying2pi.address), balances[1]);
   });
 
   describe('join, exit and swap through', () => {
@@ -219,7 +281,7 @@ describe('PowerIndexWrapper', () => {
 
       assert.equal((await this.token1.balanceOf(alice)).toString(), amountToSwap.toString());
       const token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
-      const token2PoolBalanceBefore = (await this.token2Wrapper.balanceOf(pool.address)).toString();
+      const token2PoolBalanceBefore = (await this.underlying2pi.balanceOf(pool.address)).toString();
       const token2AliceBalanceBefore = (await this.token2.balanceOf(alice)).toString();
 
       await expectRevert(
@@ -249,7 +311,7 @@ describe('PowerIndexWrapper', () => {
         addBN(token1PoolBalanceBefore, amountToSwap),
       );
       assert.equal(
-        (await this.token2Wrapper.balanceOf(pool.address)).toString(),
+        (await this.underlying2pi.balanceOf(pool.address)).toString(),
         subBN(token2PoolBalanceBefore, expectedOutWithFee),
       );
       assert.equal(
@@ -424,7 +486,7 @@ describe('PowerIndexWrapper', () => {
       );
       let ratio = divScalarBN(poolOutAmount, await pool.totalSupply());
       const token1InAmount = mulScalarBN(ratio, await pool.getBalance(this.token1.address));
-      const token2InAmount = mulScalarBN(ratio, await pool.getBalance(this.token2Wrapper.address));
+      const token2InAmount = mulScalarBN(ratio, await pool.getBalance(this.underlying2pi.address));
 
       const poolOutAmountFee = mulScalarBN(poolOutAmount, communityJoinFee);
       const poolOutAmountAfterFee = subBN(poolOutAmount, poolOutAmountFee);
@@ -439,7 +501,7 @@ describe('PowerIndexWrapper', () => {
       assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
       assert.equal((await this.token2.balanceOf(alice)).toString(), '0');
       assert.equal(await this.token1.balanceOf(pool.address), addBN(token1InAmount, balances[0]));
-      assert.equal(await this.token2Wrapper.balanceOf(pool.address), addBN(token2InAmount, balances[1]));
+      assert.equal(await this.underlying2pi.balanceOf(pool.address), addBN(token2InAmount, balances[1]));
       assert.equal((await pool.balanceOf(alice)).toString(), poolOutAmountAfterFee.toString());
 
       const poolInAmountFee = mulScalarBN(poolOutAmountAfterFee, communityExitFee);
@@ -447,7 +509,7 @@ describe('PowerIndexWrapper', () => {
 
       ratio = divScalarBN(poolInAmountAfterFee, await pool.totalSupply());
       const token1OutAmount = mulScalarBN(ratio, await pool.getBalance(this.token1.address));
-      const token2OutAmount = mulScalarBN(ratio, await pool.getBalance(this.token2Wrapper.address));
+      const token2OutAmount = mulScalarBN(ratio, await pool.getBalance(this.underlying2pi.address));
 
       await pool.approve(poolWrapper.address, poolOutAmountAfterFee, { from: alice });
 
@@ -466,7 +528,7 @@ describe('PowerIndexWrapper', () => {
         subBN(addBN(token1InAmount, balances[0]), token1OutAmount),
       );
       assertEqualWithAccuracy(
-        await this.token2Wrapper.balanceOf(pool.address),
+        await this.underlying2pi.balanceOf(pool.address),
         subBN(addBN(token2InAmount, balances[1]), token2OutAmount),
       );
     });

@@ -11,14 +11,14 @@ interface WrappedPiErc20Interface is IERC20 {
 
   function changeRouter(address _newRouter) external;
 
-  function approveToken(address _to, uint256 _amount) external;
+  function approveUnderlying(address _to, uint256 _amount) external;
 
-  function callVoting(
+  function callExternal(
     address voting,
     bytes4 signature,
     bytes calldata args,
     uint256 value
   ) external;
 
-  function getWrappedBalance() external view returns (uint256);
+  function getUnderlyingBalance() external view returns (uint256);
 }

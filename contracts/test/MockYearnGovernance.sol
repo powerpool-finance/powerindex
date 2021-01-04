@@ -684,12 +684,13 @@ contract MockYearnGovernance is LPTokenWrapper, IRewardDistributionRecipient {
         lock = _lock;
     }
 
-    function initialize(uint id, address _governance, address _voteToken) public {
+    function initialize(uint id, address _governance, address _voteToken, address _rewardToken) public {
         require(config == true, "!config");
         config = false;
         proposalCount = id;
         governance = _governance;
         vote = IERC20(_voteToken);
+        token = IERC20(_rewardToken);
     }
 
     event NewProposal(uint id, address creator, uint start, uint duration, address executor);
@@ -833,7 +834,7 @@ contract MockYearnGovernance is LPTokenWrapper, IRewardDistributionRecipient {
 
     /* Default rewards contract */
 
-    IERC20 public token = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
+    IERC20 public token;
 
     uint256 public constant DURATION = 7 days;
 

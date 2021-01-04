@@ -7,11 +7,12 @@ import "../PowerIndexAbstractController.sol";
 import "../interfaces/PowerIndexWrapperInterface.sol";
 import "../interfaces/WrappedPiErc20FactoryInterface.sol";
 import "../interfaces/WrappedPiErc20Interface.sol";
+import "../interfaces/IPiRouterFactory.sol";
 
 contract PowerIndexWrappedController is PowerIndexAbstractController {
-  event ReplacePoolTokenWithWrapped(
-    address indexed existingToken,
-    address indexed wrappedToken,
+  event ReplacePoolTokenWithPiToken(
+    address indexed underlyingToken,
+    address indexed piToken,
     uint256 balance,
     uint256 denormalizedWeight
   );
@@ -24,18 +25,24 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     uint256 denormalizedWeight
   );
 
+  event ReplacePoolTokenFinish();
   event SetPoolWrapper(address indexed bpoolWrapper);
+  event CreatePiToken(address indexed underlyingToken, address indexed piToken);
 
   PowerIndexWrapperInterface public poolWrapper;
-  WrappedPiErc20FactoryInterface public wrapperFactory;
+  WrappedPiErc20FactoryInterface public piTokenFactory;
+
+  uint256 public lastMaxWeightPerSecond;
+  bool public lastWrapperMode;
+  uint256 public replaceFinishTimestamp;
 
   constructor(
     address _pool,
     address _poolWrapper,
-    address _wrapperFactory
+    address _piTokenFactory
   ) public PowerIndexAbstractController(_pool) {
     poolWrapper = PowerIndexWrapperInterface(_poolWrapper);
-    wrapperFactory = WrappedPiErc20FactoryInterface(_wrapperFactory);
+    piTokenFactory = WrappedPiErc20FactoryInterface(_piTokenFactory);
   }
 
   function setPoolWrapper(address _poolWrapper) external onlyOwner {
@@ -43,18 +50,33 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     emit SetPoolWrapper(_poolWrapper);
   }
 
-  function replacePoolTokenWithNewWrapped(
-    address _token,
-    address _router,
+  function createPiToken(
+    address _underlyingToken,
+    address _routerFactory,
+    bytes memory _routerArgs,
     string calldata _name,
     string calldata _symbol
   ) external onlyOwner {
-    WrappedPiErc20Interface wrappedToken = wrapperFactory.build(_token, _router, _name, _symbol);
-    _replacePoolTokenWithWrapped(_token, wrappedToken);
+    WrappedPiErc20Interface piToken = _createPiToken(_underlyingToken, _routerFactory, _routerArgs, _name, _symbol);
+    emit CreatePiToken(_underlyingToken, address(piToken));
   }
 
-  function replacePoolTokenWithExistsWrapped(address _token, WrappedPiErc20Interface _wrappedToken) external onlyOwner {
-    _replacePoolTokenWithWrapped(_token, _wrappedToken);
+  function replacePoolTokenWithNewPiToken(
+    address _underlyingToken,
+    address _routerFactory,
+    bytes calldata _routerArgs,
+    string calldata _name,
+    string calldata _symbol
+  ) external onlyOwner {
+    WrappedPiErc20Interface piToken = _createPiToken(_underlyingToken, _routerFactory, _routerArgs, _name, _symbol);
+    _replacePoolTokenWithPiToken(_underlyingToken, piToken);
+  }
+
+  function replacePoolTokenWithExistingPiToken(address _underlyingToken, WrappedPiErc20Interface _piToken)
+    external
+    onlyOwner
+  {
+    _replacePoolTokenWithPiToken(_underlyingToken, _piToken);
   }
 
   function replacePoolTokenWithNewVersion(
@@ -78,27 +100,74 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     );
 
     IERC20(_newToken).approve(address(pool), balance);
-    pool.bind(_newToken, balance, denormalizedWeight);
+
+    _initiateReplace(denormalizedWeight);
+
+    pool.bind(_newToken, balance, denormalizedWeight, block.timestamp + 1, replaceFinishTimestamp);
 
     emit ReplacePoolTokenWithNewVersion(_oldToken, _newToken, _migrator, balance, denormalizedWeight);
   }
 
-  function _replacePoolTokenWithWrapped(address _token, WrappedPiErc20Interface _wrappedToken) internal {
-    uint256 denormalizedWeight = pool.getDenormalizedWeight(_token);
-    uint256 balance = pool.getBalance(_token);
+  function _replacePoolTokenWithPiToken(address _underlyingToken, WrappedPiErc20Interface _piToken) internal {
+    uint256 denormalizedWeight = pool.getDenormalizedWeight(_underlyingToken);
+    uint256 balance = pool.getBalance(_underlyingToken);
 
-    pool.unbind(_token);
+    pool.unbind(_underlyingToken);
 
-    IERC20(_token).approve(address(_wrappedToken), balance);
-    _wrappedToken.deposit(balance);
+    IERC20(_underlyingToken).approve(address(_piToken), balance);
+    _piToken.deposit(balance);
 
-    _wrappedToken.approve(address(pool), balance);
-    pool.bind(address(_wrappedToken), balance, denormalizedWeight);
+    _piToken.approve(address(pool), balance);
+
+    _initiateReplace(denormalizedWeight);
+
+    pool.bind(address(_piToken), balance, denormalizedWeight, block.timestamp + 1, replaceFinishTimestamp);
 
     if (address(poolWrapper) != address(0)) {
-      poolWrapper.setTokenWrapper(_token, address(_wrappedToken));
+      poolWrapper.setPiTokenForUnderlying(_underlyingToken, address(_piToken));
     }
 
-    emit ReplacePoolTokenWithWrapped(_token, address(_wrappedToken), balance, denormalizedWeight);
+    emit ReplacePoolTokenWithPiToken(_underlyingToken, address(_piToken), balance, denormalizedWeight);
+  }
+
+  function _initiateReplace(uint256 denormalizedWeight) internal {
+    require(replaceFinishTimestamp == 0, "REPLACE_ALREADY_INITIATED");
+
+    (uint256 minWeightPerSecond, uint256 maxWeightPerSecond) = pool.getWeightPerSecondBounds();
+    lastMaxWeightPerSecond = maxWeightPerSecond;
+    lastWrapperMode = pool.getWrapperMode();
+
+    replaceFinishTimestamp = block.timestamp + denormalizedWeight.div(1 ether) + 10;
+
+    pool.setWeightPerSecondBounds(minWeightPerSecond, uint256(1 ether));
+    pool.setWrapper(0x0000000000000000000000000000000000000000, true);
+  }
+
+  function finishReplace() external {
+    require(replaceFinishTimestamp != 0, "REPLACE_NOT_INITIATED");
+    require(block.timestamp > replaceFinishTimestamp, "TOO_SOON");
+
+    (uint256 minWeightPerSecond, ) = pool.getWeightPerSecondBounds();
+    pool.setWeightPerSecondBounds(minWeightPerSecond, lastMaxWeightPerSecond);
+
+    replaceFinishTimestamp = 0;
+
+    pool.setWrapper(address(poolWrapper), lastWrapperMode);
+
+    emit ReplacePoolTokenFinish();
+  }
+
+  function _createPiToken(
+    address _underlyingToken,
+    address _routerFactory,
+    bytes memory _routerArgs,
+    string calldata _name,
+    string calldata _symbol
+  ) internal returns (WrappedPiErc20Interface) {
+    WrappedPiErc20Interface piToken = piTokenFactory.build(_underlyingToken, address(this), _name, _symbol);
+    address router = IPiRouterFactory(_routerFactory).buildRouter(address(piToken), _routerArgs);
+    Ownable(router).transferOwnership(msg.sender);
+    piToken.changeRouter(router);
+    return piToken;
   }
 }
