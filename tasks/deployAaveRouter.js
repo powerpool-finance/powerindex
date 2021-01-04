@@ -4,7 +4,7 @@ require('@nomiclabs/hardhat-ethers');
 const pIteration = require('p-iteration');
 
 task('deploy-aave-router', 'Deploy AAVE Router')
-  .setAction(async (__, {ethers}) => {
+  .setAction(async (__, {ethers, network}) => {
     const PowerIndexPoolController = await artifacts.require('PowerIndexPoolController');
     const PowerIndexWrapper = await artifacts.require('PowerIndexWrapper');
     const WrappedPiErc20Factory = await artifacts.require('WrappedPiErc20Factory');
@@ -42,10 +42,9 @@ task('deploy-aave-router', 'Deploy AAVE Router')
 
     await controller.transferOwnership(admin);
 
-    // const networkId = await web3.eth.net.getId();
-    // if (networkId === 1) {
-    //   return;
-    // }
+    if (network.name !== 'mainnetfork') {
+      return;
+    }
     await impersonateAccount(ethers, admin);
     const IStakedAave = await artifacts.require('IStakedAave');
 
