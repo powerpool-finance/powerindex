@@ -28,7 +28,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
   let owner, alice, bob, stub, mockStaking;
   let yfi, router, piYfi, myContract, defaultBasicConfig;
 
-  before(async function () {
+  beforeEach(async function () {
     [owner, alice, bob, stub, mockStaking] = await web3.eth.getAccounts();
     myContract = await MyContract.new();
     defaultBasicConfig = buildBasicRouterConfig(
@@ -111,6 +111,16 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
       await expectExactRevert(
         piYfi.callExternal(myContract.address, payload.signature, payload.calldata, 0, { from: alice }),
+        'Ownable: caller is not the owner',
+      );
+
+      await expectExactRevert(
+        piYfi.callExternalMultiple([{
+          destination: myContract.address,
+          signature: payload.signature,
+          args: payload.calldata,
+          value: 0,
+        }], { from: alice }),
         'Ownable: caller is not the owner',
       );
     });
@@ -530,6 +540,13 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
       it('should deny calling the method from non-router address', async () => {
         await expectRevert(piYfi.callExternal(alice, signature, args, 0, { from: alice }), 'ONLY_ROUTER');
+
+        await expectRevert(piYfi.callExternalMultiple([{
+          destination: alice,
+          signature: signature,
+          args: args,
+          value: 0,
+        }], { from: alice }), 'ONLY_ROUTER');
       });
     });
   });
