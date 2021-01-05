@@ -178,6 +178,8 @@ describe('WrappedPiErc20 Unit Tests', () => {
       await yfi.approve(piYfi.address, ether(42), { from: alice });
       await expectRevert(piYfi.deposit(ether(42), { from: alice }), 'FEE');
 
+      assert.equal(await web3.eth.getBalance(router.address), 0);
+
       const res = await piYfi.deposit(ether(42), { from: alice, value: ethFee });
 
       expectEvent(res, 'Deposit', {
@@ -192,14 +194,8 @@ describe('WrappedPiErc20 Unit Tests', () => {
       assert.equal(await piYfi.totalSupply(), ether(42));
       assert.equal(await piYfi.balanceOf(alice), ether(42));
 
-      await piYfi.approve(piYfi.address, ether(42), { from: alice });
-      await expectRevert(piYfi.withdraw(ether(42), { from: alice }), 'FEE');
-
-      await piYfi.withdraw(ether(42), { from: alice, value: ethFee });
-      assert.equal(await yfi.balanceOf(alice), ether(10000));
-      assert.equal(await yfi.balanceOf(piYfi.address), ether(0));
-      assert.equal(await piYfi.totalSupply(), ether(0));
-      assert.equal(await piYfi.balanceOf(alice), ether(0));
+      assert.equal(await web3.eth.getBalance(piYfi.address), 0);
+      assert.equal(await web3.eth.getBalance(router.address), ethFee);
     });
 
     describe('imbalanced router', () => {
@@ -322,6 +318,8 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
         assert.equal(await piYfi.ethFee(), ethFee);
 
+        assert.equal(await web3.eth.getBalance(router.address), 0);
+
         await piYfi.approve(piYfi.address, ether(42), { from: alice });
         await expectRevert(piYfi.withdraw(ether(42), { from: alice }), 'FEE');
 
@@ -337,6 +335,9 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
         assert.equal(await piYfi.totalSupply(), ether(0));
         assert.equal(await piYfi.balanceOf(alice), ether(0));
+
+        assert.equal(await web3.eth.getBalance(router.address), ethFee);
+        assert.equal(await web3.eth.getBalance(piYfi.address), 0);
       });
     });
 
