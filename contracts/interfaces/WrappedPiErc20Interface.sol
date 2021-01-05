@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -21,6 +22,15 @@ interface WrappedPiErc20Interface is IERC20 {
     bytes calldata args,
     uint256 value
   ) external;
+
+  struct ExternalCallData {
+    address destination;
+    bytes4 signature;
+    bytes args;
+    uint256 value;
+  }
+
+  function callExternalMultiple(ExternalCallData[] calldata calls) external;
 
   function getUnderlyingBalance() external view returns (uint256);
 }

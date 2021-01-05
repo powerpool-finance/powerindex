@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -116,6 +117,26 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
     bytes calldata _args,
     uint256 _value
   ) external override onlyRouter {
+    _callExternal(_destination, _signature, _args, _value);
+  }
+
+  function callExternalMultiple(ExternalCallData[] calldata _calls) external override onlyRouter {
+    uint256 len = _calls.length;
+    for (uint256 i = 0; i < len; i++) {
+      _callExternal(_calls[i].destination, _calls[i].signature, _calls[i].args, _calls[i].value);
+    }
+  }
+
+  function getUnderlyingBalance() external view override returns (uint256) {
+    return underlying.balanceOf(address(this));
+  }
+
+  function _callExternal(
+    address _destination,
+    bytes4 _signature,
+    bytes calldata _args,
+    uint256 _value
+  ) internal {
     (bool success, bytes memory data) = _destination.call{ value: _value }(abi.encodePacked(_signature, _args));
 
     if (!success) {
@@ -142,9 +163,5 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
     }
 
     emit CallExternal(_destination, _signature, _args, data);
-  }
-
-  function getUnderlyingBalance() external view override returns (uint256) {
-    return underlying.balanceOf(address(this));
   }
 }

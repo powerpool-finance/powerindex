@@ -83,6 +83,29 @@ describe('WrappedPiErc20 Unit Tests', () => {
       });
     });
 
+    it('should call the multiple external methods', async () => {
+      await myContract.transferOwnership(piYfi.address);
+      const payload = splitPayload(myContract.contract.methods.setAnswer(42).encodeABI());
+      const payload2 = splitPayload(myContract.contract.methods.setAnswer2(24).encodeABI());
+
+      assert.equal(await myContract.getAnswer(), 0);
+      await piYfi.callExternalMultiple([{
+        destination: myContract.address,
+        signature: payload.signature,
+        args: payload.calldata,
+        value: 0,
+      },{
+        destination: myContract.address,
+        signature: payload2.signature,
+        args: payload2.calldata,
+        value: 0,
+      }], {
+        from: alice,
+      });
+      assert.equal(await myContract.getAnswer(), 42);
+      assert.equal(await myContract.getAnswer2(), 24);
+    });
+
     it('should deny non-router calling the method', async () => {
       const payload = splitPayload(myContract.contract.methods.setAnswer(42).encodeABI());
 
