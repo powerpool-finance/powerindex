@@ -110,7 +110,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   }
 
   function migrateToNewRouter(address _piToken, address payable _newRouter) external override onlyOwner {
-    WrappedPiErc20Interface(_piToken).changeRouter(_newRouter);
+    super(_piToken, _newRouter);
 
     _newRouter.transfer(address(this).balance);
   }
