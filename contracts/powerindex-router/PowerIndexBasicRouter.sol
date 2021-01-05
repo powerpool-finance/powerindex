@@ -105,12 +105,12 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   }
 
   function setPiTokenEthFee(uint256 _ethFee) external onlyOwner {
-    require(_ethFee < 0.1 ether, "ETH_FEE_OVER_THE_LIMIT");
+    require(_ethFee <= 0.1 ether, "ETH_FEE_OVER_THE_LIMIT");
     piToken.setEthFee(_ethFee);
   }
 
-  function migrateToNewRouter(address _piToken, address payable _newRouter) external override onlyOwner {
-    super(_piToken, _newRouter);
+  function migrateToNewRouter(address _piToken, address payable _newRouter) public override onlyOwner {
+    super.migrateToNewRouter(_piToken, _newRouter);
 
     _newRouter.transfer(address(this).balance);
   }
