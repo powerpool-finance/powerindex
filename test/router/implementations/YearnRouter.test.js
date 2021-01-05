@@ -60,6 +60,7 @@ describe('YearnRouter Tests', () => {
     yearnGovernance = await MockYearnGovernance.new();
     usdc = await MockERC20.new('USDC', 'USDC', '6', mwei('10000000'));
     weth = await MockWETH.new();
+    // 0xbbc81d23ea2c3ec7e56d39296f0cbb648873a5d3
     yDeposit = await MockYDeposit.new(yCrv.address, usdc.address);
 
     poolRestrictions = await PoolRestrictions.new();
@@ -450,6 +451,22 @@ describe('YearnRouter Tests', () => {
         assert.equal(await yfi.balanceOf(piYfi.address), ether(2200));
       });
     });
+
+    it('should stake all the underlying tokens with 0 RR', async () => {
+      await yfiRouter.setReserveConfig(ether(0), 0, { from: piGov });
+
+      await piYfi.pokeRouter({ from: bob });
+      assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(52000));
+      assert.equal(await yfi.balanceOf(piYfi.address), ether(0));
+    })
+
+    it('should keep all the underlying tokens on piToken with 1 RR', async () => {
+      await yfiRouter.setReserveConfig(ether(1), 0, { from: piGov });
+
+      await piYfi.pokeRouter({ from: bob });
+      assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(42000));
+      assert.equal(await yfi.balanceOf(piYfi.address), ether(10000));
+    })
   });
 
   describe('reward distribution', async () => {

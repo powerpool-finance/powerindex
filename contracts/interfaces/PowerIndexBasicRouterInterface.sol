@@ -12,7 +12,6 @@ interface PowerIndexBasicRouterInterface {
   function getPiEquivalentForUnderlying(
     uint256 _underlyingAmount,
     IERC20 _underlyingToken,
-    uint256 _underlyingOnWrapper,
     uint256 _piTotalSupply
   ) external view returns (uint256);
 

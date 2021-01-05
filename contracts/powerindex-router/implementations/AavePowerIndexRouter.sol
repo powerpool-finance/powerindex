@@ -3,7 +3,6 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "../../interfaces/WrappedPiErc20Interface.sol";
 import "../../interfaces/aave/IAaveGovernanceV2.sol";
 import "../../interfaces/aave/IStakedAave.sol";
 import "../PowerIndexBasicRouter.sol";
@@ -91,6 +90,10 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     _redeem(_amount);
   }
 
+  function triggerCooldown() external onlyOwner {
+    _triggerCoolDown();
+  }
+
   /*** PI TOKEN CALLBACK ***/
 
   function piTokenCallback(uint256 _withdrawAmount) external override onlyPiToken {
@@ -109,7 +112,6 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     (ReserveStatus reserveStatus, uint256 diff, ) =
       _getReserveStatus(IERC20(staking).balanceOf(piToken_), _withdrawAmount);
 
-    // TODO: add lastUpdated constraint
     if (reserveStatus == ReserveStatus.SHORTAGE) {
       (CoolDownStatus coolDownStatus, uint256 coolDownFinishesAt, uint256 unstakeFinishesAt) = getCoolDownStatus();
       if (coolDownStatus == CoolDownStatus.NONE) {
@@ -135,23 +137,24 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
       uint256 unstakeFinishesAt
     )
   {
-    IStakedAave _staking = IStakedAave(staking);
-    uint256 stakerCoolDown = _staking.stakersCooldowns(address(piToken));
-    uint256 coolDownSeconds = _staking.COOLDOWN_SECONDS();
-    uint256 unstakeWindow = _staking.UNSTAKE_WINDOW();
-    uint256 current = block.timestamp;
+    IStakedAave staking_ = IStakedAave(staking);
+    uint256 stakerCoolDown = staking_.stakersCooldowns(address(piToken));
+    uint256 now_ = block.timestamp;
 
     if (stakerCoolDown == 0) {
       return (CoolDownStatus.NONE, 0, 0);
     }
 
+    uint256 coolDownSeconds = staking_.COOLDOWN_SECONDS();
+    uint256 unstakeWindow = staking_.UNSTAKE_WINDOW();
+
     coolDownFinishesAt = stakerCoolDown.add(coolDownSeconds);
     unstakeFinishesAt = coolDownFinishesAt.add(unstakeWindow);
 
-    if (current <= coolDownFinishesAt) {
+    if (now_ <= coolDownFinishesAt) {
       status = CoolDownStatus.COOLDOWN;
       // current > coolDownFinishesAt && ...
-    } else if (current < unstakeFinishesAt) {
+    } else if (now_ < unstakeFinishesAt) {
       status = CoolDownStatus.UNSTAKE_WINDOW;
     } // else { status = CoolDownStatus.NONE; }
   }
@@ -165,8 +168,8 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   function _stake(uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
-    piToken.approveUnderlying(staking, _amount);
 
+    piToken.approveUnderlying(staking, _amount);
     _callStaking(IStakedAave(0).stake.selector, abi.encode(piToken, _amount));
 
     emit Stake(msg.sender, _amount);

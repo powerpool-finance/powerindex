@@ -86,6 +86,7 @@ describe('AaveRouter Tests', () => {
   });
 
   let aave, stakedAave, piAave, aaveRouter, poolRestrictions;
+  let cooldownPeriod, unstakeWindow;
 
   // https://github.com/aave/aave-stake-v2
   describe('staking', async () => {
@@ -151,6 +152,9 @@ describe('AaveRouter Tests', () => {
       await aave.transfer(stakedAave.address, ether(42000), { from: aaveDistributor });
       await aaveRouter.transferOwnership(piGov);
 
+      cooldownPeriod = parseInt(await stakedAave.COOLDOWN_SECONDS());
+      unstakeWindow = parseInt(await stakedAave.UNSTAKE_WINDOW());
+
       // Checks...
       assert.equal(await aaveRouter.owner(), piGov);
     });
@@ -160,6 +164,88 @@ describe('AaveRouter Tests', () => {
     });
 
     it('should allow depositing Aave and staking it in a StakedAave contract', async () => {});
+
+    describe('owner methods', async () => {
+      describe('stake()/redeem()', () => {
+        beforeEach(async () => {
+          await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
+          await aave.approve(piAave.address, ether('10000'), { from: alice });
+          await piAave.deposit(ether('10000'), { from: alice });
+
+          assert.equal(await aave.balanceOf(piAave.address), ether(2000));
+          assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
+          assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
+        });
+
+        describe('stake()', () => {
+          it('should allow the owner staking any amount of reserve tokens', async () => {
+            const res = await aaveRouter.stake(ether(2000), { from: piGov });
+            expectEvent(res, 'Stake', {
+              sender: piGov,
+              amount: ether(2000),
+            });
+            assert.equal(await aave.balanceOf(piAave.address), ether(0));
+            assert.equal(await aave.balanceOf(stakedAave.address), ether(52000));
+            assert.equal(await stakedAave.balanceOf(piAave.address), ether(10000));
+          });
+
+          it('should deny staking 0', async () => {
+            await expectRevert(aaveRouter.stake(ether(0), { from: piGov }), 'CANT_STAKE_0');
+          });
+
+          it('should deny non-owner staking any amount of reserve tokens', async () => {
+            await expectRevert(aaveRouter.stake(ether(1), { from: alice }), 'Ownable: caller is not the owner');
+          });
+        })
+
+        describe('redeem()', () => {
+          beforeEach(async () => {
+            await aaveRouter.triggerCooldown({ from: piGov });
+            await time.increase(cooldownPeriod + 1);
+          });
+
+          it('should allow the owner redeeming any amount of reserve tokens', async () => {
+            const res = await aaveRouter.redeem(ether(3000), { from: piGov });
+            expectEvent(res, 'Redeem', {
+              sender: piGov,
+              amount: ether(3000),
+            });
+            assert.equal(await aave.balanceOf(piAave.address), ether(5000));
+            assert.equal(await stakedAave.balanceOf(piAave.address), ether(5000));
+            assert.equal(await aave.balanceOf(stakedAave.address), ether(47000));
+          });
+
+          it('should deny staking 0', async () => {
+            await expectRevert(aaveRouter.redeem(ether(0), { from: piGov }), 'CANT_REDEEM_0');
+          });
+
+          it('should deny non-owner staking any amount of reserve tokens', async () => {
+            await expectRevert(aaveRouter.redeem(ether(1), { from: alice }), 'Ownable: caller is not the owner');
+          });
+        });
+
+        describe('triggerCooldown()', () => {
+          it('should allow the owner triggering cooldown', async () => {
+            let res = await aaveRouter.triggerCooldown({ from: piGov });
+            expectEvent(res, 'TriggerCooldown');
+            await expectEvent.inTransaction(res.tx, StakedAaveV2, 'Cooldown', {
+              user: piAave.address
+            });
+            const cooldownTriggeredAt = parseInt(await getResTimestamp(res));
+
+            res = await aaveRouter.getCoolDownStatus();
+            assert.equal(res.status, COOLDOWN_STATUS.COOLDOWN);
+            assert.equal(res.coolDownFinishesAt, cooldownTriggeredAt + cooldownPeriod);
+            assert.equal(res.unstakeFinishesAt, cooldownTriggeredAt + cooldownPeriod + unstakeWindow);
+          })
+
+          it('should deny non-owner triggering the cooldown', async () => {
+            await expectRevert(aaveRouter.triggerCooldown({ from: alice }), 'Ownable: caller is not the owner');
+          });
+        });
+      });
+    });
+
 
     describe('stake', async () => {
       beforeEach(async () => {
@@ -241,6 +327,175 @@ describe('AaveRouter Tests', () => {
         // The router has partially staked the deposit with regard to the reserve ration value (20/80)
         assert.equal(await aave.balanceOf(piAave.address), ether(200));
         assert.equal(await aave.balanceOf(stakedAave.address), ether(42800));
+      });
+    });
+
+    it('should ignore rebalancing if the staking address is 0', async () => {
+      await aave.transfer(alice, ether(100000), { from: aaveDistributor });
+      await aave.approve(piAave.address, ether(10000), { from: alice });
+      await piAave.deposit(ether(10000), { from: alice });
+
+      await aaveRouter.triggerCooldown({ from: piGov });
+      await time.increase(cooldownPeriod + 1);
+
+      await aaveRouter.redeem(ether(8000), { from: piGov });
+      await aaveRouter.setVotingAndStaking(stakedAave.address, constants.ZERO_ADDRESS, { from: piGov });
+
+      assert.equal(await aave.balanceOf(stakedAave.address), ether(42000));
+      assert.equal(await aave.balanceOf(piAave.address), ether(10000));
+      assert.equal(await piAave.balanceOf(alice), ether(10000));
+      assert.equal(await piAave.totalSupply(), ether(10000));
+
+      await piAave.approve(piAave.address, ether(1000), { from: alice });
+      const res = await piAave.withdraw(ether(1000), { from: alice });
+      await expectEvent.inTransaction(res.tx, aaveRouter, 'IgnoreDueMissingStaking');
+
+      assert.equal(await aave.balanceOf(stakedAave.address), ether(42000));
+      assert.equal(await stakedAave.balanceOf(piAave.address), ether(0));
+      assert.equal(await aave.balanceOf(piAave.address), ether(9000));
+    });
+
+    describe('when interval enabled', () => {
+      let firstDepositAt;
+
+      beforeEach(async () => {
+        await aave.transfer(alice, ether(100000), { from: aaveDistributor });
+        await aave.approve(piAave.address, ether(10000), { from: alice });
+        const res = await piAave.deposit(ether(10000), { from: alice });
+        firstDepositAt = await getResTimestamp(res);
+
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
+        assert.equal(await aave.balanceOf(piAave.address), ether(2000));
+
+        await aaveRouter.setReserveConfig(ether('0.2'), time.duration.hours(1), { from: piGov });
+      });
+
+      it('should DO rebalance on deposit if the rebalancing interval has passed', async () => {
+        await time.increase(time.duration.minutes(61));
+
+        await aave.approve(piAave.address, ether(1000), { from: alice });
+        const res = await piAave.deposit(ether(1000), { from: alice });
+        await expectEvent.notEmitted.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing');
+
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(50800));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(8800));
+        assert.equal(await aave.balanceOf(piAave.address), ether(2200));
+      });
+
+      it('should trigger cooldown on withdrawal if the rebalancing interval has passed', async () => {
+        await time.increase(time.duration.minutes(61));
+
+        await piAave.approve(piAave.address, ether(1000), { from: alice });
+        const res = await piAave.withdraw(ether(1000), { from: alice });
+        await expectEvent.notEmitted.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing');
+        await expectEvent.inTransaction(res.tx, stakedAave, 'Cooldown', {
+          user: piAave.address
+        });
+
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
+        assert.equal(await aave.balanceOf(piAave.address), ether(1000));
+      });
+
+      it('should DO rebalance on withdrawal if the rebalancing interval AND cooldown have passed', async () => {
+        await aaveRouter.triggerCooldown({ from: piGov });
+        await time.increase(cooldownPeriod + 1);
+
+        await piAave.approve(piAave.address, ether(1000), { from: alice });
+        const res = await piAave.withdraw(ether(1000), { from: alice });
+        await expectEvent.notEmitted.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing');
+
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(49200));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(7200));
+        assert.equal(await aave.balanceOf(piAave.address), ether(1800));
+      });
+
+      it('should NOT rebalance on deposit if the rebalancing interval has not passed', async () => {
+        await time.increase(time.duration.minutes(59));
+
+        await aave.approve(piAave.address, ether(1000), { from: alice });
+        const res = await piAave.deposit(ether(1000), { from: alice });
+        const now = await getResTimestamp(res);
+        await expectEvent.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing', {
+          blockTimestamp: now,
+          lastRebalancedAt: firstDepositAt,
+          rebalancingInterval: time.duration.hours(1),
+        });
+
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
+        assert.equal(await aave.balanceOf(piAave.address), ether(3000));
+      });
+
+      it('should NOT rebalance on withdrawal if the rebalancing interval has not passed', async () => {
+        await time.increase(time.duration.minutes(59));
+
+        await piAave.approve(piAave.address, ether(1000), { from: alice });
+        const res = await piAave.withdraw(ether(1000), { from: alice });
+        const now = await getResTimestamp(res);
+        await expectEvent.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing', {
+          blockTimestamp: now,
+          lastRebalancedAt: firstDepositAt,
+          rebalancingInterval: time.duration.hours(1),
+        });
+
+        assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
+        assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
+        assert.equal(await aave.balanceOf(piAave.address), ether(1000));
+      });
+    });
+
+    describe('cooldownPeriod()', async () => {
+      beforeEach(async () => {
+        await aave.transfer(alice, ether(10000), { from: aaveDistributor });
+        await aave.approve(piAave.address, ether(1000), { from: alice });
+      });
+
+      it('should be NONE when a cooldown request has never issued', async () => {
+        const res = await aaveRouter.getCoolDownStatus();
+        assert.equal(res.status, COOLDOWN_STATUS.NONE);
+        assert.equal(res.coolDownFinishesAt, '0');
+        assert.equal(res.unstakeFinishesAt, '0');
+      });
+
+      describe('for at least 1 interaction with piToken', () => {
+        let cooldownActivatedAt;
+
+        beforeEach(async () => {
+          await piAave.deposit(ether(1000), { from: alice });
+          await time.increase(1);
+
+          await piAave.approve(piAave.address, ether(200), { from: alice });
+          let res = await piAave.withdraw(ether(200), { from: alice });
+          await expectEvent.inTransaction(res.tx, StakedAaveV2, 'Cooldown', {
+            user: piAave.address
+          });
+          cooldownActivatedAt = parseInt(await getResTimestamp(res));
+        });
+
+        it('should be NONE when a cooldown and unstake window request have finished', async () => {
+          await time.increase(cooldownPeriod + unstakeWindow + 1);
+          const res = await aaveRouter.getCoolDownStatus();
+          assert.equal(res.status, COOLDOWN_STATUS.NONE);
+          assert.equal(res.coolDownFinishesAt, cooldownActivatedAt + cooldownPeriod);
+          assert.equal(res.unstakeFinishesAt, cooldownActivatedAt + cooldownPeriod + unstakeWindow);
+        });
+
+        it('should be UNSTAKE_WINDOW after passing cooldown', async () => {
+          await time.increase(cooldownPeriod + 1)
+          const res = await aaveRouter.getCoolDownStatus();
+          assert.equal(res.status, COOLDOWN_STATUS.UNSTAKE_WINDOW);
+          assert.equal(res.coolDownFinishesAt, cooldownActivatedAt + cooldownPeriod);
+          assert.equal(res.unstakeFinishesAt, cooldownActivatedAt + cooldownPeriod + unstakeWindow);
+        });
+
+        it('should be COOLDOWN immediately after activating cooldown', async () => {
+          await time.increase(1)
+          const res = await aaveRouter.getCoolDownStatus();
+          assert.equal(res.status, COOLDOWN_STATUS.COOLDOWN);
+          assert.equal(res.coolDownFinishesAt, cooldownActivatedAt + cooldownPeriod);
+          assert.equal(res.unstakeFinishesAt, cooldownActivatedAt + cooldownPeriod + unstakeWindow);
+        });
       });
     });
 
@@ -363,6 +618,42 @@ describe('AaveRouter Tests', () => {
         await time.increase(1);
         await router.claimRewards({ from: bob });
         await expectRevert(router.distributeRewards({ from: bob }), 'MISSING_REWARD_POOLS');
+      });
+
+      it('should correctly distribute pvpFee', async () => {
+        const poolA = await MockGulpingBPool.new();
+        const poolB = await MockGulpingBPool.new();
+        const router = await AavePowerIndexRouter.new(
+          piAave.address,
+          buildBasicRouterConfig(
+            poolRestrictions.address,
+            constants.ZERO_ADDRESS,
+            stakedAave.address,
+            ether('0.2'),
+            '0',
+            pvp,
+            0,
+            [poolA.address, poolB.address],
+          ),
+          buildAaveRouterConfig(
+            aave.address
+          ),
+        );
+
+        await piAave.transfer(poolA.address, 10, { from: alice });
+        await piAave.transfer(poolB.address, 20, { from: alice });
+
+        await aaveRouter.migrateToNewRouter(piAave.address, router.address, { from: piGov });
+        await time.increase(1);
+        await router.claimRewards({ from: bob });
+        const res = await router.distributeRewards({ from: bob });
+
+        expectEvent(res, 'DistributeRewards', {
+          sender: bob,
+          pvpReward: '0',
+        });
+        assert.isTrue(parseInt(res.logs[3].args.poolRewardsUnderlying) > 1);
+        assert.isTrue(parseInt(res.logs[3].args.poolRewardsPi.length) > 1);
       });
     });
 
