@@ -107,7 +107,6 @@ describe('AaveRouter Tests', () => {
 
       //////////////////////////
       // Step #2. Withdraw 0.5K
-      await piAave.approve(piAave.address, ether(500), { from: alice });
       res = await piAave.withdraw(ether(500), { from: alice });
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
@@ -127,7 +126,6 @@ describe('AaveRouter Tests', () => {
 
       ///////////////////////////////////////////////////////
       // Step #3. Withdraw 0.5K - waiting for a COOLDOWN ends
-      await piAave.approve(piAave.address, ether(500), { from: alice });
       res = await piAave.withdraw(ether(500), { from: alice });
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
@@ -148,7 +146,6 @@ describe('AaveRouter Tests', () => {
 
       //////////////////////////////////////////////////////////
       // Step #4. Withdraw 0.5K - while within an UNSTAKE_WINDOW
-      await piAave.approve(piAave.address, ether(500), { from: alice });
       res = await piAave.withdraw(ether(500), { from: alice });
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
@@ -164,7 +161,6 @@ describe('AaveRouter Tests', () => {
 
       //////////////////////////////////////////////////////////
       // Step #5. Withdraw 0.5K - while within an UNSTAKE_WINDOW
-      await piAave.approve(piAave.address, ether(500), { from: alice });
       res = await piAave.withdraw(ether(500), { from: alice });
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');

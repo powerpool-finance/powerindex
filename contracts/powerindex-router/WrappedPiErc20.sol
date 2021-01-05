@@ -78,8 +78,7 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
     uint256 burnAmount = getPiEquivalentForUnderlying(_withdrawAmount);
     require(burnAmount > 0, "ZERO_PI_FOR_BURN");
 
-    ERC20(address(this)).transferFrom(_msgSender(), address(this), burnAmount);
-    _burn(address(this), burnAmount);
+    _burn(_msgSender(), burnAmount);
     underlying.safeTransfer(_msgSender(), _withdrawAmount);
 
     emit Withdraw(_msgSender(), _withdrawAmount, burnAmount);

@@ -277,7 +277,6 @@ describe('WrappedPiErc20 Unit Tests', () => {
         assert.equal(await yfi.balanceOf(piYfi.address), ether(42));
         assert.equal(await piYfi.balanceOf(alice), ether(42));
 
-        await piYfi.approve(piYfi.address, ether(42), { from: alice });
         const res = await piYfi.withdraw(ether(42), { from: alice });
 
         expectEvent(res, 'Withdraw', {
@@ -294,15 +293,14 @@ describe('WrappedPiErc20 Unit Tests', () => {
       });
 
       it('should call the router callback with the returned amount', async () => {
-        await piYfi.approve(piYfi.address, ether(42), { from: alice });
         const res = await piYfi.withdraw(ether(42), { from: alice });
         await expectEvent.inTransaction(res.tx, MockRouter, 'MockWrapperCallback', {
           withdrawAmount: ether(42),
         });
       });
 
-      it('should revert if there isn not enough approval', async () => {
-        await expectRevert(piYfi.withdraw(ether(42), { from: alice }), 'ERC20: transfer amount exceeds allowance');
+      it('should revert if there isn not enough balance', async () => {
+        await expectRevert(piYfi.withdraw(ether(43), { from: alice }), 'ERC20: burn amount exceeds balance');
       });
 
       it('should deny withdrawing 0', async () => {
@@ -320,7 +318,6 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
         assert.equal(await web3.eth.getBalance(router.address), 0);
 
-        await piYfi.approve(piYfi.address, ether(42), { from: alice });
         await expectRevert(piYfi.withdraw(ether(42), { from: alice }), 'FEE');
 
         const res = await piYfi.withdraw(ether(42), { from: alice, value: ethFee });
@@ -356,7 +353,6 @@ describe('WrappedPiErc20 Unit Tests', () => {
         await piYfi.transfer(bob, ether(120), { from: alice });
 
         // Withdraw
-        await piYfi.approve(piYfi.address, ether(120), { from: bob });
         const res = await piYfi.withdraw(ether(100), { from: bob });
 
         expectEvent(res, 'Withdraw', {
@@ -381,7 +377,6 @@ describe('WrappedPiErc20 Unit Tests', () => {
         await piYfi.transfer(bob, ether(62.5), { from: alice });
 
         // Withdraw
-        await piYfi.approve(piYfi.address, ether(62.5), { from: bob });
         const res = await piYfi.withdraw(ether(100), { from: bob });
 
         expectEvent(res, 'Withdraw', {
@@ -407,7 +402,6 @@ describe('WrappedPiErc20 Unit Tests', () => {
         await piYfi.transfer(bob, ether(200), { from: alice });
 
         // Withdraw
-        await piYfi.approve(piYfi.address, ether(200), { from: bob });
         const res = await piYfi.withdraw(ether(100), { from: bob });
 
         expectEvent(res, 'Withdraw', {
@@ -432,7 +426,6 @@ describe('WrappedPiErc20 Unit Tests', () => {
         await piYfi.transfer(bob, ether(100), { from: alice });
 
         // Withdraw
-        await piYfi.approve(piYfi.address, ether(100), { from: bob });
         const res = await piYfi.withdraw(ether(200), { from: bob });
 
         expectEvent(res, 'Withdraw', {

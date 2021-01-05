@@ -96,7 +96,6 @@ describe('PowerIndex BasicRouter Test', () => {
 
       assert.equal(await piToken.router(), router2.address);
 
-      await piToken.approve(piToken.address, ether('100'), { from: alice });
       await piToken.withdraw(ether('100'), { from: alice });
 
       assert.equal(await piToken.totalSupply(), ether('0'));
