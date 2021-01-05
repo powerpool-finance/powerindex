@@ -5,11 +5,13 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface WrappedPiErc20Interface is IERC20 {
-  function deposit(uint256 _amount) external returns (uint256);
+  function deposit(uint256 _amount) external payable returns (uint256);
 
-  function withdraw(uint256 _amount) external returns (uint256);
+  function withdraw(uint256 _amount) external payable returns (uint256);
 
   function changeRouter(address _newRouter) external;
+
+  function setEthFee(uint256 _newEthFee) external;
 
   function approveUnderlying(address _to, uint256 _amount) external;
 
