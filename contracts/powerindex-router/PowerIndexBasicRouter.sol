@@ -102,6 +102,11 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     emit SetPvpFee(_pvpFee);
   }
 
+  function setPiTokenEthFee(uint256 _ethFee) external onlyOwner {
+    require(_ethFee < 0.1 ether, "ETH_FEE_OVER_THE_LIMIT");
+    piToken.setEthFee(_ethFee);
+  }
+
   function _callVoting(bytes4 _sig, bytes memory _data) internal {
     piToken.callExternal(voting, _sig, _data, 0);
   }

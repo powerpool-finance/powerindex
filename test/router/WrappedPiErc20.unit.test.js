@@ -25,11 +25,11 @@ function signatureAndArgs(payload) {
 }
 
 describe('WrappedPiErc20 Unit Tests', () => {
-  let alice, bob, stub, mockStaking;
+  let owner, alice, bob, stub, mockStaking;
   let yfi, router, piYfi, myContract, defaultBasicConfig;
 
   before(async function () {
-    [, alice, bob, stub, mockStaking] = await web3.eth.getAccounts();
+    [owner, alice, bob, stub, mockStaking] = await web3.eth.getAccounts();
     myContract = await MyContract.new();
     defaultBasicConfig = buildBasicRouterConfig(
       stub,
@@ -166,6 +166,42 @@ describe('WrappedPiErc20 Unit Tests', () => {
       await expectRevert(piYfi.deposit(ether(0), { from: alice }), 'ZERO_DEPOSIT');
     });
 
+    it('should take fee if set', async () => {
+      assert.equal(await piYfi.ethFee(), ether(0));
+
+      const ethFee = ether(0.001);
+
+      await router.setPiTokenEthFee(ethFee, { from: owner });
+
+      assert.equal(await piYfi.ethFee(), ethFee);
+
+      await yfi.approve(piYfi.address, ether(42), { from: alice });
+      await expectRevert(piYfi.deposit(ether(42), { from: alice }), 'FEE');
+
+      const res = await piYfi.deposit(ether(42), { from: alice, value: ethFee });
+
+      expectEvent(res, 'Deposit', {
+        account: alice,
+        undelyingDeposited: ether(42),
+        piMinted: ether(42),
+      });
+
+      assert.equal(await yfi.balanceOf(alice), ether(9958));
+      assert.equal(await yfi.balanceOf(piYfi.address), ether(42));
+
+      assert.equal(await piYfi.totalSupply(), ether(42));
+      assert.equal(await piYfi.balanceOf(alice), ether(42));
+
+      await piYfi.approve(piYfi.address, ether(42), { from: alice });
+      await expectRevert(piYfi.withdraw(ether(42), { from: alice }), 'FEE');
+
+      await piYfi.withdraw(ether(42), { from: alice, value: ethFee });
+      assert.equal(await yfi.balanceOf(alice), ether(10000));
+      assert.equal(await yfi.balanceOf(piYfi.address), ether(0));
+      assert.equal(await piYfi.totalSupply(), ether(0));
+      assert.equal(await piYfi.balanceOf(alice), ether(0));
+    });
+
     describe('imbalanced router', () => {
       beforeEach(async () => {
         assert.equal(await yfi.balanceOf(alice), ether(10000));
@@ -275,6 +311,32 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
       it('should deny withdrawing 0', async () => {
         await expectRevert(piYfi.withdraw(ether(0), { from: alice }), 'ZERO_WITHDRAWAL');
+      });
+
+      it('should take fee if set', async () => {
+        assert.equal(await piYfi.ethFee(), ether(0));
+
+        const ethFee = ether(0.001);
+
+        await router.setPiTokenEthFee(ethFee, { from: owner });
+
+        assert.equal(await piYfi.ethFee(), ethFee);
+
+        await piYfi.approve(piYfi.address, ether(42), { from: alice });
+        await expectRevert(piYfi.withdraw(ether(42), { from: alice }), 'FEE');
+
+        const res = await piYfi.withdraw(ether(42), { from: alice, value: ethFee });
+        expectEvent(res, 'Withdraw', {
+          account: alice,
+          underlyingWithdrawn: ether(42),
+          piBurned: ether(42),
+        });
+
+        assert.equal(await yfi.balanceOf(alice), ether(10000));
+        assert.equal(await yfi.balanceOf(piYfi.address), ether(0));
+
+        assert.equal(await piYfi.totalSupply(), ether(0));
+        assert.equal(await piYfi.balanceOf(alice), ether(0));
       });
     });
 
@@ -401,6 +463,12 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
       it('should deny calling the method from non-router address', async () => {
         await expectRevert(piYfi.changeRouter(alice, { from: alice }), 'ONLY_ROUTER');
+      });
+    });
+
+    describe('setEthFee', async () => {
+      it('should deny calling the method from non-router address', async () => {
+        await expectRevert(piYfi.setEthFee(ether(0.1), { from: alice }), 'ONLY_ROUTER');
       });
     });
 
