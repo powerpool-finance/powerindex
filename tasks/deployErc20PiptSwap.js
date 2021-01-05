@@ -1,6 +1,6 @@
 require('@nomiclabs/hardhat-truffle5');
 
-task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async () => {
+task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async (__, { network }) => {
   const Erc20PiptSwap = await artifacts.require('Erc20PiptSwap');
   const PowerIndexPool = await artifacts.require('PowerIndexPool');
 
@@ -42,8 +42,7 @@ task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async () => {
 
   await erc20PiptSwap.transferOwnership(admin, sendOptions);
 
-  const networkId = await web3.eth.net.getId();
-  if (networkId === 1) {
+  if (network.name !== 'mainnetfork') {
     return;
   }
   const UniswapV2Router02 = await artifacts.require('UniswapV2Router02');

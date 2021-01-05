@@ -242,6 +242,59 @@ function buildEndpoint(endpoint) {
     }
   }
 
+async function forkReplacePoolTokenWithNewPiToken(
+  artifacts,
+  ethers,
+  controller,
+  tokenAddress,
+  factoryAddress,
+  routerArgs,
+  admin
+) {
+  const MockERC20 = await artifacts.require('MockERC20');
+  const token = await MockERC20.at(tokenAddress);
+  const PowerIndexPool = await artifacts.require('PowerIndexPool');
+  const WrappedPiErc20 = await artifacts.require('WrappedPiErc20');
+  const AavePowerIndexRouter = await artifacts.require('AavePowerIndexRouter');
+  const pool = await PowerIndexPool.at(await callContract(controller, 'pool'))
+  console.log('pool getBalance before', await callContract(pool, 'getBalance', [token.address]));
+
+  await pool.setController(controller.address, {from: admin});
+
+  const res = await controller.replacePoolTokenWithNewPiToken(
+    tokenAddress,
+    factoryAddress,
+    routerArgs,
+    'Wrapped TOKEN',
+    'WTOKEN',
+    {from: admin}
+  );
+
+  const wrappedTokenAddress = res.logs.filter(l => l.event === 'CreatePiToken')[0].args.piToken;
+  const wrappedToken = await WrappedPiErc20.at(wrappedTokenAddress);
+  const router = await AavePowerIndexRouter.at(await callContract(wrappedToken, 'router', []));
+
+  await increaseTime(60);
+
+  await controller.finishReplace();
+
+  await wrappedToken.pokeRouter();
+
+  console.log('await callContract(pool, "isBound", [token])', await callContract(pool, 'isBound', [tokenAddress]));
+  console.log('await callContract(pool, "isBound", [wrappedTokenAddress])', await callContract(pool, 'isBound', [wrappedTokenAddress]));
+
+  return {
+    token,
+    wrappedToken,
+    router
+  }
+}
+
+function callContract(contract, method, args = []) {
+  console.log(method, args);
+  return contract.contract.methods[method].apply(contract.contract, args).call();
+}
+
 module.exports = {
   deployProxied,
   createOrGetProxyAdmin,
@@ -256,8 +309,10 @@ module.exports = {
   getResTimestamp,
   forkContractUpgrade,
   deployAndSaveArgs,
-  impersonateAccount,
   increaseTime,
   increaseTimeTo,
-  evmSetNextBlockTimestamp: buildEndpoint('evm_setNextBlockTimestamp')
+  evmSetNextBlockTimestamp: buildEndpoint('evm_setNextBlockTimestamp'),
+  impersonateAccount,
+  callContract,
+  forkReplacePoolTokenWithNewPiToken
 }

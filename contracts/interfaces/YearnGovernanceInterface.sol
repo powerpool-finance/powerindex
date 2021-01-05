@@ -22,4 +22,6 @@ interface YearnGovernanceInterface {
   function balanceOf(address) external view returns (uint256);
 
   function voteLock(address) external view returns (uint256);
+
+  function earned(address) external view returns (uint256);
 }

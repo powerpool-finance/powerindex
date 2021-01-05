@@ -6,9 +6,15 @@ interface IStakedAave {
 
   function COOLDOWN_SECONDS() external view returns (uint256);
 
+  function balanceOf(address acc) external view returns (uint256);
+
   function stakersCooldowns(address staker) external view returns (uint256);
 
   function getTotalRewardsBalance(address staker) external view returns (uint256);
+
+  function stakerRewardsToClaim(address staker) external view returns (uint256);
+
+  function getUserAssetData(address staker, address asset) external view returns (uint256);
 
   function stake(address to, uint256 amount) external;
 
