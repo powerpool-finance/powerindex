@@ -233,7 +233,6 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     address piToken = piTokenByUnderlying[underlyingToken];
 
     if (piToken != address(0)) {
-      WrappedPiErc20Interface(piToken).approve(piToken, amount);
       WrappedPiErc20Interface(piToken).withdraw(amount);
     }
 

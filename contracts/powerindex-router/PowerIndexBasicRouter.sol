@@ -71,6 +71,8 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     rewardPools = _basicConfig.rewardPools;
   }
 
+  receive() external payable {}
+
   /*** OWNER METHODS ***/
 
   /**
@@ -100,6 +102,17 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     require(_pvpFee < HUNDRED_PCT, "PVP_FEE_OVER_THE_LIMIT");
     pvpFee = _pvpFee;
     emit SetPvpFee(_pvpFee);
+  }
+
+  function setPiTokenEthFee(uint256 _ethFee) external onlyOwner {
+    require(_ethFee <= 0.1 ether, "ETH_FEE_OVER_THE_LIMIT");
+    piToken.setEthFee(_ethFee);
+  }
+
+  function migrateToNewRouter(address _piToken, address payable _newRouter) public override onlyOwner {
+    super.migrateToNewRouter(_piToken, _newRouter);
+
+    _newRouter.transfer(address(this).balance);
   }
 
   function _callVoting(bytes4 _sig, bytes memory _data) internal {

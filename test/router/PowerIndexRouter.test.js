@@ -59,11 +59,23 @@ describe('PowerIndex BasicRouter Test', () => {
   });
 
   describe('changeRouter()', () => {
-    it('should allow swapping a token with a new version', async () => {
+    it('should correctly migrate to new router and allow swapping a token with a new version', async () => {
       const token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
       const piToken = await WrappedPiErc20.new(token.address, stub, 'piToken', 'piTKN');
       const router = await PowerIndexBasicRouter.new(piToken.address, defaultBasicConfig);
       const router2 = await PowerIndexBasicRouter.new(piToken.address, defaultBasicConfig);
+
+      assert.equal(await web3.eth.getBalance(router.address), ether(0));
+
+      const receivedFee = ether(0.1);
+      await web3.eth.sendTransaction({
+        to: router.address,
+        from: deployer,
+        value: receivedFee
+      })
+
+      assert.equal(await web3.eth.getBalance(router.address), receivedFee);
+      assert.equal(await web3.eth.getBalance(router2.address), ether(0));
 
       await piToken.changeRouter(router.address, { from: stub });
 
@@ -79,9 +91,11 @@ describe('PowerIndex BasicRouter Test', () => {
       await expectRevert(piToken.changeRouter(bob), 'ONLY_ROUTER');
       await router.migrateToNewRouter(piToken.address, router2.address);
 
+      assert.equal(await web3.eth.getBalance(router2.address), receivedFee);
+      assert.equal(await web3.eth.getBalance(router.address), ether(0));
+
       assert.equal(await piToken.router(), router2.address);
 
-      await piToken.approve(piToken.address, ether('100'), { from: alice });
       await piToken.withdraw(ether('100'), { from: alice });
 
       assert.equal(await piToken.totalSupply(), ether('0'));

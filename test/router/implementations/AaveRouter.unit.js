@@ -294,13 +294,9 @@ describe('AaveRouter Tests', () => {
         });
 
         it('it should stake the excess of funds while in the COOLDOWN period', async () => {
-          await piAave.approve(piAave.address, ether(500), { from: alice });
           await piAave.withdraw(ether(500), { from: alice });
-          await piAave.approve(piAave.address, ether(500), { from: alice });
           await piAave.withdraw(ether(500), { from: alice });
-          await piAave.approve(piAave.address, ether(500), { from: alice });
           await piAave.withdraw(ether(500), { from: alice });
-          await piAave.approve(piAave.address, ether(500), { from: alice });
           await piAave.withdraw(ether(500), { from: alice });
 
           assert.equal((await aaveRouter.getCoolDownStatus()).status, COOLDOWN_STATUS.COOLDOWN);
@@ -321,7 +317,6 @@ describe('AaveRouter Tests', () => {
         assert.equal(await aave.balanceOf(stakedAave.address), ether(42800));
 
         // 2nd
-        await piAave.approve(piAave.address, ether(50), { from: alice });
         await piAave.withdraw(ether(50), { from: alice });
 
         // The router has partially staked the deposit with regard to the reserve ration value (20/80)
@@ -346,7 +341,6 @@ describe('AaveRouter Tests', () => {
       assert.equal(await piAave.balanceOf(alice), ether(10000));
       assert.equal(await piAave.totalSupply(), ether(10000));
 
-      await piAave.approve(piAave.address, ether(1000), { from: alice });
       const res = await piAave.withdraw(ether(1000), { from: alice });
       await expectEvent.inTransaction(res.tx, aaveRouter, 'IgnoreDueMissingStaking');
 
@@ -385,7 +379,6 @@ describe('AaveRouter Tests', () => {
       it('should trigger cooldown on withdrawal if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(61));
 
-        await piAave.approve(piAave.address, ether(1000), { from: alice });
         const res = await piAave.withdraw(ether(1000), { from: alice });
         await expectEvent.notEmitted.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing');
         await expectEvent.inTransaction(res.tx, stakedAave, 'Cooldown', {
@@ -401,7 +394,6 @@ describe('AaveRouter Tests', () => {
         await aaveRouter.triggerCooldown({ from: piGov });
         await time.increase(cooldownPeriod + 1);
 
-        await piAave.approve(piAave.address, ether(1000), { from: alice });
         const res = await piAave.withdraw(ether(1000), { from: alice });
         await expectEvent.notEmitted.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing');
 
@@ -430,7 +422,6 @@ describe('AaveRouter Tests', () => {
       it('should NOT rebalance on withdrawal if the rebalancing interval has not passed', async () => {
         await time.increase(time.duration.minutes(59));
 
-        await piAave.approve(piAave.address, ether(1000), { from: alice });
         const res = await piAave.withdraw(ether(1000), { from: alice });
         const now = await getResTimestamp(res);
         await expectEvent.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing', {
@@ -465,7 +456,6 @@ describe('AaveRouter Tests', () => {
           await piAave.deposit(ether(1000), { from: alice });
           await time.increase(1);
 
-          await piAave.approve(piAave.address, ether(200), { from: alice });
           let res = await piAave.withdraw(ether(200), { from: alice });
           await expectEvent.inTransaction(res.tx, StakedAaveV2, 'Cooldown', {
             user: piAave.address

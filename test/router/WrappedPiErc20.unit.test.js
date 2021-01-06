@@ -25,11 +25,11 @@ function signatureAndArgs(payload) {
 }
 
 describe('WrappedPiErc20 Unit Tests', () => {
-  let alice, bob, stub, mockStaking;
+  let owner, alice, bob, stub, mockStaking;
   let yfi, router, piYfi, myContract, defaultBasicConfig;
 
-  before(async function () {
-    [, alice, bob, stub, mockStaking] = await web3.eth.getAccounts();
+  beforeEach(async function () {
+    [owner, alice, bob, stub, mockStaking] = await web3.eth.getAccounts();
     myContract = await MyContract.new();
     defaultBasicConfig = buildBasicRouterConfig(
       stub,
@@ -83,11 +83,44 @@ describe('WrappedPiErc20 Unit Tests', () => {
       });
     });
 
+    it('should call the multiple external methods', async () => {
+      await myContract.transferOwnership(piYfi.address);
+      const payload = splitPayload(myContract.contract.methods.setAnswer(42).encodeABI());
+      const payload2 = splitPayload(myContract.contract.methods.setAnswer2(24).encodeABI());
+
+      assert.equal(await myContract.getAnswer(), 0);
+      await piYfi.callExternalMultiple([{
+        destination: myContract.address,
+        signature: payload.signature,
+        args: payload.calldata,
+        value: 0,
+      },{
+        destination: myContract.address,
+        signature: payload2.signature,
+        args: payload2.calldata,
+        value: 0,
+      }], {
+        from: alice,
+      });
+      assert.equal(await myContract.getAnswer(), 42);
+      assert.equal(await myContract.getAnswer2(), 24);
+    });
+
     it('should deny non-router calling the method', async () => {
       const payload = splitPayload(myContract.contract.methods.setAnswer(42).encodeABI());
 
       await expectExactRevert(
         piYfi.callExternal(myContract.address, payload.signature, payload.calldata, 0, { from: alice }),
+        'Ownable: caller is not the owner',
+      );
+
+      await expectExactRevert(
+        piYfi.callExternalMultiple([{
+          destination: myContract.address,
+          signature: payload.signature,
+          args: payload.calldata,
+          value: 0,
+        }], { from: alice }),
         'Ownable: caller is not the owner',
       );
     });
@@ -164,6 +197,38 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
     it('should deny depositing 0', async () => {
       await expectRevert(piYfi.deposit(ether(0), { from: alice }), 'ZERO_DEPOSIT');
+    });
+
+    it('should take fee if set', async () => {
+      assert.equal(await piYfi.ethFee(), ether(0));
+
+      const ethFee = ether(0.001);
+
+      await router.setPiTokenEthFee(ethFee, { from: owner });
+
+      assert.equal(await piYfi.ethFee(), ethFee);
+
+      await yfi.approve(piYfi.address, ether(42), { from: alice });
+      await expectRevert(piYfi.deposit(ether(42), { from: alice }), 'FEE');
+
+      assert.equal(await web3.eth.getBalance(router.address), 0);
+
+      const res = await piYfi.deposit(ether(42), { from: alice, value: ethFee });
+
+      expectEvent(res, 'Deposit', {
+        account: alice,
+        undelyingDeposited: ether(42),
+        piMinted: ether(42),
+      });
+
+      assert.equal(await yfi.balanceOf(alice), ether(9958));
+      assert.equal(await yfi.balanceOf(piYfi.address), ether(42));
+
+      assert.equal(await piYfi.totalSupply(), ether(42));
+      assert.equal(await piYfi.balanceOf(alice), ether(42));
+
+      assert.equal(await web3.eth.getBalance(piYfi.address), 0);
+      assert.equal(await web3.eth.getBalance(router.address), ethFee);
     });
 
     describe('imbalanced router', () => {
@@ -245,7 +310,6 @@ describe('WrappedPiErc20 Unit Tests', () => {
         assert.equal(await yfi.balanceOf(piYfi.address), ether(42));
         assert.equal(await piYfi.balanceOf(alice), ether(42));
 
-        await piYfi.approve(piYfi.address, ether(42), { from: alice });
         const res = await piYfi.withdraw(ether(42), { from: alice });
 
         expectEvent(res, 'Withdraw', {
@@ -262,19 +326,48 @@ describe('WrappedPiErc20 Unit Tests', () => {
       });
 
       it('should call the router callback with the returned amount', async () => {
-        await piYfi.approve(piYfi.address, ether(42), { from: alice });
         const res = await piYfi.withdraw(ether(42), { from: alice });
         await expectEvent.inTransaction(res.tx, MockRouter, 'MockWrapperCallback', {
           withdrawAmount: ether(42),
         });
       });
 
-      it('should revert if there isn not enough approval', async () => {
-        await expectRevert(piYfi.withdraw(ether(42), { from: alice }), 'ERC20: transfer amount exceeds allowance');
+      it('should revert if there isn not enough balance', async () => {
+        await expectRevert(piYfi.withdraw(ether(43), { from: alice }), 'ERC20: burn amount exceeds balance');
       });
 
       it('should deny withdrawing 0', async () => {
         await expectRevert(piYfi.withdraw(ether(0), { from: alice }), 'ZERO_WITHDRAWAL');
+      });
+
+      it('should take fee if set', async () => {
+        assert.equal(await piYfi.ethFee(), ether(0));
+
+        const ethFee = ether(0.001);
+
+        await router.setPiTokenEthFee(ethFee, { from: owner });
+
+        assert.equal(await piYfi.ethFee(), ethFee);
+
+        assert.equal(await web3.eth.getBalance(router.address), 0);
+
+        await expectRevert(piYfi.withdraw(ether(42), { from: alice }), 'FEE');
+
+        const res = await piYfi.withdraw(ether(42), { from: alice, value: ethFee });
+        expectEvent(res, 'Withdraw', {
+          account: alice,
+          underlyingWithdrawn: ether(42),
+          piBurned: ether(42),
+        });
+
+        assert.equal(await yfi.balanceOf(alice), ether(10000));
+        assert.equal(await yfi.balanceOf(piYfi.address), ether(0));
+
+        assert.equal(await piYfi.totalSupply(), ether(0));
+        assert.equal(await piYfi.balanceOf(alice), ether(0));
+
+        assert.equal(await web3.eth.getBalance(router.address), ethFee);
+        assert.equal(await web3.eth.getBalance(piYfi.address), 0);
       });
     });
 
@@ -293,7 +386,6 @@ describe('WrappedPiErc20 Unit Tests', () => {
         await piYfi.transfer(bob, ether(120), { from: alice });
 
         // Withdraw
-        await piYfi.approve(piYfi.address, ether(120), { from: bob });
         const res = await piYfi.withdraw(ether(100), { from: bob });
 
         expectEvent(res, 'Withdraw', {
@@ -318,7 +410,6 @@ describe('WrappedPiErc20 Unit Tests', () => {
         await piYfi.transfer(bob, ether(62.5), { from: alice });
 
         // Withdraw
-        await piYfi.approve(piYfi.address, ether(62.5), { from: bob });
         const res = await piYfi.withdraw(ether(100), { from: bob });
 
         expectEvent(res, 'Withdraw', {
@@ -344,7 +435,6 @@ describe('WrappedPiErc20 Unit Tests', () => {
         await piYfi.transfer(bob, ether(200), { from: alice });
 
         // Withdraw
-        await piYfi.approve(piYfi.address, ether(200), { from: bob });
         const res = await piYfi.withdraw(ether(100), { from: bob });
 
         expectEvent(res, 'Withdraw', {
@@ -369,7 +459,6 @@ describe('WrappedPiErc20 Unit Tests', () => {
         await piYfi.transfer(bob, ether(100), { from: alice });
 
         // Withdraw
-        await piYfi.approve(piYfi.address, ether(100), { from: bob });
         const res = await piYfi.withdraw(ether(200), { from: bob });
 
         expectEvent(res, 'Withdraw', {
@@ -401,6 +490,12 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
       it('should deny calling the method from non-router address', async () => {
         await expectRevert(piYfi.changeRouter(alice, { from: alice }), 'ONLY_ROUTER');
+      });
+    });
+
+    describe('setEthFee', async () => {
+      it('should deny calling the method from non-router address', async () => {
+        await expectRevert(piYfi.setEthFee(ether(0.1), { from: alice }), 'ONLY_ROUTER');
       });
     });
 
@@ -445,6 +540,13 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
       it('should deny calling the method from non-router address', async () => {
         await expectRevert(piYfi.callExternal(alice, signature, args, 0, { from: alice }), 'ONLY_ROUTER');
+
+        await expectRevert(piYfi.callExternalMultiple([{
+          destination: alice,
+          signature: signature,
+          args: args,
+          value: 0,
+        }], { from: alice }), 'ONLY_ROUTER');
       });
     });
   });

@@ -311,7 +311,6 @@ describe('YearnRouter Tests', () => {
     it('should decrease reserve on withdrawal', async () => {
       assert.equal(await piYfi.balanceOf(alice), ether(10000));
 
-      await piYfi.approve(piYfi.address, ether(1000), { from: alice });
       await piYfi.withdraw(ether(1000), { from: alice });
 
       assert.equal(await piYfi.balanceOf(alice), ether(9000));
@@ -329,7 +328,6 @@ describe('YearnRouter Tests', () => {
       assert.equal(await piYfi.balanceOf(alice), ether(10000));
       assert.equal(await piYfi.totalSupply(), ether(10000));
 
-      await piYfi.approve(piYfi.address, ether(1000), { from: alice });
       const res = await piYfi.withdraw(ether(1000), { from: alice });
       await expectEvent.inTransaction(res.tx, yfiRouter, 'IgnoreDueMissingStaking');
 
@@ -358,7 +356,6 @@ describe('YearnRouter Tests', () => {
       it('should DO rebalance on withdrawal if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(61));
 
-        await piYfi.approve(piYfi.address, ether(1000), { from: alice });
         const res = await piYfi.withdraw(ether(1000), { from: alice });
         await expectEvent.notEmitted.inTransaction(res.tx, yfiRouter, 'IgnoreRebalancing');
 
@@ -387,7 +384,6 @@ describe('YearnRouter Tests', () => {
       it('should NOT rebalance on withdrawal if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(59));
 
-        await piYfi.approve(piYfi.address, ether(1000), { from: alice });
         const res = await piYfi.withdraw(ether(1000), { from: alice });
         const now = await getResTimestamp(res);
         await expectEvent.inTransaction(res.tx, yfiRouter, 'IgnoreRebalancing', {
@@ -412,7 +408,6 @@ describe('YearnRouter Tests', () => {
       });
 
       it('should not decrease reserve if vote is locked', async () => {
-        await piYfi.approve(piYfi.address, ether(1000), { from: alice });
         const res = await piYfi.withdraw(ether(1000), { from: alice });
 
         await expectEvent.inTransaction(res.tx, yfiRouter, 'IgnoreRedeemDueVoteLock');
@@ -423,7 +418,6 @@ describe('YearnRouter Tests', () => {
       });
 
       it('should revert if there is not enough funds in reserve', async () => {
-        await piYfi.approve(piYfi.address, ether(3000), { from: alice });
         await expectRevert(piYfi.withdraw(ether(3000), { from: alice }), 'ERC20: transfer amount exceeds balance');
       });
     });
