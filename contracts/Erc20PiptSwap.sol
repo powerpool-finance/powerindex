@@ -36,8 +36,9 @@ contract Erc20PiptSwap is EthPiptSwap {
     address _weth,
     address _cvp,
     address _pipt,
+    address _piptWrapper,
     address _feeManager
-  ) public EthPiptSwap(_weth, _cvp, _pipt, _feeManager) {}
+  ) public EthPiptSwap(_weth, _cvp, _pipt, _piptWrapper, _feeManager) {}
 
   function swapErc20ToPipt(
     address _swapToken,
@@ -51,8 +52,8 @@ contract Erc20PiptSwap is EthPiptSwap {
     IERC20(_swapToken).safeTransfer(address(tokenPair), _swapAmount);
     tokenPair.swap(isInverse ? ethAmount : uint256(0), isInverse ? uint256(0) : ethAmount, address(this), new bytes(0));
 
-    (, uint256 ethSwapAmount) = calcEthFee(ethAmount);
     address[] memory tokens = pipt.getCurrentTokens();
+    (, uint256 ethSwapAmount) = calcEthFee(ethAmount, getWrapFee(tokens));
     (, , poolAmountOut) = calcSwapEthToPiptInputs(ethSwapAmount, tokens, _slippage);
 
     _swapWethToPiptByPoolOut(ethAmount, poolAmountOut);
@@ -93,8 +94,9 @@ contract Erc20PiptSwap is EthPiptSwap {
     )
   {
     uint256 ethAmount = getAmountOutForUniswapValue(_uniswapPairFor(_swapToken), _swapAmount, true);
+
     if (_withFee) {
-      (, ethAmount) = calcEthFee(ethAmount);
+      (, ethAmount) = calcEthFee(ethAmount, getWrapFee(_tokens));
     }
     return calcSwapEthToPiptInputs(ethAmount, _tokens, _slippage);
   }
@@ -134,7 +136,7 @@ contract Erc20PiptSwap is EthPiptSwap {
 
     (tokensOutPipt, ethOutUniswap, totalEthOut, poolAmountFee) = calcSwapPiptToEthInputs(_poolAmountIn, _tokens);
     if (_withFee) {
-      (, totalEthOut) = calcEthFee(totalEthOut);
+      (, totalEthOut) = calcEthFee(totalEthOut, getWrapFee(_tokens));
     }
     totalErc20Out = getAmountOutForUniswapValue(_uniswapPairFor(_swapToken), totalEthOut, false);
   }
@@ -153,7 +155,7 @@ contract Erc20PiptSwap is EthPiptSwap {
 
     uint256 ethAmount = getAmountOutForUniswapValue(tokenPair, _swapAmount, true);
 
-    (ethFee, ethAfterFee) = calcEthFee(ethAmount);
+    (ethFee, ethAfterFee) = calcEthFee(ethAmount, getWrapFee(pipt.getCurrentTokens()));
 
     if (ethFee != 0) {
       erc20Fee = getAmountOutForUniswapValue(tokenPair, ethFee, false);
