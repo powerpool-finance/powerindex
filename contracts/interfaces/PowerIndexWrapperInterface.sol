@@ -7,4 +7,6 @@ interface PowerIndexWrapperInterface {
     external;
 
   function setPiTokenForUnderlying(address _underlyingTokens, address _piToken) external;
+
+  function updatePiTokenEthFees(address[] calldata _underlyingTokens) external;
 }
