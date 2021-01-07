@@ -135,27 +135,11 @@ contract EthPiptSwap is Ownable {
     uint256 len = oddTokens.length;
 
     for (uint256 i = 0; i < len; i++) {
-      uint256 tokenBalance = TokenInterface(oddTokens[i]).balanceOf(address(this));
-      IUniswapV2Pair tokenPair = _uniswapPairFor(oddTokens[i]);
-
-      (uint256 tokenReserve, uint256 ethReserve, ) = tokenPair.getReserves();
-      uint256 wethOut = UniswapV2Library.getAmountOut(tokenBalance, tokenReserve, ethReserve);
-
-      TokenInterface(oddTokens[i]).safeTransfer(address(tokenPair), tokenBalance);
-
-      tokenPair.swap(uint256(0), wethOut, address(this), new bytes(0));
+      _swapTokenForWethOut(oddTokens[i], TokenInterface(oddTokens[i]).balanceOf(address(this)));
     }
 
     uint256 wethBalance = weth.balanceOf(address(this));
-
-    IUniswapV2Pair cvpPair = _uniswapPairFor(address(cvp));
-
-    (uint256 cvpReserve, uint256 ethReserve, ) = cvpPair.getReserves();
-    uint256 cvpOut = UniswapV2Library.getAmountOut(wethBalance, ethReserve, cvpReserve);
-
-    weth.safeTransfer(address(cvpPair), wethBalance);
-
-    cvpPair.swap(cvpOut, uint256(0), address(this), new bytes(0));
+    uint256 cvpOut = _swapWethForTokenOut(address(cvp), wethBalance);
 
     cvp.safeTransfer(feePayout, cvpOut);
 
@@ -240,13 +224,8 @@ contract EthPiptSwap is Ownable {
       for (uint256 i = 0; i < _tokens.length; i++) {
         // token share relatively 1 ether of first token
         calculations[i].tokenAmount = poolRatio.mul(pipt.getBalance(_tokens[i])).div(1 ether);
-
-        (calculations[i].tokenReserve, calculations[i].ethReserve, ) = _uniswapPairFor(_tokens[i]).getReserves();
-        calculations[i].ethAmount = UniswapV2Library.getAmountIn(
-          calculations[i].tokenAmount,
-          calculations[i].ethReserve,
-          calculations[i].tokenReserve
-        );
+        calculations[i].ethAmount =
+        getAmountInForUniswapValue(_uniswapPairFor(_tokens[i]), calculations[i].tokenAmount, true);
         totalEthRequired = totalEthRequired.add(calculations[i].ethAmount);
       }
     }
@@ -289,9 +268,7 @@ contract EthPiptSwap is Ownable {
     totalEthOut = 0;
     for (uint256 i = 0; i < _tokens.length; i++) {
       tokensOutPipt[i] = poolRatio.mul(pipt.getBalance(_tokens[i])).div(1 ether);
-
-      (uint256 tokenReserve, uint256 ethReserve, ) = _uniswapPairFor(_tokens[i]).getReserves();
-      ethOutUniswap[i] = UniswapV2Library.getAmountOut(tokensOutPipt[i], tokenReserve, ethReserve);
+      ethOutUniswap[i] = getAmountOutForUniswapValue(_uniswapPairFor(_tokens[i]), tokensOutPipt[i], true);
       totalEthOut = totalEthOut.add(ethOutUniswap[i]);
     }
   }
@@ -307,13 +284,8 @@ contract EthPiptSwap is Ownable {
 
     uint256 totalEthSwap = 0;
     for (uint256 i = 0; i < len; i++) {
-      IUniswapV2Pair tokenPair = _uniswapPairFor(tokens[i]);
-
-      (calculations[i].tokenReserve, calculations[i].ethReserve, ) = tokenPair.getReserves();
       tokensInPipt[i] = ratio.mul(pipt.getBalance(tokens[i])).div(1 ether);
-      totalEthSwap = UniswapV2Library
-        .getAmountIn(tokensInPipt[i], calculations[i].ethReserve, calculations[i].tokenReserve)
-        .add(totalEthSwap);
+      totalEthSwap = getAmountInForUniswapValue(_uniswapPairFor(tokens[i]), tokensInPipt[i], true).add(totalEthSwap);
     }
     return totalEthSwap.add(totalEthSwap.mul(_slippage).div(1 ether));
   }
@@ -411,13 +383,8 @@ contract EthPiptSwap is Ownable {
     for (uint256 i = 0; i < len; i++) {
       IUniswapV2Pair tokenPair = _uniswapPairFor(_tokens[i]);
 
-      (calculations[i].tokenReserve, calculations[i].ethReserve, ) = tokenPair.getReserves();
       tokensInPipt[i] = ratio.mul(pipt.getBalance(_tokens[i])).div(1 ether);
-      calculations[i].ethAmount = UniswapV2Library.getAmountIn(
-        tokensInPipt[i],
-        calculations[i].ethReserve,
-        calculations[i].tokenReserve
-      );
+      calculations[i].ethAmount = getAmountInForUniswapValue(tokenPair, tokensInPipt[i], true);
 
       weth.safeTransfer(address(tokenPair), calculations[i].ethAmount);
 
@@ -455,7 +422,6 @@ contract EthPiptSwap is Ownable {
       tokenPair.swap(uint256(0), ethOutUniswap[i], address(this), new bytes(0));
     }
 
-
     emit PiptToEthSwap(msg.sender, _poolAmountIn, poolAmountFee, ethOutAmount, ethFeeAmount);
 
     return ethOutAmount;
@@ -478,5 +444,67 @@ contract EthPiptSwap is Ownable {
     } else {
       piptWrapper.exitPool{ value: _wrapperFee }(_poolAmountIn, _minAmountsOut);
     }
+  }
+
+  function getAmountInForUniswap(
+    IUniswapV2Pair _tokenPair,
+    uint256 _swapAmount,
+    bool _isEthIn
+  ) public view returns (uint256 amountIn, bool isInverse) {
+    isInverse = uniswapEthPairToken0[address(_tokenPair)] == address(weth);
+    if (_isEthIn ? !isInverse : isInverse) {
+      (uint256 ethReserve, uint256 tokenReserve, ) = _tokenPair.getReserves();
+      amountIn = UniswapV2Library.getAmountIn(_swapAmount, tokenReserve, ethReserve);
+    } else {
+      (uint256 tokenReserve, uint256 ethReserve, ) = _tokenPair.getReserves();
+      amountIn = UniswapV2Library.getAmountIn(_swapAmount, tokenReserve, ethReserve);
+    }
+  }
+
+  function getAmountInForUniswapValue(
+    IUniswapV2Pair _tokenPair,
+    uint256 _swapAmount,
+    bool _isEthIn
+  ) public view returns (uint256 amountIn) {
+    (amountIn, ) = getAmountInForUniswap(_tokenPair, _swapAmount, _isEthIn);
+  }
+
+  function getAmountOutForUniswap(
+    IUniswapV2Pair _tokenPair,
+    uint256 _swapAmount,
+    bool _isEthOut
+  ) public view returns (uint256 amountOut, bool isInverse) {
+    isInverse = uniswapEthPairToken0[address(_tokenPair)] == address(weth);
+    if (_isEthOut ? isInverse : !isInverse) {
+      (uint256 ethReserve, uint256 tokenReserve, ) = _tokenPair.getReserves();
+      amountOut = UniswapV2Library.getAmountOut(_swapAmount, tokenReserve, ethReserve);
+    } else {
+      (uint256 tokenReserve, uint256 ethReserve, ) = _tokenPair.getReserves();
+      amountOut = UniswapV2Library.getAmountOut(_swapAmount, tokenReserve, ethReserve);
+    }
+  }
+
+  function getAmountOutForUniswapValue(
+    IUniswapV2Pair _tokenPair,
+    uint256 _swapAmount,
+    bool _isEthOut
+  ) public view returns (uint256 ethAmount) {
+    (ethAmount, ) = getAmountOutForUniswap(_tokenPair, _swapAmount, _isEthOut);
+  }
+
+  function _swapWethForTokenOut(address _erc20, uint256 _ethIn) internal returns (uint256 erc20Out) {
+    IUniswapV2Pair tokenPair = _uniswapPairFor(_erc20);
+    bool isInverse;
+    (erc20Out, isInverse) = getAmountOutForUniswap(tokenPair, _ethIn, false);
+    weth.safeTransfer(address(tokenPair), _ethIn);
+    tokenPair.swap(isInverse ? uint256(0) : erc20Out, isInverse ? erc20Out : uint256(0), address(this), new bytes(0));
+  }
+
+  function _swapTokenForWethOut(address _erc20, uint256 _erc20In) internal returns (uint256 ethOut) {
+    IUniswapV2Pair tokenPair = _uniswapPairFor(_erc20);
+    bool isInverse;
+    (ethOut, isInverse) = getAmountOutForUniswap(tokenPair, _erc20In, true);
+    IERC20(_erc20).safeTransfer(address(tokenPair), _erc20In);
+    tokenPair.swap(isInverse ? ethOut : uint256(0), isInverse ? uint256(0) : ethOut, address(this), new bytes(0));
   }
 }
