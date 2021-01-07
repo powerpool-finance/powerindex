@@ -66,13 +66,14 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     bytes calldata _routerArgs,
     string calldata _name,
     string calldata _symbol
-  ) external onlyOwner {
+  ) external payable onlyOwner {
     WrappedPiErc20Interface piToken = _createPiToken(_underlyingToken, _routerFactory, _routerArgs, _name, _symbol);
     _replacePoolTokenWithPiToken(_underlyingToken, piToken);
   }
 
   function replacePoolTokenWithExistingPiToken(address _underlyingToken, WrappedPiErc20Interface _piToken)
     external
+    payable
     onlyOwner
   {
     _replacePoolTokenWithPiToken(_underlyingToken, _piToken);
@@ -114,7 +115,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     pool.unbind(_underlyingToken);
 
     IERC20(_underlyingToken).approve(address(_piToken), balance);
-    _piToken.deposit(balance);
+    _piToken.deposit{ value: msg.value }(balance);
 
     _piToken.approve(address(pool), balance);
 
