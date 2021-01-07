@@ -47,16 +47,14 @@ contract Erc20PiptSwap is EthPiptSwap {
   ) external returns (uint256 poolAmountOut) {
     IERC20(_swapToken).safeTransferFrom(msg.sender, address(this), _swapAmount);
 
-    IUniswapV2Pair tokenPair = _uniswapPairFor(_swapToken);
-    (uint256 ethAmount, bool isInverse) = getAmountOutForUniswap(tokenPair, _swapAmount, true);
-    IERC20(_swapToken).safeTransfer(address(tokenPair), _swapAmount);
-    tokenPair.swap(isInverse ? ethAmount : uint256(0), isInverse ? uint256(0) : ethAmount, address(this), new bytes(0));
+    uint256 ethAmount = _swapTokenForEth(_swapToken, _swapAmount);
 
     address[] memory tokens = pipt.getCurrentTokens();
-    (, uint256 ethSwapAmount) = calcEthFee(ethAmount, getWrapFee(tokens));
+    uint256 wrapperFee = getWrapFee(tokens);
+    (, uint256 ethSwapAmount) = calcEthFee(ethAmount, wrapperFee);
     (, , poolAmountOut) = calcSwapEthToPiptInputs(ethSwapAmount, tokens, _slippage);
 
-    _swapWethToPiptByPoolOut(ethAmount, poolAmountOut);
+    _swapWethToPiptByPoolOut(ethAmount, poolAmountOut, tokens, wrapperFee);
 
     emit Erc20ToPiptSwap(msg.sender, _swapToken, _swapAmount, ethAmount, poolAmountOut);
   }
@@ -64,14 +62,7 @@ contract Erc20PiptSwap is EthPiptSwap {
   function swapPiptToErc20(address _swapToken, uint256 _poolAmountIn) external returns (uint256 erc20Out) {
     uint256 ethOut = _swapPiptToWeth(_poolAmountIn);
 
-    IUniswapV2Pair tokenPair = _uniswapPairFor(_swapToken);
-
-    bool isInverse;
-    (erc20Out, isInverse) = getAmountOutForUniswap(tokenPair, ethOut, false);
-
-    weth.safeTransfer(address(tokenPair), ethOut);
-
-    tokenPair.swap(isInverse ? uint256(0) : erc20Out, isInverse ? erc20Out : uint256(0), address(this), new bytes(0));
+    uint256 erc20Out = _swapEthForToken(_swapToken, ethOut);
 
     IERC20(_swapToken).safeTransfer(msg.sender, erc20Out);
 
@@ -168,7 +159,7 @@ contract Erc20PiptSwap is EthPiptSwap {
     uint256 _swapAmount,
     bool _isEthOut
   ) public view returns (uint256 ethAmount, bool isInverse) {
-    isInverse = _tokenPair.token0() == address(weth);
+    isInverse = uniswapEthPairToken0[address(_tokenPair)] == address(weth);
     if (_isEthOut ? isInverse : !isInverse) {
       (uint256 ethReserve, uint256 tokenReserve, ) = _tokenPair.getReserves();
       ethAmount = UniswapV2Library.getAmountOut(_swapAmount, tokenReserve, ethReserve);
@@ -184,5 +175,21 @@ contract Erc20PiptSwap is EthPiptSwap {
     bool _isEthOut
   ) public view returns (uint256 ethAmount) {
     (ethAmount, ) = getAmountOutForUniswap(_tokenPair, _swapAmount, _isEthOut);
+  }
+
+  function _swapEthForToken(address _erc20, uint256 _ethIn) internal returns (uint256 erc20Out) {
+    IUniswapV2Pair tokenPair = _uniswapPairFor(_erc20);
+    bool isInverse;
+    (erc20Out, isInverse) = getAmountOutForUniswap(tokenPair, _ethIn, false);
+    weth.safeTransfer(address(tokenPair), _ethIn);
+    tokenPair.swap(isInverse ? uint256(0) : erc20Out, isInverse ? erc20Out : uint256(0), address(this), new bytes(0));
+  }
+
+  function _swapTokenForEth(address _erc20, uint256 _erc20In) internal returns (uint256 ethOut) {
+    IUniswapV2Pair tokenPair = _uniswapPairFor(_erc20);
+    bool isInverse;
+    (ethOut, isInverse) = getAmountOutForUniswap(tokenPair, _erc20In, true);
+    IERC20(_erc20).safeTransfer(address(tokenPair), _erc20In);
+    tokenPair.swap(isInverse ? ethOut : uint256(0), isInverse ? uint256(0) : ethOut, address(this), new bytes(0));
   }
 }

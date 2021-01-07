@@ -32,6 +32,7 @@ contract EthPiptSwap is Ownable {
   address public feeManager;
 
   mapping(address => address) public uniswapEthPairByTokenAddress;
+  mapping(address => address) public uniswapEthPairToken0;
   mapping(address => bool) public reApproveTokens;
   uint256 public defaultSlippage;
 
@@ -107,7 +108,7 @@ contract EthPiptSwap is Ownable {
 
     weth.deposit{ value: msg.value }();
 
-    return _swapWethToPiptByPoolOut(msg.value, poolAmountOut);
+    return _swapWethToPiptByPoolOut(msg.value, poolAmountOut, tokens, wrapperFee);
   }
 
   function swapEthToPiptByPoolOut(uint256 _poolAmountOut)
@@ -117,10 +118,11 @@ contract EthPiptSwap is Ownable {
   {
     weth.deposit{ value: msg.value }();
 
-    return _swapWethToPiptByPoolOut(msg.value, _poolAmountOut);
+    address[] memory tokens = pipt.getCurrentTokens();
+    return _swapWethToPiptByPoolOut(msg.value, _poolAmountOut, tokens, getWrapFee(tokens));
   }
 
-  function swapPiptToEth(uint256 _poolAmountIn) external returns (uint256 ethOutAmount) {
+  function swapPiptToEth(uint256 _poolAmountIn) external payable returns (uint256 ethOutAmount) {
     ethOutAmount = _swapPiptToWeth(_poolAmountIn);
 
     weth.withdraw(ethOutAmount);
@@ -183,6 +185,7 @@ contract EthPiptSwap is Ownable {
     require(len == _pairs.length && len == _reapprove.length, "LENGTHS_NOT_EQUAL");
     for (uint256 i = 0; i < len; i++) {
       uniswapEthPairByTokenAddress[_tokens[i]] = _pairs[i];
+      uniswapEthPairToken0[_pairs[i]] = IUniswapV2Pair(_pairs[i]).token0();
       reApproveTokens[_tokens[i]] = _reapprove[i];
       emit SetTokenSetting(_tokens[i], _reapprove[i], _pairs[i]);
     }
@@ -191,7 +194,9 @@ contract EthPiptSwap is Ownable {
   function fetchUnswapPairsFromFactory(address _factory, address[] calldata _tokens) external onlyOwner {
     uint256 len = _tokens.length;
     for (uint256 i = 0; i < len; i++) {
-      uniswapEthPairByTokenAddress[_tokens[i]] = IUniswapV2Factory(_factory).getPair(_tokens[i], address(weth));
+      address pair = IUniswapV2Factory(_factory).getPair(_tokens[i], address(weth));
+      uniswapEthPairByTokenAddress[_tokens[i]] = pair;
+      uniswapEthPairToken0[pair] = IUniswapV2Pair(pair).token0();
     }
   }
 
@@ -350,7 +355,12 @@ contract EthPiptSwap is Ownable {
     return IUniswapV2Pair(uniswapEthPairByTokenAddress[token]);
   }
 
-  function _swapWethToPiptByPoolOut(uint256 _wethAmount, uint256 _poolAmountOut)
+  function _swapWethToPiptByPoolOut(
+    uint256 _wethAmount,
+    uint256 _poolAmountOut,
+    address[] memory tokens,
+    uint256 wrapperFee
+  )
     internal
     returns (uint256 poolAmountOutAfterFee, uint256 oddEth)
   {
@@ -363,10 +373,6 @@ contract EthPiptSwap is Ownable {
         require(pipt.totalSupply().add(_poolAmountOut) <= maxTotalSupply, "PIPT_MAX_SUPPLY");
       }
     }
-
-    address[] memory tokens = pipt.getCurrentTokens();
-
-    uint256 wrapperFee = getWrapFee(tokens);
 
     (uint256 feeAmount, uint256 swapAmount) = calcEthFee(_wethAmount, wrapperFee);
     (uint256[] memory tokensInPipt, uint256 totalEthSwap) = _prepareTokensForJoin(tokens, _poolAmountOut);
@@ -459,6 +465,9 @@ contract EthPiptSwap is Ownable {
     if (address(piptWrapper) == address(0)) {
       pipt.joinPool(_poolAmountOut, _maxAmountsIn);
     } else {
+      if (address(this).balance < _wrapperFee) {
+        weth.withdraw(_wrapperFee);
+      }
       piptWrapper.joinPool{ value: _wrapperFee }(_poolAmountOut, _maxAmountsIn);
     }
   }
