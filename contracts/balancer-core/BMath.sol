@@ -163,7 +163,7 @@ contract BMath is BConst, BNum, BMathInterface {
         uint poolAmountOut,
         uint swapFee
     )
-        public pure
+        public pure override
         returns (uint tokenAmountIn)
     {
         uint normalizedWeight = bdiv(tokenWeightIn, totalWeight);

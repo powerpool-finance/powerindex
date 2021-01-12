@@ -20,4 +20,16 @@ interface PowerIndexBasicRouterInterface {
     uint256 _totalUnderlyingWrapped,
     uint256 _piTotalSupply
   ) external pure returns (uint256);
+
+  function getUnderlyingEquivalentForPi(
+    uint256 _piAmount,
+    IERC20 _underlyingToken,
+    uint256 _piTotalSupply
+  ) external view returns (uint256);
+
+  function getUnderlyingEquivalentForPiPure(
+    uint256 _piAmount,
+    uint256 _totalUnderlyingWrapped,
+    uint256 _piTotalSupply
+  ) external pure returns (uint256);
 }
