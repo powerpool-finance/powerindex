@@ -145,12 +145,12 @@ describe('PowerIndex BasicRouter Test', () => {
       router = await PowerIndexBasicRouter.new(piToken.address, defaultBasicConfig);
     });
 
-    describe('getPiEquivalentForUnderlyingPure()', async () => {
+    describe('getPiEquivalentForUnderlyingPure() and getUnderlyingEquivalentForPiPure()', async () => {
       it('should calculate valid values', async () => {
         // Case #1
         assert.equal(
           await router.getPiEquivalentForUnderlyingPure(
-            // amount
+            // underlying amount
             ether(100),
             // totalUnderlyingWrapped
             ether(1000),
@@ -159,11 +159,33 @@ describe('PowerIndex BasicRouter Test', () => {
           ),
           ether(120),
         );
+        assert.equal(
+          await router.getUnderlyingEquivalentForPiPure(
+            // pi amount
+            ether(120),
+            // totalUnderlyingWrapped
+            ether(1000),
+            // piTotalSupply
+            ether(1200),
+          ),
+          ether(100),
+        );
 
         // Case #2
         assert.equal(
           await router.getPiEquivalentForUnderlyingPure(
-            // amount
+            // underlying amount
+            ether(100),
+            // totalUnderlyingWrapped
+            ether(1000),
+            // piTotalSupply
+            ether(1000),
+          ),
+          ether(100),
+        );
+        assert.equal(
+          await router.getUnderlyingEquivalentForPiPure(
+            // pi amount
             ether(100),
             // totalUnderlyingWrapped
             ether(1000),
@@ -176,7 +198,7 @@ describe('PowerIndex BasicRouter Test', () => {
         // Case #3
         assert.equal(
           await router.getPiEquivalentForUnderlyingPure(
-            // amount
+            // underlying amount
             ether(100),
             // totalUnderlyingWrapped
             ether(1600),
@@ -185,11 +207,33 @@ describe('PowerIndex BasicRouter Test', () => {
           ),
           ether(62.5),
         );
+        assert.equal(
+          await router.getUnderlyingEquivalentForPiPure(
+            // pi amount
+            ether(62.5),
+            // totalUnderlyingWrapped
+            ether(1600),
+            // piTotalSupply
+            ether(1000),
+          ),
+          ether(100),
+        );
 
         // Case #4
         assert.equal(
           await router.getPiEquivalentForUnderlyingPure(
-            // amount
+            // underlying amount
+            ether(100),
+            // totalUnderlyingWrapped
+            ether(0),
+            // piTotalSupply
+            ether(0),
+          ),
+          ether(100),
+        );
+        assert.equal(
+          await router.getUnderlyingEquivalentForPiPure(
+            // pi amount
             ether(100),
             // totalUnderlyingWrapped
             ether(0),
@@ -202,7 +246,18 @@ describe('PowerIndex BasicRouter Test', () => {
         // Case #5
         assert.equal(
           await router.getPiEquivalentForUnderlyingPure(
-            // amount
+            // underlying amount
+            ether(100),
+            // totalUnderlyingWrapped
+            ether(100),
+            // piTotalSupply
+            ether(100),
+          ),
+          ether(100),
+        );
+        assert.equal(
+          await router.getUnderlyingEquivalentForPiPure(
+            // pi amount
             ether(100),
             // totalUnderlyingWrapped
             ether(100),
@@ -215,7 +270,7 @@ describe('PowerIndex BasicRouter Test', () => {
         // Case #6
         assert.equal(
           await router.getPiEquivalentForUnderlyingPure(
-            // amount
+            // underlying amount
             ether(200),
             // totalUnderlyingWrapped
             ether(200),
@@ -223,6 +278,17 @@ describe('PowerIndex BasicRouter Test', () => {
             ether(100),
           ),
           ether(100),
+        );
+        assert.equal(
+          await router.getUnderlyingEquivalentForPiPure(
+            // pi amount
+            ether(100),
+            // totalUnderlyingWrapped
+            ether(200),
+            // piTotalSupply
+            ether(100),
+          ),
+          ether(200),
         );
       });
     });
