@@ -62,7 +62,7 @@ contract Erc20PiptSwap is EthPiptSwap {
   function swapPiptToErc20(address _swapToken, uint256 _poolAmountIn) external payable returns (uint256 erc20Out) {
     uint256 ethOut = _swapPiptToWeth(_poolAmountIn);
 
-    uint256 erc20Out = _swapWethForTokenOut(_swapToken, ethOut);
+    erc20Out = _swapWethForTokenOut(_swapToken, ethOut);
 
     IERC20(_swapToken).safeTransfer(msg.sender, erc20Out);
 
