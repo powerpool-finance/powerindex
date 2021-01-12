@@ -99,7 +99,7 @@ contract EthPiptSwap is Ownable {
   }
 
   function swapEthToPipt(uint256 _slippage) public payable returns (uint256 poolAmountOutAfterFee, uint256 oddEth) {
-    address[] memory tokens = pipt.getCurrentTokens();
+    address[] memory tokens = getPiptTokens();
 
     uint256 wrapperFee = getWrapFee(tokens);
     (, uint256 swapAmount) = calcEthFee(msg.value, wrapperFee);
@@ -118,7 +118,7 @@ contract EthPiptSwap is Ownable {
   {
     weth.deposit{ value: msg.value }();
 
-    address[] memory tokens = pipt.getCurrentTokens();
+    address[] memory tokens = getPiptTokens();
     return _swapWethToPiptByPoolOut(msg.value, _poolAmountOut, tokens, getWrapFee(tokens));
   }
 
@@ -168,8 +168,7 @@ contract EthPiptSwap is Ownable {
     uint256 len = _tokens.length;
     require(len == _pairs.length && len == _reapprove.length, "LENGTHS_NOT_EQUAL");
     for (uint256 i = 0; i < len; i++) {
-      uniswapEthPairByTokenAddress[_tokens[i]] = _pairs[i];
-      uniswapEthPairToken0[_pairs[i]] = IUniswapV2Pair(_pairs[i]).token0();
+      _setUniswapSettingAndPrepareToken(_tokens[i], _pairs[i]);
       reApproveTokens[_tokens[i]] = _reapprove[i];
       emit SetTokenSetting(_tokens[i], _reapprove[i], _pairs[i]);
     }
@@ -178,9 +177,7 @@ contract EthPiptSwap is Ownable {
   function fetchUnswapPairsFromFactory(address _factory, address[] calldata _tokens) external onlyOwner {
     uint256 len = _tokens.length;
     for (uint256 i = 0; i < len; i++) {
-      address pair = IUniswapV2Factory(_factory).getPair(_tokens[i], address(weth));
-      uniswapEthPairByTokenAddress[_tokens[i]] = pair;
-      uniswapEthPairToken0[pair] = IUniswapV2Pair(pair).token0();
+      _setUniswapSettingAndPrepareToken(_tokens[i], IUniswapV2Factory(_factory).getPair(_tokens[i], address(weth)));
     }
   }
 
@@ -216,16 +213,19 @@ contract EthPiptSwap is Ownable {
     {
       uint256 piptTotalSupply = pipt.totalSupply();
       // get pool out for 1 ether as 100% for calculate shares
-      // poolOut by 1 ether first token join = piptTotalSupply.mul(1 ether).div(pipt.getBalance(_tokens[0]))
+      // poolOut by 1 ether first token join = piptTotalSupply.mul(1 ether).div(getPiptTokenBalance(_tokens[0]))
       // poolRatio = poolOut/totalSupply
       uint256 poolRatio =
-        piptTotalSupply.mul(1 ether).div(pipt.getBalance(_tokens[0])).mul(1 ether).div(piptTotalSupply);
+        piptTotalSupply.mul(1 ether).div(getPiptTokenBalance(_tokens[0])).mul(1 ether).div(piptTotalSupply);
 
       for (uint256 i = 0; i < _tokens.length; i++) {
         // token share relatively 1 ether of first token
-        calculations[i].tokenAmount = poolRatio.mul(pipt.getBalance(_tokens[i])).div(1 ether);
-        calculations[i].ethAmount =
-        getAmountInForUniswapValue(_uniswapPairFor(_tokens[i]), calculations[i].tokenAmount, true);
+        calculations[i].tokenAmount = poolRatio.mul(getPiptTokenBalance(_tokens[i])).div(1 ether);
+        calculations[i].ethAmount = getAmountInForUniswapValue(
+          _uniswapPairFor(_tokens[i]),
+          calculations[i].tokenAmount,
+          true
+        );
         totalEthRequired = totalEthRequired.add(calculations[i].ethAmount);
       }
     }
@@ -238,7 +238,7 @@ contract EthPiptSwap is Ownable {
       tokensInPipt[i] = calculations[i].tokenAmount.mul(_ethValue.mul(1 ether).div(totalEthRequired)).div(1 ether);
     }
 
-    poolOut = pipt.totalSupply().mul(tokensInPipt[0]).div(pipt.getBalance(_tokens[0]));
+    poolOut = pipt.totalSupply().mul(tokensInPipt[0]).div(getPiptTokenBalance(_tokens[0]));
   }
 
   function calcSwapPiptToEthInputs(uint256 _poolAmountIn, address[] memory _tokens)
@@ -267,16 +267,16 @@ contract EthPiptSwap is Ownable {
 
     totalEthOut = 0;
     for (uint256 i = 0; i < _tokens.length; i++) {
-      tokensOutPipt[i] = poolRatio.mul(pipt.getBalance(_tokens[i])).div(1 ether);
+      tokensOutPipt[i] = poolRatio.mul(getPiptTokenBalance(_tokens[i])).div(1 ether);
       ethOutUniswap[i] = getAmountOutForUniswapValue(_uniswapPairFor(_tokens[i]), tokensOutPipt[i], true);
       totalEthOut = totalEthOut.add(ethOutUniswap[i]);
     }
   }
 
   function calcNeedEthToPoolOut(uint256 _poolAmountOut, uint256 _slippage) public view returns (uint256) {
-    uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(10);
+    uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(100);
 
-    address[] memory tokens = pipt.getCurrentTokens();
+    address[] memory tokens = getPiptTokens();
     uint256 len = tokens.length;
 
     CalculationStruct[] memory calculations = new CalculationStruct[](len);
@@ -284,17 +284,13 @@ contract EthPiptSwap is Ownable {
 
     uint256 totalEthSwap = 0;
     for (uint256 i = 0; i < len; i++) {
-      tokensInPipt[i] = ratio.mul(pipt.getBalance(tokens[i])).div(1 ether);
+      tokensInPipt[i] = ratio.mul(getPiptTokenBalance(tokens[i])).div(1 ether);
       totalEthSwap = getAmountInForUniswapValue(_uniswapPairFor(tokens[i]), tokensInPipt[i], true).add(totalEthSwap);
     }
     return totalEthSwap.add(totalEthSwap.mul(_slippage).div(1 ether));
   }
 
-  function calcEthFee(
-    uint256 ethAmount,
-    uint256 wrapperFee
-  ) public view returns (uint256 ethFee, uint256 ethAfterFee) {
-    ethFee = wrapperFee;
+  function calcEthFee(uint256 ethAmount, uint256 wrapperFee) public view returns (uint256 ethFee, uint256 ethAfterFee) {
     uint256 len = feeLevels.length;
     for (uint256 i = 0; i < len; i++) {
       if (ethAmount >= feeLevels[i]) {
@@ -302,11 +298,12 @@ contract EthPiptSwap is Ownable {
         break;
       }
     }
+    ethFee = ethFee.add(wrapperFee);
     ethAfterFee = ethAmount.sub(ethFee);
   }
 
   function calcEthFee(uint256 ethAmount) external view returns (uint256 ethFee, uint256 ethAfterFee) {
-    (ethFee, ethAfterFee) = calcEthFee(ethAmount, getWrapFee(pipt.getCurrentTokens()));
+    (ethFee, ethAfterFee) = calcEthFee(ethAmount, getWrapFee(getPiptTokens()));
   }
 
   function getFeeLevels() external view returns (uint256[] memory) {
@@ -323,127 +320,12 @@ contract EthPiptSwap is Ownable {
     }
   }
 
-  function _uniswapPairFor(address token) internal view returns (IUniswapV2Pair) {
-    return IUniswapV2Pair(uniswapEthPairByTokenAddress[token]);
+  function getPiptTokens() public view returns (address[] memory) {
+    return address(piptWrapper) == address(0) ? pipt.getCurrentTokens() : piptWrapper.getPoolUnderlyingTokens();
   }
 
-  function _swapWethToPiptByPoolOut(
-    uint256 _wethAmount,
-    uint256 _poolAmountOut,
-    address[] memory tokens,
-    uint256 wrapperFee
-  )
-    internal
-    returns (uint256 poolAmountOutAfterFee, uint256 oddEth)
-  {
-    require(_wethAmount > 0, "ETH_REQUIRED");
-
-    {
-      address poolRestrictions = pipt.getRestrictions();
-      if (address(poolRestrictions) != address(0)) {
-        uint256 maxTotalSupply = IPoolRestrictions(poolRestrictions).getMaxTotalSupply(address(pipt));
-        require(pipt.totalSupply().add(_poolAmountOut) <= maxTotalSupply, "PIPT_MAX_SUPPLY");
-      }
-    }
-
-    (uint256 feeAmount, uint256 swapAmount) = calcEthFee(_wethAmount, wrapperFee);
-    (uint256[] memory tokensInPipt, uint256 totalEthSwap) = _prepareTokensForJoin(tokens, _poolAmountOut);
-
-    {
-      uint256 poolAmountOutFee;
-      (, uint256 communityJoinFee, , ) = pipt.getCommunityFee();
-      (poolAmountOutAfterFee, poolAmountOutFee) = pipt.calcAmountWithCommunityFee(
-        _poolAmountOut,
-        communityJoinFee,
-        address(this)
-      );
-
-      emit EthToPiptSwap(msg.sender, swapAmount, feeAmount, _poolAmountOut, poolAmountOutFee);
-    }
-
-    _joinPool(_poolAmountOut, tokensInPipt, wrapperFee);
-    pipt.safeTransfer(msg.sender, poolAmountOutAfterFee);
-
-    oddEth = swapAmount.sub(totalEthSwap);
-    if (oddEth > 0) {
-      weth.withdraw(oddEth);
-      msg.sender.transfer(oddEth);
-      emit OddEth(msg.sender, oddEth);
-    }
-  }
-
-  function _prepareTokensForJoin(address[] memory _tokens, uint256 _poolAmountOut)
-    internal
-    returns (uint256[] memory tokensInPipt, uint256 totalEthSwap)
-  {
-    uint256 len = _tokens.length;
-    tokensInPipt = new uint256[](len);
-    uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(10);
-    CalculationStruct[] memory calculations = new CalculationStruct[](len);
-    for (uint256 i = 0; i < len; i++) {
-      IUniswapV2Pair tokenPair = _uniswapPairFor(_tokens[i]);
-
-      tokensInPipt[i] = ratio.mul(pipt.getBalance(_tokens[i])).div(1 ether);
-      calculations[i].ethAmount = getAmountInForUniswapValue(tokenPair, tokensInPipt[i], true);
-
-      weth.safeTransfer(address(tokenPair), calculations[i].ethAmount);
-
-      tokenPair.swap(tokensInPipt[i], uint256(0), address(this), new bytes(0));
-      totalEthSwap = totalEthSwap.add(calculations[i].ethAmount);
-
-      if (reApproveTokens[_tokens[i]]) {
-        TokenInterface(_tokens[i]).approve(address(pipt), 0);
-      }
-
-      TokenInterface(_tokens[i]).approve(address(pipt), tokensInPipt[i]);
-    }
-  }
-
-  function _swapPiptToWeth(uint256 _poolAmountIn) internal returns (uint256) {
-    address[] memory tokens = pipt.getCurrentTokens();
-    uint256 len = tokens.length;
-
-    (uint256[] memory tokensOutPipt, uint256[] memory ethOutUniswap, uint256 totalEthOut, uint256 poolAmountFee) =
-      calcSwapPiptToEthInputs(_poolAmountIn, tokens);
-
-    pipt.safeTransferFrom(msg.sender, address(this), _poolAmountIn);
-
-    pipt.approve(address(pipt), _poolAmountIn);
-
-    uint256 wrapperFee = getWrapFee(tokens);
-
-    (uint256 ethFeeAmount, uint256 ethOutAmount) = calcEthFee(totalEthOut, wrapperFee);
-
-    _exitPool(_poolAmountIn, tokensOutPipt, wrapperFee);
-
-    for (uint256 i = 0; i < len; i++) {
-      IUniswapV2Pair tokenPair = _uniswapPairFor(tokens[i]);
-      TokenInterface(tokens[i]).safeTransfer(address(tokenPair), tokensOutPipt[i]);
-      tokenPair.swap(uint256(0), ethOutUniswap[i], address(this), new bytes(0));
-    }
-
-    emit PiptToEthSwap(msg.sender, _poolAmountIn, poolAmountFee, ethOutAmount, ethFeeAmount);
-
-    return ethOutAmount;
-  }
-
-  function _joinPool(uint256 _poolAmountOut, uint256[] memory _maxAmountsIn, uint256 _wrapperFee) internal {
-    if (address(piptWrapper) == address(0)) {
-      pipt.joinPool(_poolAmountOut, _maxAmountsIn);
-    } else {
-      if (address(this).balance < _wrapperFee) {
-        weth.withdraw(_wrapperFee);
-      }
-      piptWrapper.joinPool{ value: _wrapperFee }(_poolAmountOut, _maxAmountsIn);
-    }
-  }
-
-  function _exitPool(uint256 _poolAmountIn, uint256[] memory _minAmountsOut, uint256 _wrapperFee) internal {
-    if (address(piptWrapper) == address(0)) {
-      pipt.exitPool(_poolAmountIn, _minAmountsOut);
-    } else {
-      piptWrapper.exitPool{ value: _wrapperFee }(_poolAmountIn, _minAmountsOut);
-    }
+  function getPiptTokenBalance(address _token) public view returns (uint256) {
+    return address(piptWrapper) == address(0) ? pipt.getBalance(_token) : piptWrapper.getPoolUnderlyingBalance(_token);
   }
 
   function getAmountInForUniswap(
@@ -490,6 +372,140 @@ contract EthPiptSwap is Ownable {
     bool _isEthOut
   ) public view returns (uint256 ethAmount) {
     (ethAmount, ) = getAmountOutForUniswap(_tokenPair, _swapAmount, _isEthOut);
+  }
+
+  function _setUniswapSettingAndPrepareToken(address _token, address _pair) internal {
+    uniswapEthPairByTokenAddress[_token] = _pair;
+    uniswapEthPairToken0[_pair] = IUniswapV2Pair(_pair).token0();
+  }
+
+  function _uniswapPairFor(address token) internal view returns (IUniswapV2Pair) {
+    return IUniswapV2Pair(uniswapEthPairByTokenAddress[token]);
+  }
+
+  function _swapWethToPiptByPoolOut(
+    uint256 _wethAmount,
+    uint256 _poolAmountOut,
+    address[] memory tokens,
+    uint256 wrapperFee
+  ) internal returns (uint256 poolAmountOutAfterFee, uint256 oddEth) {
+    require(_wethAmount > 0, "ETH_REQUIRED");
+
+    {
+      address poolRestrictions = pipt.getRestrictions();
+      if (address(poolRestrictions) != address(0)) {
+        uint256 maxTotalSupply = IPoolRestrictions(poolRestrictions).getMaxTotalSupply(address(pipt));
+        require(pipt.totalSupply().add(_poolAmountOut) <= maxTotalSupply, "PIPT_MAX_SUPPLY");
+      }
+    }
+
+    (uint256 feeAmount, uint256 swapAmount) = calcEthFee(_wethAmount, wrapperFee);
+    (uint256[] memory tokensInPipt, uint256 totalEthSwap) = _prepareTokensForJoin(tokens, _poolAmountOut);
+
+    {
+      uint256 poolAmountOutFee;
+      (, uint256 communityJoinFee, , ) = pipt.getCommunityFee();
+      (poolAmountOutAfterFee, poolAmountOutFee) = pipt.calcAmountWithCommunityFee(
+        _poolAmountOut,
+        communityJoinFee,
+        address(this)
+      );
+
+      emit EthToPiptSwap(msg.sender, swapAmount, feeAmount, _poolAmountOut, poolAmountOutFee);
+    }
+
+    _joinPool(_poolAmountOut, tokensInPipt, wrapperFee);
+    totalEthSwap = totalEthSwap.add(wrapperFee);
+    pipt.safeTransfer(msg.sender, poolAmountOutAfterFee);
+
+    oddEth = swapAmount.sub(totalEthSwap);
+    if (oddEth > 0) {
+      weth.withdraw(oddEth);
+      msg.sender.transfer(oddEth);
+      emit OddEth(msg.sender, oddEth);
+    }
+  }
+
+  function _prepareTokensForJoin(address[] memory _tokens, uint256 _poolAmountOut)
+    internal
+    returns (uint256[] memory tokensInPipt, uint256 totalEthSwap)
+  {
+    uint256 len = _tokens.length;
+    tokensInPipt = new uint256[](len);
+    uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(100);
+    for (uint256 i = 0; i < len; i++) {
+      tokensInPipt[i] = ratio.mul(getPiptTokenBalance(_tokens[i])).div(1 ether);
+      totalEthSwap = totalEthSwap.add(_swapWethForTokenIn(_tokens[i], tokensInPipt[i]));
+
+      address approveAddress = address(piptWrapper) == address(0) ? address(pipt) : address(piptWrapper);
+      if (reApproveTokens[_tokens[i]]) {
+        TokenInterface(_tokens[i]).approve(approveAddress, 0);
+      }
+      TokenInterface(_tokens[i]).approve(approveAddress, tokensInPipt[i]);
+    }
+  }
+
+  function _swapPiptToWeth(uint256 _poolAmountIn) internal returns (uint256) {
+    address[] memory tokens = getPiptTokens();
+    uint256 len = tokens.length;
+
+    (uint256[] memory tokensOutPipt, uint256[] memory ethOutUniswap, uint256 totalEthOut, uint256 poolAmountFee) =
+      calcSwapPiptToEthInputs(_poolAmountIn, tokens);
+
+    pipt.safeTransferFrom(msg.sender, address(this), _poolAmountIn);
+
+    uint256 wrapperFee = getWrapFee(tokens);
+
+    (uint256 ethFeeAmount, uint256 ethOutAmount) = calcEthFee(totalEthOut, wrapperFee);
+
+    _exitPool(_poolAmountIn, tokensOutPipt, wrapperFee);
+
+    for (uint256 i = 0; i < len; i++) {
+      IUniswapV2Pair tokenPair = _uniswapPairFor(tokens[i]);
+      TokenInterface(tokens[i]).safeTransfer(address(tokenPair), tokensOutPipt[i]);
+      tokenPair.swap(uint256(0), ethOutUniswap[i], address(this), new bytes(0));
+    }
+
+    emit PiptToEthSwap(msg.sender, _poolAmountIn, poolAmountFee, ethOutAmount, ethFeeAmount);
+
+    return ethOutAmount;
+  }
+
+  function _joinPool(
+    uint256 _poolAmountOut,
+    uint256[] memory _maxAmountsIn,
+    uint256 _wrapperFee
+  ) internal {
+    if (address(piptWrapper) == address(0)) {
+      pipt.joinPool(_poolAmountOut, _maxAmountsIn);
+    } else {
+      if (address(this).balance < _wrapperFee) {
+        weth.withdraw(_wrapperFee);
+      }
+      piptWrapper.joinPool{ value: _wrapperFee }(_poolAmountOut, _maxAmountsIn);
+    }
+  }
+
+  function _exitPool(
+    uint256 _poolAmountIn,
+    uint256[] memory _minAmountsOut,
+    uint256 _wrapperFee
+  ) internal {
+    pipt.approve(address(piptWrapper) == address(0) ? address(pipt) : address(piptWrapper), _poolAmountIn);
+
+    if (address(piptWrapper) == address(0)) {
+      pipt.exitPool(_poolAmountIn, _minAmountsOut);
+    } else {
+      piptWrapper.exitPool{ value: _wrapperFee }(_poolAmountIn, _minAmountsOut);
+    }
+  }
+
+  function _swapWethForTokenIn(address _erc20, uint256 _erc20Out) internal returns (uint256 ethIn) {
+    IUniswapV2Pair tokenPair = _uniswapPairFor(_erc20);
+    bool isInverse;
+    (ethIn, isInverse) = getAmountInForUniswap(tokenPair, _erc20Out, true);
+    weth.safeTransfer(address(tokenPair), ethIn);
+    tokenPair.swap(isInverse ? uint256(0) : _erc20Out, isInverse ? _erc20Out : uint256(0), address(this), new bytes(0));
   }
 
   function _swapWethForTokenOut(address _erc20, uint256 _ethIn) internal returns (uint256 erc20Out) {

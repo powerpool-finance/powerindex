@@ -1,5 +1,5 @@
 const { expectRevert, time, constants, expectEvent } = require('@openzeppelin/test-helpers');
-const { buildBasicRouterConfig } = require('../helpers/builders');
+const { buildBasicRouterConfig, buildBasicRouterArgs } = require('../helpers/builders');
 const { ether } = require('../helpers');
 const assert = require('chai').assert;
 const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
@@ -68,15 +68,15 @@ describe('PowerIndexWrapper', () => {
   const communityExitFee = ether('0.07').toString();
   const minWeightPerSecond = ether('0.00000001').toString();
   const maxWeightPerSecond = ether('0.1').toString();
+  const piTokenEthFee = ether(0.0001).toString();
 
   let tokens, pool, poolWrapper, poolController, routerFactory, router;
-  let defaultBasicConfig;
   let defaultFactoryArguments;
 
   let minter, alice, communityWallet, poolRestrictions, stub;
   before(async function () {
     [minter, alice, communityWallet, poolRestrictions, stub] = await web3.eth.getAccounts();
-    defaultBasicConfig = buildBasicRouterConfig(
+    defaultFactoryArguments = buildBasicRouterArgs(web3, buildBasicRouterConfig(
       poolRestrictions,
       constants.ZERO_ADDRESS,
       constants.ZERO_ADDRESS,
@@ -85,19 +85,7 @@ describe('PowerIndexWrapper', () => {
       stub,
       ether(0),
       []
-    );
-    defaultFactoryArguments = web3.eth.abi.encodeParameter({
-      BasicConfig: {
-        poolRestrictions: 'address',
-        voting: 'address',
-        staking: 'address',
-        reserveRatio: 'uint256',
-        rebalancingInterval: 'uint256',
-        pvp: 'address',
-        pvpFee: 'uint256',
-        rewardPools: 'address[]',
-      }
-    }, defaultBasicConfig);
+    ));
   });
 
   beforeEach(async () => {
@@ -160,13 +148,14 @@ describe('PowerIndexWrapper', () => {
     this.piToken2 = await WrappedPiErc20.at(
       res.receipt.logs.filter(l => l.event === 'CreatePiToken')[0].args.piToken,
     );
-    const routerLogs = BasicPowerIndexRouterFactory.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'BuildBasicRouter')[0];
-    router = await PowerIndexBasicRouter.at(routerLogs.args.router);
+    router = await PowerIndexBasicRouter.at(
+      res.receipt.logs.filter(l => l.event === 'CreatePiToken')[0].args.router,
+    );
 
-    await router.setPiTokenEthFee(ether(0.0001));
+    await router.setPiTokenEthFee(piTokenEthFee);
 
     await poolController.replacePoolTokenWithExistingPiToken(this.token2.address, this.piToken2.address, {
-      value: ether(0.0001)
+      value: piTokenEthFee
     });
 
     await time.increase(60);

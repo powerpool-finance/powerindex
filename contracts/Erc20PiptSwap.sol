@@ -44,12 +44,12 @@ contract Erc20PiptSwap is EthPiptSwap {
     address _swapToken,
     uint256 _swapAmount,
     uint256 _slippage
-  ) external returns (uint256 poolAmountOut) {
+  ) external payable returns (uint256 poolAmountOut) {
     IERC20(_swapToken).safeTransferFrom(msg.sender, address(this), _swapAmount);
 
     uint256 ethAmount = _swapTokenForWethOut(_swapToken, _swapAmount);
 
-    address[] memory tokens = pipt.getCurrentTokens();
+    address[] memory tokens = getPiptTokens();
     uint256 wrapperFee = getWrapFee(tokens);
     (, uint256 ethSwapAmount) = calcEthFee(ethAmount, wrapperFee);
     (, , poolAmountOut) = calcSwapEthToPiptInputs(ethSwapAmount, tokens, _slippage);
@@ -59,7 +59,7 @@ contract Erc20PiptSwap is EthPiptSwap {
     emit Erc20ToPiptSwap(msg.sender, _swapToken, _swapAmount, ethAmount, poolAmountOut);
   }
 
-  function swapPiptToErc20(address _swapToken, uint256 _poolAmountIn) external returns (uint256 erc20Out) {
+  function swapPiptToErc20(address _swapToken, uint256 _poolAmountIn) external payable returns (uint256 erc20Out) {
     uint256 ethOut = _swapPiptToWeth(_poolAmountIn);
 
     uint256 erc20Out = _swapWethForTokenOut(_swapToken, ethOut);
@@ -146,7 +146,7 @@ contract Erc20PiptSwap is EthPiptSwap {
 
     uint256 ethAmount = getAmountOutForUniswapValue(tokenPair, _swapAmount, true);
 
-    (ethFee, ethAfterFee) = calcEthFee(ethAmount, getWrapFee(pipt.getCurrentTokens()));
+    (ethFee, ethAfterFee) = calcEthFee(ethAmount, getWrapFee(getPiptTokens()));
 
     if (ethFee != 0) {
       erc20Fee = getAmountOutForUniswapValue(tokenPair, ethFee, false);
