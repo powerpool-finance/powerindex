@@ -96,6 +96,23 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
       );
   }
 
+  function getUnderlyingEquivalentForPi(uint256 _piAmount) public view returns (uint256) {
+    return
+      PowerIndexBasicRouterInterface(router).getUnderlyingEquivalentForPi(
+        _piAmount,
+        underlying,
+        IERC20(this).totalSupply()
+      );
+  }
+
+  function balanceOfUnderlying(address account) external view returns (uint256) {
+    return getUnderlyingEquivalentForPi(IERC20(this).balanceOf(account));
+  }
+
+  function totalSupplyUnderlying() external view returns (uint256) {
+    return getUnderlyingEquivalentForPi(IERC20(this).totalSupply());
+  }
+
   function changeRouter(address _newRouter) external override onlyRouter {
     router = _newRouter;
     emit ChangeRouter(router);

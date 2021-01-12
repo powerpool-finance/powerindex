@@ -247,6 +247,33 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     return _piTotalSupply.mul(_underlyingAmount).div(_totalUnderlyingWrapped);
   }
 
+  function getUnderlyingEquivalentForPi(
+    uint256 _piAmount,
+    IERC20 _underlyingToken,
+    uint256 _piTotalSupply
+  ) public view override returns (uint256) {
+    uint256 underlyingOnPiToken = _underlyingToken.balanceOf(address(piToken));
+    return
+      getUnderlyingEquivalentForPiPure(
+        _piAmount,
+        // underlyingOnPiToken + underlyingOnStaking,
+        underlyingOnPiToken.add(_getUnderlyingStaked()),
+        _piTotalSupply
+      );
+  }
+
+  function getUnderlyingEquivalentForPiPure(
+    uint256 _piAmount,
+    uint256 _totalUnderlyingWrapped,
+    uint256 _piTotalSupply
+  ) public pure override returns (uint256) {
+    if (_piTotalSupply == 0) {
+      return _piAmount;
+    }
+    // _piAmount * _totalUnderlyingWrapped / _piTotalSupply;
+    return _totalUnderlyingWrapped.mul(_piAmount).div(_piTotalSupply);
+  }
+
   /**
    * @notice Calculates the desired reserve status
    * @param _reserveRatioPct The reserve ratio in %, 1 ether == 100 ether

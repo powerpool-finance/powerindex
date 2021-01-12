@@ -247,23 +247,29 @@ describe('WrappedPiErc20 Unit Tests', () => {
         await router.drip(stub, ether(200));
         assert.equal(await yfi.balanceOf(piYfi.address), ether(1000));
         assert.equal(await piYfi.totalSupply(), ether(1200));
-        await yfi.transfer(bob, ether(100), { from: alice });
+        assert.equal(await yfi.balanceOf(piYfi.address), await piYfi.totalSupplyUnderlying());
+
+        const underlyingDeposit = ether(100);
+        const piEquivalent = ether(120);
+        await yfi.transfer(bob, underlyingDeposit, { from: alice });
 
         // Deposit
-        await yfi.approve(piYfi.address, ether(100), { from: bob });
-        const res = await piYfi.deposit(ether(100), { from: bob });
+        await yfi.approve(piYfi.address, underlyingDeposit, { from: bob });
+        const res = await piYfi.deposit(underlyingDeposit, { from: bob });
 
         expectEvent(res, 'Deposit', {
           account: bob,
-          undelyingDeposited: ether(100),
-          piMinted: ether(120),
+          undelyingDeposited: underlyingDeposit,
+          piMinted: piEquivalent,
         });
 
         assert.equal(await yfi.balanceOf(bob), ether(0));
         assert.equal(await yfi.balanceOf(piYfi.address), ether(1100));
 
+        assert.equal(await yfi.balanceOf(piYfi.address), await piYfi.totalSupplyUnderlying());
         assert.equal(await piYfi.totalSupply(), ether(1320));
-        assert.equal(await piYfi.balanceOf(bob), ether(120));
+        assert.equal(await piYfi.balanceOf(bob), piEquivalent);
+        assert.equal(await piYfi.balanceOfUnderlying(bob), underlyingDeposit);
       });
 
       it('should mint smaller pi amount for a positively imbalanced router', async () => {
@@ -273,23 +279,28 @@ describe('WrappedPiErc20 Unit Tests', () => {
         await yfi.transfer(piYfi.address, ether(600), { from: alice });
         assert.equal(await yfi.balanceOf(piYfi.address), ether(1600));
         assert.equal(await piYfi.totalSupply(), ether(1000));
+        assert.equal(await yfi.balanceOf(piYfi.address), await piYfi.totalSupplyUnderlying());
         await yfi.transfer(bob, ether(100), { from: alice });
 
         // Deposit
-        await yfi.approve(piYfi.address, ether(100), { from: bob });
-        const res = await piYfi.deposit(ether(100), { from: bob });
+        const underlyingDeposit = ether(100);
+        const piEquivalent = ether(62.5);
+        await yfi.approve(piYfi.address, underlyingDeposit, { from: bob });
+        const res = await piYfi.deposit(underlyingDeposit, { from: bob });
 
         expectEvent(res, 'Deposit', {
           account: bob,
-          undelyingDeposited: ether(100),
-          piMinted: ether(62.5),
+          undelyingDeposited: underlyingDeposit,
+          piMinted: piEquivalent,
         });
 
         assert.equal(await yfi.balanceOf(bob), ether(0));
         assert.equal(await yfi.balanceOf(piYfi.address), ether(1700));
 
+        assert.equal(await yfi.balanceOf(piYfi.address), await piYfi.totalSupplyUnderlying());
         assert.equal(await piYfi.totalSupply(), ether(1062.5));
-        assert.equal(await piYfi.balanceOf(bob), ether(62.5));
+        assert.equal(await piYfi.balanceOf(bob), piEquivalent);
+        assert.equal(await piYfi.balanceOfUnderlying(bob), underlyingDeposit);
       });
     });
   });
