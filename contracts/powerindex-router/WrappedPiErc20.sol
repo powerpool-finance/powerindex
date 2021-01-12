@@ -92,7 +92,7 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
       PowerIndexBasicRouterInterface(router).getPiEquivalentForUnderlying(
         _underlyingAmount,
         underlying,
-        IERC20(this).totalSupply()
+        totalSupply()
       );
   }
 
@@ -101,16 +101,16 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
       PowerIndexBasicRouterInterface(router).getUnderlyingEquivalentForPi(
         _piAmount,
         underlying,
-        IERC20(this).totalSupply()
+        totalSupply()
       );
   }
 
   function balanceOfUnderlying(address account) external view returns (uint256) {
-    return getUnderlyingEquivalentForPi(IERC20(this).balanceOf(account));
+    return getUnderlyingEquivalentForPi(balanceOf(account));
   }
 
   function totalSupplyUnderlying() external view returns (uint256) {
-    return getUnderlyingEquivalentForPi(IERC20(this).totalSupply());
+    return getUnderlyingEquivalentForPi(totalSupply());
   }
 
   function changeRouter(address _newRouter) external override onlyRouter {
