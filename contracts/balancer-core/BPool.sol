@@ -28,6 +28,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         uint balance;
     }
 
+    /* ==========  EVENTS  ========== */
+
+    /** @dev Emitted when tokens are swapped. */
     event LOG_SWAP(
         address indexed caller,
         address indexed tokenIn,
@@ -36,24 +39,28 @@ contract BPool is BToken, BMath, BPoolInterface {
         uint256         tokenAmountOut
     );
 
+    /** @dev Emitted when underlying tokens are deposited for pool tokens. */
     event LOG_JOIN(
         address indexed caller,
         address indexed tokenIn,
         uint256         tokenAmountIn
     );
 
+    /** @dev Emitted when pool tokens are burned for underlying. */
     event LOG_EXIT(
         address indexed caller,
         address indexed tokenOut,
         uint256         tokenAmountOut
     );
 
+    /** @dev Emitted on calling any method with `_logs_` modifier. */
     event LOG_CALL(
         bytes4  indexed sig,
         address indexed caller,
         bytes           data
     ) anonymous;
 
+    /** @dev Emitted on calling external voting contract. */
     event LOG_CALL_VOTING(
         address indexed voting,
         bool    indexed success,
@@ -62,12 +69,15 @@ contract BPool is BToken, BMath, BPoolInterface {
         bytes           outputData
     );
 
+    /** @dev Emitted on taking community fee. */
     event LOG_COMMUNITY_FEE(
         address indexed caller,
         address indexed receiver,
         address indexed token,
         uint256         tokenAmount
     );
+
+    /* ==========  Modifiers  ========== */
 
     modifier _logs_() {
         emit LOG_CALL(msg.sig, msg.sender, msg.data);
@@ -86,29 +96,49 @@ contract BPool is BToken, BMath, BPoolInterface {
         _;
     }
 
+    /* ==========  Storage  ========== */
+
     bool private _mutex;
 
-    address private _controller; // has CONTROL role
-    bool private _publicSwap; // true if PUBLIC can call SWAP functions
+    // Account with CONTROL role. Able to modify the swap fee,
+    // adjust token weights, bind and unbind tokens and lock
+    // public swaps & joins.
+    address private _controller;
 
-    address private _wrapper; // can join, exit and swaps when _wrapperMode is true
+    // True if PUBLIC can call SWAP & JOIN functions
+    bool private _publicSwap;
+
+    // Address of contract which wraps pool operations:
+    // join, exit and swaps.
+    address private _wrapper;
+    // Restriction to execute pool operations only from wrapper.
+    // True if only wrapper can execute pool operations.
     bool private _wrapperMode;
 
+    // Contract for getting restrictions:
+    // Max total supply and voting calls conditions.
     IPoolRestrictions private _restrictions;
 
-    // `setSwapFee` and `finalize` require CONTROL
-    // `finalize` sets `PUBLIC can SWAP`, `PUBLIC can JOIN`
+    // `setSwapFee` require CONTROL
     uint private _swapFee;
+    // `_communitySwapFee`, `_communityJoinFee`, `_communityExitFee`
+    // defines the commissions for sending to `_communityFeeReceiver`
     uint private _communitySwapFee;
     uint private _communityJoinFee;
     uint private _communityExitFee;
     address private _communityFeeReceiver;
+    // `finalize` require CONTROL
+    // `finalize` sets `PUBLIC can SWAP`, `PUBLIC can JOIN`
     bool private _finalized;
 
+    // Array of underlying tokens in the pool.
     address[] internal _tokens;
+    // Internal records of the pool's underlying tokens
     mapping(address => Record) internal _records;
+    // Total denormalized weight of the pool.
     uint internal _totalWeight;
 
+    // Last block when swap happened by account address
     mapping(address => uint256) internal _lastSwapBlock;
 
     constructor(string memory name, string memory symbol) public {
@@ -123,20 +153,11 @@ contract BPool is BToken, BMath, BPoolInterface {
         _finalized = false;
     }
 
-    function isPublicSwap()
-        external view override
-        returns (bool)
-    {
-        return _publicSwap;
-    }
+    /* ==========  Token Queries  ========== */
 
-    function isFinalized()
-        external view override
-        returns (bool)
-    {
-        return _finalized;
-    }
-
+    /**
+     * @dev Check if a token is bound to the pool.
+     */
     function isBound(address t)
         external view override
         returns (bool)
@@ -144,6 +165,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return _records[t].bound;
     }
 
+    /**
+     * @dev Get the number of tokens bound to the pool.
+     */
     function getNumTokens()
         external view
         returns (uint)
@@ -151,6 +175,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return _tokens.length;
     }
 
+    /**
+     * @dev Get all bound tokens.
+     */
     function getCurrentTokens()
         external view override
         _viewlock_
@@ -159,6 +186,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return _tokens;
     }
 
+    /**
+     * @dev Get all bound tokens with finalized check.
+     */
     function getFinalTokens()
         external view override
         _viewlock_
@@ -168,6 +198,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return _tokens;
     }
 
+    /**
+     * @dev Returns the denormalized weight of a bound token.
+     */
     function getDenormalizedWeight(address token)
         external view override
         _viewlock_
@@ -178,6 +211,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return _getDenormWeight(token);
     }
 
+    /**
+     * @dev Get the total denormalized weight of the pool.
+     */
     function getTotalDenormalizedWeight()
         external view override
         _viewlock_
@@ -186,6 +222,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return _getTotalWeight();
     }
 
+    /**
+     * @dev Returns the normalized weight of a bound token.
+     */
     function getNormalizedWeight(address token)
         external view
         _viewlock_
@@ -196,6 +235,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return bdiv(_getDenormWeight(token), _getTotalWeight());
     }
 
+    /**
+     * @dev Returns the stored balance of a bound token.
+     */
     function getBalance(address token)
         external view override
         _viewlock_
@@ -206,6 +248,31 @@ contract BPool is BToken, BMath, BPoolInterface {
         return _records[token].balance;
     }
 
+    /* ==========  Config Queries  ========== */
+
+    /**
+     * @dev Check if swapping tokens and joining the pool is allowed.
+     */
+    function isPublicSwap()
+        external view override
+        returns (bool)
+    {
+        return _publicSwap;
+    }
+
+    /**
+     * @dev Check if pool is finalized.
+     */
+    function isFinalized()
+        external view override
+        returns (bool)
+    {
+        return _finalized;
+    }
+
+    /**
+     * @dev Returns the swap fee rate.
+     */
     function getSwapFee()
         external view override
         _viewlock_
@@ -214,6 +281,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return _swapFee;
     }
 
+    /**
+     * @dev Returns the community fee rate and community fee receiver.
+     */
     function getCommunityFee()
         external view override
         _viewlock_
@@ -222,6 +292,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return (_communitySwapFee, _communityJoinFee, _communityExitFee, _communityFeeReceiver);
     }
 
+    /**
+     * @dev Returns the controller address.
+     */
     function getController()
         external view
         _viewlock_
@@ -230,6 +303,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return _controller;
     }
 
+    /**
+     * @dev Returns the wrapper address.
+     */
     function getWrapper()
         external view
         _viewlock_
@@ -238,6 +314,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return _wrapper;
     }
 
+    /**
+     * @dev Check if wrapper mode is enabled.
+     */
     function getWrapperMode()
         external view
         _viewlock_
@@ -246,6 +325,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return _wrapperMode;
     }
 
+    /**
+     * @dev Returns the wrapper address.
+     */
     function getRestrictions()
         external view override
         _viewlock_
@@ -254,6 +336,12 @@ contract BPool is BToken, BMath, BPoolInterface {
         return address(_restrictions);
     }
 
+    /* ==========  Configuration Actions  ========== */
+
+    /**
+     * @dev Set the swap fee.
+     * Note: Swap fee must be between 0.0001% and 10%
+     */
     function setSwapFee(uint swapFee)
         external override
         _logs_
@@ -264,6 +352,10 @@ contract BPool is BToken, BMath, BPoolInterface {
         _swapFee = swapFee;
     }
 
+    /**
+     * @dev Set the community fee and community fee receiver.
+     * Note: Community fee must be between 0.0001% and 10%
+     */
     function setCommunityFeeAndReceiver(
         uint communitySwapFee,
         uint communityJoinFee,
@@ -284,6 +376,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         _communityFeeReceiver = communityFeeReceiver;
     }
 
+    /**
+     * @dev Set the restrictions contract address.
+     */
     function setRestrictions(IPoolRestrictions restrictions)
         external
         _logs_
@@ -293,6 +388,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         _restrictions = restrictions;
     }
 
+    /**
+     * @dev Set the controller address.
+     */
     function setController(address manager)
         external override
         _logs_
@@ -302,6 +400,10 @@ contract BPool is BToken, BMath, BPoolInterface {
         _controller = manager;
     }
 
+    /**
+     * @dev Activates public swap.
+     * Note: Possible only when pool is not finalized.
+     */
     function setPublicSwap(bool public_)
         external override
         _logs_
@@ -312,6 +414,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         _publicSwap = public_;
     }
 
+    /**
+     * @dev Set the wrapper address and mode.
+     */
     function setWrapper(address wrapper, bool wrapperMode)
         external
         _logs_
@@ -322,6 +427,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         _wrapperMode = wrapperMode;
     }
 
+    /**
+     * @dev Finalize the pool.
+     */
     function finalize()
         external override
         _logs_
@@ -338,6 +446,8 @@ contract BPool is BToken, BMath, BPoolInterface {
         _pushPoolShare(msg.sender, INIT_POOL_SUPPLY);
     }
 
+    /* ==========  Voting Management Actions  ========== */
+
     function callVoting(address voting, bytes4 signature, bytes calldata args, uint256 value)
         external override
         _logs_
@@ -351,6 +461,14 @@ contract BPool is BToken, BMath, BPoolInterface {
         emit LOG_CALL_VOTING(voting, success, signature, args, data);
     }
 
+    /* ==========  Token Management Actions  ========== */
+
+    /**
+     * @dev Bind a token with depositing balance.
+     * @param token Address of the token to bind.
+     * @param balance Initial token balance.
+     * @param denorm Desired weight for the token.
+     */
     function bind(address token, uint balance, uint denorm)
         public override
         virtual
@@ -372,6 +490,12 @@ contract BPool is BToken, BMath, BPoolInterface {
         rebind(token, balance, denorm);
     }
 
+    /**
+     * @dev Rebind token with changing balance and denorm.
+     * @param token Address of the token to rebind.
+     * @param balance New token balance.
+     * @param denorm Desired weight for the token.
+     */
     function rebind(address token, uint balance, uint denorm)
         public override
         virtual
@@ -404,6 +528,11 @@ contract BPool is BToken, BMath, BPoolInterface {
         }
     }
 
+    /**
+     * @dev Remove a token from the pool.
+     * Replaces the address in the tokens array with the last address,
+     * then removes it from the array.
+     */
     function unbind(address token)
         public override
         virtual
@@ -434,7 +563,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         _pushUnderlying(token, msg.sender, tokenBalance);
     }
 
-    // Absorb any tokens that have been sent to this contract into the pool
+    /**
+     * @dev Absorb any tokens that have been sent to this contract into the pool
+     */
     function gulp(address token)
         external override
         _logs_
@@ -444,6 +575,10 @@ contract BPool is BToken, BMath, BPoolInterface {
         _records[token].balance = IERC20(token).balanceOf(address(this));
     }
 
+    /* ==========  Price Queries  ========== */
+    /**
+     * @dev Returns the spot price for `tokenOut` in terms of `tokenIn`.
+     */
     function getSpotPrice(address tokenIn, address tokenOut)
         external view
         _viewlock_
@@ -455,6 +590,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return calcSpotPrice(inRecord.balance, _getDenormWeight(tokenIn), outRecord.balance, _getDenormWeight(tokenOut), _swapFee);
     }
 
+    /**
+     * @dev Returns the spot price for `tokenOut` in terms of `tokenIn` without swapFee.
+     */
     function getSpotPriceSansFee(address tokenIn, address tokenOut)
         external view
         _viewlock_
@@ -467,6 +605,16 @@ contract BPool is BToken, BMath, BPoolInterface {
         return calcSpotPrice(inRecord.balance, _getDenormWeight(tokenIn), outRecord.balance, _getDenormWeight(tokenOut), 0);
     }
 
+    /* ==========  Liquidity Provider Actions and Token Swaps  ========== */
+
+    /**
+     * @dev Mint new pool tokens by providing the proportional amount of each
+     * underlying token's balance relative to the proportion of pool tokens minted.
+     *
+     * @param poolAmountOut Amount of pool tokens to mint
+     * @param maxAmountsIn Maximum amount of each token to pay in the same
+     * order as the pool's _tokens list.
+     */
     function joinPool(uint poolAmountOut, uint[] calldata maxAmountsIn)
         external override
         _logs_
@@ -504,6 +652,17 @@ contract BPool is BToken, BMath, BPoolInterface {
         emit LOG_COMMUNITY_FEE(msg.sender, _communityFeeReceiver, address(this), poolAmountOutFee);
     }
 
+    /**
+     * @dev Burns `poolAmountIn` pool tokens in exchange for the amounts of each
+     * underlying token's balance proportional to the ratio of tokens burned to
+     * total pool supply. The amount of each token transferred to the caller must
+     * be greater than or equal to the associated minimum output amount from the
+     * `minAmountsOut` array.
+     *
+     * @param poolAmountIn Exact amount of pool tokens to burn
+     * @param minAmountsOut Minimum amount of each token to receive, in the same
+     * order as the pool's _tokens list.
+     */
     function exitPool(uint poolAmountIn, uint[] calldata minAmountsOut)
         external override
         _logs_
@@ -541,7 +700,19 @@ contract BPool is BToken, BMath, BPoolInterface {
         emit LOG_COMMUNITY_FEE(msg.sender, _communityFeeReceiver, address(this), poolAmountInFee);
     }
 
-
+    /**
+    * @dev Execute a token swap with a specified amount of input
+    * tokens and a minimum amount of output tokens.
+    *
+    * Note: Will revert if `tokenOut` is uninitialized.
+    *
+    * @param tokenIn Token to swap in
+    * @param tokenAmountIn Exact amount of `tokenIn` to swap in
+    * @param tokenOut Token to swap out
+    * @param minAmountOut Minimum amount of `tokenOut` to receive
+    * @param maxPrice Maximum ratio of input to output tokens
+    * @return (tokenAmountOut, spotPriceAfter)
+    */
     function swapExactAmountIn(
         address tokenIn,
         uint tokenAmountIn,
@@ -617,7 +788,20 @@ contract BPool is BToken, BMath, BPoolInterface {
 
         return (tokenAmountOut, spotPriceAfter);
     }
-
+    /**
+    * @dev Trades at most `maxAmountIn` of `tokenIn` for exactly `tokenAmountOut`
+    * of `tokenOut`.
+    *
+    * Returns the actual input amount and the new spot price after the swap,
+    * which can not exceed `maxPrice`.
+    *
+    * @param tokenIn Token to swap in
+    * @param maxAmountIn Maximum amount of `tokenIn` to pay
+    * @param tokenOut Token to swap out
+    * @param tokenAmountOut Exact amount of `tokenOut` to receive
+    * @param maxPrice Maximum ratio of input to output tokens
+    * @return (tokenAmountIn, spotPriceAfter)
+    */
     function swapExactAmountOut(
         address tokenIn,
         uint maxAmountIn,
@@ -694,7 +878,18 @@ contract BPool is BToken, BMath, BPoolInterface {
         return (tokenAmountIn, spotPriceAfter);
     }
 
-
+    /**
+     * @dev Pay `tokenAmountIn` of `tokenIn` to mint at least `minPoolAmountOut`
+     * pool tokens.
+     *
+     * The pool implicitly swaps `(1- weightTokenIn) * tokenAmountIn` to the other
+     * underlying tokens. Thus a swap fee is charged against the input tokens.
+     *
+     * @param tokenIn Token to send the pool
+     * @param tokenAmountIn Exact amount of `tokenIn` to pay
+     * @param minPoolAmountOut Minimum amount of pool tokens to mint
+     * @return poolAmountOut - Amount of pool tokens minted
+     */
     function joinswapExternAmountIn(address tokenIn, uint tokenAmountIn, uint minPoolAmountOut)
         external override
         _logs_
@@ -741,6 +936,17 @@ contract BPool is BToken, BMath, BPoolInterface {
         return poolAmountOut;
     }
 
+    /**
+     * @dev Pay up to `maxAmountIn` of `tokenIn` to mint exactly `poolAmountOut`.
+     *
+     * The pool implicitly swaps `(1- weightTokenIn) * tokenAmountIn` to the other
+     * underlying tokens. Thus a swap fee is charged against the input tokens.
+     *
+     * @param tokenIn Token to send the pool
+     * @param poolAmountOut Exact amount of pool tokens to mint
+     * @param maxAmountIn Maximum amount of `tokenIn` to pay
+     * @return tokenAmountIn - Amount of `tokenIn` paid
+     */
     function joinswapPoolAmountOut(address tokenIn, uint poolAmountOut, uint maxAmountIn)
         external override
         _logs_
@@ -788,6 +994,18 @@ contract BPool is BToken, BMath, BPoolInterface {
         return tokenAmountIn;
     }
 
+    /**
+     * @dev Burns `poolAmountIn` pool tokens in exchange for at least `minAmountOut`
+     * of `tokenOut`. Returns the number of tokens sent to the caller.
+     *
+     * The pool implicitly burns the tokens for all underlying tokens and swaps them
+     * to the desired output token. A swap fee is charged against the output tokens.
+     *
+     * @param tokenOut Token to receive
+     * @param poolAmountIn Exact amount of pool tokens to burn
+     * @param minAmountOut Minimum amount of `tokenOut` to receive
+     * @return tokenAmountOut - Amount of `tokenOut` received
+     */
     function exitswapPoolAmountIn(address tokenOut, uint poolAmountIn, uint minAmountOut)
         external override
         _logs_
@@ -834,6 +1052,18 @@ contract BPool is BToken, BMath, BPoolInterface {
         return tokenAmountOutAfterFee;
     }
 
+    /**
+    * @dev Burn up to `maxPoolAmountIn` for exactly `tokenAmountOut` of `tokenOut`.
+    * Returns the number of pool tokens burned.
+    *
+    * The pool implicitly burns the tokens for all underlying tokens and swaps them
+    * to the desired output token. A swap fee is charged against the output tokens.
+    *
+    * @param tokenOut Token to receive
+    * @param tokenAmountOut Exact amount of `tokenOut` to receive
+    * @param maxPoolAmountIn Maximum amount of pool tokens to burn
+    * @return poolAmountIn - Amount of pool tokens burned
+    */
     function exitswapExternAmountOut(address tokenOut, uint tokenAmountOut, uint maxPoolAmountIn)
         external override
         _logs_
@@ -880,7 +1110,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         return poolAmountIn;
     }
 
-
+    /* ==========  Underlying Token Internal Functions  ========== */
     // ==
     // 'Underlying' token-manipulation functions make external calls but are NOT locked
     // You must `_lock_` or otherwise ensure reentry-safety
@@ -933,6 +1163,8 @@ contract BPool is BToken, BMath, BPoolInterface {
     {
         _burn(amount);
     }
+
+    /* ==========  Require Checks Functions  ========== */
 
     function _requireTokenIsBound(address token)
         internal view
@@ -989,6 +1221,8 @@ contract BPool is BToken, BMath, BPoolInterface {
       _lastSwapBlock[tx.origin] = block.number;
     }
 
+    /* ==========  Token Query Internal Functions  ========== */
+
     function _getDenormWeight(address token)
         internal view virtual
         returns (uint)
@@ -1012,6 +1246,15 @@ contract BPool is BToken, BMath, BPoolInterface {
         _totalWeight = bsub(_totalWeight, _amount);
     }
 
+    /* ==========  Other Public getters  ========== */
+    /**
+    * @dev Calculate result amount after taking community fee.
+    *
+    * @param tokenAmountIn - Token amount
+    * @param communityFee - Community fee amount
+    * @return tokenAmountInAfterFee - Amount after taking fee
+    * @return tokenAmountFee - Result fee amount
+    */
     function calcAmountWithCommunityFee(
         uint tokenAmountIn,
         uint communityFee,
@@ -1029,6 +1272,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return (tokenAmountInAfterFee, tokenAmountFee);
     }
 
+    /**
+    * @dev Returns MIN_WEIGHT constant.
+    */
     function getMinWeight()
         external view override
         returns (uint)
@@ -1036,6 +1282,9 @@ contract BPool is BToken, BMath, BPoolInterface {
         return MIN_WEIGHT;
     }
 
+    /**
+    * @dev Returns MAX_BOUND_TOKENS constant.
+    */
     function getMaxBoundTokens()
         external view override
         returns (uint)
