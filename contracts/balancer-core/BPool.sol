@@ -711,7 +711,8 @@ contract BPool is BToken, BMath, BPoolInterface {
     * @param tokenOut Token to swap out
     * @param minAmountOut Minimum amount of `tokenOut` to receive
     * @param maxPrice Maximum ratio of input to output tokens
-    * @return (tokenAmountOut, spotPriceAfter)
+    * @return tokenAmountOut
+    * @return spotPriceAfter
     */
     function swapExactAmountIn(
         address tokenIn,
@@ -800,7 +801,8 @@ contract BPool is BToken, BMath, BPoolInterface {
     * @param tokenOut Token to swap out
     * @param tokenAmountOut Exact amount of `tokenOut` to receive
     * @param maxPrice Maximum ratio of input to output tokens
-    * @return (tokenAmountIn, spotPriceAfter)
+    * @return tokenAmountIn
+    * @return spotPriceAfter
     */
     function swapExactAmountOut(
         address tokenIn,
