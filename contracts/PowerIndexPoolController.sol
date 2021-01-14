@@ -10,7 +10,12 @@ import "./powerindex-router/PowerIndexWrappedController.sol";
 contract PowerIndexPoolController is PowerIndexWrappedController {
   using SafeERC20 for IERC20;
 
+  /* ==========  Storage  ========== */
+
+  /** @dev Signature to execute bind of pool. */
   bytes4 public constant BIND_SIG = bytes4(keccak256(bytes("bind(address,uint256,uint256,uint256,uint256)")));
+
+  /** @dev Signature to execute unbind of pool. */
   bytes4 public constant UNBIND_SIG = bytes4(keccak256(bytes("unbind(address)")));
 
   struct DynamicWeightInput {
@@ -25,6 +30,8 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     address _poolWrapper,
     address _wrapperFactory
   ) public PowerIndexWrappedController(_pool, _poolWrapper, _wrapperFactory) {}
+
+  /* ==========  Configuration Actions  ========== */
 
   /**
    * @notice Call bind of pool
@@ -120,6 +127,16 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     require(signature != BIND_SIG && signature != UNBIND_SIG && signature != CALL_VOTING_SIG, "SIGNATURE_NOT_ALLOWED");
   }
 
+  /*** Internal Functions ***/
+
+  /**
+   * @notice Set target weight of old token to MIN_WEIGHT and add new token with previous weight of old token
+   * @param oldToken Token to replace
+   * @param newToken New token
+   * @param balance Initial new token balance
+   * @param fromTimestamp From timestamp of dynamic weight
+   * @param targetTimestamp Target timestamp of dynamic weight
+   */
   function _replaceTokenWithNew(
     address oldToken,
     address newToken,
@@ -137,6 +154,9 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     pool.bind(newToken, balance, targetDenorm.sub(minWeight), fromTimestamp, targetTimestamp);
   }
 
+  /**
+   * @notice Checking that pool doesn't maximum number or it have the pool with target weight equals min weight
+   */
   function _validateNewTokenBind() internal {
     address[] memory tokens = pool.getCurrentTokens();
     uint256 tokensLen = tokens.length;
