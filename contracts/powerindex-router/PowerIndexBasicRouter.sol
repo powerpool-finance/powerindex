@@ -216,6 +216,10 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     return IERC20(staking).balanceOf(address(piToken));
   }
 
+  function getUnderlyingStaked() external view returns (uint256) {
+    return _getUnderlyingStaked();
+  }
+
   function getRewardPools() external view returns (address[] memory) {
     return rewardPools;
   }
