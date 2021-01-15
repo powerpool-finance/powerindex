@@ -11,6 +11,8 @@ More details in 👉:
 
 - [`PowerIndexPool.sol` and `PoolRestrictions.sol` Security Audit by MixBytes](https://github.com/powerpool-finance/powerpool-docs/blob/master/audits/PowerIndexPoolSecurityAuditScope1.pdf)
 - [`VestedLPMining.sol` and `PowerIndexPoolController.sol` Security Audit by Pessimistic](https://github.com/powerpool-finance/powerpool-docs/blob/master/audits/PowerIndexPool_SecurityAudit_Scope1_Pessimistic.pdf)
+- [`PowerIndexPool.sol` Security Audit by Pessimistic](https://github.com/powerpool-finance/powerpool-docs/blob/master/audits/PowerIndexPool.sol%20Security%20Analysis%20by%20Pessimistic.pdf)
+
 
 ## Testing and Development
 
