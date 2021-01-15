@@ -6,10 +6,9 @@ pragma solidity 0.6.12;
 import "../powerindex-router/PowerIndexBasicRouter.sol";
 
 contract MockPowerIndexBasicRouter is PowerIndexBasicRouter {
-
   uint256 piRate;
 
-  constructor(address _piToken, BasicConfig memory _basicConfig) PowerIndexBasicRouter(_piToken, _basicConfig) public {
+  constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexBasicRouter(_piToken, _basicConfig) {
     piRate = 1 ether;
   }
 

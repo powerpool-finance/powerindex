@@ -71,7 +71,7 @@ contract PowerIndexWrapper is ControllerOwnable, BMath, PowerIndexWrapperInterfa
   ) external payable override returns (uint256 tokenAmountIn, uint256 spotPriceAfter) {
     (address factTokenIn, uint256 factMaxAmountIn) = _getFactTokenAndAmount(tokenIn, maxAmountIn);
     (address factTokenOut, uint256 factTokenAmountOut) = _getFactTokenAndAmount(tokenOut, tokenAmountOut);
-    uint256 factMaxPrice = getFactMaxPrice(maxAmountIn, factMaxAmountIn, tokenAmountOut, factTokenAmountOut, maxPrice, true);
+    uint256 factMaxPrice = getFactMaxPrice(maxAmountIn, factMaxAmountIn, tokenAmountOut, factTokenAmountOut, maxPrice);
     uint256 amountInRate = factMaxAmountIn.mul(uint256(1 ether)).div(maxAmountIn);
 
     uint256 prevMaxAmount = factMaxAmountIn;
@@ -113,7 +113,7 @@ contract PowerIndexWrapper is ControllerOwnable, BMath, PowerIndexWrapperInterfa
   ) external payable override returns (uint256 tokenAmountOut, uint256 spotPriceAfter) {
     (address factTokenIn, uint256 factAmountIn) = _processUnderlyingTokenIn(tokenIn, tokenAmountIn);
     (address factTokenOut, uint256 factMinAmountOut) = _getFactTokenAndAmount(tokenOut, minAmountOut);
-    uint256 factMaxPrice = getFactMaxPrice(tokenAmountIn, factAmountIn, minAmountOut, factMinAmountOut, maxPrice, false);
+    uint256 factMaxPrice = getFactMaxPrice(tokenAmountIn, factAmountIn, minAmountOut, factMinAmountOut, maxPrice);
 
     (tokenAmountOut, spotPriceAfter) = bpool.swapExactAmountIn(
       factTokenIn,
@@ -250,9 +250,9 @@ contract PowerIndexWrapper is ControllerOwnable, BMath, PowerIndexWrapperInterfa
     uint256 swapFee
   ) public pure override returns (uint256) {
     return
-      super
-        .calcInGivenOut(tokenBalanceIn, tokenWeightIn, tokenBalanceOut, tokenWeightOut, tokenAmountOut, swapFee)
-        .add(1);
+      super.calcInGivenOut(tokenBalanceIn, tokenWeightIn, tokenBalanceOut, tokenWeightOut, tokenAmountOut, swapFee).add(
+        1
+      );
   }
 
   function calcSingleInGivenPoolOut(
@@ -290,10 +290,7 @@ contract PowerIndexWrapper is ControllerOwnable, BMath, PowerIndexWrapperInterfa
     uint256 tokenWeightOut,
     uint256 swapFee
   ) public pure override returns (uint256) {
-    return
-      super
-        .calcSpotPrice(tokenBalanceIn, tokenWeightIn, tokenBalanceOut, tokenWeightOut, swapFee)
-        .add(1);
+    return super.calcSpotPrice(tokenBalanceIn, tokenWeightIn, tokenBalanceOut, tokenWeightOut, swapFee).add(1);
   }
 
   function calcOutGivenIn(
@@ -305,9 +302,9 @@ contract PowerIndexWrapper is ControllerOwnable, BMath, PowerIndexWrapperInterfa
     uint256 swapFee
   ) public pure override returns (uint256) {
     return
-      super
-        .calcOutGivenIn(tokenBalanceIn, tokenWeightIn, tokenBalanceOut, tokenWeightOut, tokenAmountIn, swapFee)
-        .sub(10);
+      super.calcOutGivenIn(tokenBalanceIn, tokenWeightIn, tokenBalanceOut, tokenWeightOut, tokenAmountIn, swapFee).sub(
+        10
+      );
   }
 
   function calcPoolOutGivenSingleIn(
@@ -389,15 +386,20 @@ contract PowerIndexWrapper is ControllerOwnable, BMath, PowerIndexWrapperInterfa
     uint256 factAmountIn,
     uint256 amountOut,
     uint256 factAmountOut,
-    uint256 maxPrice,
-    bool isOut
+    uint256 maxPrice
   ) public returns (uint256 factMaxPrice) {
     uint256 amountInRate = amountIn.mul(uint256(1 ether)).div(factAmountIn);
     uint256 amountOutRate = factAmountOut.mul(uint256(1 ether)).div(amountOut);
-    return amountInRate > amountOutRate ? maxPrice.mul(amountInRate).div(amountOutRate) : maxPrice.mul(amountOutRate).div(amountInRate);
+    return
+      amountInRate > amountOutRate
+        ? maxPrice.mul(amountInRate).div(amountOutRate)
+        : maxPrice.mul(amountOutRate).div(amountInRate);
   }
 
-  function _processUnderlyingTokenIn(address _underlyingToken, uint256 _amount) internal returns (address factToken, uint256 factAmount) {
+  function _processUnderlyingTokenIn(address _underlyingToken, uint256 _amount)
+    internal
+    returns (address factToken, uint256 factAmount)
+  {
     if (_amount == 0) {
       return (_underlyingToken, _amount);
     }
@@ -437,7 +439,11 @@ contract PowerIndexWrapper is ControllerOwnable, BMath, PowerIndexWrapperInterfa
     return piToken == address(0) ? token : piToken;
   }
 
-  function _getFactTokenAndAmount(address token, uint256 amount) internal view returns (address factToken, uint256 factAmount) {
+  function _getFactTokenAndAmount(address token, uint256 amount)
+    internal
+    view
+    returns (address factToken, uint256 factAmount)
+  {
     address piToken = piTokenByUnderlying[token];
     if (piToken == address(0)) {
       return (token, amount);

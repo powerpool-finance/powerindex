@@ -65,7 +65,7 @@ MockCvp.numberFormat = 'String';
 WETH.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 
-describe.only('PowerIndexWrapper', () => {
+describe('PowerIndexWrapper', () => {
   const name = 'My Pool';
   const symbol = 'MP';
   const balances = [ether('10'), ether('20')];

@@ -13,11 +13,11 @@ interface BMathInterface {
   ) external pure returns (uint256 tokenAmountIn);
 
   function calcSingleInGivenPoolOut(
-    uint tokenBalanceIn,
-    uint tokenWeightIn,
-    uint poolSupply,
-    uint totalWeight,
-    uint poolAmountOut,
-    uint swapFee
-  ) external pure returns (uint tokenAmountIn);
+    uint256 tokenBalanceIn,
+    uint256 tokenWeightIn,
+    uint256 poolSupply,
+    uint256 totalWeight,
+    uint256 poolAmountOut,
+    uint256 swapFee
+  ) external pure returns (uint256 tokenAmountIn);
 }
