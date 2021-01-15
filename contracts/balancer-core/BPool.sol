@@ -18,7 +18,6 @@ import "./BToken.sol";
 import "./BMath.sol";
 import "../interfaces/IPoolRestrictions.sol";
 import "../interfaces/BPoolInterface.sol";
-import "hardhat/console.sol";
 
 contract BPool is BToken, BMath, BPoolInterface {
 
@@ -571,7 +570,6 @@ contract BPool is BToken, BMath, BPoolInterface {
                                     _getDenormWeight(tokenOut),
                                     _swapFee
                                 );
-        console.log("spotPriceBefore", spotPriceBefore);
         require(spotPriceBefore <= maxPrice, "LIMIT_PRICE");
 
         (uint tokenAmountInAfterFee, uint tokenAmountInFee) = calcAmountWithCommunityFee(
@@ -607,7 +605,6 @@ contract BPool is BToken, BMath, BPoolInterface {
             spotPriceBefore <= bdiv(tokenAmountInAfterFee, tokenAmountOut),
             "MATH_APPROX"
         );
-      console.log("spotPriceAfter", spotPriceAfter);
       require(spotPriceAfter <= maxPrice, "LIMIT_PRICE");
 
         emit LOG_SWAP(msg.sender, tokenIn, tokenOut, tokenAmountInAfterFee, tokenAmountOut);

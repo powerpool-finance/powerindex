@@ -321,11 +321,11 @@ contract EthPiptSwap is Ownable {
   }
 
   function getPiptTokens() public view returns (address[] memory) {
-    return address(piptWrapper) == address(0) ? pipt.getCurrentTokens() : piptWrapper.getUnderlyingTokens();
+    return address(piptWrapper) == address(0) ? pipt.getCurrentTokens() : piptWrapper.getCurrentTokens();
   }
 
   function getPiptTokenBalance(address _token) public view returns (uint256) {
-    return address(piptWrapper) == address(0) ? pipt.getBalance(_token) : piptWrapper.getUnderlyingBalance(_token);
+    return address(piptWrapper) == address(0) ? pipt.getBalance(_token) : piptWrapper.getBalance(_token);
   }
 
   function getAmountInForUniswap(
