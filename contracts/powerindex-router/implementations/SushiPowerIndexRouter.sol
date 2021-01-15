@@ -88,11 +88,10 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
   }
 
   function getPendingRewards() public view returns (uint256) {
-    uint256 sushiStaked = _getUnderlyingStaked();
-    uint256 sushiAtPiToken = SUSHI.balanceOf(address(piToken));
-
-    // return sushiAtPiToken + sushiStaked - piToken.totalSupply()
-    return sushiAtPiToken.add(sushiStaked).sub(piToken.totalSupply());
+    // return sushiAtPiToken + sushiBackedByXSushi - piToken.totalSupply()
+    return SUSHI.balanceOf(address(piToken))
+      .add(getUnderlyingBackedByXSushi())
+      .sub(piToken.totalSupply());
   }
 
   function getUnderlyingStaked() public view returns (uint256) {
@@ -168,6 +167,12 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
   /*** INTERNALS ***/
 
   function _getUnderlyingStaked() internal view override returns (uint256) {
+    // return piTokenTotalSupply - sushiAtPiToken
+    return piToken.totalSupply().sub(SUSHI.balanceOf(address(piToken)));
+  }
+
+  // underlying + rewards
+  function getUnderlyingBackedByXSushi() public view returns (uint256) {
     if (staking == address(0)) {
       return 0;
     }

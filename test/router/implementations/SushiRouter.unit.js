@@ -233,7 +233,8 @@ describe('SushiRouter Tests', () => {
         assert.equal(await sushi.balanceOf(xSushi.address), ether(80000));
         assert.equal(await xSushi.balanceOf(piSushi.address), ether(8000));
         assert.equal(await sushi.balanceOf(piSushi.address), ether(2000));
-        assert.equal(await sushiRouter.getUnderlyingStaked(), ether(12800));
+        assert.equal(await sushiRouter.getUnderlyingStaked(), ether(8000));
+        assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), ether(12800));
         assert.equal(await sushiRouter.getSushiForXSushi(ether(2000)), ether(3200));
       });
 
@@ -242,10 +243,12 @@ describe('SushiRouter Tests', () => {
         await piSushi.deposit(ether(1000), { from: alice });
 
         assert.equal(await piSushi.balanceOf(alice), ether(11000));
-        assert.equal(await sushi.balanceOf(xSushi.address), ether(79840));
-        assert.equal(await xSushi.balanceOf(piSushi.address), ether(7900));
-        assert.equal(await sushi.balanceOf(piSushi.address), ether(3160));
-        assert.equal(await sushiRouter.getUnderlyingStaked(), ether(12640));
+        assert.equal(await sushi.balanceOf(xSushi.address), ether(80800));
+        assert.equal(await xSushi.balanceOf(piSushi.address), ether(8500));
+        assert.equal(await sushi.balanceOf(piSushi.address), ether(2200));
+        assert.equal(await sushiRouter.getUnderlyingStaked(), ether(8800));
+        assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), ether(13600));
+        assert.equal(await sushiRouter.getPendingRewards(), ether(4800));
         assert.equal(await sushiRouter.getSushiForXSushi(ether(3160)), ether(5056));
       });
 
@@ -253,10 +256,12 @@ describe('SushiRouter Tests', () => {
         await piSushi.withdraw(ether(1000), { from: alice });
 
         assert.equal(await piSushi.balanceOf(alice), ether(9000));
-        assert.equal(await sushi.balanceOf(xSushi.address), ether(78240));
-        assert.equal(await xSushi.balanceOf(piSushi.address), ether(6900));
-        assert.equal(await sushi.balanceOf(piSushi.address), ether(2760));
-        assert.equal(await sushiRouter.getUnderlyingStaked(), ether(11040));
+        assert.equal(await sushi.balanceOf(xSushi.address), ether(79200));
+        assert.equal(await xSushi.balanceOf(piSushi.address), ether(7500));
+        assert.equal(await sushi.balanceOf(piSushi.address), ether(1800));
+        assert.equal(await sushiRouter.getUnderlyingStaked(), ether(7200));
+        assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), ether(12000));
+        assert.equal(await sushiRouter.getPendingRewards(), ether(4800));
         assert.equal(await sushiRouter.getSushiForXSushi(ether(3160)), ether(5056));
       });
     });
@@ -355,12 +360,20 @@ describe('SushiRouter Tests', () => {
         assert.equal(await sushi.balanceOf(xSushi.address), ether(50000));
         assert.equal(await xSushi.balanceOf(piSushi.address), ether(8000));
         assert.equal(await sushi.balanceOf(piSushi.address), ether(3000));
+        assert.equal(await piSushi.totalSupply(), ether(10000));
+        assert.equal(await sushiRouter.getUnderlyingStaked(), ether(7000));
+        assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), ether(8000));
+        assert.equal(await sushiRouter.getPendingRewards(), ether(1000));
 
         await piSushi.pokeRouter({ from: bob });
 
-        assert.equal(await sushi.balanceOf(xSushi.address), ether(50800));
-        assert.equal(await xSushi.balanceOf(piSushi.address), ether(8800));
-        assert.equal(await sushi.balanceOf(piSushi.address), ether(2200));
+        assert.equal(await sushi.balanceOf(xSushi.address), ether(51000));
+        assert.equal(await xSushi.balanceOf(piSushi.address), ether(9000));
+        assert.equal(await sushi.balanceOf(piSushi.address), ether(2000));
+        assert.equal(await piSushi.totalSupply(), ether(10000));
+        assert.equal(await sushiRouter.getUnderlyingStaked(), ether(8000));
+        assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), ether(9000));
+        assert.equal(await sushiRouter.getPendingRewards(), ether(1000));
       });
     });
 
@@ -410,7 +423,8 @@ describe('SushiRouter Tests', () => {
 
       await time.increase(time.duration.days(8));
       assert.equal(await sushi.balanceOf(piSushi.address), ether(2000));
-      assert.equal(await sushiRouter.getUnderlyingStaked(), ether(8320));
+      assert.equal(await sushiRouter.getUnderlyingStaked(), ether(8000));
+      assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), ether(8320));
       assert.equal(await sushiRouter.getPendingRewards(), ether(320));
       assert.equal(await sushiRouter.getXSushiForSushi(ether(320)), '307692307692307692307');
 

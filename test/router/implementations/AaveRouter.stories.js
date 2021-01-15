@@ -20,7 +20,7 @@ const COOLDOWN_STATUS = {
   UNSTAKE_WINDOW: 2,
 };
 
-describe('AaveRouter Tests', () => {
+describe('AaveRouter Stories', () => {
   let minter, bob, alice, rewardsVault, emissionManager, stub;
   let aave, stakedAave, piAave, aaveRouter, poolRestrictions;
 
