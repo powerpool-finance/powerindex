@@ -34,7 +34,7 @@ contract BMath is BConst, BNum, BMathInterface {
         uint tokenWeightOut,
         uint swapFee
     )
-        public pure
+        public pure virtual
         returns (uint spotPrice)
     {
         uint numer = bdiv(tokenBalanceIn, tokenWeightIn);
@@ -62,7 +62,7 @@ contract BMath is BConst, BNum, BMathInterface {
         uint tokenAmountIn,
         uint swapFee
     )
-        public pure
+        public pure virtual
         returns (uint tokenAmountOut)
     {
         uint weightRatio = bdiv(tokenWeightIn, tokenWeightOut);
@@ -93,7 +93,7 @@ contract BMath is BConst, BNum, BMathInterface {
         uint tokenAmountOut,
         uint swapFee
     )
-        public pure override
+        public pure virtual override
         returns (uint tokenAmountIn)
     {
         uint weightRatio = bdiv(tokenWeightOut, tokenWeightIn);
@@ -124,7 +124,7 @@ contract BMath is BConst, BNum, BMathInterface {
         uint tokenAmountIn,
         uint swapFee
     )
-        public pure
+        public pure virtual
         returns (uint poolAmountOut)
     {
         // Charge the trading fee for the proportion of tokenAi
@@ -163,7 +163,7 @@ contract BMath is BConst, BNum, BMathInterface {
         uint poolAmountOut,
         uint swapFee
     )
-        public pure
+        public pure virtual override
         returns (uint tokenAmountIn)
     {
         uint normalizedWeight = bdiv(tokenWeightIn, totalWeight);
@@ -202,7 +202,7 @@ contract BMath is BConst, BNum, BMathInterface {
         uint poolAmountIn,
         uint swapFee
     )
-        public pure
+        public pure virtual
         returns (uint tokenAmountOut)
     {
         uint normalizedWeight = bdiv(tokenWeightOut, totalWeight);
@@ -240,7 +240,7 @@ contract BMath is BConst, BNum, BMathInterface {
         uint tokenAmountOut,
         uint swapFee
     )
-        public pure
+        public pure virtual
         returns (uint poolAmountIn)
     {
 

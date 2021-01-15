@@ -829,7 +829,7 @@ contract BPool is BToken, BMath, BPoolInterface {
             spotPriceBefore <= bdiv(tokenAmountInAfterFee, tokenAmountOut),
             "MATH_APPROX"
         );
-        require(spotPriceAfter <= maxPrice, "LIMIT_PRICE");
+      require(spotPriceAfter <= maxPrice, "LIMIT_PRICE");
 
         emit LOG_SWAP(msg.sender, tokenIn, tokenOut, tokenAmountInAfterFee, tokenAmountOut);
 

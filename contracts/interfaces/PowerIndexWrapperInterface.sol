@@ -3,9 +3,11 @@
 pragma solidity 0.6.12;
 
 interface PowerIndexWrapperInterface {
-  function getPoolUnderlyingTokens() external view returns (address[] memory tokens);
+  function getFinalTokens() external view returns (address[] memory tokens);
 
-  function getPoolUnderlyingBalance(address _token) external view returns (uint256);
+  function getCurrentTokens() external view returns (address[] memory tokens);
+
+  function getBalance(address _token) external view returns (uint256);
 
   function setPiTokenForUnderlyingsMultiple(address[] calldata _underlyingTokens, address[] calldata _piTokens)
     external;

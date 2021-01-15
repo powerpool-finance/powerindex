@@ -471,7 +471,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
       );
     })
 
-    describe('swapErc20ToPipt should work properly', async () => {
+    describe('swapErc20ToPipt with piToken and ethFee should work properly', async () => {
       let erc20PiptSwap;
       const piTokenEthFee = ether(0.0001).toString();
 
