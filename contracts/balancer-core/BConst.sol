@@ -16,24 +16,30 @@ pragma solidity 0.6.12;
 
 contract BConst {
     uint public constant BONE              = 10**18;
-
+    // Minimum number of tokens in the pool
     uint public constant MIN_BOUND_TOKENS  = 2;
+    // Maximum number of tokens in the pool
     uint public constant MAX_BOUND_TOKENS  = 9;
-
+    // Minimum swap fee
     uint public constant MIN_FEE           = BONE / 10**6;
+    // Maximum swap fee
     uint public constant MAX_FEE           = BONE / 10;
-
+    // Minimum weight for token
     uint public constant MIN_WEIGHT        = 1000000000;
+    // Maximum weight for token
     uint public constant MAX_WEIGHT        = BONE * 50;
+    // Maximum total weight
     uint public constant MAX_TOTAL_WEIGHT  = BONE * 50;
+    // Minimum balance for a token
     uint public constant MIN_BALANCE       = BONE / 10**12;
-
+    // Initial pool tokens supply
     uint public constant INIT_POOL_SUPPLY  = BONE * 100;
 
     uint public constant MIN_BPOW_BASE     = 1 wei;
     uint public constant MAX_BPOW_BASE     = (2 * BONE) - 1 wei;
     uint public constant BPOW_PRECISION    = BONE / 10**10;
-
+    // Maximum input tokens balance ratio for swaps.
     uint public constant MAX_IN_RATIO      = BONE / 2;
+    // Maximum output tokens balance ratio for swaps.
     uint public constant MAX_OUT_RATIO     = (BONE / 3) + 1 wei;
 }

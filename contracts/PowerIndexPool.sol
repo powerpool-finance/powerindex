@@ -19,7 +19,7 @@ import "./balancer-core/BPool.sol";
 import "./interfaces/PowerIndexPoolInterface.sol";
 
 contract PowerIndexPool is BPool {
-  /// @notice The event emitted when a dynamic weight set to token
+  /// @notice The event emitted when a dynamic weight set to token.
   event SetDynamicWeight(
     address indexed token,
     uint256 fromDenorm,
@@ -28,7 +28,7 @@ contract PowerIndexPool is BPool {
     uint256 targetTimestamp
   );
 
-  /// @notice The event emitted when weight per second bounds set
+  /// @notice The event emitted when weight per second bounds set.
   event SetWeightPerSecondBounds(uint256 minWeightPerSecond, uint256 maxWeightPerSecond);
 
   struct DynamicWeight {
@@ -37,12 +37,12 @@ contract PowerIndexPool is BPool {
     uint256 targetDenorm;
   }
 
-  /// @dev Mapping for storing dynamic weights settings. fromDenorm stored in _records mapping as denorm variable
+  /// @dev Mapping for storing dynamic weights settings. fromDenorm stored in _records mapping as denorm variable.
   mapping(address => DynamicWeight) private _dynamicWeights;
 
-  /// @dev Min weight per second limit
+  /// @dev Min weight per second limit.
   uint256 private _minWeightPerSecond;
-  /// @dev Max weight per second limit
+  /// @dev Max weight per second limit.
   uint256 private _maxWeightPerSecond;
 
   constructor(
@@ -58,9 +58,9 @@ contract PowerIndexPool is BPool {
   /*** Controller Interface ***/
 
   /**
-   * @notice Set weight per second bounds by controller
-   * @param minWeightPerSecond Min weight per second
-   * @param maxWeightPerSecond Max weight per second
+   * @notice Set minimum and maximum weight per second by controller.
+   * @param minWeightPerSecond Minimum weight per second.
+   * @param maxWeightPerSecond Maximum weight per second.
    */
   function setWeightPerSecondBounds(uint256 minWeightPerSecond, uint256 maxWeightPerSecond) public _logs_ _lock_ {
     _onlyController();
@@ -71,11 +71,11 @@ contract PowerIndexPool is BPool {
   }
 
   /**
-   * @notice Set dynamic weight for token by controller
-   * @param token Token for change settings
-   * @param targetDenorm Target weight. fromDenorm will be fetch by current value of _getDenormWeight
-   * @param fromTimestamp From timestamp of dynamic weight
-   * @param targetTimestamp Target timestamp of dynamic weight
+   * @notice Set dynamic weight for token by controller contract.
+   * @param token Token to change weight.
+   * @param targetDenorm Target weight. fromDenorm will fetch from current value of _getDenormWeight.
+   * @param fromTimestamp Start timestamp for changing weight.
+   * @param targetTimestamp Target timestamp for changing weight.
    */
   function setDynamicWeight(
     address token,
@@ -115,12 +115,12 @@ contract PowerIndexPool is BPool {
   }
 
   /**
-   * @notice Bind and setDynamicWeight at the same time
-   * @param token Token for bind
-   * @param balance Initial balance
-   * @param targetDenorm Target weight
-   * @param fromTimestamp From timestamp of dynamic weight
-   * @param targetTimestamp Target timestamp of dynamic weight
+   * @notice Bind and setDynamicWeight at the same time.
+   * @param token Token for bind.
+   * @param balance Initial token balance.
+   * @param targetDenorm Target weight.
+   * @param fromTimestamp Start timestamp to change weight.
+   * @param targetTimestamp Target timestamp to change weight.
    */
   function bind(
     address token,
@@ -138,8 +138,8 @@ contract PowerIndexPool is BPool {
   }
 
   /**
-   * @notice Override parent unbind function
-   * @param token Token for unbind
+   * @dev Override parent unbind function.
+   * @param token Token for unbind.
    */
   function unbind(address token) public override {
     super.unbind(token);
@@ -148,7 +148,7 @@ contract PowerIndexPool is BPool {
   }
 
   /**
-   * @notice Override parent bind function and disable.
+   * @dev Override parent bind function and disable.
    */
   function bind(
     address,
@@ -159,10 +159,10 @@ contract PowerIndexPool is BPool {
   }
 
   /**
-   * @notice Override parent rebind function. Allowed only for calling from bind function
-   * @param token Token for rebind
-   * @param balance Balance for rebind
-   * @param denorm Weight for rebind
+   * @notice Override parent rebind function. Allowed only for calling from bind function.
+   * @param token Token for rebind.
+   * @param balance Balance for rebind.
+   * @param denorm Weight for rebind.
    */
   function rebind(
     address token,

@@ -10,7 +10,12 @@ import "./powerindex-router/PowerIndexWrappedController.sol";
 contract PowerIndexPoolController is PowerIndexWrappedController {
   using SafeERC20 for IERC20;
 
+  /* ==========  Storage  ========== */
+
+  /** @dev Signature to execute bind in pool. */
   bytes4 public constant BIND_SIG = bytes4(keccak256(bytes("bind(address,uint256,uint256,uint256,uint256)")));
+
+  /** @dev Signature to execute unbind in pool. */
   bytes4 public constant UNBIND_SIG = bytes4(keccak256(bytes("unbind(address)")));
 
   struct DynamicWeightInput {
@@ -26,13 +31,15 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     address _wrapperFactory
   ) public PowerIndexWrappedController(_pool, _poolWrapper, _wrapperFactory) {}
 
+  /* ==========  Configuration Actions  ========== */
+
   /**
-   * @notice Call bind of pool
-   * @param token Token for bind
-   * @param balance Initial balance
-   * @param targetDenorm Target weight
-   * @param fromTimestamp From timestamp of dynamic weight
-   * @param targetTimestamp Target timestamp of dynamic weight
+   * @notice Call bind in pool.
+   * @param token Token to bind.
+   * @param balance Initial token balance.
+   * @param targetDenorm Target weight.
+   * @param fromTimestamp Start timestamp to change weight.
+   * @param targetTimestamp Target timestamp to change weight.
    */
   function bind(
     address token,
@@ -49,12 +56,13 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
   }
 
   /**
-   * @notice Set target weight of old token to MIN_WEIGHT and add new token with previous weight of old token
-   * @param oldToken Token to replace
-   * @param newToken New token
-   * @param balance Initial new token balance
-   * @param fromTimestamp From timestamp of dynamic weight
-   * @param targetTimestamp Target timestamp of dynamic weight
+   * @notice Set the old token's target weight to MIN_WEIGHT and add a new token
+   * with a previous weight of the old token.
+   * @param oldToken Token to replace.
+   * @param newToken New token.
+   * @param balance Initial new token balance.
+   * @param fromTimestamp Start timestamp to change weight.
+   * @param targetTimestamp Target timestamp to change weight.
    */
   function replaceTokenWithNew(
     address oldToken,
@@ -68,11 +76,11 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
 
   /**
    * @notice The same as replaceTokenWithNew, but sets fromTimestamp with block.timestamp
-              and uses durationFromNow to set targetTimestamp
+   * and uses durationFromNow to set targetTimestamp.
    * @param oldToken Token to replace
    * @param newToken New token
    * @param balance Initial new token balance
-   * @param durationFromNow Duration for set targetTimestamp by sum with block.timestamp
+   * @param durationFromNow Duration to set targetTimestamp.
    */
   function replaceTokenWithNewFromNow(
     address oldToken,
@@ -85,8 +93,8 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
   }
 
   /**
-   * @notice Call setDynamicWeight for several tokens
-   * @param _dynamicWeights Tokens dynamic weights configs
+   * @notice Call setDynamicWeight for several tokens.
+   * @param _dynamicWeights Tokens dynamic weights configs.
    */
   function setDynamicWeightList(DynamicWeightInput[] memory _dynamicWeights) external onlyOwner {
     uint256 len = _dynamicWeights.length;
@@ -101,8 +109,8 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
   }
 
   /**
-   * @notice Permissionless function for unbind tokens which has reached MIN_WEIGHT
-   * @param _token Token to unbind
+   * @notice Permissionless function to unbind tokens with MIN_WEIGHT.
+   * @param _token Token to unbind.
    */
   function unbindNotActualToken(address _token) external {
     require(pool.getDenormalizedWeight(_token) == pool.getMinWeight(), "DENORM_MIN");
@@ -120,6 +128,17 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     require(signature != BIND_SIG && signature != UNBIND_SIG && signature != CALL_VOTING_SIG, "SIGNATURE_NOT_ALLOWED");
   }
 
+  /*** Internal Functions ***/
+
+  /**
+   * @notice Set the old token's target weight to MIN_WEIGHT and
+   * add a new token with a previous weight of the old token.
+   * @param oldToken Token to replace
+   * @param newToken New token
+   * @param balance Initial new token balance
+   * @param fromTimestamp Start timestamp to change weight.
+   * @param targetTimestamp Target timestamp to change weight.
+   */
   function _replaceTokenWithNew(
     address oldToken,
     address newToken,
@@ -137,6 +156,10 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     pool.bind(newToken, balance, targetDenorm.sub(minWeight), fromTimestamp, targetTimestamp);
   }
 
+  /**
+   * @notice Check that pool doesn't have the maximum number of bound tokens.
+   * If there is a max number of bound tokens, one should have a minimum weight.
+   */
   function _validateNewTokenBind() internal {
     address[] memory tokens = pool.getCurrentTokens();
     uint256 tokensLen = tokens.length;
