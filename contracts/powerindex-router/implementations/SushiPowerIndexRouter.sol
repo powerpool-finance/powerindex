@@ -159,8 +159,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     (ReserveStatus reserveStatus, uint256 sushiDiff, ) = _getReserveStatus(_getUnderlyingStaked(), _withdrawAmount);
 
     if (reserveStatus == ReserveStatus.SHORTAGE) {
-      uint256 xSushiDiff = getXSushiForSushi(sushiDiff);
-      _redeem(xSushiDiff);
+      _redeem(getXSushiForSushi(sushiDiff));
     } else if (reserveStatus == ReserveStatus.EXCESS) {
       _stake(sushiDiff);
     }
