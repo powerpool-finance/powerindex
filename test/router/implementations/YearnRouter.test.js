@@ -306,6 +306,7 @@ describe('YearnRouter Tests', () => {
       assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(50800));
       assert.equal(await yearnGovernance.balanceOf(piYfi.address), ether(8800));
       assert.equal(await yfi.balanceOf(piYfi.address), ether(2200));
+      assert.equal(await yfiRouter.getUnderlyingStaked(), ether(8800));
     });
 
     it('should decrease reserve on withdrawal', async () => {
@@ -317,6 +318,7 @@ describe('YearnRouter Tests', () => {
       assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(49200));
       assert.equal(await yearnGovernance.balanceOf(piYfi.address), ether(7200));
       assert.equal(await yfi.balanceOf(piYfi.address), ether(1800));
+      assert.equal(await yfiRouter.getUnderlyingStaked(), ether(7200));
     });
 
     it('should ignore rebalancing if the staking address is 0', async () => {
