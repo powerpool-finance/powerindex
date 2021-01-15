@@ -184,7 +184,7 @@ contract BPool is BToken, BMath, BPoolInterface {
 
     /**
       * @notice Get all bound tokens.
-      * @return bound token address array.
+      * @return tokens - bound token address array.
      */
     function getCurrentTokens()
         external view override
@@ -196,7 +196,7 @@ contract BPool is BToken, BMath, BPoolInterface {
 
     /**
       * @notice Get all bound tokens with a finalization check.
-      * @return bound token address array.
+      * @return tokens - bound token address array.
      */
     function getFinalTokens()
         external view override
@@ -302,7 +302,10 @@ contract BPool is BToken, BMath, BPoolInterface {
 
     /**
      * @notice Returns the community fee rate and community fee receiver.
-     * @return community fee rate and community fee receiver.
+     * @return communitySwapFee - community swap fee rate.
+     * @return communityJoinFee - community join fee rate.
+     * @return communityExitFee - community exit fee rate.
+     * @return communityFeeReceiver - community fee receiver address.
      */
     function getCommunityFee()
         external view override
@@ -626,7 +629,7 @@ contract BPool is BToken, BMath, BPoolInterface {
      * @notice Returns the spot price for `tokenOut` in terms of `tokenIn`.
      * @param tokenIn Bound tokenIn address.
      * @param tokenOut Bound tokenOut address.
-     * @return amount of tokenIn in wei for 1 ether of tokenOut.
+     * @return spotPrice - amount of tokenIn in wei for 1 ether of tokenOut.
      */
 
     function getSpotPrice(address tokenIn, address tokenOut)
@@ -644,7 +647,7 @@ contract BPool is BToken, BMath, BPoolInterface {
      * @notice Returns the spot price for `tokenOut` in terms of `tokenIn` without swapFee.
      * @param tokenIn Bound tokenIn address.
      * @param tokenOut Bound tokenOut address.
-     * @return amount of tokenIn in wei for 1 ether of tokenOut.
+     * @return spotPrice - amount of tokenIn in wei for 1 ether of tokenOut.
      */
     function getSpotPriceSansFee(address tokenIn, address tokenOut)
         external view
@@ -760,8 +763,8 @@ contract BPool is BToken, BMath, BPoolInterface {
     * @param tokenOut Token to swap out.
     * @param minAmountOut Minimum amount of `tokenOut` to receive.
     * @param maxPrice Maximum ratio of input to output tokens.
-    * @return tokenAmountOut.
-    * @return spotPriceAfter.
+    * @return tokenAmountOut
+    * @return spotPriceAfter
     */
     function swapExactAmountIn(
         address tokenIn,
