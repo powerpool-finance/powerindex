@@ -224,7 +224,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 _underlyingAmount,
     IERC20 _underlyingToken,
     uint256 _piTotalSupply
-  ) public view override returns (uint256) {
+  ) public view virtual override returns (uint256) {
     uint256 underlyingOnPiToken = _underlyingToken.balanceOf(address(piToken));
     return
       getPiEquivalentForUnderlyingPure(
@@ -239,7 +239,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 _underlyingAmount,
     uint256 _totalUnderlyingWrapped,
     uint256 _piTotalSupply
-  ) public pure override returns (uint256) {
+  ) public pure virtual override returns (uint256) {
     if (_piTotalSupply == 0) {
       return _underlyingAmount;
     }
@@ -251,7 +251,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 _piAmount,
     IERC20 _underlyingToken,
     uint256 _piTotalSupply
-  ) public view override returns (uint256) {
+  ) public view virtual override returns (uint256) {
     uint256 underlyingOnPiToken = _underlyingToken.balanceOf(address(piToken));
     return
       getUnderlyingEquivalentForPiPure(
@@ -266,7 +266,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 _piAmount,
     uint256 _totalUnderlyingWrapped,
     uint256 _piTotalSupply
-  ) public pure override returns (uint256) {
+  ) public pure virtual override returns (uint256) {
     if (_piTotalSupply == 0) {
       return _piAmount;
     }
