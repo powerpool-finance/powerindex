@@ -56,7 +56,8 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
   }
 
   /**
-   * @notice Set the old token's target weight to MIN_WEIGHT and add a new token with a previous weight of the old token.
+   * @notice Set the old token's target weight to MIN_WEIGHT and add a new token
+   * with a previous weight of the old token.
    * @param oldToken Token to replace.
    * @param newToken New token.
    * @param balance Initial new token balance.
@@ -130,7 +131,8 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
   /*** Internal Functions ***/
 
   /**
-   * @notice Set the old token's target weight to MIN_WEIGHT and add a new token with a previous weight of the old token.
+   * @notice Set the old token's target weight to MIN_WEIGHT and
+   * add a new token with a previous weight of the old token.
    * @param oldToken Token to replace
    * @param newToken New token
    * @param balance Initial new token balance
