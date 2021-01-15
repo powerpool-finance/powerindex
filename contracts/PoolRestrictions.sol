@@ -14,7 +14,7 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
   /** @dev Emitted on changing signature restriction. */
   event SetSignatureAllowed(bytes4 indexed signature, bool allowed);
 
-  /** @dev Emitted on changing signature restriction for specific voting. */
+  /** @dev Emitted on changing signature restriction for specific voting contract. */
   event SetSignatureAllowedForAddress(
     address indexed voting,
     bytes4 indexed signature,
@@ -25,7 +25,7 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
   /** @dev Emitted on adding or removing sender for voting execution. */
   event SetVotingSenderAllowed(address indexed voting, address indexed sender, bool allowed);
 
-  /** @dev Emitted on adding or removing operators without fees. */
+  /** @dev Emitted on adding or removing contracts without fees. */
   event SetWithoutFee(address indexed addr, bool withoutFee);
 
   /* ==========  Storage  ========== */
@@ -78,7 +78,7 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
   }
 
   /**
-   * @dev Set signatures allowing status for specific votings.
+   * @dev Set signatures allowing status for specific voting addresses.
    * @param _votingAddress Specific voting address.
    * @param _override Override signature status by specific voting address or not.
    * @param _signatures List of signatures.
@@ -94,7 +94,7 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
   }
 
   /**
-   * @dev Set senders allowing status for voting's addresses.
+   * @dev Set senders allowing status for voting addresses.
    * @param _votingAddress Specific voting address.
    * @param _senders List of senders.
    * @param _allowed List of booleans (allowed or not) for each sender.
@@ -114,7 +114,7 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
   }
 
   /**
-   * @dev Set operators, who doesn't pay community fee.
+   * @dev Set contracts, which doesn't pay community fee.
    * @param _addresses List of operators.
    * @param _withoutFee Boolean for whole list of operators.
    */

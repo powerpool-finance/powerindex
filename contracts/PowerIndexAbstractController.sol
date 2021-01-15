@@ -21,7 +21,7 @@ contract PowerIndexAbstractController is Ownable {
   }
 
   /**
-   * @notice Call any function from pool, except prohibited signatures
+   * @notice Call any function from pool, except prohibited signatures.
    * @param signature Method signature
    * @param args Encoded method inputs
    */
