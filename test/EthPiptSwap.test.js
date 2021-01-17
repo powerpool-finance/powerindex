@@ -18,8 +18,8 @@ const MockBPoolClient = artifacts.require('MockBPoolClient');
 const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
-const BasicPowerIndexRouterFactory = artifacts.require('BasicPowerIndexRouterFactory');
-const PowerIndexBasicRouter = artifacts.require('PowerIndexBasicRouter');
+const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRouterFactory');
+const PowerIndexBasicRouter = artifacts.require('MockPowerIndexBasicRouter');
 
 WETH.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
@@ -471,8 +471,8 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
       );
     })
 
-    describe('swapErc20ToPipt with piToken and ethFee should work properly', async () => {
-      let erc20PiptSwap;
+    describe.only('swapErc20ToPipt with piToken and ethFee should work properly', async () => {
+      let erc20PiptSwap, piTokenTotalEthFee;
       const piTokenEthFee = ether(0.0001).toString();
 
       beforeEach(async () => {
@@ -497,20 +497,35 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         await poolWrapper.setController(poolController.address);
         await pool.setController(poolController.address);
 
-        const res = await poolController.replacePoolTokenWithNewPiToken(balancerTokens[0].address, routerFactory.address, defaultFactoryArguments, 'W T 2', 'WT2', {
+        let res = await poolController.replacePoolTokenWithNewPiToken(balancerTokens[0].address, routerFactory.address, defaultFactoryArguments, 'W T 1', 'WT1', {
           value: piTokenEthFee
         });
-        const router = await PowerIndexBasicRouter.at(
+        const router1 = await PowerIndexBasicRouter.at(
           res.receipt.logs.filter(l => l.event === 'CreatePiToken')[0].args.router,
         );
-
-        await router.setPiTokenEthFee(piTokenEthFee);
-
-        await poolWrapper.updatePiTokenEthFees([balancerTokens[0].address]);
+        await router1.setPiTokenEthFee(piTokenEthFee);
+        await router1.mockSetRate(ether('0.5'));
 
         await time.increase(60);
 
         await poolController.finishReplace();
+
+        res = await poolController.replacePoolTokenWithNewPiToken(balancerTokens[1].address, routerFactory.address, defaultFactoryArguments, 'W T 2', 'WT2', {
+          value: piTokenEthFee
+        });
+        const router2 = await PowerIndexBasicRouter.at(
+          res.receipt.logs.filter(l => l.event === 'CreatePiToken')[0].args.router,
+        );
+        await router2.setPiTokenEthFee(piTokenEthFee);
+        await router2.mockSetRate(ether('1.5'));
+
+        await poolWrapper.updatePiTokenEthFees([balancerTokens[0].address, balancerTokens[1].address]);
+
+        await time.increase(60);
+
+        await poolController.finishReplace();
+
+        piTokenTotalEthFee = await poolWrapper.calcEthFeeForTokens([balancerTokens[0].address, balancerTokens[1].address]);
 
         erc20PiptSwap = await Erc20PiptSwap.new(
           this.weth.address,
@@ -541,8 +556,8 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         const slippage = ether('0.04');
 
         const {ethFee: ethInFee, ethAfterFee: ethInAfterFee} = await erc20PiptSwap.calcEthFee(ethToSwap);
-        assert.equal(ethInFee, ether('6.0001').toString(10));
-        assert.equal(ethInAfterFee, ether('593.9999').toString(10));
+        assert.equal(ethInFee, ether('6.0002').toString(10));
+        assert.equal(ethInAfterFee, ether('593.9998').toString(10));
 
         const swapEthToPiptInputs = await erc20PiptSwap.calcSwapEthToPiptInputs(
           ethInAfterFee,
@@ -585,12 +600,12 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         await pool.approve(erc20PiptSwap.address, poolOutAfterFee, {from: bob});
 
         bobBalanceBefore = await web3.eth.getBalance(bob);
-        res = await erc20PiptSwap.swapPiptToEth(poolOutAfterFee, {from: bob, value: piTokenEthFee, gasPrice});
+        res = await erc20PiptSwap.swapPiptToEth(poolOutAfterFee, {from: bob, value: piTokenTotalEthFee, gasPrice});
 
         weiUsed = res.receipt.gasUsed * gasPrice;
         balanceAfterWeiUsed = subBN(bobBalanceBefore, weiUsed);
 
-        assert.equal(subBN(addBN(balanceAfterWeiUsed, ethOutAfterFee), piTokenEthFee), await web3.eth.getBalance(bob));
+        assert.equal(subBN(addBN(balanceAfterWeiUsed, ethOutAfterFee), piTokenTotalEthFee), await web3.eth.getBalance(bob));
         assert.equal(await this.weth.balanceOf(erc20PiptSwap.address), addBN(ethInFee, ethOutFee));
       });
 
@@ -668,7 +683,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           await pool.approve(erc20PiptSwap.address, poolOutAfterFee, {from: bob});
 
           bobBalanceBefore = await usdToken.balanceOf(bob);
-          await erc20PiptSwap.swapPiptToErc20(tokenAddress, poolOutAfterFee, {from: bob, gasPrice, value: piTokenEthFee});
+          await erc20PiptSwap.swapPiptToErc20(tokenAddress, poolOutAfterFee, {from: bob, gasPrice, value: piTokenTotalEthFee});
 
           assert.equal(addBN(bobBalanceBefore, swapPiptToEthInputs.totalErc20Out), await usdToken.balanceOf(bob));
           assert.equal(await pool.balanceOf(bob), '0');
