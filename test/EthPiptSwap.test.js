@@ -81,7 +81,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
 
   const poolsData = JSON.parse(fs.readFileSync('data/poolsData.json', { encoding: 'utf8' }));
 
-  const gasPrice = 1000000000;
+  const gasPrice = 100 * 10**9;
 
   let minter, bob, feeManager, feeReceiver, permanentVotingPower;
   before(async function () {
@@ -274,6 +274,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
       let res = await ethPiptSwap.swapEthToPipt(slippage, { from: bob, value: ethToSwap, gasPrice });
 
       let weiUsed = res.receipt.gasUsed * gasPrice;
+      console.log('        swapEthToPipt gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
       let balanceAfterWeiUsed = subBN(bobBalanceBefore, weiUsed);
       const oddEth = res.receipt.logs.filter(l => l.event === 'OddEth')[0].args;
       assert.equal(subBN(addBN(balanceAfterWeiUsed, oddEth.amount), ethToSwap), await web3.eth.getBalance(bob));
@@ -328,6 +329,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
       res = await ethPiptSwap.swapPiptToEth(poolOutAfterFee, { from: bob, gasPrice });
 
       weiUsed = res.receipt.gasUsed * gasPrice;
+      console.log('        swapPiptToEth gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
       balanceAfterWeiUsed = subBN(bobBalanceBefore, weiUsed);
 
       assert.equal(addBN(balanceAfterWeiUsed, ethOutAfterFee), await web3.eth.getBalance(bob));
@@ -416,6 +418,8 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           await usdToken.approve(erc20PiptSwap.address, amountToSwap, {from: bob});
 
           let res = await erc20PiptSwap.swapErc20ToPipt(tokenAddress, amountToSwap, slippage, {from: bob, gasPrice});
+          let weiUsed = res.receipt.gasUsed * gasPrice;
+          console.log('          swapErc20ToPipt gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
 
           assert.equal(subBN(bobBalanceBefore, amountToSwap), await usdToken.balanceOf(bob));
           assert.equal(await this.weth.balanceOf(erc20PiptSwap.address), ethFee);
@@ -443,7 +447,9 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           await pool.approve(erc20PiptSwap.address, poolOutAfterFee, {from: bob});
 
           bobBalanceBefore = await usdToken.balanceOf(bob);
-          await erc20PiptSwap.swapPiptToErc20(tokenAddress, poolOutAfterFee, {from: bob, gasPrice});
+          res = await erc20PiptSwap.swapPiptToErc20(tokenAddress, poolOutAfterFee, {from: bob, gasPrice});
+          weiUsed = res.receipt.gasUsed * gasPrice;
+          console.log('          swapErc20ToPipt gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
 
           assert.equal(addBN(bobBalanceBefore, swapPiptToEthInputs.totalErc20Out), await usdToken.balanceOf(bob));
           assert.equal(await pool.balanceOf(bob), '0');
@@ -471,7 +477,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
       );
     })
 
-    describe.only('swapErc20ToPipt with piToken and ethFee should work properly', async () => {
+    describe('swapErc20ToPipt with piToken and ethFee should work properly', async () => {
       let erc20PiptSwap, piTokenTotalEthFee;
       const piTokenEthFee = ether(0.0001).toString();
 
@@ -575,6 +581,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         let res = await erc20PiptSwap.swapEthToPipt(slippage, {from: bob, value: ethToSwap, gasPrice});
 
         let weiUsed = res.receipt.gasUsed * gasPrice;
+        console.log('          swapEthToPipt gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
         let balanceAfterWeiUsed = subBN(bobBalanceBefore, weiUsed);
         const oddEth = res.receipt.logs.filter(l => l.event === 'OddEth')[0].args;
         assert.equal(subBN(addBN(balanceAfterWeiUsed, oddEth.amount), ethToSwap), await web3.eth.getBalance(bob));
@@ -603,6 +610,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         res = await erc20PiptSwap.swapPiptToEth(poolOutAfterFee, {from: bob, value: piTokenTotalEthFee, gasPrice});
 
         weiUsed = res.receipt.gasUsed * gasPrice;
+        console.log('          swapPiptToEth gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
         balanceAfterWeiUsed = subBN(bobBalanceBefore, weiUsed);
 
         assert.equal(subBN(addBN(balanceAfterWeiUsed, ethOutAfterFee), piTokenTotalEthFee), await web3.eth.getBalance(bob));
@@ -656,6 +664,8 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           await usdToken.approve(erc20PiptSwap.address, amountToSwap, {from: bob});
 
           let res = await erc20PiptSwap.swapErc20ToPipt(tokenAddress, amountToSwap, slippage, {from: bob, gasPrice});
+          let weiUsed = res.receipt.gasUsed * gasPrice;
+          console.log('          swapErc20ToPipt gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
 
           assert.equal(subBN(bobBalanceBefore, amountToSwap), await usdToken.balanceOf(bob));
           assert.equal(await this.weth.balanceOf(erc20PiptSwap.address), ethFee);
@@ -683,7 +693,9 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           await pool.approve(erc20PiptSwap.address, poolOutAfterFee, {from: bob});
 
           bobBalanceBefore = await usdToken.balanceOf(bob);
-          await erc20PiptSwap.swapPiptToErc20(tokenAddress, poolOutAfterFee, {from: bob, gasPrice, value: piTokenTotalEthFee});
+          res = await erc20PiptSwap.swapPiptToErc20(tokenAddress, poolOutAfterFee, {from: bob, gasPrice, value: piTokenTotalEthFee});
+          weiUsed = res.receipt.gasUsed * gasPrice;
+          console.log('          swapPiptToErc20 gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
 
           assert.equal(addBN(bobBalanceBefore, swapPiptToEthInputs.totalErc20Out), await usdToken.balanceOf(bob));
           assert.equal(await pool.balanceOf(bob), '0');
