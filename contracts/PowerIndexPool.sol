@@ -150,12 +150,8 @@ contract PowerIndexPool is BPool {
   /**
    * @dev Override parent bind function and disable.
    */
-  function bind(
-    address,
-    uint256,
-    uint256
-  ) public override {
-    revert("DISABLED"); // Only new bind function is allowed
+  function bind(address token, uint balance, uint denorm) public override {
+    super.bind(token, balance, denorm);
   }
 
   /**

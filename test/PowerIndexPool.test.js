@@ -14,6 +14,8 @@ const _ = require('lodash');
 const pIteration = require('p-iteration');
 
 PowerIndexPool.numberFormat = 'String';
+MockERC20.numberFormat = 'String';
+MockCvp.numberFormat = 'String';
 
 const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
@@ -137,10 +139,10 @@ describe('PowerIndexPool', () => {
     pool = await PowerIndexPool.at(logNewPool.args.pool);
 
     this.getTokensToJoinPoolAndApprove = async (_pool, amountToMint) => {
-      const poolTotalSupply = (await _pool.totalSupply()).toString(10);
+      const poolTotalSupply = await _pool.totalSupply();
       const ratio = divScalarBN(amountToMint, poolTotalSupply);
-      const token1Amount = mulScalarBN(ratio, (await _pool.getBalance(this.token1.address)).toString(10));
-      const token2Amount = mulScalarBN(ratio, (await _pool.getBalance(this.token2.address)).toString(10));
+      const token1Amount = mulScalarBN(ratio, await _pool.getBalance(this.token1.address));
+      const token2Amount = mulScalarBN(ratio, await _pool.getBalance(this.token2.address));
       await this.token1.approve(this.bActions.address, token1Amount);
       await this.token2.approve(this.bActions.address, token2Amount);
       return [token1Amount, token2Amount];
@@ -233,7 +235,7 @@ describe('PowerIndexPool', () => {
           await getDenormWeight(_tokenTo, await getTimestamp(1)),
           swapFee,
         )
-      ).toString(10);
+      );
 
       await this.bExchange.multihopBatchSwapExactIn(
         [
@@ -293,9 +295,60 @@ describe('PowerIndexPool', () => {
 
         await this.multihopBatchSwapExactIn(tokens[0], tokens[1], amountToSwap);
 
-        assert.equal((await this.token1.balanceOf(communityWallet)).toString(), amountCommunitySwapFee.toString());
+        assert.equal(await this.token1.balanceOf(communityWallet), amountCommunitySwapFee.toString());
       });
     }
+  });
+
+  it('gulp should work properly with bound token', async () => {
+    const excessBalance = ether('1');
+    const poolMappingBalance = await pool.getBalance(this.token1.address);
+    const poolActualBalance = await this.token1.balanceOf(pool.address);
+    const pvpBalance = await this.token1.balanceOf(communityWallet);
+
+    await this.token1.transfer(pool.address, excessBalance);
+
+    assert.equal(poolMappingBalance, await pool.getBalance(this.token1.address));
+    assert.equal(addBN(poolActualBalance, excessBalance), await this.token1.balanceOf(pool.address));
+
+    await pool.gulp(this.token1.address);
+
+    assert.equal(poolMappingBalance, await pool.getBalance(this.token1.address));
+    assert.equal(poolActualBalance, await this.token1.balanceOf(pool.address));
+    assert.equal(addBN(pvpBalance, excessBalance), await this.token1.balanceOf(communityWallet));
+
+    await pool.gulp(this.token1.address);
+
+    assert.equal(poolMappingBalance, await pool.getBalance(this.token1.address));
+    assert.equal(poolActualBalance, await this.token1.balanceOf(pool.address));
+  });
+
+  it('gulp should work properly with not bound token', async () => {
+    const newToken = await MockERC20.new('My Token 2', 'MT2', '18', ether('1000000'));
+
+    const excessBalance = ether('1');
+    assert.equal(await pool.isBound(newToken.address), false);
+    const poolActualBalance = await newToken.balanceOf(pool.address);
+    const pvpBalance = await newToken.balanceOf(communityWallet);
+
+    await newToken.transfer(pool.address, excessBalance);
+
+    assert.equal(addBN(poolActualBalance, excessBalance), await newToken.balanceOf(pool.address));
+
+    await pool.gulp(newToken.address);
+
+    assert.equal(poolActualBalance, await newToken.balanceOf(pool.address));
+    assert.equal(addBN(pvpBalance, excessBalance), await newToken.balanceOf(communityWallet));
+
+    await pool.gulp(newToken.address);
+
+    assert.equal(poolActualBalance, await newToken.balanceOf(pool.address));
+  });
+
+  it('gulp should support wrapper mode', async () => {
+    await pool.setWrapper(alice, true);
+
+    await expectRevert(pool.gulp(this.token1.address), "ONLY_WRAPPER");
   });
 
   describe('restoring ratio after weight changing', () => {

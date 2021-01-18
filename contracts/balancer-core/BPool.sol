@@ -619,8 +619,11 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _requireTokenIsBound(token);
-        _records[token].balance = IERC20(token).balanceOf(address(this));
+        _onlyWrapperOrNotWrapperMode();
+        uint256 diff = bsub(IERC20(token).balanceOf(address(this)), _records[token].balance);
+        if (diff > 0) {
+          IERC20(token).transfer(_communityFeeReceiver, diff);
+        }
     }
 
     /* ==========  Price Queries  ========== */
@@ -829,7 +832,7 @@ contract BPool is BToken, BMath, BPoolInterface {
             spotPriceBefore <= bdiv(tokenAmountInAfterFee, tokenAmountOut),
             "MATH_APPROX"
         );
-      require(spotPriceAfter <= maxPrice, "LIMIT_PRICE");
+        require(spotPriceAfter <= maxPrice, "LIMIT_PRICE");
 
         emit LOG_SWAP(msg.sender, tokenIn, tokenOut, tokenAmountInAfterFee, tokenAmountOut);
 
