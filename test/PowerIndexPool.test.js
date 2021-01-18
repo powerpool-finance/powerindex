@@ -351,6 +351,12 @@ describe('PowerIndexPool', () => {
     await expectRevert(pool.gulp(this.token1.address), "ONLY_WRAPPER");
   });
 
+  it('gulp should support wrapper mode', async () => {
+    await pool.setWrapper(alice, true);
+
+    await expectRevert(pool.gulp(this.token1.address), "ONLY_WRAPPER");
+  });
+
   describe('restoring ratio after weight changing', () => {
     let amountToSwapBefore,
       amountToSwapAfter,

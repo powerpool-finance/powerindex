@@ -25,6 +25,13 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     uint256 targetTimestamp;
   }
 
+  address public weightsStrategy;
+
+  modifier onlyWeightsStrategy() {
+    require(msg.sender == weightsStrategy, "WEIGHTS_STRATEGY");
+    _;
+  }
+
   constructor(
     address _pool,
     address _poolWrapper,
@@ -97,6 +104,22 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
    * @param _dynamicWeights Tokens dynamic weights configs.
    */
   function setDynamicWeightList(DynamicWeightInput[] memory _dynamicWeights) external onlyOwner {
+    uint256 len = _dynamicWeights.length;
+    for (uint256 i = 0; i < len; i++) {
+      pool.setDynamicWeight(
+        _dynamicWeights[i].token,
+        _dynamicWeights[i].targetDenorm,
+        _dynamicWeights[i].fromTimestamp,
+        _dynamicWeights[i].targetTimestamp
+      );
+    }
+  }
+
+  /**
+   * @notice Call setDynamicWeight for several tokens, can be called only by weightsStrategy address.
+   * @param _dynamicWeights Tokens dynamic weights configs.
+   */
+  function setDynamicWeightListByStrategy(DynamicWeightInput[] memory _dynamicWeights) external onlyWeightsStrategy {
     uint256 len = _dynamicWeights.length;
     for (uint256 i = 0; i < len; i++) {
       pool.setDynamicWeight(
