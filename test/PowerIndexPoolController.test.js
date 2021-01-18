@@ -209,7 +209,7 @@ describe('PowerIndexPoolController', () => {
 
     await expectRevert(
       controller.setDynamicWeightListByStrategy([dwArg], {from: minter}),
-      "ONLY_WEIGHTS_STRATEGY"
+      'ONLY_WEIGHTS_STRATEGY'
     );
 
     await controller.setDynamicWeightListByStrategy([dwArg], {from: weightsStrategy});
@@ -219,12 +219,12 @@ describe('PowerIndexPoolController', () => {
     assert.equal(dw.targetTimestamp, dwArg.targetTimestamp);
     assert.equal(dw.targetDenorm, dwArg.targetDenorm);
 
-    await expectRevert(controller.setWeightsStrategy(alice, {from: weightsStrategy}), "Ownable: caller is not the owner");
+    await expectRevert(controller.setWeightsStrategy(alice, {from: weightsStrategy}), 'Ownable: caller is not the owner');
 
     await controller.setWeightsStrategy(alice, {from: minter});
     assert.equal(await controller.weightsStrategy(), alice);
 
-    await expectRevert(controller.setDynamicWeightListByStrategy([dwArg], {from: weightsStrategy}), "ONLY_WEIGHTS_STRATEGY");
+    await expectRevert(controller.setDynamicWeightListByStrategy([dwArg], {from: weightsStrategy}), 'ONLY_WEIGHTS_STRATEGY');
   });
 
   it('should allow swapping a token with a new version', async () => {
