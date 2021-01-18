@@ -77,6 +77,7 @@ describe('PowerIndexWrapper', () => {
   const minWeightPerSecond = ether('0.00000001').toString();
   const maxWeightPerSecond = ether('0.1').toString();
   const piTokenEthFee = ether(0.0001).toString();
+  const gasPrice = 100 * 10**9;
 
   let tokens, pool, poolWrapper, poolController, routerFactory, router;
   let defaultFactoryArguments;
@@ -311,7 +312,6 @@ describe('PowerIndexWrapper', () => {
           mulScalarBN(price, ether('1.05')),
           { from: alice, value: ethFee },
         );
-
         assert.equal(await this.token1.balanceOf(alice), '0');
         assert.equal(
           await this.token1.balanceOf(pool.address),
@@ -349,7 +349,7 @@ describe('PowerIndexWrapper', () => {
           swapFee,
         );
 
-        await poolWrapper.swapExactAmountIn(
+        const res = await poolWrapper.swapExactAmountIn(
           this.token2.address,
           amountToSwap,
           this.token1.address,
@@ -357,6 +357,8 @@ describe('PowerIndexWrapper', () => {
           mulScalarBN(price, ether('1.05')),
           { from: alice, value: ethFee },
         );
+        const weiUsed = res.receipt.gasUsed * gasPrice;
+        console.log('        swapExactAmountIn gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
 
         assert.equal(await this.token2.balanceOf(alice), subBN(token2AliceBalanceBefore, amountToSwap));
         assert.equal(
@@ -398,7 +400,7 @@ describe('PowerIndexWrapper', () => {
           swapFee,
         );
 
-        await poolWrapper.swapExactAmountIn(
+        const res = await poolWrapper.swapExactAmountIn(
           this.token2.address,
           amountToSwap,
           this.token1.address,
@@ -406,6 +408,8 @@ describe('PowerIndexWrapper', () => {
           mulScalarBN(price, ether('1.05')),
           { from: alice, value: ethFee },
         );
+        const weiUsed = res.receipt.gasUsed * gasPrice;
+        console.log('        swapExactAmountIn gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
 
         assert.equal(await this.token2.balanceOf(alice), subBN(token2AliceBalanceBefore, amountToSwap));
         assertEqualWithAccuracy(
@@ -946,11 +950,13 @@ describe('PowerIndexWrapper', () => {
         //   'function call failed to execute',
         // );
 
-        await poolWrapper.joinPool(
+        const res = await poolWrapper.joinPool(
           poolOutAmount,
           [token1InAmount, token2InAmount],
           { from: alice, value: ethFee }
         );
+        const weiUsed = res.receipt.gasUsed * gasPrice;
+        console.log('        joinPool gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
 
         assert.equal(await this.token1.balanceOf(alice), subBN(token1AliceBalanceBefore, token1InAmount));
         assert.equal(await this.token2.balanceOf(alice), subBN(token2AliceBalanceBefore, token2InAmount));
@@ -1030,11 +1036,13 @@ describe('PowerIndexWrapper', () => {
         const poolOutAmountFee = mulScalarBN(poolOutAmount, communityJoinFee);
         const poolOutAmountAfterFee = subBN(poolOutAmount, poolOutAmountFee);
 
-        await poolWrapper.joinPool(
+        const res = await poolWrapper.joinPool(
           poolOutAmount,
           [token2InAmount, token1InAmount],
           { from: alice, value: ethFee }
         );
+        const weiUsed = res.receipt.gasUsed * gasPrice;
+        console.log('        joinPool gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
 
         assert.equal(await this.token1.balanceOf(alice), subBN(token1AliceBalanceBefore, token1InAmount));
         assert.equal(await this.token2.balanceOf(alice), subBN(token2AliceBalanceBefore, token2InAmount));
