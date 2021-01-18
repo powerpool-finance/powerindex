@@ -490,7 +490,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
 
         const piTokenFactory = await WrappedPiErc20Factory.new();
         const routerFactory = await BasicPowerIndexRouterFactory.new();
-        const poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, piTokenFactory.address);
+        const poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, piTokenFactory.address, zeroAddress);
 
         await pool.setWrapper(poolWrapper.address, true);
 

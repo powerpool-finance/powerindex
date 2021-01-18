@@ -186,7 +186,7 @@ describe('PowerIndexPool Unit', () => {
       );
     });
     it('original bind should be disabled in controller', async () => {
-      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress);
+      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
 
       const bindSig = pool.contract._jsonInterface.filter(item => item.name === 'bind' && item.inputs.length === 5)[0]
@@ -201,7 +201,7 @@ describe('PowerIndexPool Unit', () => {
       );
     });
     it('original unbind should be disabled in controller', async () => {
-      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress);
+      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
 
       const unbindSig = pool.contract._jsonInterface.filter(item => item.name === 'unbind')[0].signature;

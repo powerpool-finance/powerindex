@@ -66,6 +66,7 @@ WETH.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 
 describe('PowerIndexWrapper', () => {
+  const zeroAddress = '0x0000000000000000000000000000000000000000';
   const name = 'My Pool';
   const symbol = 'MP';
   const balances = [ether('10'), ether('20')];
@@ -143,7 +144,7 @@ describe('PowerIndexWrapper', () => {
 
     const piTokenFactory = await WrappedPiErc20Factory.new();
     routerFactory = await BasicPowerIndexRouterFactory.new();
-    poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, piTokenFactory.address);
+    poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, piTokenFactory.address, zeroAddress);
 
     await pool.setWrapper(poolWrapper.address, true);
 

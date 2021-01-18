@@ -25,18 +25,25 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     uint256 targetTimestamp;
   }
 
+  /** @dev Emitted on setting new weights strategy. */
+  event SetWeightsStrategy(address indexed weightsStrategy);
+
+  /** @dev Weights strategy contract address. */
   address public weightsStrategy;
 
   modifier onlyWeightsStrategy() {
-    require(msg.sender == weightsStrategy, "WEIGHTS_STRATEGY");
+    require(msg.sender == weightsStrategy, "ONLY_WEIGHTS_STRATEGY");
     _;
   }
 
   constructor(
     address _pool,
     address _poolWrapper,
-    address _wrapperFactory
-  ) public PowerIndexWrappedController(_pool, _poolWrapper, _wrapperFactory) {}
+    address _wrapperFactory,
+    address _weightsStrategy
+  ) public PowerIndexWrappedController(_pool, _poolWrapper, _wrapperFactory) {
+    weightsStrategy = _weightsStrategy;
+  }
 
   /* ==========  Configuration Actions  ========== */
 
@@ -113,6 +120,15 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
         _dynamicWeights[i].targetTimestamp
       );
     }
+  }
+
+  /**
+   * @notice Set _weightsStrategy address.
+   * @param _weightsStrategy Contract for weights management.
+   */
+  function setWeightsStrategy(address _weightsStrategy) external onlyOwner {
+    weightsStrategy = _weightsStrategy;
+    emit SetWeightsStrategy(_weightsStrategy);
   }
 
   /**
