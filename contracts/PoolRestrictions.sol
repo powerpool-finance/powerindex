@@ -6,39 +6,61 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IPoolRestrictions.sol";
 
 contract PoolRestrictions is IPoolRestrictions, Ownable {
+  /* ==========  EVENTS  ========== */
+
+  /** @dev Emitted on changing total restrictions for token. */
   event SetTotalRestrictions(address indexed token, uint256 maxTotalSupply);
+
+  /** @dev Emitted on changing signature restriction. */
   event SetSignatureAllowed(bytes4 indexed signature, bool allowed);
+
+  /** @dev Emitted on changing signature restriction for specific voting contract. */
   event SetSignatureAllowedForAddress(
     address indexed voting,
     bytes4 indexed signature,
     bool allowed,
     bool overrideAllowed
   );
+
+  /** @dev Emitted on adding or removing sender for voting execution. */
   event SetVotingSenderAllowed(address indexed voting, address indexed sender, bool allowed);
+
+  /** @dev Emitted on adding or removing contracts without fees. */
   event SetWithoutFee(address indexed addr, bool withoutFee);
+
+  /* ==========  Storage  ========== */
 
   struct TotalRestrictions {
     uint256 maxTotalSupply;
   }
-  // token => restrictions
+  /** @dev Public records of restrictions by pool's addresses. */
   mapping(address => TotalRestrictions) public totalRestrictions;
 
-  // signature => allowed
+  /** @dev Public records of general signature's restrictions. */
   mapping(bytes4 => bool) public signaturesAllowed;
 
   struct VotingSignature {
     bool allowed;
     bool overrideAllowed;
   }
-  // votingAddress => signature => data
+  /** @dev Public records of signature's restrictions by specific votings. */
   mapping(address => mapping(bytes4 => VotingSignature)) public votingSignatures;
-  // votingAddress => sender => boolean
+
+  /** @dev Public records of senders allowed by voting's addresses */
   mapping(address => mapping(address => bool)) public votingSenderAllowed;
 
+  /** @dev Public records of operators, who doesn't pay community fee */
   mapping(address => bool) public withoutFeeAddresses;
 
   constructor() public Ownable() {}
 
+  /* ==========  Configuration Actions  ========== */
+
+  /**
+   * @dev Set total restrictions for pools list.
+   * @param _poolsList List of pool's addresses.
+   * @param _maxTotalSupplyList List of total supply limits for each pool address.
+   */
   function setTotalRestrictions(address[] calldata _poolsList, uint256[] calldata _maxTotalSupplyList)
     external
     onlyOwner
@@ -46,10 +68,22 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
     _setTotalRestrictions(_poolsList, _maxTotalSupplyList);
   }
 
+  /**
+   * @dev Set voting signatures allowing status.
+   * @param _signatures List of signatures.
+   * @param _allowed List of booleans (allowed or not) for each signature.
+   */
   function setVotingSignatures(bytes4[] calldata _signatures, bool[] calldata _allowed) external onlyOwner {
     _setVotingSignatures(_signatures, _allowed);
   }
 
+  /**
+   * @dev Set signatures allowing status for specific voting addresses.
+   * @param _votingAddress Specific voting address.
+   * @param _override Override signature status by specific voting address or not.
+   * @param _signatures List of signatures.
+   * @param _allowed List of booleans (allowed or not) for each signature.
+   */
   function setVotingSignaturesForAddress(
     address _votingAddress,
     bool _override,
@@ -59,6 +93,12 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
     _setVotingSignaturesForAddress(_votingAddress, _override, _signatures, _allowed);
   }
 
+  /**
+   * @dev Set senders allowing status for voting addresses.
+   * @param _votingAddress Specific voting address.
+   * @param _senders List of senders.
+   * @param _allowed List of booleans (allowed or not) for each sender.
+   */
   function setVotingAllowedForSenders(
     address _votingAddress,
     address[] calldata _senders,
@@ -73,6 +113,11 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
     }
   }
 
+  /**
+   * @dev Set contracts, which doesn't pay community fee.
+   * @param _addresses List of operators.
+   * @param _withoutFee Boolean for whole list of operators.
+   */
   function setWithoutFee(address[] calldata _addresses, bool _withoutFee) external onlyOwner {
     uint256 len = _addresses.length;
     _validateArrayLength(len);
@@ -81,6 +126,8 @@ contract PoolRestrictions is IPoolRestrictions, Ownable {
       emit SetWithoutFee(_addresses[i], _withoutFee);
     }
   }
+
+  /* ==========  Config Queries  ========== */
 
   function getMaxTotalSupply(address _poolAddress) external view override returns (uint256) {
     return totalRestrictions[_poolAddress].maxTotalSupply;

@@ -4,12 +4,13 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "../balancer-core/BMath.sol";
 import "../interfaces/BPoolInterface.sol";
 import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/PowerIndexWrapperInterface.sol";
 import "../lib/ControllerOwnable.sol";
 
-contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
+contract PowerIndexWrapper is ControllerOwnable, BMath, PowerIndexWrapperInterface {
   using SafeMath for uint256;
 
   event SetPiTokenForUnderlying(address indexed underlyingToken, address indexed piToken);
@@ -68,19 +69,38 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     uint256 tokenAmountOut,
     uint256 maxPrice
   ) external payable override returns (uint256 tokenAmountIn, uint256 spotPriceAfter) {
-    address factTokenIn = _processUnderlyingTokenIn(tokenIn, maxAmountIn);
-    address factTokenOut = _getFactToken(tokenOut);
+    (address actualTokenIn, uint256 actualMaxAmountIn) = _getActualTokenAndAmount(tokenIn, maxAmountIn);
+    (address actualTokenOut, uint256 actualTokenAmountOut) = _getActualTokenAndAmount(tokenOut, tokenAmountOut);
+    uint256 actualMaxPrice =
+      getActualMaxPrice(maxAmountIn, actualMaxAmountIn, tokenAmountOut, actualTokenAmountOut, maxPrice);
+    uint256 amountInRate = actualMaxAmountIn.mul(uint256(1 ether)).div(maxAmountIn);
+
+    uint256 prevMaxAmount = actualMaxAmountIn;
+    actualMaxAmountIn = calcInGivenOut(
+      bpool.getBalance(actualTokenIn),
+      bpool.getDenormalizedWeight(actualTokenIn),
+      bpool.getBalance(actualTokenOut),
+      bpool.getDenormalizedWeight(actualTokenOut),
+      actualTokenAmountOut,
+      bpool.getSwapFee()
+    );
+    if (prevMaxAmount > actualMaxAmountIn) {
+      maxAmountIn = actualMaxAmountIn.mul(uint256(1 ether)).div(amountInRate);
+    } else {
+      actualMaxAmountIn = prevMaxAmount;
+    }
+
+    _processUnderlyingTokenIn(tokenIn, maxAmountIn);
 
     (tokenAmountIn, spotPriceAfter) = bpool.swapExactAmountOut(
-      factTokenIn,
-      maxAmountIn,
-      factTokenOut,
-      tokenAmountOut,
-      maxPrice
+      actualTokenIn,
+      actualMaxAmountIn,
+      actualTokenOut,
+      actualTokenAmountOut,
+      actualMaxPrice
     );
 
-    _processUnderlyingTokenOut(tokenIn, maxAmountIn.sub(tokenAmountIn));
-    _processUnderlyingTokenOutBalance(tokenOut);
+    _processUnderlyingOrPiTokenOutBalance(tokenOut);
 
     return (tokenAmountIn, spotPriceAfter);
   }
@@ -92,51 +112,64 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     uint256 minAmountOut,
     uint256 maxPrice
   ) external payable override returns (uint256 tokenAmountOut, uint256 spotPriceAfter) {
-    address factTokenIn = _processUnderlyingTokenIn(tokenIn, tokenAmountIn);
-    address factTokenOut = _getFactToken(tokenOut);
+    (address actualTokenIn, uint256 actualAmountIn) = _processUnderlyingTokenIn(tokenIn, tokenAmountIn);
+    (address actualTokenOut, uint256 actualMinAmountOut) = _getActualTokenAndAmount(tokenOut, minAmountOut);
+    uint256 actualMaxPrice =
+      getActualMaxPrice(tokenAmountIn, actualAmountIn, minAmountOut, actualMinAmountOut, maxPrice);
 
     (tokenAmountOut, spotPriceAfter) = bpool.swapExactAmountIn(
-      factTokenIn,
-      tokenAmountIn,
-      factTokenOut,
-      minAmountOut,
-      maxPrice
+      actualTokenIn,
+      actualAmountIn,
+      actualTokenOut,
+      actualMinAmountOut,
+      actualMaxPrice
     );
 
-    _processUnderlyingTokenOutBalance(tokenOut);
+    _processUnderlyingOrPiTokenOutBalance(tokenOut);
 
     return (tokenAmountOut, spotPriceAfter);
   }
 
   function joinPool(uint256 poolAmountOut, uint256[] memory maxAmountsIn) external payable override {
-    address[] memory tokens = bpool.getFinalTokens();
+    address[] memory tokens = getCurrentTokens();
     uint256 len = tokens.length;
     require(maxAmountsIn.length == len, "ERR_LENGTH_MISMATCH");
 
     uint256 ratio = poolAmountOut.mul(1 ether).div(bpool.totalSupply()).add(100);
 
     for (uint256 i = 0; i < len; i++) {
-      address factToken = piTokenByUnderlying[tokens[i]];
-      factToken = factToken == address(0) ? tokens[i] : factToken;
+      (address actualToken, uint256 actualMaxAmountIn) = _getActualTokenAndAmount(tokens[i], maxAmountsIn[i]);
+      uint256 amountInRate = actualMaxAmountIn.mul(uint256(1 ether)).div(maxAmountsIn[i]);
 
-      uint256 prevMaxAmount = maxAmountsIn[i];
-      maxAmountsIn[i] = ratio.mul(bpool.getBalance(factToken)).div(1 ether);
-      maxAmountsIn[i] = prevMaxAmount > maxAmountsIn[i] ? maxAmountsIn[i] : prevMaxAmount;
+      uint256 prevMaxAmount = actualMaxAmountIn;
+      actualMaxAmountIn = ratio.mul(bpool.getBalance(actualToken)).div(1 ether);
+      if (prevMaxAmount > actualMaxAmountIn) {
+        maxAmountsIn[i] = actualMaxAmountIn.mul(uint256(1 ether)).div(amountInRate);
+      } else {
+        actualMaxAmountIn = prevMaxAmount;
+      }
 
-      _processUnderlyingOrPiTokenIn(tokens[i], maxAmountsIn[i]);
+      _processUnderlyingTokenIn(tokens[i], maxAmountsIn[i]);
+      maxAmountsIn[i] = actualMaxAmountIn;
     }
     bpool.joinPool(poolAmountOut, maxAmountsIn);
     require(bpool.transfer(msg.sender, bpool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
   }
 
-  function exitPool(uint256 poolAmountIn, uint256[] calldata minAmountsOut) external payable override {
-    address[] memory tokens = bpool.getFinalTokens();
-    require(minAmountsOut.length == tokens.length, "ERR_LENGTH_MISMATCH");
+  function exitPool(uint256 poolAmountIn, uint256[] memory minAmountsOut) external payable override {
+    address[] memory tokens = getCurrentTokens();
+    uint256 len = tokens.length;
+    require(minAmountsOut.length == len, "ERR_LENGTH_MISMATCH");
 
     bpool.transferFrom(msg.sender, address(this), poolAmountIn);
+
+    for (uint256 i = 0; i < len; i++) {
+      (, minAmountsOut[i]) = _getActualTokenAndAmount(tokens[i], minAmountsOut[i]);
+    }
+
     bpool.exitPool(poolAmountIn, minAmountsOut);
 
-    for (uint256 i = 0; i < tokens.length; i++) {
+    for (uint256 i = 0; i < len; i++) {
       _processUnderlyingOrPiTokenOutBalance(tokens[i]);
     }
   }
@@ -146,8 +179,8 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     uint256 tokenAmountIn,
     uint256 minPoolAmountOut
   ) external payable override returns (uint256 poolAmountOut) {
-    address factTokenIn = _processUnderlyingTokenIn(tokenIn, tokenAmountIn);
-    poolAmountOut = bpool.joinswapExternAmountIn(factTokenIn, tokenAmountIn, minPoolAmountOut);
+    (address actualTokenIn, uint256 actualAmountIn) = _processUnderlyingTokenIn(tokenIn, tokenAmountIn);
+    poolAmountOut = bpool.joinswapExternAmountIn(actualTokenIn, actualAmountIn, minPoolAmountOut);
     require(bpool.transfer(msg.sender, bpool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
     return poolAmountOut;
   }
@@ -157,9 +190,27 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     uint256 poolAmountOut,
     uint256 maxAmountIn
   ) external payable override returns (uint256 tokenAmountIn) {
-    address factTokenIn = _processUnderlyingTokenIn(tokenIn, maxAmountIn);
-    tokenAmountIn = bpool.joinswapPoolAmountOut(factTokenIn, poolAmountOut, maxAmountIn);
-    _processUnderlyingTokenOut(tokenIn, maxAmountIn.sub(tokenAmountIn));
+    (address actualTokenIn, uint256 actualMaxAmountIn) = _getActualTokenAndAmount(tokenIn, maxAmountIn);
+    uint256 amountInRate = actualMaxAmountIn.mul(uint256(1 ether)).div(maxAmountIn);
+
+    uint256 prevMaxAmount = maxAmountIn;
+    maxAmountIn = calcSingleInGivenPoolOut(
+      getBalance(tokenIn),
+      bpool.getDenormalizedWeight(actualTokenIn),
+      bpool.totalSupply(),
+      bpool.getTotalDenormalizedWeight(),
+      poolAmountOut,
+      bpool.getSwapFee()
+    );
+    if (prevMaxAmount > maxAmountIn) {
+      maxAmountIn = maxAmountIn;
+      actualMaxAmountIn = maxAmountIn.mul(amountInRate).div(uint256(1 ether));
+    } else {
+      maxAmountIn = prevMaxAmount;
+    }
+
+    _processUnderlyingTokenIn(tokenIn, maxAmountIn);
+    tokenAmountIn = bpool.joinswapPoolAmountOut(actualTokenIn, poolAmountOut, actualMaxAmountIn);
     require(bpool.transfer(msg.sender, bpool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
     return tokenAmountIn;
   }
@@ -171,9 +222,9 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
   ) external payable override returns (uint256 tokenAmountOut) {
     require(bpool.transferFrom(msg.sender, address(this), poolAmountIn), "ERR_TRANSFER_FAILED");
 
-    address factTokenOut = _getFactToken(tokenOut);
-    tokenAmountOut = bpool.exitswapPoolAmountIn(factTokenOut, poolAmountIn, minAmountOut);
-    _processUnderlyingTokenOutBalance(tokenOut);
+    (address actualTokenOut, uint256 actualMinAmountOut) = _getActualTokenAndAmount(tokenOut, minAmountOut);
+    tokenAmountOut = bpool.exitswapPoolAmountIn(actualTokenOut, poolAmountIn, actualMinAmountOut);
+    _processUnderlyingOrPiTokenOutBalance(tokenOut);
     return tokenAmountOut;
   }
 
@@ -184,9 +235,9 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
   ) external payable override returns (uint256 poolAmountIn) {
     require(bpool.transferFrom(msg.sender, address(this), maxPoolAmountIn), "ERR_TRANSFER_FAILED");
 
-    address factTokenOut = _getFactToken(tokenOut);
-    poolAmountIn = bpool.exitswapExternAmountOut(factTokenOut, tokenAmountOut, maxPoolAmountIn);
-    _processUnderlyingTokenOutBalance(tokenOut);
+    (address actualTokenOut, uint256 actualTokenAmountOut) = _getActualTokenAndAmount(tokenOut, tokenAmountOut);
+    poolAmountIn = bpool.exitswapExternAmountOut(actualTokenOut, actualTokenAmountOut, maxPoolAmountIn);
+    _processUnderlyingOrPiTokenOutBalance(tokenOut);
     require(bpool.transfer(msg.sender, maxPoolAmountIn.sub(poolAmountIn)), "ERR_TRANSFER_FAILED");
     return poolAmountIn;
   }
@@ -198,17 +249,95 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     uint256 tokenWeightOut,
     uint256 tokenAmountOut,
     uint256 swapFee
-  ) public view returns (uint256 tokenAmountIn) {
+  ) public pure override returns (uint256) {
     return
-      bpool.calcInGivenOut(tokenBalanceIn, tokenWeightIn, tokenBalanceOut, tokenWeightOut, tokenAmountOut, swapFee);
+      super.calcInGivenOut(tokenBalanceIn, tokenWeightIn, tokenBalanceOut, tokenWeightOut, tokenAmountOut, swapFee).add(
+        1
+      );
   }
 
-  function getBalance(address token) external view returns (uint256) {
-    return bpool.getBalance(token);
+  function calcSingleInGivenPoolOut(
+    uint256 tokenBalanceIn,
+    uint256 tokenWeightIn,
+    uint256 poolSupply,
+    uint256 totalWeight,
+    uint256 poolAmountOut,
+    uint256 swapFee
+  ) public pure override returns (uint256) {
+    return
+      super
+        .calcSingleInGivenPoolOut(tokenBalanceIn, tokenWeightIn, poolSupply, totalWeight, poolAmountOut, swapFee)
+        .add(1);
+  }
+
+  function calcPoolInGivenSingleOut(
+    uint256 tokenBalanceOut,
+    uint256 tokenWeightOut,
+    uint256 poolSupply,
+    uint256 totalWeight,
+    uint256 tokenAmountOut,
+    uint256 swapFee
+  ) public pure override returns (uint256) {
+    return
+      super
+        .calcPoolInGivenSingleOut(tokenBalanceOut, tokenWeightOut, poolSupply, totalWeight, tokenAmountOut, swapFee)
+        .add(1);
+  }
+
+  function calcSpotPrice(
+    uint256 tokenBalanceIn,
+    uint256 tokenWeightIn,
+    uint256 tokenBalanceOut,
+    uint256 tokenWeightOut,
+    uint256 swapFee
+  ) public pure override returns (uint256) {
+    return super.calcSpotPrice(tokenBalanceIn, tokenWeightIn, tokenBalanceOut, tokenWeightOut, swapFee).add(1);
+  }
+
+  function calcOutGivenIn(
+    uint256 tokenBalanceIn,
+    uint256 tokenWeightIn,
+    uint256 tokenBalanceOut,
+    uint256 tokenWeightOut,
+    uint256 tokenAmountIn,
+    uint256 swapFee
+  ) public pure override returns (uint256) {
+    return
+      super.calcOutGivenIn(tokenBalanceIn, tokenWeightIn, tokenBalanceOut, tokenWeightOut, tokenAmountIn, swapFee).sub(
+        10
+      );
+  }
+
+  function calcPoolOutGivenSingleIn(
+    uint256 tokenBalanceIn,
+    uint256 tokenWeightIn,
+    uint256 poolSupply,
+    uint256 totalWeight,
+    uint256 tokenAmountIn,
+    uint256 swapFee
+  ) public pure override returns (uint256) {
+    return
+      super
+        .calcPoolOutGivenSingleIn(tokenBalanceIn, tokenWeightIn, poolSupply, totalWeight, tokenAmountIn, swapFee)
+        .sub(10);
+  }
+
+  function calcSingleOutGivenPoolIn(
+    uint256 tokenBalanceOut,
+    uint256 tokenWeightOut,
+    uint256 poolSupply,
+    uint256 totalWeight,
+    uint256 poolAmountIn,
+    uint256 swapFee
+  ) public pure override returns (uint256) {
+    return
+      super
+        .calcSingleOutGivenPoolIn(tokenBalanceOut, tokenWeightOut, poolSupply, totalWeight, poolAmountIn, swapFee)
+        .sub(10);
   }
 
   function getDenormalizedWeight(address token) external view returns (uint256) {
-    return bpool.getDenormalizedWeight(token);
+    return bpool.getDenormalizedWeight(_getActualToken(token));
   }
 
   function getSwapFee() external view returns (uint256) {
@@ -230,7 +359,7 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     }
   }
 
-  function getPoolUnderlyingTokens() external view override returns (address[] memory tokens) {
+  function getCurrentTokens() public view override returns (address[] memory tokens) {
     tokens = bpool.getCurrentTokens();
 
     uint256 len = tokens.length;
@@ -241,81 +370,86 @@ contract PowerIndexWrapper is ControllerOwnable, PowerIndexWrapperInterface {
     }
   }
 
-  function getPoolUnderlyingBalance(address _token) external view override returns (uint256) {
+  function getFinalTokens() public view override returns (address[] memory tokens) {
+    return getCurrentTokens();
+  }
+
+  function getBalance(address _token) public view override returns (uint256) {
     address piTokenAddress = piTokenByUnderlying[_token];
     if (piTokenAddress == address(0)) {
       return bpool.getBalance(_token);
     }
-    return WrappedPiErc20EthFeeInterface(piTokenAddress).getPiEquivalentForUnderlying(bpool.getBalance(piTokenAddress));
+    return WrappedPiErc20EthFeeInterface(piTokenAddress).getUnderlyingEquivalentForPi(bpool.getBalance(piTokenAddress));
   }
 
-  function _processUnderlyingTokenIn(address underlyingToken, uint256 amount) internal returns (address factToken) {
-    if (amount == 0) {
-      return underlyingToken;
-    }
-    require(IERC20(underlyingToken).transferFrom(msg.sender, address(this), amount), "ERR_TRANSFER_FAILED");
-
-    address piToken = piTokenByUnderlying[underlyingToken];
-    if (piToken == address(0)) {
-      return underlyingToken;
-    }
-    WrappedPiErc20Interface(piToken).deposit{ value: ethFeeByPiToken[piToken] }(amount);
-    return piToken;
+  function getActualMaxPrice(
+    uint256 amountIn,
+    uint256 actualAmountIn,
+    uint256 amountOut,
+    uint256 actualAmountOut,
+    uint256 maxPrice
+  ) public returns (uint256 actualMaxPrice) {
+    uint256 amountInRate = amountIn.mul(uint256(1 ether)).div(actualAmountIn);
+    uint256 amountOutRate = actualAmountOut.mul(uint256(1 ether)).div(amountOut);
+    return
+      amountInRate > amountOutRate
+        ? maxPrice.mul(amountInRate).div(amountOutRate)
+        : maxPrice.mul(amountOutRate).div(amountInRate);
   }
 
-  function _processUnderlyingOrPiTokenIn(address underlyingOrPiToken, uint256 amount)
+  function _processUnderlyingTokenIn(address _underlyingToken, uint256 _amount)
     internal
-    returns (address factToken)
+    returns (address actualToken, uint256 actualAmount)
   {
-    address underlyingToken = underlyingByPiToken[underlyingOrPiToken];
-    if (underlyingToken == address(0)) {
-      return _processUnderlyingTokenIn(underlyingOrPiToken, amount);
-    } else {
-      return _processUnderlyingTokenIn(underlyingToken, amount);
+    if (_amount == 0) {
+      return (_underlyingToken, _amount);
     }
+    require(IERC20(_underlyingToken).transferFrom(msg.sender, address(this), _amount), "ERR_TRANSFER_FAILED");
+
+    actualToken = piTokenByUnderlying[_underlyingToken];
+    if (actualToken == address(0)) {
+      return (_underlyingToken, _amount);
+    }
+    actualAmount = WrappedPiErc20Interface(actualToken).deposit{ value: ethFeeByPiToken[actualToken] }(_amount);
   }
 
-  function _processUnderlyingTokenOut(address underlyingToken, uint256 amount) internal {
-    if (amount == 0) {
-      return;
-    }
-    address piToken = piTokenByUnderlying[underlyingToken];
+  function _processPiTokenOutBalance(address _piToken) internal {
+    uint256 balance = WrappedPiErc20EthFeeInterface(_piToken).balanceOfUnderlying(address(this));
 
-    if (piToken != address(0)) {
-      WrappedPiErc20Interface(piToken).withdraw{ value: ethFeeByPiToken[piToken] }(amount);
-    }
+    WrappedPiErc20Interface(_piToken).withdraw{ value: ethFeeByPiToken[_piToken] }(balance);
 
-    require(IERC20(underlyingToken).transfer(msg.sender, amount), "ERR_TRANSFER_FAILED");
+    require(IERC20(underlyingByPiToken[_piToken]).transfer(msg.sender, balance), "ERR_TRANSFER_FAILED");
   }
 
-  function _processUnderlyingTokenOutBalance(address underlyingToken) internal {
-    address piToken = piTokenByUnderlying[underlyingToken];
+  function _processUnderlyingTokenOutBalance(address _underlyingToken) internal returns (uint256 balance) {
+    balance = IERC20(_underlyingToken).balanceOf(address(this));
+    require(IERC20(_underlyingToken).transfer(msg.sender, balance), "ERR_TRANSFER_FAILED");
+  }
+
+  function _processUnderlyingOrPiTokenOutBalance(address _underlyingOrPiToken) internal {
+    address piToken = piTokenByUnderlying[_underlyingOrPiToken];
     if (piToken == address(0)) {
-      _processUnderlyingTokenOut(underlyingToken, IERC20(underlyingToken).balanceOf(address(this)));
+      _processUnderlyingTokenOutBalance(_underlyingOrPiToken);
     } else {
-      _processUnderlyingTokenOut(underlyingToken, WrappedPiErc20Interface(piToken).balanceOf(address(this)));
+      _processPiTokenOutBalance(piToken);
     }
   }
 
-  function _processUnderlyingOrPiTokenOutBalance(address underlyingOrPiToken) internal {
-    address underlyingToken = underlyingByPiToken[underlyingOrPiToken];
-    if (underlyingToken == address(0)) {
-      _processUnderlyingTokenOut(underlyingOrPiToken, IERC20(underlyingOrPiToken).balanceOf(address(this)));
-    } else {
-      _processUnderlyingTokenOut(
-        underlyingToken,
-        WrappedPiErc20Interface(underlyingOrPiToken).balanceOf(address(this))
-      );
-    }
+  function _getActualToken(address token) internal view returns (address) {
+    address piToken = piTokenByUnderlying[token];
+    return piToken == address(0) ? token : piToken;
   }
 
-  function _getFactToken(address token) internal view returns (address) {
+  function _getActualTokenAndAmount(address token, uint256 amount)
+    internal
+    view
+    returns (address actualToken, uint256 actualAmount)
+  {
     address piToken = piTokenByUnderlying[token];
     if (piToken == address(0)) {
-      return token;
-    } else {
-      return piToken;
+      return (token, amount);
     }
+    return (piToken, WrappedPiErc20EthFeeInterface(piToken).getPiEquivalentForUnderlying(amount));
   }
 
   function _setPiTokenForUnderlying(address underlyingToken, address piToken) internal {
@@ -350,4 +484,8 @@ interface WrappedPiErc20EthFeeInterface {
   function router() external view returns (address);
 
   function getPiEquivalentForUnderlying(uint256 _underlyingAmount) external view returns (uint256);
+
+  function getUnderlyingEquivalentForPi(uint256 _piAmount) external view returns (uint256);
+
+  function balanceOfUnderlying(address _account) external view returns (uint256);
 }

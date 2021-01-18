@@ -13,8 +13,8 @@ const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
-const BasicPowerIndexRouterFactory = artifacts.require('BasicPowerIndexRouterFactory');
-const PowerIndexBasicRouter = artifacts.require('PowerIndexBasicRouter');
+const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRouterFactory');
+const PowerIndexBasicRouter = artifacts.require('MockPowerIndexBasicRouter');
 
 const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
@@ -41,8 +41,11 @@ function addBN(bn1, bn2) {
     .add(toBN(bn2.toString(10)))
     .toString(10);
 }
+function greaterThenOrEqual(bn1, bn2) {
+  return toBN(bn1.toString(10)).gte(toBN(bn2.toString(10)));
+}
 
-function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
+function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '40') {
   bn1 = toBN(bn1.toString(10));
   bn2 = toBN(bn2.toString(10));
   const bn1GreaterThenBn2 = bn1.gt(bn2);
@@ -56,6 +59,11 @@ async function getTimestamp(shift = 0) {
 }
 
 PowerIndexPool.numberFormat = 'String';
+PowerIndexWrapper.numberFormat = 'String';
+MockERC20.numberFormat = 'String';
+MockCvp.numberFormat = 'String';
+WETH.numberFormat = 'String';
+WrappedPiErc20.numberFormat = 'String';
 
 describe('PowerIndexWrapper', () => {
   const name = 'My Pool';
@@ -69,6 +77,7 @@ describe('PowerIndexWrapper', () => {
   const minWeightPerSecond = ether('0.00000001').toString();
   const maxWeightPerSecond = ether('0.1').toString();
   const piTokenEthFee = ether(0.0001).toString();
+  const gasPrice = 100 * 10**9;
 
   let tokens, pool, poolWrapper, poolController, routerFactory, router;
   let defaultFactoryArguments;
@@ -163,10 +172,10 @@ describe('PowerIndexWrapper', () => {
     await poolController.finishReplace();
 
     this.getTokensToJoinPoolAndApprove = async amountToMint => {
-      const poolTotalSupply = (await pool.totalSupply()).toString(10);
+      const poolTotalSupply = await pool.totalSupply();
       const ratio = divScalarBN(amountToMint, poolTotalSupply);
-      const token1Amount = mulScalarBN(ratio, (await pool.getBalance(this.token1.address)).toString(10));
-      const token2Amount = mulScalarBN(ratio, (await pool.getBalance(this.token2.address)).toString(10));
+      const token1Amount = mulScalarBN(ratio, await pool.getBalance(this.token1.address));
+      const token2Amount = mulScalarBN(ratio, await pool.getBalance(this.token2.address));
       await this.token1.approve(poolWrapper.address, token1Amount);
       await this.token2.approve(poolWrapper.address, token2Amount);
       return [token1Amount, token2Amount];
@@ -201,519 +210,937 @@ describe('PowerIndexWrapper', () => {
     assert.equal(await pool.getBalance(this.piToken2.address), balances[1]);
   });
 
-  describe('join, exit and swap through', () => {
-    let amountToSwap, amountCommunitySwapFee, amountAfterCommunitySwapFee, expectedSwapOut, ethFee;
-    beforeEach(async () => {
-      amountToSwap = ether('0.1').toString(10);
-      await this.token1.transfer(alice, amountToSwap);
-      await this.token2.transfer(alice, mulScalarBN(amountToSwap, ether('2')));
-      await this.token1.approve(poolWrapper.address, amountToSwap, { from: alice });
-      await this.token2.approve(poolWrapper.address, mulScalarBN(amountToSwap, ether('2')), { from: alice });
-      await this.token1.approve(this.bExchange.address, amountToSwap, { from: alice });
-      await this.token2.approve(this.bExchange.address, mulScalarBN(amountToSwap, ether('2')), { from: alice });
+  [0.5, 1, 1.5].forEach(piTokenRate => {
+    describe(`join, exit and swap through with ${piTokenRate} rate`, () => {
+      let amountToSwap, amountCommunitySwapFee, amountAfterCommunitySwapFee, expectedSwapOut, ethFee;
+      beforeEach(async () => {
+        amountToSwap = ether('0.1').toString(10);
 
-      ethFee = await poolWrapper.calcEthFeeForTokens([ this.token1.address, this.token2.address ]);
-      assert.equal(ethFee, ether(0.0001));
+        await router.mockSetRate(ether(piTokenRate.toString()));
 
-      amountCommunitySwapFee = mulScalarBN(amountToSwap, communitySwapFee);
-      amountAfterCommunitySwapFee = subBN(amountToSwap, amountCommunitySwapFee);
+        await this.token1.transfer(alice, amountToSwap);
+        await this.token2.transfer(alice, mulScalarBN(amountToSwap, ether('2')));
+        await this.token1.approve(poolWrapper.address, amountToSwap, { from: alice });
+        await this.token2.approve(poolWrapper.address, mulScalarBN(amountToSwap, ether('2')), { from: alice });
+        await this.token1.approve(this.bExchange.address, amountToSwap, { from: alice });
+        await this.token2.approve(this.bExchange.address, mulScalarBN(amountToSwap, ether('2')), { from: alice });
 
-      expectedSwapOut = (
-        await pool.calcOutGivenIn(
-          balances[0],
+        ethFee = await poolWrapper.calcEthFeeForTokens([ this.token1.address, this.token2.address ]);
+        assert.equal(ethFee, ether(0.0001));
+
+        amountCommunitySwapFee = mulScalarBN(amountToSwap, communitySwapFee);
+        amountAfterCommunitySwapFee = subBN(amountToSwap, amountCommunitySwapFee);
+
+        expectedSwapOut = await poolWrapper.calcOutGivenIn(
+          await poolWrapper.getBalance(this.token1.address),
           weights[0],
-          balances[1],
+          await poolWrapper.getBalance(this.token2.address),
           weights[1],
           amountAfterCommunitySwapFee,
           swapFee,
-        )
-      ).toString(10);
-    });
+        );
 
-    it('swapExactAmountIn should works correctly', async () => {
-      const price = (
-        await pool.calcSpotPrice(
-          addBN(balances[0], amountToSwap),
+        this.createPiToken1 = async() => {
+          const res = await poolController.replacePoolTokenWithNewPiToken(this.token1.address, routerFactory.address, defaultFactoryArguments, 'W T 2', 'WT2', {
+            value: piTokenEthFee
+          });
+          const piToken1 = await WrappedPiErc20.at(
+            res.receipt.logs.filter(l => l.event === 'CreatePiToken')[0].args.piToken,
+          );
+          const router1 = await PowerIndexBasicRouter.at(
+            res.receipt.logs.filter(l => l.event === 'CreatePiToken')[0].args.router,
+          );
+
+          await router1.setPiTokenEthFee(piTokenEthFee);
+
+          await time.increase(60);
+
+          await poolController.finishReplace();
+
+          await poolWrapper.updatePiTokenEthFees([this.token1.address]);
+
+          assert.equal(await poolWrapper.ethFeeByPiToken(piToken1.address), ether(0.0001));
+
+          ethFee = await poolWrapper.calcEthFeeForTokens([ this.token1.address, this.token2.address ]);
+          assert.equal(ethFee, ether(0.0002));
+          return {piToken1};
+        };
+      });
+
+      it('swapExactAmountIn with regular token should works correctly', async () => {
+        const price = await poolWrapper.calcSpotPrice(
+          addBN(await poolWrapper.getBalance(this.token1.address), amountToSwap),
           weights[0],
-          subBN(balances[1], expectedSwapOut),
+          subBN(await poolWrapper.getBalance(this.token2.address), expectedSwapOut),
           weights[1],
           swapFee,
-        )
-      ).toString(10);
+        );
 
-      assert.equal((await this.token1.balanceOf(alice)).toString(), amountToSwap.toString());
-      const token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
-      const token2AliceBalanceBefore = (await this.token2.balanceOf(alice)).toString();
+        assert.equal(await this.token1.balanceOf(alice), amountToSwap);
+        const token1PoolBalanceBefore = await this.token1.balanceOf(pool.address);
+        const token2AliceBalanceBefore = await this.token2.balanceOf(alice);
 
-      await expectRevert(
-        pool.swapExactAmountIn(
+        await expectRevert(
+          pool.swapExactAmountIn(
+            this.token1.address,
+            amountToSwap,
+            this.token2.address,
+            expectedSwapOut,
+            mulScalarBN(price, ether('1.05')),
+            { from: alice },
+          ),
+          'ONLY_WRAPPER',
+        );
+
+        await expectRevert(
+          poolWrapper.swapExactAmountIn(
+            this.token1.address,
+            amountToSwap,
+            this.token2.address,
+            expectedSwapOut,
+            mulScalarBN(price, ether('1.05')),
+            { from: alice },
+          ),
+          'function call failed to execute',
+        );
+
+        await poolWrapper.swapExactAmountIn(
           this.token1.address,
           amountToSwap,
           this.token2.address,
           expectedSwapOut,
           mulScalarBN(price, ether('1.05')),
-          { from: alice },
-        ),
-        'ONLY_WRAPPER',
-      );
+          { from: alice, value: ethFee },
+        );
+        assert.equal(await this.token1.balanceOf(alice), '0');
+        assert.equal(
+          await this.token1.balanceOf(pool.address),
+          addBN(token1PoolBalanceBefore, amountAfterCommunitySwapFee),
+        );
+        assertEqualWithAccuracy(
+          await this.token2.balanceOf(alice),
+          addBN(token2AliceBalanceBefore, expectedSwapOut),
+        );
+        assert.equal(
+          greaterThenOrEqual(await this.token2.balanceOf(alice), addBN(token2AliceBalanceBefore, expectedSwapOut)),
+          true
+        );
+      });
 
-      await expectRevert(
-        poolWrapper.swapExactAmountIn(
-          this.token1.address,
-          amountToSwap,
+      it('swapExactAmountIn piToken should works correctly', async () => {
+        const price = await poolWrapper.calcSpotPrice(
+          addBN(await poolWrapper.getBalance(this.token2.address), amountToSwap),
+          weights[1],
+          subBN(await poolWrapper.getBalance(this.token1.address), expectedSwapOut),
+          weights[0],
+          swapFee,
+        );
+
+        const token2PoolBalanceBefore = await this.piToken2.balanceOf(pool.address);
+        const token1AliceBalanceBefore = await this.token1.balanceOf(alice);
+        const token2AliceBalanceBefore = await this.token2.balanceOf(alice);
+
+        expectedSwapOut = await poolWrapper.calcOutGivenIn(
+          await poolWrapper.getBalance(this.token2.address),
+          weights[1],
+          await poolWrapper.getBalance(this.token1.address),
+          weights[0],
+          amountAfterCommunitySwapFee,
+          swapFee,
+        );
+
+        const res = await poolWrapper.swapExactAmountIn(
           this.token2.address,
+          amountToSwap,
+          this.token1.address,
           expectedSwapOut,
           mulScalarBN(price, ether('1.05')),
-          { from: alice },
-        ),
-        'function call failed to execute',
-      );
+          { from: alice, value: ethFee },
+        );
+        const weiUsed = res.receipt.gasUsed * gasPrice;
+        console.log('        swapExactAmountIn gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
 
-      await poolWrapper.swapExactAmountIn(
-        this.token1.address,
-        amountToSwap,
-        this.token2.address,
-        expectedSwapOut,
-        mulScalarBN(price, ether('1.05')),
-        { from: alice, value: ethFee },
-      );
+        assert.equal(await this.token2.balanceOf(alice), subBN(token2AliceBalanceBefore, amountToSwap));
+        assert.equal(
+          await this.piToken2.balanceOf(pool.address),
+          addBN(token2PoolBalanceBefore, await this.piToken2.getPiEquivalentForUnderlying(amountAfterCommunitySwapFee)),
+        );
+        assertEqualWithAccuracy(
+          await this.token1.balanceOf(alice),
+          addBN(token1AliceBalanceBefore, expectedSwapOut),
+        );
+        assert.equal(
+          greaterThenOrEqual(await this.token1.balanceOf(alice), addBN(token1AliceBalanceBefore, expectedSwapOut)),
+          true
+        );
+      });
 
-      assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-      assert.equal(
-        (await this.token1.balanceOf(pool.address)).toString(),
-        addBN(token1PoolBalanceBefore, amountAfterCommunitySwapFee),
-      );
-      assert.equal(
-        (await this.token2.balanceOf(alice)).toString(),
-        addBN(token2AliceBalanceBefore, expectedSwapOut).toString(),
-      );
-    });
+      it('swapExactAmountIn with 2 piTokens should works correctly', async () => {
+        const {piToken1} = await this.createPiToken1();
 
-    it('swapExactAmountOut should works correctly', async () => {
-      const expectedOutWithFee = (
-        await pool.calcOutGivenIn(balances[0], weights[0], balances[1], weights[1], amountToSwap, swapFee)
-      ).toString(10);
-      const expectedOutFee = mulScalarBN(expectedOutWithFee, communitySwapFee);
-
-      const price = (
-        await pool.calcSpotPrice(
-          addBN(balances[0], amountToSwap),
+        const price = await poolWrapper.calcSpotPrice(
+          addBN(await poolWrapper.getBalance(this.token2.address), amountToSwap),
+          weights[1],
+          subBN(await poolWrapper.getBalance(this.token1.address), expectedSwapOut),
           weights[0],
-          subBN(balances[1], expectedOutWithFee),
+          swapFee,
+        );
+
+        const token1PoolBalanceBefore = await piToken1.balanceOf(pool.address);
+        const token2PoolBalanceBefore = await this.piToken2.balanceOf(pool.address);
+        const token1AliceBalanceBefore = await this.token1.balanceOf(alice);
+        const token2AliceBalanceBefore = await this.token2.balanceOf(alice);
+
+        expectedSwapOut = await poolWrapper.calcOutGivenIn(
+          await poolWrapper.getBalance(this.token2.address),
+          weights[1],
+          await poolWrapper.getBalance(this.token1.address),
+          weights[0],
+          amountAfterCommunitySwapFee,
+          swapFee,
+        );
+
+        const res = await poolWrapper.swapExactAmountIn(
+          this.token2.address,
+          amountToSwap,
+          this.token1.address,
+          expectedSwapOut,
+          mulScalarBN(price, ether('1.05')),
+          { from: alice, value: ethFee },
+        );
+        const weiUsed = res.receipt.gasUsed * gasPrice;
+        console.log('        swapExactAmountIn gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
+
+        assert.equal(await this.token2.balanceOf(alice), subBN(token2AliceBalanceBefore, amountToSwap));
+        assertEqualWithAccuracy(
+          await piToken1.balanceOf(pool.address),
+          subBN(token1PoolBalanceBefore, await piToken1.getPiEquivalentForUnderlying(expectedSwapOut)),
+        );
+        assert.equal(
+          await this.piToken2.balanceOf(pool.address),
+          addBN(token2PoolBalanceBefore, await this.piToken2.getPiEquivalentForUnderlying(amountAfterCommunitySwapFee)),
+        );
+        assertEqualWithAccuracy(
+          await this.token1.balanceOf(alice),
+          addBN(token1AliceBalanceBefore, expectedSwapOut),
+        );
+        assert.equal(
+          greaterThenOrEqual(await this.token1.balanceOf(alice), addBN(token1AliceBalanceBefore, expectedSwapOut)),
+          true
+        );
+      });
+
+      it('swapExactAmountOut should works correctly', async () => {
+        const expectedOutWithFee = await poolWrapper.calcOutGivenIn(
+          await poolWrapper.getBalance(this.token1.address),
+          weights[0],
+          await poolWrapper.getBalance(this.token2.address),
+          weights[1],
+          amountToSwap,
+          swapFee
+        );
+        const {tokenAmountInAfterFee: expectedOutWithoutFee} = await pool.calcAmountWithCommunityFee(expectedOutWithFee, communitySwapFee, poolWrapper.address);
+
+        const price = await poolWrapper.calcSpotPrice(
+          addBN(await poolWrapper.getBalance(this.token1.address), amountToSwap),
+          weights[0],
+          subBN(await poolWrapper.getBalance(this.token2.address), expectedOutWithFee),
           weights[1],
           swapFee,
-        )
-      ).toString(10);
+        );
 
-      assert.equal((await this.token1.balanceOf(alice)).toString(), amountToSwap.toString());
-      const token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
-      const token2PoolBalanceBefore = (await this.piToken2.balanceOf(pool.address)).toString();
-      const token2AliceBalanceBefore = (await this.token2.balanceOf(alice)).toString();
+        assert.equal(await this.token1.balanceOf(alice), amountToSwap);
+        const token1PoolBalanceBefore = await this.token1.balanceOf(pool.address);
+        const token2PoolBalanceBefore = await this.piToken2.balanceOf(pool.address);
+        const token2AliceBalanceBefore = await this.token2.balanceOf(alice);
 
-      await expectRevert(
-        pool.swapExactAmountOut(
+        await expectRevert(
+          pool.swapExactAmountOut(
+            this.token1.address,
+            amountToSwap,
+            this.token2.address,
+            expectedOutWithFee,
+            mulScalarBN(price, ether('1.05')),
+            { from: alice },
+          ),
+          'ONLY_WRAPPER',
+        );
+
+        await expectRevert(
+          poolWrapper.swapExactAmountOut(
+            this.token1.address,
+            amountToSwap,
+            this.token2.address,
+            expectedOutWithFee,
+            mulScalarBN(price, ether('1.05')),
+            { from: alice },
+          ),
+          'function call failed to execute',
+        );
+
+        await poolWrapper.swapExactAmountOut(
           this.token1.address,
           amountToSwap,
           this.token2.address,
           expectedOutWithFee,
           mulScalarBN(price, ether('1.05')),
-          { from: alice },
-        ),
-        'ONLY_WRAPPER',
-      );
+          { from: alice, value: ethFee },
+        );
 
-      await expectRevert(
-        poolWrapper.swapExactAmountOut(
-          this.token1.address,
+        assertEqualWithAccuracy(await this.token1.balanceOf(alice), '0');
+        assertEqualWithAccuracy(
+          await this.token1.balanceOf(pool.address),
+          addBN(token1PoolBalanceBefore, amountToSwap),
+        );
+        assertEqualWithAccuracy(
+          await this.piToken2.balanceOf(pool.address),
+          subBN(token2PoolBalanceBefore, await this.piToken2.getPiEquivalentForUnderlying(expectedOutWithFee)),
+        );
+        assertEqualWithAccuracy(
+          await this.token2.balanceOf(alice),
+          addBN(token2AliceBalanceBefore, expectedOutWithoutFee),
+        );
+        //TODO: find the way to solve wei problem
+        // assert.equal(greaterThenOrEqual(
+        //   await this.token2.balanceOf(alice),
+        //   addBN(token2AliceBalanceBefore, expectedOutWithoutFee),
+        // ), true);
+      });
+
+      it('swapExactAmountOut piToken should works correctly', async () => {
+        const expectedOutWithFee = await poolWrapper.calcOutGivenIn(
+          await poolWrapper.getBalance(this.token2.address),
+          weights[1],
+          await poolWrapper.getBalance(this.token1.address),
+          weights[0],
           amountToSwap,
+          swapFee
+        );
+        const {tokenAmountInAfterFee: expectedOutWithoutFee} = await pool.calcAmountWithCommunityFee(expectedOutWithFee, communitySwapFee, poolWrapper.address);
+
+        const price = await poolWrapper.calcSpotPrice(
+          addBN(await poolWrapper.getBalance(this.token2.address), amountToSwap),
+          weights[1],
+          subBN(await poolWrapper.getBalance(this.token1.address), expectedOutWithFee),
+          weights[0],
+          swapFee,
+        );
+
+        const token1PoolBalanceBefore = await this.token1.balanceOf(pool.address);
+        const token2PoolBalanceBefore = await this.piToken2.balanceOf(pool.address);
+        const token1AliceBalanceBefore = await this.token1.balanceOf(alice);
+        const token2AliceBalanceBefore = await this.token2.balanceOf(alice);
+
+        await poolWrapper.swapExactAmountOut(
           this.token2.address,
+          amountToSwap,
+          this.token1.address,
           expectedOutWithFee,
           mulScalarBN(price, ether('1.05')),
-          { from: alice },
-        ),
-        'function call failed to execute',
-      );
+          { from: alice, value: ethFee },
+        );
 
-      await poolWrapper.swapExactAmountOut(
-        this.token1.address,
-        amountToSwap,
-        this.token2.address,
-        expectedOutWithFee,
-        mulScalarBN(price, ether('1.05')),
-        { from: alice, value: ethFee },
-      );
+        assertEqualWithAccuracy(await this.token2.balanceOf(alice), subBN(token2AliceBalanceBefore, amountToSwap));
+        assertEqualWithAccuracy(
+          await this.token1.balanceOf(pool.address),
+          subBN(token1PoolBalanceBefore, expectedOutWithFee),
+        );
+        assertEqualWithAccuracy(
+          await this.piToken2.balanceOf(pool.address),
+          addBN(token2PoolBalanceBefore, await this.piToken2.getPiEquivalentForUnderlying(amountToSwap)),
+        );
+        assertEqualWithAccuracy(
+          await this.token1.balanceOf(alice),
+          addBN(token1AliceBalanceBefore, expectedOutWithoutFee),
+        );
+        assert.equal(greaterThenOrEqual(
+          await this.token1.balanceOf(alice),
+          addBN(token1AliceBalanceBefore, expectedOutWithoutFee)
+        ), true)
+      });
 
-      assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-      assert.equal(
-        (await this.token1.balanceOf(pool.address)).toString(),
-        addBN(token1PoolBalanceBefore, amountToSwap),
-      );
-      assert.equal(
-        (await this.piToken2.balanceOf(pool.address)).toString(),
-        subBN(token2PoolBalanceBefore, expectedOutWithFee),
-      );
-      assert.equal(
-        (await this.token2.balanceOf(alice)).toString(),
-        addBN(token2AliceBalanceBefore, subBN(expectedOutWithFee, expectedOutFee)).toString(),
-      );
-    });
+      it('swapExactAmountOut with 2 piTokens should works correctly', async () => {
+        const {piToken1} = await this.createPiToken1();
 
-    it('joinswapExternAmountIn and exitswapPoolAmountIn should works correctly', async () => {
-      const amountCommunityJoinFee = mulScalarBN(amountToSwap, communityJoinFee);
-      const amountAfterCommunityJoinFee = subBN(amountToSwap, amountCommunityJoinFee);
-
-      expectedSwapOut = (
-        await pool.calcOutGivenIn(
-          balances[0],
-          weights[0],
-          balances[1],
+        const expectedOutWithFee = await poolWrapper.calcOutGivenIn(
+          await poolWrapper.getBalance(this.token2.address),
           weights[1],
-          amountAfterCommunityJoinFee,
-          swapFee,
-        )
-      ).toString(10);
+          await poolWrapper.getBalance(this.token1.address),
+          weights[0],
+          amountToSwap,
+          swapFee
+        );
+        const {tokenAmountInAfterFee: expectedOutWithoutFee} = await pool.calcAmountWithCommunityFee(expectedOutWithFee, communitySwapFee, poolWrapper.address);
 
-      const poolAmountOut = (
-        await pool.calcPoolOutGivenSingleIn(
+        const price = await poolWrapper.calcSpotPrice(
+          addBN(await poolWrapper.getBalance(this.token2.address), amountToSwap),
+          weights[1],
+          subBN(await poolWrapper.getBalance(this.token1.address), expectedOutWithFee),
+          weights[0],
+          swapFee,
+        );
+
+        const token1PoolBalanceBefore = await piToken1.balanceOf(pool.address);
+        const token2PoolBalanceBefore = await this.piToken2.balanceOf(pool.address);
+        const token1AliceBalanceBefore = await this.token1.balanceOf(alice);
+        const token2AliceBalanceBefore = await this.token2.balanceOf(alice);
+
+        await poolWrapper.swapExactAmountOut(
+          this.token2.address,
+          amountToSwap,
+          this.token1.address,
+          expectedOutWithFee,
+          mulScalarBN(price, ether('1.05')),
+          { from: alice, value: ethFee },
+        );
+
+        assertEqualWithAccuracy(await this.token2.balanceOf(alice), subBN(token2AliceBalanceBefore, amountToSwap));
+        assertEqualWithAccuracy(
+          await piToken1.balanceOf(pool.address),
+          subBN(token1PoolBalanceBefore, await piToken1.getPiEquivalentForUnderlying(expectedOutWithFee)),
+        );
+        assertEqualWithAccuracy(
+          await this.piToken2.balanceOf(pool.address),
+          addBN(token2PoolBalanceBefore, await this.piToken2.getPiEquivalentForUnderlying(amountToSwap)),
+        );
+        assertEqualWithAccuracy(
+          await this.token1.balanceOf(alice),
+          addBN(token1AliceBalanceBefore, expectedOutWithoutFee),
+        );
+        assert.equal(greaterThenOrEqual(
+          await this.token1.balanceOf(alice),
+          addBN(token1AliceBalanceBefore, expectedOutWithoutFee)
+        ), true)
+      });
+
+      it('joinswapExternAmountIn and exitswapPoolAmountIn should works correctly', async () => {
+        const amountCommunityJoinFee = mulScalarBN(amountToSwap, communityJoinFee);
+        const amountAfterCommunityJoinFee = subBN(amountToSwap, amountCommunityJoinFee);
+
+        const minPoolAmountOut = await poolWrapper.calcPoolOutGivenSingleIn(
           await pool.getBalance(this.token1.address),
           await pool.getDenormalizedWeight(this.token1.address),
           await pool.totalSupply(),
           await pool.getTotalDenormalizedWeight(),
           amountAfterCommunityJoinFee,
           swapFee,
-        )
-      ).toString(10);
+        );
 
-      let token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
+        let token1PoolBalanceBefore = await this.token1.balanceOf(pool.address);
 
-      await expectRevert(
-        pool.joinswapExternAmountIn(this.token1.address, amountToSwap, poolAmountOut, { from: alice }),
-        'ONLY_WRAPPER',
-      );
+        await expectRevert(
+          pool.joinswapExternAmountIn(this.token1.address, amountToSwap, minPoolAmountOut, { from: alice }),
+          'ONLY_WRAPPER',
+        );
 
-      await poolWrapper.joinswapExternAmountIn(
-        this.token1.address,
-        amountToSwap,
-        poolAmountOut,
-        { from: alice }
-      );
+        await poolWrapper.joinswapExternAmountIn(
+          this.token1.address,
+          amountToSwap,
+          minPoolAmountOut,
+          { from: alice }
+        );
 
-      assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-      assert.equal(
-        (await this.token1.balanceOf(pool.address)).toString(),
-        addBN(token1PoolBalanceBefore, amountAfterCommunityJoinFee),
-      );
-      assert.equal((await pool.balanceOf(alice)).toString(), poolAmountOut.toString());
+        assert.equal(await this.token1.balanceOf(alice), '0');
+        assert.equal(
+          await this.token1.balanceOf(pool.address),
+          addBN(token1PoolBalanceBefore, amountAfterCommunityJoinFee),
+        );
+        assert.equal(greaterThenOrEqual(await pool.balanceOf(alice), minPoolAmountOut), true);
+        assertEqualWithAccuracy(await pool.balanceOf(alice), minPoolAmountOut);
 
-      const exitTokenAmountOut = (
-        await pool.calcSingleOutGivenPoolIn(
+        const minExitTokenAmountOut = await poolWrapper.calcSingleOutGivenPoolIn(
           await pool.getBalance(this.token1.address),
           await pool.getDenormalizedWeight(this.token1.address),
           await pool.totalSupply(),
           await pool.getTotalDenormalizedWeight(),
-          poolAmountOut,
+          minPoolAmountOut,
           swapFee,
-        )
-      ).toString(10);
+        );
 
-      token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
+        token1PoolBalanceBefore = await this.token1.balanceOf(pool.address);
 
-      await pool.approve(poolWrapper.address, poolAmountOut, { from: alice });
+        await pool.approve(poolWrapper.address, minPoolAmountOut, { from: alice });
 
-      await expectRevert(
-        pool.exitswapPoolAmountIn(this.token1.address, poolAmountOut, exitTokenAmountOut, { from: alice }),
-        'ONLY_WRAPPER',
-      );
+        await expectRevert(
+          pool.exitswapPoolAmountIn(this.token1.address, minPoolAmountOut, minExitTokenAmountOut, { from: alice }),
+          'ONLY_WRAPPER',
+        );
 
-      await poolWrapper.exitswapPoolAmountIn(
-        this.token1.address,
-        poolAmountOut,
-        exitTokenAmountOut,
-        { from: alice, value: ethFee }
-      );
+        await poolWrapper.exitswapPoolAmountIn(
+          this.token1.address,
+          minPoolAmountOut,
+          minExitTokenAmountOut,
+          { from: alice, value: ethFee }
+        );
 
-      const exitTokenAmountCommunityFee = mulScalarBN(exitTokenAmountOut, communityExitFee);
-      const exitTokenAmountAfterCommunityFee = subBN(exitTokenAmountOut, exitTokenAmountCommunityFee);
+        const exitTokenAmountCommunityFee = mulScalarBN(minExitTokenAmountOut, communityExitFee);
+        const exitTokenAmountAfterCommunityFee = subBN(minExitTokenAmountOut, exitTokenAmountCommunityFee);
 
-      assert.equal((await this.token1.balanceOf(alice)).toString(), exitTokenAmountAfterCommunityFee);
-      assert.equal(
-        (await this.token1.balanceOf(pool.address)).toString(),
-        subBN(token1PoolBalanceBefore, exitTokenAmountOut),
-      );
-      assert.equal((await pool.balanceOf(alice)).toString(), '0');
-    });
+        assert.equal(greaterThenOrEqual(await this.token1.balanceOf(alice), exitTokenAmountAfterCommunityFee), true);
+        assertEqualWithAccuracy(await this.token1.balanceOf(alice), exitTokenAmountAfterCommunityFee);
+        assertEqualWithAccuracy(
+          await this.token1.balanceOf(pool.address),
+          subBN(token1PoolBalanceBefore, minExitTokenAmountOut),
+        );
+        assertEqualWithAccuracy(await pool.balanceOf(alice), '0');
+      });
 
-    it('joinswapPoolAmountOut and exitswapExternAmountOut should works correctly', async () => {
-      const poolAmountOutWithoutFee = (
-        await pool.calcPoolOutGivenSingleIn(
+      it('joinswapExternAmountIn and exitswapPoolAmountIn piToken should works correctly', async () => {
+        const amountCommunityJoinFee = mulScalarBN(amountToSwap, communityJoinFee);
+        const amountAfterCommunityJoinFee = subBN(amountToSwap, amountCommunityJoinFee);
+
+        const minPoolAmountOut = await poolWrapper.calcPoolOutGivenSingleIn(
+          await poolWrapper.getBalance(this.token2.address),
+          await poolWrapper.getDenormalizedWeight(this.token2.address),
+          await pool.totalSupply(),
+          await pool.getTotalDenormalizedWeight(),
+          amountAfterCommunityJoinFee,
+          swapFee,
+        );
+
+        let token2PoolBalanceBefore = await this.piToken2.balanceOf(pool.address);
+        let token2AliceBalanceBefore = await this.token2.balanceOf(alice);
+
+        await poolWrapper.joinswapExternAmountIn(
+          this.token2.address,
+          amountToSwap,
+          minPoolAmountOut,
+          { from: alice, value: ethFee }
+        );
+
+        assertEqualWithAccuracy(
+          await this.piToken2.balanceOf(pool.address),
+          addBN(token2PoolBalanceBefore, await this.piToken2.getPiEquivalentForUnderlying(amountAfterCommunityJoinFee)),
+        );
+        assert.equal(greaterThenOrEqual(await pool.balanceOf(alice), minPoolAmountOut), true);
+        assertEqualWithAccuracy(await pool.balanceOf(alice), minPoolAmountOut);
+        assert.equal(await this.token2.balanceOf(alice), subBN(token2AliceBalanceBefore, amountToSwap));
+
+        const minExitTokenAmountOut = await poolWrapper.calcSingleOutGivenPoolIn(
+          await poolWrapper.getBalance(this.token2.address),
+          await poolWrapper.getDenormalizedWeight(this.token2.address),
+          await pool.totalSupply(),
+          await pool.getTotalDenormalizedWeight(),
+          minPoolAmountOut,
+          swapFee,
+        );
+
+        token2PoolBalanceBefore = await this.piToken2.balanceOf(pool.address);
+
+        await pool.approve(poolWrapper.address, minPoolAmountOut, { from: alice });
+
+        await poolWrapper.exitswapPoolAmountIn(
+          this.token2.address,
+          minPoolAmountOut,
+          minExitTokenAmountOut,
+          { from: alice, value: ethFee }
+        );
+
+        const exitTokenAmountCommunityFee = mulScalarBN(minExitTokenAmountOut, communityExitFee);
+        const exitTokenAmountAfterCommunityFee = subBN(minExitTokenAmountOut, exitTokenAmountCommunityFee);
+
+        assert.equal(greaterThenOrEqual(await this.token1.balanceOf(alice), exitTokenAmountAfterCommunityFee), true);
+        assertEqualWithAccuracy(
+          await this.token2.balanceOf(alice),
+          addBN(subBN(token2AliceBalanceBefore, amountToSwap), exitTokenAmountAfterCommunityFee)
+        );
+        assertEqualWithAccuracy(
+          await this.piToken2.balanceOf(pool.address),
+          subBN(token2PoolBalanceBefore, await this.piToken2.getPiEquivalentForUnderlying(minExitTokenAmountOut)),
+        );
+        assertEqualWithAccuracy(await pool.balanceOf(alice), '0');
+      });
+
+      it('joinswapPoolAmountOut and exitswapExternAmountOut should works correctly', async () => {
+        const poolAmountOutWithoutFee = await poolWrapper.calcPoolOutGivenSingleIn(
           await pool.getBalance(this.token1.address),
           await pool.getDenormalizedWeight(this.token1.address),
           await pool.totalSupply(),
           await pool.getTotalDenormalizedWeight(),
           amountToSwap,
           swapFee,
-        )
-      ).toString(10);
+        );
 
-      const amountIn = (
-        await pool.calcSingleInGivenPoolOut(
+        const amountIn = await poolWrapper.calcSingleInGivenPoolOut(
           await pool.getBalance(this.token1.address),
           await pool.getDenormalizedWeight(this.token1.address),
           await pool.totalSupply(),
           await pool.getTotalDenormalizedWeight(),
           poolAmountOutWithoutFee,
           swapFee,
-        )
-      ).toString(10);
+        );
 
-      let token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
+        let token1PoolBalanceBefore = await this.token1.balanceOf(pool.address);
 
-      await expectRevert(
-        pool.joinswapPoolAmountOut(this.token1.address, poolAmountOutWithoutFee, amountIn, { from: alice }),
-        'ONLY_WRAPPER',
-      );
+        await expectRevert(
+          pool.joinswapPoolAmountOut(this.token1.address, poolAmountOutWithoutFee, amountIn, { from: alice }),
+          'ONLY_WRAPPER',
+        );
 
-      await this.token1.transfer(alice, subBN(amountIn, amountToSwap));
-      await this.token1.approve(poolWrapper.address, amountIn, {from: alice});
+        await this.token1.transfer(alice, subBN(amountIn, amountToSwap));
+        await this.token1.approve(poolWrapper.address, amountIn, {from: alice});
 
-      await poolWrapper.joinswapPoolAmountOut(
-        this.token1.address,
-        poolAmountOutWithoutFee,
-        amountIn,
-        { from: alice, value: ethFee }
-      );
+        await poolWrapper.joinswapPoolAmountOut(
+          this.token1.address,
+          poolAmountOutWithoutFee,
+          amountIn,
+          { from: alice, value: ethFee }
+        );
 
-      const poolAmountOutAfterFee = subBN(poolAmountOutWithoutFee, mulScalarBN(poolAmountOutWithoutFee, communityJoinFee));
+        const {tokenAmountInAfterFee: poolAmountOutAfterFee} = await pool.calcAmountWithCommunityFee(poolAmountOutWithoutFee, communityJoinFee, poolWrapper.address);
 
-      assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-      assert.equal(
-        (await this.token1.balanceOf(pool.address)).toString(),
-        addBN(token1PoolBalanceBefore, amountIn),
-      );
-      assert.equal((await pool.balanceOf(alice)).toString(), poolAmountOutAfterFee.toString());
+        assert.equal(await this.token1.balanceOf(alice), '0');
+        assertEqualWithAccuracy(
+          await this.token1.balanceOf(pool.address),
+          addBN(token1PoolBalanceBefore, amountIn),
+        );
+        assert.equal(greaterThenOrEqual(await pool.balanceOf(alice), poolAmountOutAfterFee), true);
+        assertEqualWithAccuracy(await pool.balanceOf(alice), poolAmountOutAfterFee);
 
-      const amountToExit = ether('0.05').toString(10);
+        const amountToExit = ether('0.05').toString(10);
 
-      const poolAmountIn = (
-        await pool.calcPoolInGivenSingleOut(
+        const poolAmountIn = await poolWrapper.calcPoolInGivenSingleOut(
           await pool.getBalance(this.token1.address),
           await pool.getDenormalizedWeight(this.token1.address),
           await pool.totalSupply(),
           await pool.getTotalDenormalizedWeight(),
           amountToExit,
           swapFee,
-        )
-      ).toString(10);
+        );
 
-      token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
-      const token1AliceBalanceBefore = (await this.token1.balanceOf(alice)).toString();
-      const poolAliceBalanceBefore = (await pool.balanceOf(alice)).toString();
+        token1PoolBalanceBefore = await this.token1.balanceOf(pool.address);
+        const token1AliceBalanceBefore = await this.token1.balanceOf(alice);
+        const poolAliceBalanceBefore = await pool.balanceOf(alice);
 
-      await pool.approve(poolWrapper.address, poolAmountIn, { from: alice });
+        await pool.approve(poolWrapper.address, poolAmountIn, { from: alice });
 
-      await expectRevert(
-        pool.exitswapExternAmountOut(this.token1.address, amountToExit, poolAmountIn, { from: alice }),
-        'ONLY_WRAPPER',
-      );
+        await expectRevert(
+          pool.exitswapExternAmountOut(this.token1.address, amountToExit, poolAmountIn, { from: alice }),
+          'ONLY_WRAPPER',
+        );
 
-      await poolWrapper.exitswapExternAmountOut(
-        this.token1.address,
-        amountToExit,
-        poolAmountIn,
-        { from: alice }
-      );
+        await poolWrapper.exitswapExternAmountOut(
+          this.token1.address,
+          amountToExit,
+          poolAmountIn,
+          { from: alice }
+        );
 
-      assert.equal(
-        (await this.token1.balanceOf(alice)).toString(),
-        addBN(token1AliceBalanceBefore, subBN(amountToExit, mulScalarBN(amountToExit, communityExitFee)))
-      );
-      assert.equal(
-        (await this.token1.balanceOf(pool.address)).toString(),
-        subBN(token1PoolBalanceBefore, amountToExit),
-      );
-      assert.equal(
-        (await pool.balanceOf(alice)).toString(),
-        subBN(poolAliceBalanceBefore, poolAmountIn)
-      );
-    });
+        const {tokenAmountInAfterFee: amountToExitAfterFee} = await pool.calcAmountWithCommunityFee(amountToExit, communityExitFee, poolWrapper.address);
 
-    it('joinPool and exitPool should works correctly', async () => {
-      const poolOutAmount = divScalarBN(
-        mulScalarBN(amountToSwap, await pool.totalSupply()),
-        await pool.getBalance(this.token1.address),
-      );
-      let ratio = divScalarBN(poolOutAmount, await pool.totalSupply());
-      const token1InAmount = mulScalarBN(ratio, await pool.getBalance(this.token1.address));
-      const token2InAmount = mulScalarBN(ratio, await pool.getBalance(this.piToken2.address));
+        assertEqualWithAccuracy(
+          await this.token1.balanceOf(alice),
+          addBN(token1AliceBalanceBefore, amountToExitAfterFee)
+        );
+        assert.equal(
+          await this.token1.balanceOf(pool.address),
+          subBN(token1PoolBalanceBefore, amountToExit),
+        );
+        assertEqualWithAccuracy(
+          await pool.balanceOf(alice),
+          subBN(poolAliceBalanceBefore, poolAmountIn)
+        );
+      });
 
-      const poolOutAmountFee = mulScalarBN(poolOutAmount, communityJoinFee);
-      const poolOutAmountAfterFee = subBN(poolOutAmount, poolOutAmountFee);
-
-      await expectRevert(
-        pool.joinPool(poolOutAmount, [token1InAmount, token2InAmount], { from: alice }),
-        'ONLY_WRAPPER',
-      );
-
-      await expectRevert(
-        poolWrapper.joinPool(poolOutAmount, [token1InAmount, token2InAmount], { from: alice }),
-        'function call failed to execute',
-      );
-
-      await poolWrapper.joinPool(
-        poolOutAmount,
-        [token1InAmount, token2InAmount],
-        { from: alice, value: ethFee }
-      );
-
-      assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-      assert.equal((await this.token2.balanceOf(alice)).toString(), '0');
-      assert.equal(await this.token1.balanceOf(pool.address), addBN(token1InAmount, balances[0]));
-      assert.equal(await this.piToken2.balanceOf(pool.address), addBN(token2InAmount, balances[1]));
-      assert.equal((await pool.balanceOf(alice)).toString(), poolOutAmountAfterFee.toString());
-
-      const poolInAmountFee = mulScalarBN(poolOutAmountAfterFee, communityExitFee);
-      const poolInAmountAfterFee = subBN(poolOutAmountAfterFee, poolInAmountFee);
-
-      ratio = divScalarBN(poolInAmountAfterFee, await pool.totalSupply());
-      const token1OutAmount = mulScalarBN(ratio, await pool.getBalance(this.token1.address));
-      const token2OutAmount = mulScalarBN(ratio, await pool.getBalance(this.piToken2.address));
-
-      await pool.approve(poolWrapper.address, poolOutAmountAfterFee, { from: alice });
-
-      await expectRevert(
-        pool.exitPool(poolOutAmountAfterFee, [token1OutAmount, token2OutAmount], { from: alice }),
-        'ONLY_WRAPPER',
-      );
-      await expectRevert(
-        poolWrapper.exitPool(poolOutAmountAfterFee, [token1OutAmount, token2OutAmount], { from: alice }),
-        'function call failed to execute',
-      );
-
-      await poolWrapper.exitPool(
-        poolOutAmountAfterFee,
-        [token1OutAmount, token2OutAmount],
-        { from: alice, value: ethFee }
-      );
-
-      assertEqualWithAccuracy((await pool.balanceOf(alice)).toString(), '0');
-      assertEqualWithAccuracy((await this.token1.balanceOf(alice)).toString(), token1OutAmount);
-      assertEqualWithAccuracy((await this.token2.balanceOf(alice)).toString(), token2OutAmount);
-      assertEqualWithAccuracy(
-        await this.token1.balanceOf(pool.address),
-        subBN(addBN(token1InAmount, balances[0]), token1OutAmount),
-      );
-      assertEqualWithAccuracy(
-        await this.piToken2.balanceOf(pool.address),
-        subBN(addBN(token2InAmount, balances[1]), token2OutAmount),
-      );
-    });
-
-    it('swapExactAmountIn should works correctly', async () => {
-      const price = (
-        await pool.calcSpotPrice(
-          addBN(balances[0], amountToSwap),
-          weights[0],
-          subBN(balances[1], expectedSwapOut),
-          weights[1],
+      it('joinswapPoolAmountOut and exitswapExternAmountOut piToken should works correctly', async () => {
+        const poolAmountOutWithoutFee = await poolWrapper.calcPoolOutGivenSingleIn(
+          await poolWrapper.getBalance(this.token2.address),
+          await poolWrapper.getDenormalizedWeight(this.token2.address),
+          await pool.totalSupply(),
+          await pool.getTotalDenormalizedWeight(),
+          amountToSwap,
           swapFee,
-        )
-      ).toString(10);
+        );
 
-      assert.equal((await this.token1.balanceOf(alice)).toString(), amountToSwap.toString());
-      const token1PoolBalanceBefore = (await this.token1.balanceOf(pool.address)).toString();
-      const token2AliceBalanceBefore = (await this.token2.balanceOf(alice)).toString();
+        const amountIn = await poolWrapper.calcSingleInGivenPoolOut(
+          await poolWrapper.getBalance(this.token2.address),
+          await poolWrapper.getDenormalizedWeight(this.token2.address),
+          await pool.totalSupply(),
+          await pool.getTotalDenormalizedWeight(),
+          poolAmountOutWithoutFee,
+          swapFee,
+        );
 
-      await this.token1.approve(poolWrapper.address, amountToSwap, { from: alice });
+        let token2PoolBalanceBefore = await this.piToken2.balanceOf(pool.address);
+        let token2AliceBalanceBefore = await this.token2.balanceOf(alice);
 
-      await expectRevert(
-        pool.swapExactAmountIn(
-          this.token1.address,
-          amountToSwap,
+        const res = await poolWrapper.joinswapPoolAmountOut(
           this.token2.address,
-          expectedSwapOut,
-          mulScalarBN(price, ether('1.05')),
-          { from: alice },
-        ),
-        'ONLY_WRAPPER',
-      );
+          poolAmountOutWithoutFee,
+          amountIn,
+          { from: alice, value: ethFee }
+        );
+        const logJoin = PowerIndexPool.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'LOG_JOIN')[0];
 
-      await expectRevert(
-        poolWrapper.swapExactAmountIn(
-          this.token1.address,
-          amountToSwap,
+        const {tokenAmountInAfterFee: poolAmountOutAfterFee} = await pool.calcAmountWithCommunityFee(poolAmountOutWithoutFee, communityJoinFee, poolWrapper.address);
+
+        assert.equal(await this.token2.balanceOf(alice), subBN(token2AliceBalanceBefore, amountIn));
+        assert.equal(
+          await this.piToken2.balanceOf(pool.address),
+          addBN(token2PoolBalanceBefore, logJoin.args.tokenAmountIn),
+        );
+        assert.equal(greaterThenOrEqual(await pool.balanceOf(alice), poolAmountOutAfterFee), true);
+        assertEqualWithAccuracy(await pool.balanceOf(alice), poolAmountOutAfterFee);
+
+        const amountToExit = ether('0.05').toString(10);
+
+        const poolAmountIn = await poolWrapper.calcPoolInGivenSingleOut(
+          await poolWrapper.getBalance(this.token2.address),
+          await poolWrapper.getDenormalizedWeight(this.token2.address),
+          await pool.totalSupply(),
+          await pool.getTotalDenormalizedWeight(),
+          amountToExit,
+          swapFee,
+        );
+
+        const poolAliceBalanceBefore = await pool.balanceOf(alice);
+
+        await pool.approve(poolWrapper.address, poolAmountIn, { from: alice });
+
+        token2PoolBalanceBefore = await this.piToken2.balanceOf(pool.address);
+        token2AliceBalanceBefore = await this.token2.balanceOf(alice);
+
+        const {tokenAmountInAfterFee: amountToExitAfterFee} = await pool.calcAmountWithCommunityFee(amountToExit, communityExitFee, poolWrapper.address);
+
+        await poolWrapper.exitswapExternAmountOut(
           this.token2.address,
-          expectedSwapOut,
-          mulScalarBN(price, ether('1.05')),
-          { from: alice },
-        ),
-        'function call failed to execute',
-      );
+          amountToExit,
+          poolAmountIn,
+          { from: alice, value: ethFee }
+        );
 
-      await poolWrapper.swapExactAmountIn(
-        this.token1.address,
-        amountToSwap,
-        this.token2.address,
-        expectedSwapOut,
-        mulScalarBN(price, ether('1.05')),
-        { from: alice, value: ethFee },
-      );
+        assertEqualWithAccuracy(await this.token2.balanceOf(alice), addBN(token2AliceBalanceBefore, amountToExitAfterFee));
+        assert.equal(
+          await this.piToken2.balanceOf(pool.address),
+          subBN(token2PoolBalanceBefore, await this.piToken2.getPiEquivalentForUnderlying(amountToExit)),
+        );
+        assertEqualWithAccuracy(
+          await pool.balanceOf(alice),
+          subBN(poolAliceBalanceBefore, poolAmountIn)
+        );
+      });
 
-      assert.equal((await this.token1.balanceOf(alice)).toString(), '0');
-      assert.equal(
-        (await this.token1.balanceOf(pool.address)).toString(),
-        addBN(token1PoolBalanceBefore, amountAfterCommunitySwapFee),
-      );
+      it('joinPool and exitPool should works correctly', async () => {
+        const poolOutAmount = divScalarBN(
+          mulScalarBN(amountToSwap, await pool.totalSupply()),
+          await pool.getBalance(this.token1.address),
+        );
+        let ratio = divScalarBN(poolOutAmount, await pool.totalSupply());
+        const token1InAmount = mulScalarBN(ratio, await poolWrapper.getBalance(this.token1.address));
+        const token2InAmount = mulScalarBN(ratio, await poolWrapper.getBalance(this.token2.address));
 
-      assert.equal(
-        (await this.token2.balanceOf(alice)).toString(),
-        addBN(token2AliceBalanceBefore, expectedSwapOut).toString(),
-      );
-    });
+        await this.token1.transfer(alice, token1InAmount);
+        await this.token1.approve(poolWrapper.address, token1InAmount, {from: alice});
+        await this.token2.transfer(alice, token2InAmount);
+        await this.token2.approve(poolWrapper.address, token2InAmount, {from: alice});
 
-    it('withdrawOddEthFee should works correctly', async () => {
-      const poolAmountOutWithoutFee = (
-        await pool.calcPoolOutGivenSingleIn(
+        let token1AliceBalanceBefore = await this.token1.balanceOf(alice);
+        let token2AliceBalanceBefore = await this.token2.balanceOf(alice);
+
+        const poolOutAmountFee = mulScalarBN(poolOutAmount, communityJoinFee);
+        const poolOutAmountAfterFee = subBN(poolOutAmount, poolOutAmountFee);
+
+        // await expectRevert(
+        //   pool.joinPool(poolOutAmount, [token1InAmount, token2InAmount], { from: alice }),
+        //   'ONLY_WRAPPER',
+        // );
+        //
+        // await expectRevert(
+        //   poolWrapper.joinPool(poolOutAmount, [token1InAmount, token2InAmount], { from: alice }),
+        //   'function call failed to execute',
+        // );
+
+        const res = await poolWrapper.joinPool(
+          poolOutAmount,
+          [token1InAmount, token2InAmount],
+          { from: alice, value: ethFee }
+        );
+        const weiUsed = res.receipt.gasUsed * gasPrice;
+        console.log('        joinPool gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
+
+        assert.equal(await this.token1.balanceOf(alice), subBN(token1AliceBalanceBefore, token1InAmount));
+        assert.equal(await this.token2.balanceOf(alice), subBN(token2AliceBalanceBefore, token2InAmount));
+        assert.equal(await this.token1.balanceOf(pool.address), addBN(token1InAmount, balances[0]));
+        assert.equal(
+          await this.piToken2.balanceOf(pool.address),
+          addBN(await this.piToken2.getPiEquivalentForUnderlying(token2InAmount), balances[1])
+        );
+        assert.equal(await pool.balanceOf(alice), poolOutAmountAfterFee);
+
+        const poolInAmountFee = mulScalarBN(poolOutAmountAfterFee, communityExitFee);
+        const poolInAmountAfterFee = subBN(poolOutAmountAfterFee, poolInAmountFee);
+
+        ratio = divScalarBN(poolInAmountAfterFee, await pool.totalSupply());
+        const token1OutAmount = mulScalarBN(ratio, await poolWrapper.getBalance(this.token1.address));
+        const token2OutAmount = mulScalarBN(ratio, await poolWrapper.getBalance(this.token2.address));
+
+        await pool.approve(poolWrapper.address, poolOutAmountAfterFee, { from: alice });
+
+        await expectRevert(
+          pool.exitPool(poolOutAmountAfterFee, [token1OutAmount, token2OutAmount], { from: alice }),
+          'ONLY_WRAPPER',
+        );
+        await expectRevert(
+          poolWrapper.exitPool(poolOutAmountAfterFee, [token1OutAmount, token2OutAmount], { from: alice }),
+          'function call failed to execute',
+        );
+
+        token1AliceBalanceBefore = await this.token1.balanceOf(alice);
+        token2AliceBalanceBefore = await this.token2.balanceOf(alice);
+
+        await poolWrapper.exitPool(
+          poolOutAmountAfterFee,
+          [token1OutAmount, token2OutAmount],
+          { from: alice, value: ethFee }
+        );
+
+        assertEqualWithAccuracy(await pool.balanceOf(alice), '0');
+        assertEqualWithAccuracy(await this.token1.balanceOf(alice), addBN(token1AliceBalanceBefore, token1OutAmount));
+        assertEqualWithAccuracy(await this.token2.balanceOf(alice), addBN(token2AliceBalanceBefore, token2OutAmount));
+        assertEqualWithAccuracy(
+          await this.token1.balanceOf(pool.address),
+          subBN(addBN(token1InAmount, balances[0]), token1OutAmount),
+        );
+        assertEqualWithAccuracy(
+          await this.piToken2.balanceOf(pool.address),
+          subBN(
+            addBN(await this.piToken2.getPiEquivalentForUnderlying(token2InAmount), balances[1]),
+            await this.piToken2.getPiEquivalentForUnderlying(token2OutAmount)
+          ),
+        );
+      });
+
+      it('joinPool and exitPool with 2 piTokens should works correctly', async () => {
+        const {piToken1} = await this.createPiToken1();
+
+        assert.sameMembers(await pool.getCurrentTokens(), [this.piToken2.address, piToken1.address]);
+        assert.sameMembers(await poolWrapper.getCurrentTokens(), [this.token2.address, this.token1.address]);
+
+        const poolOutAmount = divScalarBN(
+          mulScalarBN(amountToSwap, await pool.totalSupply()),
+          await poolWrapper.getBalance(this.token1.address),
+        );
+        let ratio = divScalarBN(poolOutAmount, await pool.totalSupply());
+        const token1InAmount = await piToken1.getUnderlyingEquivalentForPi(mulScalarBN(ratio, await pool.getBalance(piToken1.address)));
+        const token2InAmount = await this.piToken2.getUnderlyingEquivalentForPi(mulScalarBN(ratio, await pool.getBalance(this.piToken2.address)));
+
+        await this.token1.transfer(alice, token1InAmount);
+        await this.token2.transfer(alice, token2InAmount);
+
+        await this.token1.approve(poolWrapper.address, token1InAmount, {from: alice});
+        await this.token2.approve(poolWrapper.address, token2InAmount, {from: alice});
+
+        let token1AliceBalanceBefore = await this.token1.balanceOf(alice);
+        let token2AliceBalanceBefore = await this.token2.balanceOf(alice);
+
+        const poolOutAmountFee = mulScalarBN(poolOutAmount, communityJoinFee);
+        const poolOutAmountAfterFee = subBN(poolOutAmount, poolOutAmountFee);
+
+        const res = await poolWrapper.joinPool(
+          poolOutAmount,
+          [token2InAmount, token1InAmount],
+          { from: alice, value: ethFee }
+        );
+        const weiUsed = res.receipt.gasUsed * gasPrice;
+        console.log('        joinPool gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
+
+        assert.equal(await this.token1.balanceOf(alice), subBN(token1AliceBalanceBefore, token1InAmount));
+        assert.equal(await this.token2.balanceOf(alice), subBN(token2AliceBalanceBefore, token2InAmount));
+        assert.equal(await piToken1.balanceOf(pool.address), addBN(await piToken1.getPiEquivalentForUnderlying(token1InAmount), balances[0]));
+        assert.equal(
+          await this.piToken2.balanceOf(pool.address),
+          addBN(await this.piToken2.getPiEquivalentForUnderlying(token2InAmount), balances[1])
+        );
+        assert.equal(
+          await piToken1.balanceOf(pool.address),
+          addBN(await piToken1.getPiEquivalentForUnderlying(token1InAmount), balances[0])
+        );
+        assert.equal(await pool.balanceOf(alice), poolOutAmountAfterFee);
+
+        const poolInAmountFee = mulScalarBN(poolOutAmountAfterFee, communityExitFee);
+        const poolInAmountAfterFee = subBN(poolOutAmountAfterFee, poolInAmountFee);
+
+        ratio = divScalarBN(poolInAmountAfterFee, await pool.totalSupply());
+        const token1OutAmount = await piToken1.getUnderlyingEquivalentForPi(mulScalarBN(ratio, await pool.getBalance(piToken1.address)));
+        const token2OutAmount = await this.piToken2.getUnderlyingEquivalentForPi(mulScalarBN(ratio, await pool.getBalance(this.piToken2.address)));
+
+        await pool.approve(poolWrapper.address, poolOutAmountAfterFee, { from: alice });
+
+        await expectRevert(
+          pool.exitPool(poolOutAmountAfterFee, [token2OutAmount, token1OutAmount], { from: alice }),
+          'ONLY_WRAPPER',
+        );
+        await expectRevert(
+          poolWrapper.exitPool(poolOutAmountAfterFee, [token2OutAmount, token1OutAmount], { from: alice }),
+          'function call failed to execute',
+        );
+
+        token1AliceBalanceBefore = await this.token1.balanceOf(alice);
+        token2AliceBalanceBefore = await this.token2.balanceOf(alice);
+
+        await poolWrapper.exitPool(
+          poolOutAmountAfterFee,
+          [token2OutAmount, token1OutAmount],
+          { from: alice, value: ethFee }
+        );
+
+        assertEqualWithAccuracy(await pool.balanceOf(alice), '0');
+        assertEqualWithAccuracy(await this.token1.balanceOf(alice), addBN(token1AliceBalanceBefore, token1OutAmount));
+        assertEqualWithAccuracy(await this.token2.balanceOf(alice), addBN(token2AliceBalanceBefore, token2OutAmount));
+        assertEqualWithAccuracy(
+          await piToken1.balanceOf(pool.address),
+          subBN(addBN(await piToken1.getPiEquivalentForUnderlying(token1InAmount), balances[0]), await piToken1.getPiEquivalentForUnderlying(token1OutAmount)),
+        );
+        assertEqualWithAccuracy(
+          await this.piToken2.balanceOf(pool.address),
+          subBN(
+            addBN(await this.piToken2.getPiEquivalentForUnderlying(token2InAmount), balances[1]),
+            await this.piToken2.getPiEquivalentForUnderlying(token2OutAmount)
+          ),
+        );
+      });
+
+      it('withdrawOddEthFee should works correctly', async () => {
+        const poolAmountOutWithoutFee = await poolWrapper.calcPoolOutGivenSingleIn(
           await pool.getBalance(this.token1.address),
           await pool.getDenormalizedWeight(this.token1.address),
           await pool.totalSupply(),
           await pool.getTotalDenormalizedWeight(),
           amountToSwap,
           swapFee,
-        )
-      ).toString(10);
+        );
 
-      const amountIn = (
-        await pool.calcSingleInGivenPoolOut(
+        const amountIn = await poolWrapper.calcSingleInGivenPoolOut(
           await pool.getBalance(this.token1.address),
           await pool.getDenormalizedWeight(this.token1.address),
           await pool.totalSupply(),
           await pool.getTotalDenormalizedWeight(),
           poolAmountOutWithoutFee,
           swapFee,
-        )
-      ).toString(10);
+        );
 
-      await this.token1.transfer(alice, subBN(amountIn, amountToSwap));
-      await this.token1.approve(poolWrapper.address, amountIn, {from: alice});
+        await this.token1.transfer(alice, subBN(amountIn, amountToSwap));
+        await this.token1.approve(poolWrapper.address, amountIn, {from: alice});
 
-      await poolWrapper.joinswapPoolAmountOut(
-        this.token1.address,
-        poolAmountOutWithoutFee,
-        amountIn,
-        {from: alice, value: ethFee}
-      );
+        await poolWrapper.joinswapPoolAmountOut(
+          this.token1.address,
+          poolAmountOutWithoutFee,
+          amountIn,
+          {from: alice, value: ethFee}
+        );
 
-      assert.equal(await web3.eth.getBalance(poolWrapper.address), ethFee);
-      await expectRevert(
-        poolWrapper.withdrawOddEthFee(communityWallet, {from: minter}),
-        'NOT_CONTROLLER',
-      );
+        assert.equal(await web3.eth.getBalance(poolWrapper.address), ethFee);
+        await expectRevert(
+          poolWrapper.withdrawOddEthFee(communityWallet, {from: minter}),
+          'NOT_CONTROLLER',
+        );
 
-      const communityWalletEthBalanceBefore = await web3.eth.getBalance(communityWallet);
-      await poolController.migrateController(minter, [poolWrapper.address], {from: minter});
-      await poolWrapper.withdrawOddEthFee(communityWallet, {from: minter});
-      assert.equal(addBN(communityWalletEthBalanceBefore, ethFee), await web3.eth.getBalance(communityWallet));
-      assert.equal(await web3.eth.getBalance(poolWrapper.address), ether(0));
+        const communityWalletEthBalanceBefore = await web3.eth.getBalance(communityWallet);
+        await poolController.migrateController(minter, [poolWrapper.address], {from: minter});
+        await poolWrapper.withdrawOddEthFee(communityWallet, {from: minter});
+        assert.equal(addBN(communityWalletEthBalanceBefore, ethFee), await web3.eth.getBalance(communityWallet));
+        assert.equal(await web3.eth.getBalance(poolWrapper.address), ether(0));
+      });
     });
   });
 });
