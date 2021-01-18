@@ -89,13 +89,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
 
   function getPendingRewards() public view returns (uint256) {
     // return sushiAtPiToken + sushiBackedByXSushi - piToken.totalSupply()
-    return SUSHI.balanceOf(address(piToken))
-      .add(getUnderlyingBackedByXSushi())
-      .sub(piToken.totalSupply());
-  }
-
-  function getUnderlyingStaked() public view returns (uint256) {
-    return _getUnderlyingStaked();
+    return SUSHI.balanceOf(address(piToken)).add(getUnderlyingBackedByXSushi()).sub(piToken.totalSupply());
   }
 
   /*** EQUIVALENT METHODS OVERRIDES ***/
