@@ -91,6 +91,8 @@ describe('PowerIndexPool', () => {
   const minWeightPerSecond = ether('0.00000001');
   const maxWeightPerSecond = ether('0.1');
 
+  const gasPrice = 100 * 10**9;
+
   let tokens;
   let pool;
   let proxyAdmin;
@@ -214,7 +216,7 @@ describe('PowerIndexPool', () => {
         await token.approve(pool.address, tokenInAmount, { from: alice });
         amounts.push(tokenInAmount);
       });
-      await pool.joinPool(poolOutAmount, amounts, { from: alice });
+      return await pool.joinPool(poolOutAmount, amounts, { from: alice });
     };
 
     this.exitswapExternAmountOut = async (_token, _amountOut) => {
@@ -832,7 +834,9 @@ describe('PowerIndexPool', () => {
     });
 
     it('should correctly change 8-th token to new', async () => {
-      await this.joinPool(tokens, ether('18800'));
+      const res = await this.joinPool(tokens, ether('18800'));
+      const weiUsed = res.receipt.gasUsed * gasPrice;
+      console.log('        joinPool gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
 
       const oldTokenAddress = tokens[7];
 
