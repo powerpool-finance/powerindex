@@ -64,7 +64,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   function claimRewards() external {
     uint256 rewardsPending = IStakedAave(staking).getTotalRewardsBalance(address(piToken));
-    require(rewardsPending > 0, "NOTING_TO_CLAIM");
+    require(rewardsPending > 0, "NOTHING_TO_CLAIM");
 
     _callStaking(IStakedAave.claimRewards.selector, abi.encode(address(this), rewardsPending));
 
