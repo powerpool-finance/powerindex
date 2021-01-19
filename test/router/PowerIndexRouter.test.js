@@ -66,24 +66,6 @@ describe('PowerIndex BasicRouter Test', () => {
     });
   });
 
-  describe('weighed underlying', () => {
-    let leakingRouter, piToken, token;
-
-    beforeEach(async () => {
-      token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
-      piToken = await WrappedPiErc20.new(token.address, stub, 'piToken', 'piTKN');
-      leakingRouter = await MockRouter.new(piToken.address, defaultBasicConfig);
-
-      await piToken.changeRouter(leakingRouter.address, { from: stub });
-    });
-
-    it('should', async () => {
-      await token.transfer(alice, ether('100'));
-      await token.approve(piToken.address, ether('100'), { from: alice });
-      await piToken.deposit(ether('100'), { from: alice });
-    });
-  });
-
   describe('changeRouter()', () => {
     it('should correctly migrate to new router and allow swapping a token with a new version', async () => {
       const token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
