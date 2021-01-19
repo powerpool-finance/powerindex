@@ -137,7 +137,6 @@ describe('Balancer', () => {
     await expectRevert(pool.getBalance(alice), 'NOT_BOUND');
     await expectRevert(pool.rebind(alice, '0', '0', { from: minter }), 'NOT_BOUND');
     await expectRevert(pool.unbind(alice, { from: minter }), 'NOT_BOUND');
-    await expectRevert(pool.gulp(alice, { from: minter }), 'NOT_BOUND');
     await expectRevert(pool.getSpotPriceSansFee(this.token1.address, alice), 'NOT_BOUND');
     await expectRevert(pool.getSpotPriceSansFee(alice, this.token1.address), 'NOT_BOUND');
     await expectRevert(pool.swapExactAmountIn(alice, '0', this.token1.address, '0', '0'), 'NOT_BOUND');
