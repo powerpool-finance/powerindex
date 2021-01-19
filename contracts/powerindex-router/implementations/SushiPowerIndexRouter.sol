@@ -41,6 +41,9 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
 
   /*** PERMISSIONLESS REWARD CLAIMING AND DISTRIBUTION ***/
 
+  /**
+   * @notice Withdraws the extra staked SUSHI as a reward and transfers it to the router
+   */
   function claimRewards() external {
     uint256 rewardsPending = getPendingRewards();
     require(rewardsPending > 0, "NOTING_TO_CLAIM");
@@ -59,6 +62,9 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     emit ClaimRewards(msg.sender, xSushiToBurn, rewardsPending, released);
   }
 
+  /**
+   * @notice Wraps the router's SUSHIs into piTokens and transfers it to the pools proportionally their SUSHI balances
+   */
   function distributeRewards() external {
     uint256 pendingReward = SUSHI.balanceOf(address(this));
     require(pendingReward > 0, "NO_PENDING_REWARD");
@@ -79,14 +85,50 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
 
   /*** VIEWERS ***/
 
+  /**
+   * @notice Get the amount of xSUSHI tokens SushiBar will mint in exchange of the given SUSHI tokens
+   * @param _sushi The input amount of SUSHI tokens
+   * @return The corresponding amount of xSUSHI tokens
+   */
   function getXSushiForSushi(uint256 _sushi) public view returns (uint256) {
     return _sushi.mul(IERC20(staking).totalSupply()) / SUSHI.balanceOf(staking);
   }
 
-  function getSushiForXSushi(uint256 _xSushi) public view returns (uint256) {
+  /**
+   * @notice Get the amount of SUSHI tokens SushiBar will release in exchange of the given xSUSHI tokens
+   * @param _xSushi The input amount of xSUSHI tokens
+   * @return The corresponding amount of SUSHI tokens
+   */
+  function getSushiForXSushi(uint256 _xSushi) external view returns (uint256) {
     return _xSushi.mul(SUSHI.balanceOf(staking)) / IERC20(staking).totalSupply();
   }
 
+  /**
+   * @notice Get the total amount of SUSHI tokens could be released in exchange of the piToken's xSUSHI balance.
+   *         Is comprised of the underlyingStaked and the pendingRewards.
+   * @return The SUSHI amount
+   */
+  function getUnderlyingBackedByXSushi() public view returns (uint256) {
+    if (staking == address(0)) {
+      return 0;
+    }
+
+    uint256 xSushiAtPiToken = IERC20(staking).balanceOf(address(piToken));
+    if (xSushiAtPiToken == 0) {
+      return 0;
+    }
+
+    uint256 sushiAtBar = SUSHI.balanceOf(staking);
+    uint256 xSushiTotal = IERC20(staking).totalSupply();
+
+    // return xSushiAtPiToken * sushiAtBar / xSushiTotal;
+    return xSushiAtPiToken.mul(sushiAtBar) / xSushiTotal;
+  }
+
+  /**
+   * @notice Get the amount of current pending rewards available at SushiBar
+   * @return The amount of pending rewards
+   */
   function getPendingRewards() public view returns (uint256) {
     // return sushiAtPiToken + sushiBackedByXSushi - piToken.totalSupply()
     return SUSHI.balanceOf(address(piToken)).add(getUnderlyingBackedByXSushi()).sub(piToken.totalSupply());
@@ -128,16 +170,29 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
 
   /*** OWNER METHODS ***/
 
+  /**
+   * @notice The contract owner manually stakes the given amount of SUSHI
+   * @param _sushi The amount SUSHI to stake
+   */
   function stake(uint256 _sushi) external onlyOwner {
     _stake(_sushi);
   }
 
+  /**
+   * @notice The contract owner manually burns the given amount of xSUSHI in exchange of SUSHI tokens
+   * @param _xSushi The amount xSUSHI to burn
+   */
   function redeem(uint256 _xSushi) external onlyOwner {
     _redeem(_xSushi);
   }
 
   /*** PI TOKEN CALLBACK ***/
 
+  /**
+   * @notice The piToken contract callback hook. Is forced to be called on deposit/withdraw actions. Can be called
+   *         anytime using the permissionless `pokeRouter()` method.
+   * @param _withdrawAmount The amount of SUSHI being withdrawn. 0 in case of a deposit or a permissonless poke.
+   */
   function piTokenCallback(uint256 _withdrawAmount) external payable override onlyPiToken {
     // Ignore the tokens without a voting assigned
     if (staking == address(0)) {
@@ -160,27 +215,13 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
 
   /*** INTERNALS ***/
 
+  /**
+   * @notice Get the opposite to the reserve ratio amount of SUSHI staked at SushiBar
+   * @return The SUSHI amount
+   */
   function _getUnderlyingStaked() internal view override returns (uint256) {
     // return piTokenTotalSupply - sushiAtPiToken
     return piToken.totalSupply().sub(SUSHI.balanceOf(address(piToken)));
-  }
-
-  // underlying + rewards
-  function getUnderlyingBackedByXSushi() public view returns (uint256) {
-    if (staking == address(0)) {
-      return 0;
-    }
-
-    uint256 xSushiAtPiToken = IERC20(staking).balanceOf(address(piToken));
-    if (xSushiAtPiToken == 0) {
-      return 0;
-    }
-
-    uint256 sushiAtBar = SUSHI.balanceOf(staking);
-    uint256 xSushiTotal = IERC20(staking).totalSupply();
-
-    // return xSushiAtPiToken * sushiAtBar / xSushiTotal;
-    return xSushiAtPiToken.mul(sushiAtBar) / xSushiTotal;
   }
 
   function _stake(uint256 _sushi) internal {
