@@ -104,7 +104,7 @@ contract BPool is BToken, BMath, BPoolInterface {
     // community entree fee, community exit fee,
     // change token weights, bind, unbind and rebind tokens,
     // set wrapper contract, enable wrapper mode, change CONTROLLER.
-    address private _controller;
+    address internal _controller;
 
     // True if PUBLIC can call SWAP & JOIN functions
     bool private _publicSwap;

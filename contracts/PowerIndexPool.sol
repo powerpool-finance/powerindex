@@ -17,8 +17,9 @@ pragma solidity 0.6.12;
 
 import "./balancer-core/BPool.sol";
 import "./interfaces/PowerIndexPoolInterface.sol";
+import "@openzeppelin/contracts/proxy/Initializable.sol";
 
-contract PowerIndexPool is BPool {
+contract PowerIndexPool is BPool, Initializable {
   /// @notice The event emitted when a dynamic weight set to token.
   event SetDynamicWeight(
     address indexed token,
@@ -45,12 +46,18 @@ contract PowerIndexPool is BPool {
   /// @dev Max weight per second limit.
   uint256 private _maxWeightPerSecond;
 
-  constructor(
-    string memory name,
-    string memory symbol,
+  constructor() public BPool("", "") {}
+
+  function initialize(
+    string calldata name,
+    string calldata symbol,
+    address controller,
     uint256 minWeightPerSecond,
     uint256 maxWeightPerSecond
-  ) public BPool(name, symbol) {
+  ) external initializer {
+    _name = name;
+    _symbol = symbol;
+    _controller = controller;
     _minWeightPerSecond = minWeightPerSecond;
     _maxWeightPerSecond = maxWeightPerSecond;
   }

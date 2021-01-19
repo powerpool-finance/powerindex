@@ -9,6 +9,9 @@ const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
+const ProxyFactory = artifacts.require('ProxyFactory');
+const ProxyAdmin = artifacts.require('ProxyAdmin');
+const MockPowerIndexPoolV2 = artifacts.require('MockPowerIndexPoolV2');
 
 const _ = require('lodash');
 const pIteration = require('p-iteration');
@@ -16,6 +19,7 @@ const pIteration = require('p-iteration');
 PowerIndexPool.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
 MockCvp.numberFormat = 'String';
+MockPowerIndexPoolV2.numberFormat = 'String';
 
 const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
@@ -72,7 +76,7 @@ function ether(v) {
   return ozEther(v).toString(10);
 }
 
-describe('PowerIndexPool', () => {
+describe.only('PowerIndexPool', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const name = 'My Pool';
   const symbol = 'MP';
@@ -89,6 +93,7 @@ describe('PowerIndexPool', () => {
 
   let tokens;
   let pool;
+  let proxyAdmin;
 
   let controller, alice, communityWallet;
   before(async function () {
@@ -98,7 +103,15 @@ describe('PowerIndexPool', () => {
   beforeEach(async () => {
     this.weth = await WETH.new();
 
-    this.bFactory = await PowerIndexPoolFactory.new({ from: controller });
+    proxyAdmin = await ProxyAdmin.new();
+    const proxyFactory = await ProxyFactory.new();
+    const impl = await PowerIndexPool.new();
+    this.bFactory = await PowerIndexPoolFactory.new(
+      proxyFactory.address,
+      impl.address,
+      proxyAdmin.address,
+      { from: controller }
+    );
     this.bActions = await PowerIndexPoolActions.new({ from: controller });
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: controller });
 
@@ -355,6 +368,18 @@ describe('PowerIndexPool', () => {
     await pool.setWrapper(alice, true);
 
     await expectRevert(pool.gulp(this.token1.address), 'ONLY_WRAPPER');
+  });
+
+  it('proxy upgrade should work properly', async () => {
+    const newImpl = await MockPowerIndexPoolV2.new();
+
+    await expectRevert(proxyAdmin.upgrade(pool.address, newImpl.address, {from: alice}), 'Ownable: caller is not the owner');
+    await proxyAdmin.upgrade(pool.address, newImpl.address, {from: controller});
+
+    pool = await MockPowerIndexPoolV2.at(pool.address);
+    assert.equal(await pool.test(), '0');
+    await pool.setTest('1');
+    assert.equal(await pool.test(), '1');
   });
 
   describe('restoring ratio after weight changing', () => {

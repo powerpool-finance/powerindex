@@ -3,6 +3,7 @@ const { ether } = require('./helpers');
 const { buildBasicRouterConfig } = require('./helpers/builders');
 const assert = require('chai').assert;
 const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
+const ProxyFactory = artifacts.require('ProxyFactory');
 const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
 const PowerIndexPool = artifacts.require('PowerIndexPool');
 const MockERC20 = artifacts.require('MockERC20');
@@ -119,7 +120,14 @@ describe('PowerIndexPoolController', () => {
   beforeEach(async () => {
     this.weth = await WETH.new();
 
-    this.bFactory = await PowerIndexPoolFactory.new({ from: minter });
+    const proxyFactory = await ProxyFactory.new();
+    const impl = await PowerIndexPool.new();
+    this.bFactory = await PowerIndexPoolFactory.new(
+      proxyFactory.address,
+      impl.address,
+      zeroAddress,
+      { from: minter }
+    );
     this.bActions = await PowerIndexPoolActions.new({ from: minter });
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: minter });
 

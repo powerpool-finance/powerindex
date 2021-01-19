@@ -46,7 +46,7 @@ contract PowerIndexPoolActions {
     Args calldata args,
     TokenConfig[] calldata tokens
   ) external returns (PowerIndexPoolInterface pool) {
-    pool = factory.newPool(name, symbol, args.minWeightPerSecond, args.maxWeightPerSecond);
+    pool = factory.newPool(name, symbol, address(this), args.minWeightPerSecond, args.maxWeightPerSecond);
     pool.setSwapFee(args.swapFee);
     pool.setCommunityFeeAndReceiver(
       args.communitySwapFee,

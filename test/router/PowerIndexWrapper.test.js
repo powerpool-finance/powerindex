@@ -15,6 +15,7 @@ const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRouterFactory');
 const PowerIndexBasicRouter = artifacts.require('MockPowerIndexBasicRouter');
+const ProxyFactory = artifacts.require('ProxyFactory');
 
 const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
@@ -100,7 +101,14 @@ describe('PowerIndexWrapper', () => {
   beforeEach(async () => {
     this.weth = await WETH.new();
 
-    this.bFactory = await PowerIndexPoolFactory.new({ from: minter });
+    const proxyFactory = await ProxyFactory.new();
+    const impl = await PowerIndexPool.new();
+    this.bFactory = await PowerIndexPoolFactory.new(
+      proxyFactory.address,
+      impl.address,
+      zeroAddress,
+      { from: minter }
+    );
     this.bActions = await PowerIndexPoolActions.new({ from: minter });
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: minter });
 
