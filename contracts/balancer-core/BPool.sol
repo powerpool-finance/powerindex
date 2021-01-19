@@ -18,8 +18,10 @@ import "./BToken.sol";
 import "./BMath.sol";
 import "../interfaces/IPoolRestrictions.sol";
 import "../interfaces/BPoolInterface.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 contract BPool is BToken, BMath, BPoolInterface {
+    using SafeERC20 for IERC20;
 
     struct Record {
         bool bound;   // is token bound to pool
@@ -622,7 +624,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _onlyWrapperOrNotWrapperMode();
         uint256 diff = bsub(IERC20(token).balanceOf(address(this)), _records[token].balance);
         if (diff > 0) {
-          IERC20(token).transfer(_communityFeeReceiver, diff);
+          IERC20(token).safeTransfer(_communityFeeReceiver, diff);
         }
     }
 
