@@ -6,7 +6,6 @@ const MockERC20 = artifacts.require('MockERC20');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexBasicRouter = artifacts.require('PowerIndexBasicRouter');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
-const MockRouter = artifacts.require('MockRouter');
 
 MockERC20.numberFormat = 'String';
 PowerIndexBasicRouter.numberFormat = 'String';
