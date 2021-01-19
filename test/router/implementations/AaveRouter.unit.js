@@ -159,6 +159,23 @@ describe('AaveRouter Tests', () => {
       assert.equal(await aaveRouter.owner(), piGov);
     });
 
+    it('should deny initializing contract with rebalancingInterval LT UNSTAKE_WINDOW', async () => {
+      await expectRevert(AavePowerIndexRouter.new(
+        piAave.address,
+        buildBasicRouterConfig(
+          poolRestrictions.address,
+          constants.ZERO_ADDRESS,
+          stakedAave.address,
+          ether('0.2'),
+          '172801',
+          pvp,
+          ether('0.2'),
+          [],
+        ),
+        buildAaveRouterConfig(aave.address),
+      ), 'REBALANCING_GT_UNSTAKE');
+    });
+
     it('should deny non-piToken calling piTokenCallback', async () => {
       await expectRevert(aaveRouter.piTokenCallback(0), 'ONLY_PI_TOKEN_ALLOWED');
     });
@@ -166,6 +183,30 @@ describe('AaveRouter Tests', () => {
     it('should allow depositing Aave and staking it in a StakedAave contract', async () => {});
 
     describe('owner methods', async () => {
+      describe('setReserveConfig()', () => {
+        it('should allow the owner setting a reserve config', async () => {
+          const res = await aaveRouter.setReserveConfig(ether('0.2'), 3600, { from: piGov });
+          expectEvent(res, 'SetReserveConfig', {
+            ratio: ether('0.2'),
+            rebalancingInterval: '3600'
+          });
+          assert.equal(await aaveRouter.reserveRatio(), ether('0.2'))
+          assert.equal(await aaveRouter.rebalancingInterval(), 3600)
+        });
+
+        it('should deny setting a reserve ratio greater or equal 100%', async () => {
+          await expectRevert(aaveRouter.setReserveConfig(ether('1.01'), 0, { from: piGov }), 'RR_GREATER_THAN_100_PCT');
+        });
+
+        it('should deny setting a rebalancingInterval greater than UNSTAKE_WINDOW', async () => {
+          await expectRevert(aaveRouter.setReserveConfig(ether('0.2'), 172801, { from: piGov }), 'REBALANCING_GT_UNSTAKE');
+        });
+
+        it('should deny non-owner setting reserve config', async () => {
+          await expectRevert(aaveRouter.setReserveConfig(ether('0.2'), 3600, { from: alice }), 'Ownable: caller is not the owner');
+        });
+      });
+
       describe('stake()/redeem()', () => {
         beforeEach(async () => {
           await aave.transfer(alice, ether('10000'), { from: aaveDistributor });

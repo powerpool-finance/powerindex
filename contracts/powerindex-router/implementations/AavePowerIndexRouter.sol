@@ -37,6 +37,15 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     AaveConfig memory _aaveConfig
   ) public PowerIndexBasicRouter(_piToken, _basicConfig) {
     AAVE = IERC20(_aaveConfig.AAVE);
+    require(
+      _basicConfig.rebalancingInterval < IStakedAave(_basicConfig.staking).UNSTAKE_WINDOW(),
+      "REBALANCING_GT_UNSTAKE"
+    );
+  }
+
+  function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) public override onlyOwner {
+    require(_rebalancingInterval < IStakedAave(staking).UNSTAKE_WINDOW(), "REBALANCING_GT_UNSTAKE");
+    PowerIndexBasicRouter.setReserveConfig(_reserveRatio, _rebalancingInterval);
   }
 
   /*** THE PROXIED METHOD EXECUTORS FOR VOTING ***/

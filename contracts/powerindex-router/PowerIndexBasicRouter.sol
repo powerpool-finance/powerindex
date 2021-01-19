@@ -85,7 +85,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     emit SetVotingAndStaking(_voting, _staking);
   }
 
-  function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) external override onlyOwner {
+  function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) public virtual override onlyOwner {
     require(_reserveRatio <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
     reserveRatio = _reserveRatio;
     rebalancingInterval = _rebalancingInterval;
