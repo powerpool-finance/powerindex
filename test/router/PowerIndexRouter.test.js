@@ -40,6 +40,32 @@ describe('PowerIndex BasicRouter Test', () => {
     );
   });
 
+  describe('initialization', () => {
+    it('should deny initialization with a RR > 100%', async () => {
+      const basicConfig = Object.assign({}, defaultBasicConfig, { reserveRatio: ether('1.01') });
+      await expectRevert(PowerIndexBasicRouter.new(alice, basicConfig), 'RR_GT_HUNDRED_PCT');
+    });
+
+    it('should deny initialization with a pvpFee >= 100%', async () => {
+      const basicConfig = Object.assign({}, defaultBasicConfig, { pvpFee: ether('1') });
+      await expectRevert(PowerIndexBasicRouter.new(alice, basicConfig), 'PVP_FEE_GTE_HUNDRED_PCT');
+    });
+
+    it('should deny initialization with a zero piToken address', async () => {
+      await expectRevert(PowerIndexBasicRouter.new(constants.ZERO_ADDRESS, defaultBasicConfig), 'INVALID_PI_TOKEN');
+    });
+
+    it('should deny initialization with a zero PVP address', async () => {
+      const basicConfig = Object.assign({}, defaultBasicConfig, { pvp: constants.ZERO_ADDRESS });
+      await expectRevert(PowerIndexBasicRouter.new(alice, basicConfig), 'INVALID_PVP_ADDR');
+    });
+
+    it('should deny initialization with a zero PoolRestrictions address', async () => {
+      const basicConfig = Object.assign({}, defaultBasicConfig, { poolRestrictions: constants.ZERO_ADDRESS });
+      await expectRevert(PowerIndexBasicRouter.new(alice, basicConfig), 'INVALID_POOL_RESTRICTIONS_ADDR');
+    });
+  });
+
   describe('weighed underlying', () => {
     let leakingRouter, piToken, token;
 
