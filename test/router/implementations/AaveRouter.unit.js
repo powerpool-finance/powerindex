@@ -621,7 +621,7 @@ describe('AaveRouter Tests', () => {
           [buildAaveAssetConfigInput(0, '0', stakedAave.address)],
           { from: emissionManager },
         );
-        await expectRevert(aaveRouter.claimRewards({ from: alice }), 'NOTING_TO_CLAIM');
+        await expectRevert(aaveRouter.claimRewards({ from: alice }), 'NOTHING_TO_CLAIM');
       });
 
       it('should revert distribute rewards() if there is no yCrv on the balance', async () => {
