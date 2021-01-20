@@ -29,7 +29,8 @@ interface IVestedLPMining {
     uint256 _allocPoint,
     IERC20 _lpToken,
     uint8 _poolType,
-    bool _votesEnabled
+    bool _votesEnabled,
+    uint256 _boostRate
   ) external;
 
   /// @notice Update parameters of the given pool (only the owner may call)
@@ -37,7 +38,8 @@ interface IVestedLPMining {
     uint256 _pid,
     uint256 _allocPoint,
     uint8 _poolType,
-    bool _votesEnabled
+    bool _votesEnabled,
+    uint256 _boostRate
   ) external;
 
   /// @notice Set the migrator contract (only the owner may call)
@@ -72,10 +74,10 @@ interface IVestedLPMining {
   function updatePool(uint256 _pid) external;
 
   /// @notice Deposit the given amount of LP tokens to the given pool
-  function deposit(uint256 _pid, uint256 _amount) external;
+  function deposit(uint256 _pid, uint256 _amount, uint256 _boostAmount) external;
 
   /// @notice Withdraw the given amount of LP tokens from the given pool
-  function withdraw(uint256 _pid, uint256 _amount) external;
+  function withdraw(uint256 _pid, uint256 _amount, uint256 _boostAmount) external;
 
   /// @notice Withdraw LP tokens without caring about pending CVP tokens. EMERGENCY ONLY.
   function emergencyWithdraw(uint256 _pid) external;

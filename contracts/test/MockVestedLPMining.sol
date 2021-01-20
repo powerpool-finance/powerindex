@@ -34,13 +34,13 @@ contract MockVestedLPMining is VestedLPMining {
     uint32 lastUpdateBlock
   );
 
-  function __computeCvpVesting(User calldata _user, uint256 _accCvpPerLpt)
+  function __computeCvpVesting(User calldata _user, uint256 _accCvpPerLpt, UserPoolBoost calldata _userPB, PoolBoost calldata _poolBoost)
     external
     returns (uint256 newlyEntitled, uint256 newlyVested)
   {
     User memory u = _user;
 
-    (newlyEntitled, newlyVested) = super._computeCvpVesting(u, _accCvpPerLpt);
+    (newlyEntitled, newlyVested) = super._computeCvpVesting(u, _accCvpPerLpt, _userPB, _poolBoost);
 
     emit _UpdatedUser(newlyEntitled, newlyVested, u.cvpAdjust, u.pendedCvp, u.vestingBlock, u.lastUpdateBlock);
     return (newlyEntitled, newlyVested);
