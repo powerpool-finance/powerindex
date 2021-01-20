@@ -9,11 +9,17 @@ const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
+const ProxyFactory = artifacts.require('ProxyFactory');
+const ProxyAdmin = artifacts.require('ProxyAdmin');
+const MockPowerIndexPoolV2 = artifacts.require('MockPowerIndexPoolV2');
 
 const _ = require('lodash');
 const pIteration = require('p-iteration');
 
 PowerIndexPool.numberFormat = 'String';
+MockERC20.numberFormat = 'String';
+MockCvp.numberFormat = 'String';
+MockPowerIndexPoolV2.numberFormat = 'String';
 
 const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
@@ -89,6 +95,7 @@ describe('PowerIndexPool', () => {
 
   let tokens;
   let pool;
+  let proxyAdmin;
 
   let controller, alice, communityWallet;
   before(async function () {
@@ -98,7 +105,15 @@ describe('PowerIndexPool', () => {
   beforeEach(async () => {
     this.weth = await WETH.new();
 
-    this.bFactory = await PowerIndexPoolFactory.new({ from: controller });
+    proxyAdmin = await ProxyAdmin.new();
+    const proxyFactory = await ProxyFactory.new();
+    const impl = await PowerIndexPool.new();
+    this.bFactory = await PowerIndexPoolFactory.new(
+      proxyFactory.address,
+      impl.address,
+      proxyAdmin.address,
+      { from: controller }
+    );
     this.bActions = await PowerIndexPoolActions.new({ from: controller });
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: controller });
 
@@ -139,10 +154,10 @@ describe('PowerIndexPool', () => {
     pool = await PowerIndexPool.at(logNewPool.args.pool);
 
     this.getTokensToJoinPoolAndApprove = async (_pool, amountToMint) => {
-      const poolTotalSupply = (await _pool.totalSupply()).toString(10);
+      const poolTotalSupply = await _pool.totalSupply();
       const ratio = divScalarBN(amountToMint, poolTotalSupply);
-      const token1Amount = mulScalarBN(ratio, (await _pool.getBalance(this.token1.address)).toString(10));
-      const token2Amount = mulScalarBN(ratio, (await _pool.getBalance(this.token2.address)).toString(10));
+      const token1Amount = mulScalarBN(ratio, await _pool.getBalance(this.token1.address));
+      const token2Amount = mulScalarBN(ratio, await _pool.getBalance(this.token2.address));
       await this.token1.approve(this.bActions.address, token1Amount);
       await this.token2.approve(this.bActions.address, token2Amount);
       return [token1Amount, token2Amount];
@@ -235,7 +250,7 @@ describe('PowerIndexPool', () => {
           await getDenormWeight(_tokenTo, await getTimestamp(1)),
           swapFee,
         )
-      ).toString(10);
+      );
 
       await this.bExchange.multihopBatchSwapExactIn(
         [
@@ -295,9 +310,78 @@ describe('PowerIndexPool', () => {
 
         await this.multihopBatchSwapExactIn(tokens[0], tokens[1], amountToSwap);
 
-        assert.equal((await this.token1.balanceOf(communityWallet)).toString(), amountCommunitySwapFee.toString());
+        assert.equal(await this.token1.balanceOf(communityWallet), amountCommunitySwapFee.toString());
       });
     }
+  });
+
+  it('gulp should work properly with bound token', async () => {
+    const excessBalance = ether('1');
+    const poolMappingBalance = await pool.getBalance(this.token1.address);
+    const poolActualBalance = await this.token1.balanceOf(pool.address);
+    const pvpBalance = await this.token1.balanceOf(communityWallet);
+
+    await this.token1.transfer(pool.address, excessBalance);
+
+    assert.equal(poolMappingBalance, await pool.getBalance(this.token1.address));
+    assert.equal(addBN(poolActualBalance, excessBalance), await this.token1.balanceOf(pool.address));
+
+    await pool.gulp(this.token1.address);
+
+    assert.equal(poolMappingBalance, await pool.getBalance(this.token1.address));
+    assert.equal(poolActualBalance, await this.token1.balanceOf(pool.address));
+    assert.equal(addBN(pvpBalance, excessBalance), await this.token1.balanceOf(communityWallet));
+
+    await pool.gulp(this.token1.address);
+
+    assert.equal(poolMappingBalance, await pool.getBalance(this.token1.address));
+    assert.equal(poolActualBalance, await this.token1.balanceOf(pool.address));
+  });
+
+  it('gulp should work properly with not bound token', async () => {
+    const newToken = await MockERC20.new('My Token 2', 'MT2', '18', ether('1000000'));
+
+    const excessBalance = ether('1');
+    assert.equal(await pool.isBound(newToken.address), false);
+    const poolActualBalance = await newToken.balanceOf(pool.address);
+    const pvpBalance = await newToken.balanceOf(communityWallet);
+
+    await newToken.transfer(pool.address, excessBalance);
+
+    assert.equal(addBN(poolActualBalance, excessBalance), await newToken.balanceOf(pool.address));
+
+    await pool.gulp(newToken.address);
+
+    assert.equal(poolActualBalance, await newToken.balanceOf(pool.address));
+    assert.equal(addBN(pvpBalance, excessBalance), await newToken.balanceOf(communityWallet));
+
+    await pool.gulp(newToken.address);
+
+    assert.equal(poolActualBalance, await newToken.balanceOf(pool.address));
+  });
+
+  it('gulp should support wrapper mode', async () => {
+    await pool.setWrapper(alice, true);
+
+    await expectRevert(pool.gulp(this.token1.address), 'ONLY_WRAPPER');
+  });
+
+  it('gulp should support wrapper mode', async () => {
+    await pool.setWrapper(alice, true);
+
+    await expectRevert(pool.gulp(this.token1.address), 'ONLY_WRAPPER');
+  });
+
+  it('proxy upgrade should work properly', async () => {
+    const newImpl = await MockPowerIndexPoolV2.new();
+
+    await expectRevert(proxyAdmin.upgrade(pool.address, newImpl.address, {from: alice}), 'Ownable: caller is not the owner');
+    await proxyAdmin.upgrade(pool.address, newImpl.address, {from: controller});
+
+    pool = await MockPowerIndexPoolV2.at(pool.address);
+    assert.equal(await pool.test(), '0');
+    await pool.setTest('1');
+    assert.equal(await pool.test(), '1');
   });
 
   describe('restoring ratio after weight changing', () => {
@@ -615,7 +699,7 @@ describe('PowerIndexPool', () => {
       const poolAmountOutAfterJoin = await this.calcPoolOutGivenSingleIn(this.token3.address, ether('0.0001'));
       assert.equal(poolAmountOutAfterJoin, ether('152.544804372061724031').toString());
 
-      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress);
+      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
       const fromTimestamp = await getTimestamp(100);
       await poolController.setDynamicWeightList([
@@ -768,7 +852,7 @@ describe('PowerIndexPool', () => {
       fromTimestamp = await getTimestamp(100);
       targetTimestamp = await getTimestamp(11000);
 
-      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress);
+      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
 
       await newToken.approve(poolController.address, b);
@@ -906,7 +990,7 @@ describe('PowerIndexPool', () => {
       assert.equal(await pool.isBound(newToken.address), false);
       assert.equal(await pool.getNumTokens(), '8');
 
-      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress);
+      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
 
       const duration = '10000';

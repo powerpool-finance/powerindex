@@ -18,8 +18,10 @@ import "./BToken.sol";
 import "./BMath.sol";
 import "../interfaces/IPoolRestrictions.sol";
 import "../interfaces/BPoolInterface.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 contract BPool is BToken, BMath, BPoolInterface {
+    using SafeERC20 for IERC20;
 
     struct Record {
         bool bound;   // is token bound to pool
@@ -104,7 +106,7 @@ contract BPool is BToken, BMath, BPoolInterface {
     // community entree fee, community exit fee,
     // change token weights, bind, unbind and rebind tokens,
     // set wrapper contract, enable wrapper mode, change CONTROLLER.
-    address private _controller;
+    address internal _controller;
 
     // True if PUBLIC can call SWAP & JOIN functions
     bool private _publicSwap;
@@ -619,8 +621,11 @@ contract BPool is BToken, BMath, BPoolInterface {
         _logs_
         _lock_
     {
-        _requireTokenIsBound(token);
-        _records[token].balance = IERC20(token).balanceOf(address(this));
+        _onlyWrapperOrNotWrapperMode();
+        uint256 diff = bsub(IERC20(token).balanceOf(address(this)), _records[token].balance);
+        if (diff > 0) {
+          IERC20(token).safeTransfer(_communityFeeReceiver, diff);
+        }
     }
 
     /* ==========  Price Queries  ========== */
@@ -829,7 +834,7 @@ contract BPool is BToken, BMath, BPoolInterface {
             spotPriceBefore <= bdiv(tokenAmountInAfterFee, tokenAmountOut),
             "MATH_APPROX"
         );
-      require(spotPriceAfter <= maxPrice, "LIMIT_PRICE");
+        require(spotPriceAfter <= maxPrice, "LIMIT_PRICE");
 
         emit LOG_SWAP(msg.sender, tokenIn, tokenOut, tokenAmountInAfterFee, tokenAmountOut);
 

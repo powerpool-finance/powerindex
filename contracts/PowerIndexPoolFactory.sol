@@ -16,26 +16,52 @@ pragma solidity 0.6.12;
 
 // Builds new Power Index Pools, logging their addresses and providing `isPowerIndexPool(address) -> (bool)`
 
-import "./PowerIndexPool.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/PowerIndexPoolFactoryInterface.sol";
+import "./interfaces/ProxyFactoryInterface.sol";
 
-contract PowerIndexPoolFactory is PowerIndexPoolFactoryInterface {
-  event LOG_NEW_POOL(address indexed caller, address indexed pool);
+contract PowerIndexPoolFactory is Ownable, PowerIndexPoolFactoryInterface {
+  event LOG_NEW_POOL(address indexed caller, address indexed pool, address indexed implementation);
+  event SET_IMPLEMENTATION(address indexed caller, address indexed implementation, address indexed proxyAdmin);
+
+  string public constant signature = "initialize(string,string,address,uint256,uint256)";
 
   mapping(address => bool) public isPowerIndexPool;
+  ProxyFactoryInterface public proxyFactory;
+  address public implementation;
+  address public proxyAdmin;
 
-  constructor() public {}
+  constructor(
+    address _proxyFactory,
+    address _implementation,
+    address _proxyAdmin
+  ) public {
+    proxyFactory = ProxyFactoryInterface(_proxyFactory);
+    implementation = _implementation;
+    proxyAdmin = _proxyAdmin;
+  }
+
+  function setProxySettings(address _implementation, address _proxyAdmin) external onlyOwner {
+    implementation = _implementation;
+    proxyAdmin = _proxyAdmin;
+    emit SET_IMPLEMENTATION(msg.sender, _implementation, _proxyAdmin);
+  }
 
   function newPool(
-    string calldata name,
-    string calldata symbol,
-    uint256 minWeightPerSecond,
-    uint256 maxWeightPerSecond
+    string calldata _name,
+    string calldata _symbol,
+    address _controller,
+    uint256 _minWeightPerSecond,
+    uint256 _maxWeightPerSecond
   ) external override returns (PowerIndexPoolInterface) {
-    PowerIndexPool pool = new PowerIndexPool(name, symbol, minWeightPerSecond, maxWeightPerSecond);
-    isPowerIndexPool[address(pool)] = true;
-    emit LOG_NEW_POOL(msg.sender, address(pool));
-    pool.setController(msg.sender);
-    return PowerIndexPoolInterface(address(pool));
+    address proxy =
+      proxyFactory.build(
+        implementation,
+        proxyAdmin,
+        abi.encodeWithSignature(signature, _name, _symbol, _controller, _minWeightPerSecond, _maxWeightPerSecond)
+      );
+    isPowerIndexPool[proxy] = true;
+    emit LOG_NEW_POOL(msg.sender, proxy, implementation);
+    return PowerIndexPoolInterface(proxy);
   }
 }

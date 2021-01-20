@@ -20,6 +20,7 @@ const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRouterFactory');
 const PowerIndexBasicRouter = artifacts.require('MockPowerIndexBasicRouter');
+const ProxyFactory = artifacts.require('ProxyFactory');
 
 WETH.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
@@ -92,7 +93,14 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
     this.weth = await WETH.new();
     this.weth.deposit({ value: ether('50000000') });
 
-    this.bFactory = await PowerIndexPoolFactory.new({ from: minter });
+    const proxyFactory = await ProxyFactory.new();
+    const impl = await PowerIndexPool.new();
+    this.bFactory = await PowerIndexPoolFactory.new(
+      proxyFactory.address,
+      impl.address,
+      zeroAddress,
+      { from: minter }
+    );
     this.bActions = await PowerIndexPoolActions.new({ from: minter });
     this.uniswapFactory = await UniswapV2Factory.new(feeManager, { from: minter });
     this.uniswapRouter = await UniswapV2Router02.new(this.uniswapFactory.address, this.weth.address, { from: minter });
@@ -496,7 +504,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
 
         const piTokenFactory = await WrappedPiErc20Factory.new();
         const routerFactory = await BasicPowerIndexRouterFactory.new();
-        const poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, piTokenFactory.address);
+        const poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, piTokenFactory.address, zeroAddress);
 
         await pool.setWrapper(poolWrapper.address, true);
 

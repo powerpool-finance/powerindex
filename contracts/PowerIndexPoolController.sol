@@ -25,11 +25,25 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     uint256 targetTimestamp;
   }
 
+  /** @dev Emitted on setting new weights strategy. */
+  event SetWeightsStrategy(address indexed weightsStrategy);
+
+  /** @dev Weights strategy contract address. */
+  address public weightsStrategy;
+
+  modifier onlyWeightsStrategy() {
+    require(msg.sender == weightsStrategy, "ONLY_WEIGHTS_STRATEGY");
+    _;
+  }
+
   constructor(
     address _pool,
     address _poolWrapper,
-    address _wrapperFactory
-  ) public PowerIndexWrappedController(_pool, _poolWrapper, _wrapperFactory) {}
+    address _wrapperFactory,
+    address _weightsStrategy
+  ) public PowerIndexWrappedController(_pool, _poolWrapper, _wrapperFactory) {
+    weightsStrategy = _weightsStrategy;
+  }
 
   /* ==========  Configuration Actions  ========== */
 
@@ -97,6 +111,31 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
    * @param _dynamicWeights Tokens dynamic weights configs.
    */
   function setDynamicWeightList(DynamicWeightInput[] memory _dynamicWeights) external onlyOwner {
+    uint256 len = _dynamicWeights.length;
+    for (uint256 i = 0; i < len; i++) {
+      pool.setDynamicWeight(
+        _dynamicWeights[i].token,
+        _dynamicWeights[i].targetDenorm,
+        _dynamicWeights[i].fromTimestamp,
+        _dynamicWeights[i].targetTimestamp
+      );
+    }
+  }
+
+  /**
+   * @notice Set _weightsStrategy address.
+   * @param _weightsStrategy Contract for weights management.
+   */
+  function setWeightsStrategy(address _weightsStrategy) external onlyOwner {
+    weightsStrategy = _weightsStrategy;
+    emit SetWeightsStrategy(_weightsStrategy);
+  }
+
+  /**
+   * @notice Call setDynamicWeight for several tokens, can be called only by weightsStrategy address.
+   * @param _dynamicWeights Tokens dynamic weights configs.
+   */
+  function setDynamicWeightListByStrategy(DynamicWeightInput[] memory _dynamicWeights) external onlyWeightsStrategy {
     uint256 len = _dynamicWeights.length;
     for (uint256 i = 0; i < len; i++) {
       pool.setDynamicWeight(

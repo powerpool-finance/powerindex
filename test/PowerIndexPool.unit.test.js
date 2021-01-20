@@ -4,6 +4,7 @@ const assert = require('chai').assert;
 const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
 const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
 const PowerIndexPool = artifacts.require('PowerIndexPool');
+const ProxyFactory = artifacts.require('ProxyFactory');
 const MockERC20 = artifacts.require('MockERC20');
 const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
@@ -52,7 +53,14 @@ describe('PowerIndexPool Unit', () => {
   beforeEach(async () => {
     this.weth = await WETH.new();
 
-    this.bFactory = await PowerIndexPoolFactory.new({ from: controller });
+    const proxyFactory = await ProxyFactory.new();
+    const impl = await PowerIndexPool.new();
+    this.bFactory = await PowerIndexPoolFactory.new(
+      proxyFactory.address,
+      impl.address,
+      zeroAddress,
+      { from: controller }
+    );
     this.bActions = await PowerIndexPoolActions.new({ from: controller });
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: controller });
 
@@ -169,11 +177,6 @@ describe('PowerIndexPool Unit', () => {
   });
 
   describe('disabled functions', async () => {
-    it('original bind should be disabled', async () => {
-      const newToken = await MockERC20.new('New Token', 'NT', '18', ether('1000000'));
-      await newToken.approve(pool.address, ether('1'));
-      await expectRevert(pool.bind(newToken.address, ether('1'), ether('10')), 'DISABLED');
-    });
     it('original rebind should be disabled', async () => {
       await this.token1.approve(pool.address, ether('1'));
       await expectRevert(
@@ -186,7 +189,7 @@ describe('PowerIndexPool Unit', () => {
       );
     });
     it('original bind should be disabled in controller', async () => {
-      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress);
+      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
 
       const bindSig = pool.contract._jsonInterface.filter(item => item.name === 'bind' && item.inputs.length === 5)[0]
@@ -201,7 +204,7 @@ describe('PowerIndexPool Unit', () => {
       );
     });
     it('original unbind should be disabled in controller', async () => {
-      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress);
+      const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
 
       const unbindSig = pool.contract._jsonInterface.filter(item => item.name === 'unbind')[0].signature;
@@ -268,23 +271,6 @@ describe('PowerIndexPool Unit', () => {
     });
   });
 
-  describe('gulp()', async () => {
-    it('it should absorb accidentally sent tokens into a pool', async () => {
-      assert.equal(await pool.getBalance(this.token1.address), ether(100));
-      assert.equal(await this.token1.balanceOf(pool.address), ether(100));
-
-      await this.token1.transfer(pool.address, ether(42));
-
-      assert.equal(await pool.getBalance(this.token1.address), ether(100));
-      assert.equal(await this.token1.balanceOf(pool.address), ether(142));
-
-      await pool.gulp(this.token1.address);
-
-      assert.equal(await pool.getBalance(this.token1.address), ether(142));
-      assert.equal(await this.token1.balanceOf(pool.address), ether(142));
-    });
-  });
-
   describe('getNormalizedWeight()', async () => {
     it('should return normalized weight of the token', async () => {
       assert.equal(await pool.getNormalizedWeight(this.token1.address), ether('0.5'));
@@ -294,7 +280,7 @@ describe('PowerIndexPool Unit', () => {
 
   describe('setPublicSwap()', async () => {
     it('should allow setting', async () => {
-      const newPool = await PowerIndexPool.new('P', 'P', ether('0.5'), ether('0.5'))
+      const newPool = await PowerIndexPool.new()
       assert.equal(await newPool.isPublicSwap(), false);
       await newPool.setPublicSwap(true)
       assert.equal(await newPool.isPublicSwap(), true);

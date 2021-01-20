@@ -15,6 +15,7 @@ const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRouterFactory');
 const PowerIndexBasicRouter = artifacts.require('MockPowerIndexBasicRouter');
+const ProxyFactory = artifacts.require('ProxyFactory');
 
 const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
@@ -66,6 +67,7 @@ WETH.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 
 describe('PowerIndexWrapper', () => {
+  const zeroAddress = '0x0000000000000000000000000000000000000000';
   const name = 'My Pool';
   const symbol = 'MP';
   const balances = [ether('10'), ether('20')];
@@ -100,7 +102,14 @@ describe('PowerIndexWrapper', () => {
   beforeEach(async () => {
     this.weth = await WETH.new();
 
-    this.bFactory = await PowerIndexPoolFactory.new({ from: minter });
+    const proxyFactory = await ProxyFactory.new();
+    const impl = await PowerIndexPool.new();
+    this.bFactory = await PowerIndexPoolFactory.new(
+      proxyFactory.address,
+      impl.address,
+      zeroAddress,
+      { from: minter }
+    );
     this.bActions = await PowerIndexPoolActions.new({ from: minter });
     this.bExchange = await ExchangeProxy.new(this.weth.address, { from: minter });
 
@@ -144,7 +153,7 @@ describe('PowerIndexWrapper', () => {
 
     const piTokenFactory = await WrappedPiErc20Factory.new();
     routerFactory = await BasicPowerIndexRouterFactory.new();
-    poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, piTokenFactory.address);
+    poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, piTokenFactory.address, zeroAddress);
 
     await pool.setWrapper(poolWrapper.address, true);
 

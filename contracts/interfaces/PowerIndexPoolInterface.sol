@@ -5,6 +5,13 @@ pragma solidity 0.6.12;
 import "./BPoolInterface.sol";
 
 interface PowerIndexPoolInterface is BPoolInterface {
+  function initialize(
+    string calldata name,
+    string calldata symbol,
+    uint256 minWeightPerSecond,
+    uint256 maxWeightPerSecond
+  ) external;
+
   function bind(
     address,
     uint256,
