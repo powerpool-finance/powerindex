@@ -30,7 +30,9 @@ interface IVestedLPMining {
     IERC20 _lpToken,
     uint8 _poolType,
     bool _votesEnabled,
-    uint256 _boostRate
+    uint256 _lpBoostMultiplicator,
+    uint256 _cvpBoostMultiplicator,
+    uint256 _poolBoostRate
   ) external;
 
   /// @notice Update parameters of the given pool (only the owner may call)
@@ -39,7 +41,9 @@ interface IVestedLPMining {
     uint256 _allocPoint,
     uint8 _poolType,
     bool _votesEnabled,
-    uint256 _boostRate
+    uint256 _lpBoostMultiplicator,
+    uint256 _cvpBoostMultiplicator,
+    uint256 _poolBoostRate
   ) external;
 
   /// @notice Set the migrator contract (only the owner may call)
