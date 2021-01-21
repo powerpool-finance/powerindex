@@ -328,14 +328,14 @@ describe('PowerIndexPool', () => {
 
     await pool.gulp(this.token1.address);
 
-    assert.equal(poolMappingBalance, await pool.getBalance(this.token1.address));
-    assert.equal(poolActualBalance, await this.token1.balanceOf(pool.address));
-    assert.equal(addBN(pvpBalance, excessBalance), await this.token1.balanceOf(communityWallet));
+    assert.equal(addBN(poolMappingBalance, excessBalance), await pool.getBalance(this.token1.address));
+    assert.equal(addBN(poolActualBalance, excessBalance), await this.token1.balanceOf(pool.address));
+    assert.equal(pvpBalance, await this.token1.balanceOf(communityWallet));
 
     await pool.gulp(this.token1.address);
 
-    assert.equal(poolMappingBalance, await pool.getBalance(this.token1.address));
-    assert.equal(poolActualBalance, await this.token1.balanceOf(pool.address));
+    assert.equal(addBN(poolMappingBalance, excessBalance), await pool.getBalance(this.token1.address));
+    assert.equal(addBN(poolActualBalance, excessBalance), await this.token1.balanceOf(pool.address));
   });
 
   it('gulp should work properly with not bound token', async () => {
