@@ -962,13 +962,13 @@ describe('VestedLPMining', () => {
       assert.equal(await this.allCvpOf(bob), '1000');
 
       const poolBoost = await this.lpMining.poolBoostByLp('0');
-      assert.equal(poolBoost.lpBoostMultiplicator.toString(), scale('2'));
-      assert.equal(poolBoost.cvpBoostMultiplicator.toString(), scale('4'));
+      assert.equal(poolBoost.lpBoostRate.toString(), scale('2'));
+      assert.equal(poolBoost.cvpBoostRate.toString(), scale('4'));
       assert.equal(poolBoost.accCvpPerLpBoost.toString(), '200000000000');
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '40040040040');
     });
 
-    it('should correctly boost with lpBoostMultiplicator: 2 and cvpBoostMultiplicator: 4', async () => {
+    it('should correctly boost with lpBoostRate: 2 and cvpBoostRate: 4', async () => {
       await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('4'), scale('10'), {from: minter});
       await this.lp.approve(this.lpMining.address, '1000', {from: bob});
 
@@ -981,7 +981,7 @@ describe('VestedLPMining', () => {
       assert.equal(await this.allCvpOf(bob), '1060');
     });
 
-    it('should correctly boost with lpBoostMultiplicator: 4 and cvpBoostMultiplicator: 4', async () => {
+    it('should correctly boost with lpBoostRate: 4 and cvpBoostRate: 4', async () => {
       await this.lpMining.add('100', this.lp.address, '1', true, scale('4'), scale('4'), scale('10'), {from: minter});
       await this.lp.approve(this.lpMining.address, '1000', {from: bob});
 
@@ -994,7 +994,7 @@ describe('VestedLPMining', () => {
       assert.equal(await this.allCvpOf(bob), '1080');
     });
 
-    it('should correctly boost with lpBoostMultiplicator: 2 and cvpBoostMultiplicator: 8', async () => {
+    it('should correctly boost with lpBoostRate: 2 and cvpBoostRate: 8', async () => {
       await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('8'), scale('10'), {from: minter});
       await this.lp.approve(this.lpMining.address, '1000', {from: bob});
 
@@ -1007,7 +1007,7 @@ describe('VestedLPMining', () => {
       assert.equal(await this.allCvpOf(bob), '1100');
     });
 
-    it('should correctly boost with lpBoostMultiplicator: 4 and cvpBoostMultiplicator: 8', async () => {
+    it('should correctly boost with lpBoostRate: 4 and cvpBoostRate: 8', async () => {
       await this.lpMining.add('100', this.lp.address, '1', true, scale('4'), scale('8'), scale('10'), {from: minter});
       await this.lp.approve(this.lpMining.address, '1000', {from: bob});
 
@@ -1020,13 +1020,13 @@ describe('VestedLPMining', () => {
       assert.equal(await this.allCvpOf(bob), '1120');
 
       const poolBoost = await this.lpMining.poolBoostByLp('0');
-      assert.equal(poolBoost.lpBoostMultiplicator.toString(), scale('4'));
-      assert.equal(poolBoost.cvpBoostMultiplicator.toString(), scale('8'));
+      assert.equal(poolBoost.lpBoostRate.toString(), scale('4'));
+      assert.equal(poolBoost.cvpBoostRate.toString(), scale('8'));
       assert.equal(poolBoost.accCvpPerLpBoost.toString(), '400000000000');
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '80000000000');
     });
 
-    it('should correctly enable boost in existing pool with lpBoostMultiplicator: 4 and cvpBoostMultiplicator: 8', async () => {
+    it('should correctly enable boost in existing pool with lpBoostRate: 4 and cvpBoostRate: 8', async () => {
       await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', {from: minter});
       await this.lp.approve(this.lpMining.address, '1000', {from: bob});
 
@@ -1041,8 +1041,8 @@ describe('VestedLPMining', () => {
       assert.equal(await this.allCvpOf(bob), '2000');
 
       let poolBoost = await this.lpMining.poolBoostByLp('0');
-      assert.equal(poolBoost.lpBoostMultiplicator.toString(), scale('0'));
-      assert.equal(poolBoost.cvpBoostMultiplicator.toString(), scale('0'));
+      assert.equal(poolBoost.lpBoostRate.toString(), scale('0'));
+      assert.equal(poolBoost.cvpBoostRate.toString(), scale('0'));
       assert.equal(poolBoost.accCvpPerLpBoost.toString(), '0');
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '0');
 
@@ -1056,8 +1056,8 @@ describe('VestedLPMining', () => {
       assert.equal(await this.allCvpOf(bob), '3000');
 
       poolBoost = await this.lpMining.poolBoostByLp('0');
-      assert.equal(poolBoost.lpBoostMultiplicator.toString(), scale('4'));
-      assert.equal(poolBoost.cvpBoostMultiplicator.toString(), scale('8'));
+      assert.equal(poolBoost.lpBoostRate.toString(), scale('4'));
+      assert.equal(poolBoost.cvpBoostRate.toString(), scale('8'));
       assert.equal(poolBoost.accCvpPerLpBoost.toString(), '320000000000');
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '0');
 

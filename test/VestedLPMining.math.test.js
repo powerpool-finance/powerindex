@@ -351,8 +351,8 @@ describe('VestedLPMining (internal math)', () => {
   }
   function PoolBoost() {
     return {
-      lpBoostMultiplicator: '0',
-      cvpBoostMultiplicator: '0',
+      lpBoostRate: '0',
+      cvpBoostRate: '0',
       lastUpdateBlock: '0',
       accCvpPerLpBoost: '0',
       accCvpPerCvpBoost: '0',

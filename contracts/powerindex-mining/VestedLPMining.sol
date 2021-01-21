@@ -96,8 +96,8 @@ contract VestedLPMining is
   mapping(address => uint256) public lastSwapBlock;
 
   struct PoolBoost {
-    uint256 lpBoostMultiplicator;
-    uint256 cvpBoostMultiplicator;
+    uint256 lpBoostRate;
+    uint256 cvpBoostRate;
     uint32 lastUpdateBlock;
     uint256 accCvpPerLpBoost;
     uint256 accCvpPerCvpBoost;
@@ -111,7 +111,7 @@ contract VestedLPMining is
   mapping(uint256 => PoolBoost) public poolBoostByLp;
   mapping(uint256 => mapping(address => UserPoolBoost)) public usersPoolBoost;
 
-  mapping(address => uint256) public lpBoostRateByToken;
+  mapping(address => uint256) public lpBoostRatioByToken;
 
   /// @inheritdoc IVestedLPMining
   function initialize(
@@ -142,9 +142,9 @@ contract VestedLPMining is
     IERC20 _lpToken,
     uint8 _poolType,
     bool _votesEnabled,
-    uint256 _lpBoostMultiplicator,
-    uint256 _cvpBoostMultiplicator,
-    uint256 _lpBoostRate
+    uint256 _lpBoostRate,
+    uint256 _cvpBoostRate,
+    uint256 _lpBoostRatio
   ) public override onlyOwner {
     require(!isLpTokenAdded(_lpToken), "VLPMining: token already added");
 
@@ -166,11 +166,11 @@ contract VestedLPMining is
     );
     poolPidByAddress[address(_lpToken)] = pid;
 
-    poolBoostByLp[pid].lpBoostMultiplicator = _lpBoostMultiplicator;
-    poolBoostByLp[pid].cvpBoostMultiplicator = _cvpBoostMultiplicator;
+    poolBoostByLp[pid].lpBoostRate = _lpBoostRate;
+    poolBoostByLp[pid].cvpBoostRate = _cvpBoostRate;
 
     poolBoostByLp[pid].lastUpdateBlock = lastUpdateBlock;
-    lpBoostRateByToken[address(_lpToken)] = _lpBoostRate;
+    lpBoostRatioByToken[address(_lpToken)] = _lpBoostRatio;
 
     emit AddLpToken(address(_lpToken), pid, _allocPoint);
   }
@@ -181,9 +181,9 @@ contract VestedLPMining is
     uint256 _allocPoint,
     uint8 _poolType,
     bool _votesEnabled,
-    uint256 _lpBoostMultiplicator,
-    uint256 _cvpBoostMultiplicator,
-    uint256 _lpBoostRate
+    uint256 _lpBoostRate,
+    uint256 _cvpBoostRate,
+    uint256 _lpBoostRatio
   ) public override onlyOwner {
     massUpdatePools();
     totalAllocPoint = totalAllocPoint.sub(uint256(pools[_pid].allocPoint)).add(_allocPoint);
@@ -191,10 +191,10 @@ contract VestedLPMining is
     pools[_pid].votesEnabled = _votesEnabled;
     pools[_pid].poolType = _poolType;
 
-    poolBoostByLp[_pid].lpBoostMultiplicator = _lpBoostMultiplicator;
-    poolBoostByLp[_pid].cvpBoostMultiplicator = _cvpBoostMultiplicator;
+    poolBoostByLp[_pid].lpBoostRate = _lpBoostRate;
+    poolBoostByLp[_pid].cvpBoostRate = _cvpBoostRate;
 
-    lpBoostRateByToken[address(pools[_pid].lpToken)] = _lpBoostRate;
+    lpBoostRatioByToken[address(pools[_pid].lpToken)] = _lpBoostRatio;
 
     emit SetLpToken(address(pools[_pid].lpToken), _pid, _allocPoint);
   }
@@ -473,7 +473,7 @@ contract VestedLPMining is
 
     uint256 cvpReward = _computePoolReward(_pool);
 
-    if (poolBoost.lpBoostMultiplicator != 0) {
+    if (poolBoost.lpBoostRate != 0) {
       PoolBoost memory _poolBoost = poolBoost;
       uint32 prevBoostBlock = poolBoost.lastUpdateBlock;
       uint256 prevCvpBoostAcc = poolBoost.accCvpPerCvpBoost;
@@ -633,7 +633,7 @@ contract VestedLPMining is
       _pool.lastUpdateBlock,
       _poolBoost.accCvpPerLpBoost,
       _pool.lpToken,
-      _poolBoost.lpBoostMultiplicator
+      _poolBoost.lpBoostRate
     );
   }
 
@@ -642,7 +642,7 @@ contract VestedLPMining is
       _poolBoost.lastUpdateBlock,
       _poolBoost.accCvpPerCvpBoost,
       cvp,
-      _poolBoost.cvpBoostMultiplicator
+      _poolBoost.cvpBoostRate
     );
   }
 
@@ -722,9 +722,9 @@ contract VestedLPMining is
   ) private view returns (uint96 cvpResult) {
     cvpResult = _computeCvpAdjustment(lptAmount, pool.accCvpPerLpt);
     if (
-      poolBoost.cvpBoostMultiplicator == 0 ||
-      poolBoost.lpBoostMultiplicator == 0 ||
-      userPB.balance < minCvpBalanceToBoost(lptAmount, lpBoostRateByToken[address(pool.lpToken)])
+      poolBoost.cvpBoostRate == 0 ||
+      poolBoost.lpBoostRate == 0 ||
+      userPB.balance < minCvpBalanceToBoost(lptAmount, lpBoostRatioByToken[address(pool.lpToken)])
     ) {
       return cvpResult;
     }
@@ -738,8 +738,8 @@ contract VestedLPMining is
     return SafeMath96.fromUint(lptAmount.mul(accCvpPerLpt).div(SCALE), "VLPMining::_computeCvpAdj");
   }
 
-  function minCvpBalanceToBoost(uint256 _lpAmount, uint256 _boostRate) public pure returns (uint256) {
-    return _lpAmount.mul(_boostRate).div(SCALE);
+  function minCvpBalanceToBoost(uint256 _lpAmount, uint256 _boostRatio) public pure returns (uint256) {
+    return _lpAmount.mul(_boostRatio).div(SCALE);
   }
 
   function _validatePoolId(uint256 pid) private view {
