@@ -622,9 +622,13 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
     {
         _onlyWrapperOrNotWrapperMode();
-        uint256 diff = bsub(IERC20(token).balanceOf(address(this)), _records[token].balance);
-        if (diff > 0) {
-          IERC20(token).safeTransfer(_communityFeeReceiver, diff);
+        if (_records[token].bound) {
+          _records[token].balance = IERC20(token).balanceOf(address(this));
+        } else {
+          uint256 diff = bsub(IERC20(token).balanceOf(address(this)), _records[token].balance);
+          if (diff > 0) {
+            IERC20(token).safeTransfer(_communityFeeReceiver, diff);
+          }
         }
     }
 
