@@ -44,7 +44,7 @@ describe('Migrator', () => {
       await this.cvp.transfer(this.reservoir.address, supply, { from: alice });
       await this.reservoir.setApprove(this.cvp.address, this.lpMining.address, supply, { from: alice });
 
-      await this.lpMining.add('100', this.lp1.address, '1', true, { from: alice });
+      await this.lpMining.add('100', this.lp1.address, '1', true, '0', '0', '0', { from: alice });
     });
 
     it('should do the migration successfully', async () => {
@@ -57,7 +57,7 @@ describe('Migrator', () => {
       await this.weth.transfer(this.lp1.address, '5000', { from: minter });
       await this.lp1.sync();
       await this.lp1.approve(this.lpMining.address, '100000000000', { from: minter });
-      await this.lpMining.deposit('0', '2000000', { from: minter });
+      await this.lpMining.deposit('0', '2000000', '0', { from: minter });
       assert.equal((await this.lp1.balanceOf(this.lpMining.address)).valueOf(), '2000000');
       await expectRevert(this.lpMining.migrate(0), 'VLPMining: no migrator');
       await this.lpMining.setMigrator(this.migrator.address, { from: alice });
@@ -69,7 +69,7 @@ describe('Migrator', () => {
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp2.address), true);
       assert.equal((await this.lp1.balanceOf(this.lpMining.address)).valueOf(), '0');
       assert.equal((await this.lp2.balanceOf(this.lpMining.address)).valueOf(), '2000000');
-      await this.lpMining.withdraw('0', '2000000', { from: minter });
+      await this.lpMining.withdraw('0', '2000000', '0', { from: minter });
       await this.lp2.transfer(this.lp2.address, '2000000', { from: minter });
       await this.lp2.burn(bob);
       assert.equal((await this.token.balanceOf(bob)).valueOf(), '9033718');
