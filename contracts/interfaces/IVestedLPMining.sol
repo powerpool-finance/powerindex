@@ -78,10 +78,18 @@ interface IVestedLPMining {
   function updatePool(uint256 _pid) external;
 
   /// @notice Deposit the given amount of LP tokens to the given pool
-  function deposit(uint256 _pid, uint256 _amount, uint256 _boostAmount) external;
+  function deposit(
+    uint256 _pid,
+    uint256 _amount,
+    uint256 _boostAmount
+  ) external;
 
   /// @notice Withdraw the given amount of LP tokens from the given pool
-  function withdraw(uint256 _pid, uint256 _amount, uint256 _boostAmount) external;
+  function withdraw(
+    uint256 _pid,
+    uint256 _amount,
+    uint256 _boostAmount
+  ) external;
 
   /// @notice Withdraw LP tokens without caring about pending CVP tokens. EMERGENCY ONLY.
   function emergencyWithdraw(uint256 _pid) external;

@@ -14,6 +14,8 @@ import "../lib/SafeMath96.sol";
 import "../lib/SafeMath32.sol";
 import "./DelegatableVotes.sol";
 
+import "hardhat/console.sol";
+
 contract VestedLPMining is
   OwnableUpgradeSafe,
   ReentrancyGuardUpgradeSafe,
@@ -111,7 +113,7 @@ contract VestedLPMining is
   mapping(uint256 => PoolBoost) public poolBoostByLp;
   mapping(uint256 => mapping(address => UserPoolBoost)) public usersPoolBoost;
 
-  mapping(uint256 => uint256) public poolBoostRate;
+  mapping(address => uint256) public lpBoostRateByToken;
 
   /// @inheritdoc IVestedLPMining
   function initialize(
@@ -144,7 +146,7 @@ contract VestedLPMining is
     bool _votesEnabled,
     uint256 _lpBoostMultiplicator,
     uint256 _cvpBoostMultiplicator,
-    uint256 _poolBoostRate
+    uint256 _lpBoostRate
   ) public override onlyOwner {
     require(!isLpTokenAdded(_lpToken), "VLPMining: token already added");
 
@@ -169,7 +171,8 @@ contract VestedLPMining is
     poolBoostByLp[pid].lpBoostMultiplicator = _lpBoostMultiplicator;
     poolBoostByLp[pid].cvpBoostMultiplicator = _cvpBoostMultiplicator;
 
-    poolBoostRate[pid] = _poolBoostRate;
+    poolBoostByLp[pid].lastUpdateBlock = lastUpdateBlock;
+    lpBoostRateByToken[address(_lpToken)] = _lpBoostRate;
 
     emit AddLpToken(address(_lpToken), pid, _allocPoint);
   }
@@ -182,7 +185,7 @@ contract VestedLPMining is
     bool _votesEnabled,
     uint256 _lpBoostMultiplicator,
     uint256 _cvpBoostMultiplicator,
-    uint256 _poolBoostRate
+    uint256 _lpBoostRate
   ) public override onlyOwner {
     massUpdatePools();
     totalAllocPoint = totalAllocPoint.sub(uint256(pools[_pid].allocPoint)).add(_allocPoint);
@@ -193,7 +196,7 @@ contract VestedLPMining is
     poolBoostByLp[_pid].lpBoostMultiplicator = _lpBoostMultiplicator;
     poolBoostByLp[_pid].cvpBoostMultiplicator = _cvpBoostMultiplicator;
 
-    poolBoostRate[_pid] = _poolBoostRate;
+    lpBoostRateByToken[address(pools[_pid].lpToken)] = _lpBoostRate;
 
     emit SetLpToken(address(pools[_pid].lpToken), _pid, _allocPoint);
   }
@@ -258,8 +261,10 @@ contract VestedLPMining is
 
     _computePoolReward(_pool);
     _computePoolBoostReward(_poolBoost);
+
+    _pool.lastUpdateBlock = pools[_pid].lastUpdateBlock;
     _computePoolRewardByBoost(_pool, _poolBoost);
-    uint96 newlyEntitled = _computeCvpToEntitle(user, _pool.accCvpPerLpt, userPB, _poolBoost);
+    uint96 newlyEntitled = _computeCvpToEntitle(user, _pool, userPB, _poolBoost);
 
     return uint256(newlyEntitled.add(user.pendedCvp));
   }
@@ -273,8 +278,10 @@ contract VestedLPMining is
 
     _computePoolReward(_pool);
     _computePoolBoostReward(_poolBoost);
+
+    _pool.lastUpdateBlock = pools[_pid].lastUpdateBlock;
     _computePoolRewardByBoost(_pool, _poolBoost);
-    (, uint256 newlyVested) = _computeCvpVesting(_user, _pool.accCvpPerLpt, _userPB, _poolBoost);
+    (, uint256 newlyVested) = _computeCvpVesting(_user, _pool, _userPB, _poolBoost);
 
     return newlyVested;
   }
@@ -299,7 +306,11 @@ contract VestedLPMining is
   }
 
   /// @inheritdoc IVestedLPMining
-  function deposit(uint256 _pid, uint256 _amount, uint256 _boostAmount) public override nonReentrant {
+  function deposit(
+    uint256 _pid,
+    uint256 _amount,
+    uint256 _boostAmount
+  ) public override nonReentrant {
     _validatePoolId(_pid);
     _preventSameTxOriginAndMsgSender();
 
@@ -309,7 +320,7 @@ contract VestedLPMining is
     UserPoolBoost storage userPB = usersPoolBoost[_pid][msg.sender];
 
     _doPoolUpdate(pool, poolBoost);
-    _vestUserCvp(user, pool.accCvpPerLpt, userPB, poolBoost);
+    _vestUserCvp(user, pool, userPB, poolBoost);
 
     if (_amount != 0) {
       pool.lpToken.safeTransferFrom(msg.sender, address(this), _amount);
@@ -319,14 +330,18 @@ contract VestedLPMining is
       cvp.safeTransferFrom(msg.sender, address(this), _boostAmount);
       userPB.balance = userPB.balance.add(_boostAmount);
     }
-    user.cvpAdjust = _computeCvpAdjustmentWithBoost(user.lptAmount, pool.accCvpPerLpt, userPB, poolBoost);
+    user.cvpAdjust = _computeCvpAdjustmentWithBoost(user.lptAmount, pool, userPB, poolBoost);
     emit Deposit(msg.sender, _pid, _amount);
 
     _doCheckpointVotes(msg.sender);
   }
 
   /// @inheritdoc IVestedLPMining
-  function withdraw(uint256 _pid, uint256 _amount, uint256 _boostAmount) public override nonReentrant {
+  function withdraw(
+    uint256 _pid,
+    uint256 _amount,
+    uint256 _boostAmount
+  ) public override nonReentrant {
     _validatePoolId(_pid);
     _preventSameTxOriginAndMsgSender();
 
@@ -337,7 +352,7 @@ contract VestedLPMining is
     require(user.lptAmount >= _amount, "VLPMining: amount exceeds balance");
 
     _doPoolUpdate(pool, poolBoost);
-    _vestUserCvp(user, pool.accCvpPerLpt, userPB, poolBoost);
+    _vestUserCvp(user, pool, userPB, poolBoost);
 
     if (_amount != 0) {
       user.lptAmount = user.lptAmount.sub(_amount);
@@ -459,15 +474,28 @@ contract VestedLPMining is
     uint256 prevAcc = _pool.accCvpPerLpt;
 
     uint256 cvpReward = _computePoolReward(_pool);
-    cvpReward = cvpReward.add(_computePoolBoostReward(poolBoost));
-    cvpReward = cvpReward.add(_computePoolRewardByBoost(_pool, poolBoost));
 
-    if (cvpReward != 0) {
-      cvpVestingPool = cvpVestingPool.add(
-        SafeMath96.fromUint(cvpReward, "VLPMining::_doPoolUpdate:1"),
-        "VLPMining::_doPoolUpdate:2"
-      );
+    if (poolBoost.lpBoostMultiplicator != 0) {
+      PoolBoost memory _poolBoost = poolBoost;
+      uint32 prevBoostBlock = poolBoost.lastUpdateBlock;
+      uint256 prevCvpBoostAcc = poolBoost.accCvpPerCvpBoost;
+      uint256 prevLpBoostAcc = poolBoost.accCvpPerLpBoost;
+
+      cvpReward = cvpReward.add(_computePoolBoostReward(_poolBoost));
+      _pool.lastUpdateBlock = prevBlock;
+      cvpReward = cvpReward.add(_computePoolRewardByBoost(_pool, _poolBoost));
+
+      if (_poolBoost.accCvpPerCvpBoost > prevCvpBoostAcc) {
+        poolBoost.accCvpPerCvpBoost = _poolBoost.accCvpPerCvpBoost;
+      }
+      if (_poolBoost.accCvpPerLpBoost > prevLpBoostAcc) {
+        poolBoost.accCvpPerLpBoost = _poolBoost.accCvpPerLpBoost;
+      }
+      if (_poolBoost.lastUpdateBlock > prevBoostBlock) {
+        poolBoost.lastUpdateBlock = _poolBoost.lastUpdateBlock;
+      }
     }
+
     if (_pool.accCvpPerLpt > prevAcc) {
       pool.accCvpPerLpt = _pool.accCvpPerLpt;
     }
@@ -475,34 +503,25 @@ contract VestedLPMining is
       pool.lastUpdateBlock = _pool.lastUpdateBlock;
     }
 
-    if (poolBoost.lpBoostMultiplicator == 0) {
-      return;
-    }
-    PoolBoost memory _poolBoost = poolBoost;
-    uint32 prevBoostBlock = poolBoost.lastUpdateBlock;
-    uint256 prevCvpBoostAcc = poolBoost.accCvpPerCvpBoost;
-    uint256 prevLpBoostAcc = poolBoost.accCvpPerLpBoost;
-
-    _computePoolBoostReward(_poolBoost);
-    _computePoolRewardByBoost(_pool, _poolBoost);
-
-    if (_poolBoost.accCvpPerCvpBoost > prevCvpBoostAcc) {
-      poolBoost.accCvpPerCvpBoost = _poolBoost.accCvpPerCvpBoost;
-    }
-    if (_poolBoost.accCvpPerLpBoost > prevLpBoostAcc) {
-      poolBoost.accCvpPerLpBoost = _poolBoost.accCvpPerLpBoost;
-    }
-    if (_poolBoost.lastUpdateBlock > prevBoostBlock) {
-      poolBoost.lastUpdateBlock = _poolBoost.lastUpdateBlock;
+    if (cvpReward != 0) {
+      cvpVestingPool = cvpVestingPool.add(
+        SafeMath96.fromUint(cvpReward, "VLPMining::_doPoolUpdate:1"),
+        "VLPMining::_doPoolUpdate:2"
+      );
     }
   }
 
-  function _vestUserCvp(User storage user, uint256 accCvpPerLpt, UserPoolBoost storage userPB, PoolBoost storage poolBoost) internal {
+  function _vestUserCvp(
+    User storage user,
+    Pool storage pool,
+    UserPoolBoost storage userPB,
+    PoolBoost storage poolBoost
+  ) internal {
     User memory _user = user;
     UserPoolBoost memory _userPB = userPB;
     uint32 prevVestingBlock = _user.vestingBlock;
     uint32 prevUpdateBlock = _user.lastUpdateBlock;
-    (uint256 newlyEntitled, uint256 newlyVested) = _computeCvpVesting(_user, accCvpPerLpt, _userPB, poolBoost);
+    (uint256 newlyEntitled, uint256 newlyVested) = _computeCvpVesting(_user, pool, _userPB, poolBoost);
 
     if (newlyEntitled != 0) {
       user.pendedCvp = _user.pendedCvp;
@@ -534,11 +553,12 @@ contract VestedLPMining is
    * @return newlyEntitled - CVP amount to entitle (on top of tokens entitled so far)
    * @return newlyVested - CVP amount to vest (on top of tokens already vested)
    */
-  function _computeCvpVesting(User memory _user, uint256 accCvpPerLpt, UserPoolBoost memory _userPB, PoolBoost memory _poolBoost)
-    internal
-    view
-    returns (uint256 newlyEntitled, uint256 newlyVested)
-  {
+  function _computeCvpVesting(
+    User memory _user,
+    Pool memory pool,
+    UserPoolBoost memory _userPB,
+    PoolBoost memory _poolBoost
+  ) internal view returns (uint256 newlyEntitled, uint256 newlyVested) {
     uint32 prevBlock = _user.lastUpdateBlock;
     _user.lastUpdateBlock = _currBlock();
     if (prevBlock >= _user.lastUpdateBlock) {
@@ -550,7 +570,7 @@ contract VestedLPMining is
     // Tokens which are to be entitled starting from the `user.lastUpdateBlock`, shall be
     // vested proportionally to the number of blocks already minted within the period between
     // the `user.lastUpdateBlock` and `cvpVestingPeriodInBlocks` following the current block
-    newlyEntitled = uint256(_computeCvpToEntitle(_user, accCvpPerLpt, _userPB, _poolBoost));
+    newlyEntitled = uint256(_computeCvpToEntitle(_user, pool, _userPB, _poolBoost));
     uint256 newToVest =
       newlyEntitled == 0 ? 0 : (newlyEntitled.mul(uint256(age)).div(uint256(age + cvpVestingPeriodInBlocks)));
 
@@ -597,10 +617,16 @@ contract VestedLPMining is
     return (newlyEntitled, newlyVested);
   }
 
-  function _computePoolRewardByBoost(
-    Pool memory _pool,
-    PoolBoost memory _poolBoost
-  )
+  function _computePoolReward(Pool memory _pool) internal view returns (uint256 poolCvpReward) {
+    (poolCvpReward, _pool.accCvpPerLpt, _pool.lastUpdateBlock) = _computeReward(
+      _pool.lastUpdateBlock,
+      _pool.accCvpPerLpt,
+      _pool.lpToken,
+      SCALE.mul(uint256(_pool.allocPoint)).div(totalAllocPoint).mul(uint256(cvpPerBlock))
+    );
+  }
+
+  function _computePoolRewardByBoost(Pool memory _pool, PoolBoost memory _poolBoost)
     internal
     view
     returns (uint256 poolCvpReward)
@@ -610,15 +636,6 @@ contract VestedLPMining is
       _poolBoost.accCvpPerLpBoost,
       _pool.lpToken,
       _poolBoost.lpBoostMultiplicator
-    );
-  }
-
-  function _computePoolReward(Pool memory _pool) internal view returns (uint256 poolCvpReward) {
-    (poolCvpReward, _pool.accCvpPerLpt, _pool.lastUpdateBlock) = _computeReward(
-      _pool.lastUpdateBlock,
-      _pool.accCvpPerLpt,
-      _pool.lpToken,
-      SCALE.mul(uint256(_pool.allocPoint)).div(totalAllocPoint).mul(uint256(cvpPerBlock))
     );
   }
 
@@ -637,8 +654,13 @@ contract VestedLPMining is
     IERC20 _token,
     uint256 _cvpPoolRate
   )
-    internal view
-    returns (uint256 poolCvpReward, uint256 newAccumulated, uint32 newLastUpdateBlock)
+    internal
+    view
+    returns (
+      uint256 poolCvpReward,
+      uint256 newAccumulated,
+      uint32 newLastUpdateBlock
+    )
   {
     newAccumulated = _accumulated;
 
@@ -680,33 +702,46 @@ contract VestedLPMining is
 
   function _computeCvpToEntitle(
     User memory user,
-    uint256 poolAccCvpPerLpt,
+    Pool memory pool,
     UserPoolBoost memory userPB,
     PoolBoost memory poolBoost
-  ) private pure returns (uint96 cvpResult) {
+  ) private view returns (uint96 cvpResult) {
     if (user.lptAmount == 0) {
       return 0;
     }
-    return _computeCvpAdjustmentWithBoost(user.lptAmount, poolAccCvpPerLpt, userPB, poolBoost).sub(user.cvpAdjust, "VLPMining::computeCvp:2");
+    return
+      _computeCvpAdjustmentWithBoost(user.lptAmount, pool, userPB, poolBoost).sub(
+        user.cvpAdjust,
+        "VLPMining::computeCvp:2"
+      );
   }
 
   function _computeCvpAdjustmentWithBoost(
     uint256 lptAmount,
-    uint256 accCvpPerLpt,
+    Pool memory pool,
     UserPoolBoost memory userPB,
     PoolBoost memory poolBoost
-  ) private pure returns (uint96 cvpResult) {
-    cvpResult = _computeCvpAdjustment(lptAmount, accCvpPerLpt);
-    if (poolBoost.cvpBoostMultiplicator == 0 || poolBoost.lpBoostMultiplicator == 0 || userPB.balance == 0) {
+  ) private view returns (uint96 cvpResult) {
+    cvpResult = _computeCvpAdjustment(lptAmount, pool.accCvpPerLpt);
+    if (
+      poolBoost.cvpBoostMultiplicator == 0 ||
+      poolBoost.lpBoostMultiplicator == 0 ||
+      userPB.balance < minCvpBalanceToBoost(lptAmount, lpBoostRateByToken[address(pool.lpToken)])
+    ) {
       return cvpResult;
     }
-    return cvpResult
-      .add(_computeCvpAdjustment(userPB.balance, poolBoost.accCvpPerCvpBoost))
-      .add(_computeCvpAdjustment(lptAmount, poolBoost.accCvpPerLpBoost));
+    return
+      cvpResult.add(_computeCvpAdjustment(userPB.balance, poolBoost.accCvpPerCvpBoost)).add(
+        _computeCvpAdjustment(lptAmount, poolBoost.accCvpPerLpBoost)
+      );
   }
 
   function _computeCvpAdjustment(uint256 lptAmount, uint256 accCvpPerLpt) private pure returns (uint96) {
     return SafeMath96.fromUint(lptAmount.mul(accCvpPerLpt).div(SCALE), "VLPMining::_computeCvpAdj");
+  }
+
+  function minCvpBalanceToBoost(uint256 _lpAmount, uint256 _boostRate) public pure returns (uint256) {
+    return _lpAmount.mul(_boostRate).div(SCALE);
   }
 
   function _validatePoolId(uint256 pid) private view {

@@ -34,13 +34,15 @@ contract MockVestedLPMining is VestedLPMining {
     uint32 lastUpdateBlock
   );
 
-  function __computeCvpVesting(User calldata _user, uint256 _accCvpPerLpt, UserPoolBoost calldata _userPB, PoolBoost calldata _poolBoost)
-    external
-    returns (uint256 newlyEntitled, uint256 newlyVested)
-  {
+  function __computeCvpVesting(
+    User calldata _user,
+    Pool calldata _pool,
+    UserPoolBoost calldata _userPB,
+    PoolBoost calldata _poolBoost
+  ) external returns (uint256 newlyEntitled, uint256 newlyVested) {
     User memory u = _user;
 
-    (newlyEntitled, newlyVested) = super._computeCvpVesting(u, _accCvpPerLpt, _userPB, _poolBoost);
+    (newlyEntitled, newlyVested) = super._computeCvpVesting(u, _pool, _userPB, _poolBoost);
 
     emit _UpdatedUser(newlyEntitled, newlyVested, u.cvpAdjust, u.pendedCvp, u.vestingBlock, u.lastUpdateBlock);
     return (newlyEntitled, newlyVested);
@@ -72,5 +74,9 @@ contract MockVestedLPMining is VestedLPMining {
     (uint192 sharedData, uint32 blockNumber) = book[address(this)].getLatestData();
     (uint96 totalPooledCvp, ) = _unpackData(sharedData);
     return totalPooledCvp;
+  }
+
+  function setPoolBoostLastUpdateBlock(uint256 pid, uint32 lastUpdateBlock) external {
+    poolBoostByLp[pid].lastUpdateBlock = lastUpdateBlock;
   }
 }
