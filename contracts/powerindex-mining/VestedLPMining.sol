@@ -14,8 +14,6 @@ import "../lib/SafeMath96.sol";
 import "../lib/SafeMath32.sol";
 import "./DelegatableVotes.sol";
 
-import "hardhat/console.sol";
-
 contract VestedLPMining is
   OwnableUpgradeSafe,
   ReentrancyGuardUpgradeSafe,
