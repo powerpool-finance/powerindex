@@ -1068,6 +1068,17 @@ describe('VestedLPMining', () => {
       poolBoost = await this.lpMining.poolBoostByLp('0');
       assert.equal(poolBoost.accCvpPerLpBoost.toString(), '720000000000');
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '80000000000');
+
+      let userPoolBoost = await this.lpMining.usersPoolBoost('0', bob);
+      assert.equal(userPoolBoost.balance.toString(), '1000');
+
+      const cvpBalanceBefore = await this.cvp.balanceOf(bob);
+      await this.lpMining.emergencyWithdraw('0', {from: bob});
+      const cvpBalanceAfter = await this.cvp.balanceOf(bob);
+      assert.equal(cvpBalanceBefore.add(userPoolBoost.balance).toString(), cvpBalanceAfter.toString());
+
+      userPoolBoost = await this.lpMining.usersPoolBoost('0', bob);
+      assert.equal(userPoolBoost.balance.toString(), '0');
     });
   });
 });

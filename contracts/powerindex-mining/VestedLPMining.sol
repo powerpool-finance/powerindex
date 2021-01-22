@@ -329,7 +329,7 @@ contract VestedLPMining is
       userPB.balance = userPB.balance.add(_boostAmount);
     }
     user.cvpAdjust = _computeCvpAdjustmentWithBoost(user.lptAmount, pool, userPB, poolBoost);
-    emit Deposit(msg.sender, _pid, _amount);
+    emit Deposit(msg.sender, _pid, _amount, _boostAmount);
 
     _doCheckpointVotes(msg.sender);
   }
@@ -360,8 +360,8 @@ contract VestedLPMining is
       userPB.balance = userPB.balance.sub(_boostAmount);
       cvp.safeTransfer(msg.sender, _boostAmount);
     }
-    user.cvpAdjust = _computeCvpAdjustment(user.lptAmount, pool.accCvpPerLpt);
-    emit Withdraw(msg.sender, _pid, _amount);
+    user.cvpAdjust = _computeCvpAdjustmentWithBoost(user.lptAmount, pool, userPB, poolBoost);
+    emit Withdraw(msg.sender, _pid, _amount, _boostAmount);
 
     _doCheckpointVotes(msg.sender);
   }
@@ -373,9 +373,13 @@ contract VestedLPMining is
 
     Pool storage pool = pools[_pid];
     User storage user = users[_pid][msg.sender];
+    UserPoolBoost storage userPB = usersPoolBoost[_pid][msg.sender];
 
     pool.lpToken.safeTransfer(msg.sender, user.lptAmount);
-    emit EmergencyWithdraw(msg.sender, _pid, user.lptAmount);
+    if (userPB.balance != 0) {
+      cvp.safeTransfer(msg.sender, userPB.balance);
+    }
+    emit EmergencyWithdraw(msg.sender, _pid, user.lptAmount, userPB.balance);
 
     if (user.pendedCvp > 0) {
       // TODO: Make user.pendedCvp be updated as of the pool' lastUpdateBlock
@@ -386,6 +390,7 @@ contract VestedLPMining is
     user.cvpAdjust = 0;
     user.pendedCvp = 0;
     user.vestingBlock = 0;
+    userPB.balance = 0;
 
     _doCheckpointVotes(msg.sender);
   }

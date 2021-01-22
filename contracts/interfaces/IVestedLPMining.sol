@@ -115,9 +115,9 @@ interface IVestedLPMining {
   event SetCvpPoolByMetaPool(address indexed metaPool, address indexed cvpPool);
   event MigrateLpToken(address indexed oldLpToken, address indexed newLpToken, uint256 indexed pid);
 
-  event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
-  event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-  event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
+  event Deposit(address indexed user, uint256 indexed pid, uint256 amount, uint256 boostAmount);
+  event Withdraw(address indexed user, uint256 indexed pid, uint256 amount, uint256 boostAmount);
+  event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount, uint256 boostAmount);
 
   event CheckpointTotalLpVotes(uint256 lpVotes);
   event CheckpointUserLpVotes(address indexed user, uint256 indexed pid, uint256 lpVotes);
