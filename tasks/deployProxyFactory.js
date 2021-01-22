@@ -1,7 +1,7 @@
 require('@nomiclabs/hardhat-truffle5');
 
 
-task('deploy-proxy-factory', 'Deploy Proxy Factory').setAction(async (__, {ethers, network}) => {
+task('deploy-proxy-factory', 'Deploy Proxy Factory').setAction(async (__, {network}) => {
   const ProxyFactory = artifacts.require('ProxyFactory');
 
   const { web3 } = ProxyFactory;
