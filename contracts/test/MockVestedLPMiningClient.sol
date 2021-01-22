@@ -14,8 +14,8 @@ contract MockVestedLPMiningClient {
     token.transferFrom(msg.sender, address(this), amount);
     token.approve(address(lpMining), amount);
 
-    lpMining.deposit(poolId, amount);
+    lpMining.deposit(poolId, amount, 0);
 
-    lpMining.withdraw(poolId, amount);
+    lpMining.withdraw(poolId, amount, 0);
   }
 }
