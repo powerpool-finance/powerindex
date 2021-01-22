@@ -2,7 +2,9 @@ require('@nomiclabs/hardhat-truffle5');
 
 const pIteration = require('p-iteration');
 
-task('deploy-assy', 'Deploy ASSY').setAction(async () => {
+task('deploy-assy', 'Deploy ASSY').setAction(async (__, {ethers, network}) => {
+  const {impersonateAccount, callContract} = require('../test/helpers');
+
   const PowerIndexPoolFactory = await artifacts.require('PowerIndexPoolFactory');
   const PowerIndexPoolActions = await artifacts.require('PowerIndexPoolActions');
   const PowerIndexPool = await artifacts.require('PowerIndexPool');
@@ -16,22 +18,22 @@ task('deploy-assy', 'Deploy ASSY').setAction(async () => {
   const sendOptions = { from: deployer };
 
   const admin = '0xb258302c3f209491d604165549079680708581cc';
-  const proxyAdmin = '0x7696f9208f9e195ba31e6f4B2D07B6462C8C42bb';
-  const proxyFactory = '0x3C8C3c0A1Ee8296e41a0B735a7a58c179A6D595E';
+  const proxyAdminAddr = '0x7696f9208f9e195ba31e6f4B2D07B6462C8C42bb';
+  const proxyFactoryAddr = '0x3C8C3c0A1Ee8296e41a0B735a7a58c179A6D595E';
   const impl = await PowerIndexPool.new();
 
-  const bFactory = await PowerIndexPoolFactory.new(proxyFactory, impl.address, proxyAdmin, sendOptions);
+  const bFactory = await PowerIndexPoolFactory.new(proxyFactoryAddr, impl.address, proxyAdminAddr, sendOptions);
   const bActions = await PowerIndexPoolActions.new(sendOptions);
   console.log('bFactory', bFactory.address);
   console.log('bActions', bActions.address);
   const poolConfigs = [
     {
-      name: 'AAVE SUSHI SNX YFI Index',
+      name: 'AAVE SNX SUSHI YFI Index',
       symbol: 'ASSY',
       tokens: [
         {address: '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9', denorm: ether('15')},   //AAVE
-        {address: '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', denorm: ether('7.5')},  //SUSHI
         {address: '0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f', denorm: ether('12.5')}, //SNX
+        {address: '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', denorm: ether('7.5')},  //SUSHI
         {address: '0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e', denorm: ether('15')},   //YFI
       ],
       swapFee: 0.002,
@@ -42,6 +44,7 @@ task('deploy-assy', 'Deploy ASSY').setAction(async () => {
     },
   ];
 
+  let poolAddress;
   await pIteration.forEachSeries(poolConfigs, async poolConfig => {
     const balances = [];
     await pIteration.forEachSeries(poolConfig.tokens, async (t, index) => {
@@ -81,17 +84,24 @@ task('deploy-assy', 'Deploy ASSY').setAction(async () => {
     // await poolRestrictions.setTotalRestrictions([pool.address], [ether(20000)]);
 
     await pool.setController(admin);
+    poolAddress = pool.address;
   })
 
   // await pvpV1.transferOwnership(admin);
   // await poolRestrictions.transferOwnership(admin);
+  if (network.name !== 'mainnetfork') {
+    return;
+  }
+  await impersonateAccount(ethers, admin);
+  const MockPowerIndexPoolV2 = await artifacts.require('MockPowerIndexPoolV2');
+  const ProxyAdmin = await artifacts.require('ProxyAdmin');
+
+  const newImpl = await MockPowerIndexPoolV2.new();
+
+  const proxyAdmin = await ProxyAdmin.at(proxyAdminAddr);
+  await proxyAdmin.upgrade(poolAddress, newImpl.address, {from: admin});
 
   function ether(amount) {
     return toWei(amount.toString(), 'ether');
   }
 });
-
-function callContract(contract, method, args = []) {
-  console.log(method, args);
-  return contract.contract.methods[method].apply(contract.contract, args).call();
-}
