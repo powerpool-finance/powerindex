@@ -65,6 +65,7 @@ contract BToken is BTokenBase, IERC20 {
 
     string  internal _name;
     string  internal _symbol;
+    uint8   private _decimals;
 
     function name() public view returns (string memory) {
         return _name;
