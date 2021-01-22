@@ -28,7 +28,7 @@ task('deploy-assy', 'Deploy ASSY').setAction(async (__, {ethers, network}) => {
   console.log('bActions', bActions.address);
   const poolConfigs = [
     {
-      name: 'AAVE SNX SUSHI YFI Index',
+      name: 'ASSY Index',
       symbol: 'ASSY',
       tokens: [
         {address: '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9', denorm: ether('15')},   //AAVE
