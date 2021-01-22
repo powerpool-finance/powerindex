@@ -30,9 +30,9 @@ task('deploy-assy', 'Deploy ASSY').setAction(async () => {
       symbol: 'ASSY',
       tokens: [
         {address: '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9', denorm: ether('15')},   //AAVE
+        {address: '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', denorm: ether('7.5')},  //SUSHI
         {address: '0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f', denorm: ether('12.5')}, //SNX
         {address: '0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e', denorm: ether('15')},   //YFI
-        {address: '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', denorm: ether('7.5')},  //SUSHI
       ],
       swapFee: 0.002,
       communitySwapFee: 0.001,
