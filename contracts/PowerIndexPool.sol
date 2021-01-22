@@ -57,7 +57,6 @@ contract PowerIndexPool is BPool, Initializable {
   ) external initializer {
     _name = name;
     _symbol = symbol;
-    _decimals = 18;
     _controller = controller;
     _minWeightPerSecond = minWeightPerSecond;
     _maxWeightPerSecond = maxWeightPerSecond;
