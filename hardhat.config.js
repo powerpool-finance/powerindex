@@ -105,7 +105,7 @@ const config = {
     settings: {
       optimizer: {
         enabled: !!process.env.ETHERSCAN_KEY || process.env.COMPILE_TARGET === 'release',
-        runs: 200,
+        runs: 2,
       },
     },
     version: '0.6.12',

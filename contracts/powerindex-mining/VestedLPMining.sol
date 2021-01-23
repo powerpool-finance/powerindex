@@ -112,6 +112,7 @@ contract VestedLPMining is
   mapping(uint256 => mapping(address => UserPoolBoost)) public usersPoolBoost;
 
   mapping(address => uint256) public lpBoostRatioByToken;
+  mapping(address => uint256) public lpBoostMaxRatioByToken;
 
   /// @inheritdoc IVestedLPMining
   function initialize(
@@ -144,7 +145,8 @@ contract VestedLPMining is
     bool _votesEnabled,
     uint256 _lpBoostRate,
     uint256 _cvpBoostRate,
-    uint256 _lpBoostRatio
+    uint256 _lpBoostMinRatio,
+    uint256 _lpBoostMaxRatio
   ) public override onlyOwner {
     require(!isLpTokenAdded(_lpToken), "VLPMining: token already added");
 
@@ -170,7 +172,8 @@ contract VestedLPMining is
     poolBoostByLp[pid].cvpBoostRate = _cvpBoostRate;
 
     poolBoostByLp[pid].lastUpdateBlock = lastUpdateBlock;
-    lpBoostRatioByToken[address(_lpToken)] = _lpBoostRatio;
+    lpBoostRatioByToken[address(_lpToken)] = _lpBoostMinRatio;
+    lpBoostMaxRatioByToken[address(_lpToken)] = _lpBoostMaxRatio;
 
     emit AddLpToken(address(_lpToken), pid, _allocPoint);
   }
@@ -183,7 +186,8 @@ contract VestedLPMining is
     bool _votesEnabled,
     uint256 _lpBoostRate,
     uint256 _cvpBoostRate,
-    uint256 _lpBoostRatio
+    uint256 _lpBoostMinRatio,
+    uint256 _lpBoostMaxRatio
   ) public override onlyOwner {
     massUpdatePools();
     totalAllocPoint = totalAllocPoint.sub(uint256(pools[_pid].allocPoint)).add(_allocPoint);
@@ -194,7 +198,8 @@ contract VestedLPMining is
     poolBoostByLp[_pid].lpBoostRate = _lpBoostRate;
     poolBoostByLp[_pid].cvpBoostRate = _cvpBoostRate;
 
-    lpBoostRatioByToken[address(pools[_pid].lpToken)] = _lpBoostRatio;
+    lpBoostRatioByToken[address(pools[_pid].lpToken)] = _lpBoostMinRatio;
+    lpBoostMaxRatioByToken[address(pools[_pid].lpToken)] = _lpBoostMaxRatio;
 
     emit SetLpToken(address(pools[_pid].lpToken), _pid, _allocPoint);
   }
@@ -729,7 +734,8 @@ contract VestedLPMining is
     if (
       poolBoost.cvpBoostRate == 0 ||
       poolBoost.lpBoostRate == 0 ||
-      userPB.balance < minCvpBalanceToBoost(lptAmount, lpBoostRatioByToken[address(pool.lpToken)])
+      userPB.balance < cvpBalanceToBoost(lptAmount, address(pool.lpToken), true) ||
+      userPB.balance > cvpBalanceToBoost(lptAmount, address(pool.lpToken), false)
     ) {
       return cvpResult;
     }
@@ -743,8 +749,12 @@ contract VestedLPMining is
     return SafeMath96.fromUint(lptAmount.mul(accCvpPerLpt).div(SCALE), "VLPMining::_computeCvpAdj");
   }
 
-  function minCvpBalanceToBoost(uint256 _lpAmount, uint256 _boostRatio) public pure returns (uint256) {
-    return _lpAmount.mul(_boostRatio).div(SCALE);
+  function cvpBalanceToBoost(
+    uint256 _lpAmount,
+    address _lpToken,
+    bool _min
+  ) public view returns (uint256) {
+    return _lpAmount.mul(_min ? lpBoostRatioByToken[_lpToken] : lpBoostMaxRatioByToken[_lpToken]).div(SCALE);
   }
 
   function _validatePoolId(uint256 pid) private view {

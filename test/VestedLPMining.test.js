@@ -100,7 +100,7 @@ describe('VestedLPMining', () => {
         );
         await this.prepareReservoir();
 
-        await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', { from: minter });
+        await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter });
         await this.lp.approve(this.lpMining.address, '1000', { from: bob });
         await this.lpMining.deposit(0, '100', 0, { from: bob });
         assert.equal((await this.lp.balanceOf(bob)).toString(), '900');
@@ -131,7 +131,7 @@ describe('VestedLPMining', () => {
       });
       await this.prepareReservoir();
 
-      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', { from: minter });
+      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter });
       await this.lp.approve(this.lpMining.address, '1000', { from: bob });
       await this.lpMining.deposit(0, '100', 0, { from: bob });
       await time.advanceBlockTo(this.shiftBlock('89'));
@@ -159,7 +159,7 @@ describe('VestedLPMining', () => {
       });
       await this.prepareReservoir();
 
-      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', { from: minter });
+      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter });
       await this.lp.approve(this.lpMining.address, '1000', { from: bob });
       await time.advanceBlockTo(this.shiftBlock('199'));
       assert.equal(await this.cvpBalanceOf(this.reservoir.address), this.reservoirInitialBalance.toString());
@@ -186,7 +186,7 @@ describe('VestedLPMining', () => {
       });
       await this.prepareReservoir();
 
-      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', { from: minter });
+      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter });
       await this.lp.approve(this.lpMining.address, '1000', { from: alice });
       await this.lp.approve(this.lpMining.address, '1000', { from: bob });
       await this.lp.approve(this.lpMining.address, '1000', { from: carol });
@@ -287,7 +287,7 @@ describe('VestedLPMining', () => {
 
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp.address), false);
       // Add first LP to the pool with allocation 1
-      await this.lpMining.add('10', this.lp.address, '1', true, '0', '0', '0', { from: minter });
+      await this.lpMining.add('10', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter });
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp.address), true);
       assert.equal(await this.lpMining.poolPidByAddress(this.lp.address), '0');
 
@@ -296,14 +296,14 @@ describe('VestedLPMining', () => {
       await this.lpMining.deposit(0, '10', 0, { from: alice });
 
       await expectRevert(
-        this.lpMining.add('10', this.lp.address, '1', true, '0', '0', '0', { from: minter }),
+        this.lpMining.add('10', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter }),
         'VLPMining: token already added',
       );
 
       // Add LP2 to the pool with allocation 2 at block 420
       await time.advanceBlockTo(this.shiftBlock('419'));
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp2.address), false);
-      await this.lpMining.add('20', this.lp2.address, '1', true, '0', '0', '0', { from: minter });
+      await this.lpMining.add('20', this.lp2.address, '1', true, '0', '0', '0', '0', { from: minter });
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp.address), true);
       assert.equal(await this.lpMining.poolPidByAddress(this.lp.address), '0');
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp2.address), true);
@@ -322,7 +322,7 @@ describe('VestedLPMining', () => {
 
       this.lp3 = await MockERC20.new('LPToken3', 'LP3', '18', '10000000000', { from: minter });
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp3.address), false);
-      await this.lpMining.add('20', this.lp3.address, '1', true, '0', '0', '0', { from: minter });
+      await this.lpMining.add('20', this.lp3.address, '1', true, '0', '0', '0', '0', { from: minter });
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp.address), true);
       assert.equal(await this.lpMining.poolPidByAddress(this.lp.address), '0');
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp2.address), true);
@@ -332,7 +332,7 @@ describe('VestedLPMining', () => {
 
       this.lp4 = await MockERC20.new('LPToken4', 'LP4', '18', '10000000000', { from: minter });
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp4.address), false);
-      await this.lpMining.add('20', this.lp4.address, '1', true, '0', '0', '0', { from: minter });
+      await this.lpMining.add('20', this.lp4.address, '1', true, '0', '0', '0', '0', { from: minter });
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp.address), true);
       assert.equal(await this.lpMining.poolPidByAddress(this.lp.address), '0');
       assert.equal(await this.lpMining.isLpTokenAdded(this.lp2.address), true);
@@ -352,7 +352,7 @@ describe('VestedLPMining', () => {
       await this.prepareReservoir();
 
       await this.lp.approve(this.lpMining.address, '1000', { from: alice });
-      await this.lpMining.add('1', this.lp.address, '1', true, '0', '0', '0', { from: minter });
+      await this.lpMining.add('1', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter });
       // Alice deposits 10 LPs at block 590
       await time.advanceBlockTo(this.shiftBlock('589'));
       await this.lpMining.deposit(0, '10', 0, { from: alice });
@@ -379,7 +379,7 @@ describe('VestedLPMining', () => {
       await this.lp.transfer(alice, '1000', { from: minter });
       await this.lp.approve(this.lpMining.address, '1000', { from: alice });
 
-      await this.lpMining.add('1', this.lp.address, '1', true, '0', '0', '0', { from: minter });
+      await this.lpMining.add('1', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter });
 
       const getUserCurrVotes = async user =>
         (await this.cvp.balanceOf(user)).add(await this.lpMining.getCurrentVotes(user));
@@ -453,7 +453,7 @@ describe('VestedLPMining', () => {
       await this.cvp.transfer(this.lp2.address, '5000000000', { from: minter });
       await this.lp2.transfer(alice, '1000', { from: minter });
       await this.lp2.approve(this.lpMining.address, '1000', { from: alice });
-      await this.lpMining.add('1', this.lp2.address, '1', true, '0', '0', '0', { from: minter }); // block #818
+      await this.lpMining.add('1', this.lp2.address, '1', true, '0', '0', '0', '0', { from: minter }); // block #818
       await this.lpMining.deposit('1', '10', 0, { from: alice }); // block #819
       const sixthBlockNumber = await web3.eth.getBlockNumber();
       await time.advanceBlock(); // block #820
@@ -496,7 +496,7 @@ describe('VestedLPMining', () => {
       await time.advanceBlock();
       // assert.equal((await this.lpMining.getCurrentVotes(alice)).toString(), '4'); // +1 - rounding error
 
-      await this.lpMining.set(1, '1', '1', false, '0', '0', '0', { from: minter });
+      await this.lpMining.set(1, '1', '1', false, '0', '0', '0', '0', { from: minter });
       await this.lpMining.checkpointVotes(alice);
       const eighthBlockNumber = await web3.eth.getBlockNumber(); // block #828
       await time.advanceBlock();
@@ -526,7 +526,7 @@ describe('VestedLPMining', () => {
 
       await this.lp.approve(this.lpMining.address, '1000', { from: bob });
       await time.advanceBlockTo(this.shiftBlock('909'));
-      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', { from: minter });
+      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter });
       await this.lpMining.deposit(0, '100', 0, { from: bob });
       await time.advanceBlockTo(this.shiftBlock('919'));
       await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 920
@@ -653,7 +653,7 @@ describe('VestedLPMining', () => {
       );
       await this.prepareReservoir();
 
-      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', { from: minter });
+      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter });
       await this.lp.approve(this.lpMining.address, '1000', { from: bob });
       await this.lpMining.deposit(0, '100', 0, { from: bob });
       assert.equal((await this.lp.balanceOf(bob)).toString(), '900');
@@ -676,8 +676,8 @@ describe('VestedLPMining', () => {
     const metaLp = await MockERC20.new('LPToken', 'LP', '18', ether('200'), { from: minter });
     await lp.transfer(metaLp.address, ether('100'), { from: minter });
 
-    await this.lpMining.add('1', lp.address, '1', true, '0', '0', '0', {from: minter});
-    await this.lpMining.add('1', metaLp.address, '1', true, '0', '0', '0', {from: minter});
+    await this.lpMining.add('1', lp.address, '1', true, '0', '0', '0', '0', {from: minter});
+    await this.lpMining.add('1', metaLp.address, '1', true, '0', '0', '0', '0', {from: minter});
     await this.lpMining.setCvpPoolByMetaPool(metaLp.address, lp.address, {from: minter});
 
     // Alice deposits 10 LPs at block #2090
@@ -777,8 +777,8 @@ describe('VestedLPMining', () => {
     const metaLp = await MockERC20.new('LPToken', 'LP', '18', ether('200'), { from: minter });
     await lp.transfer(metaLp.address, ether('100'), { from: minter });
 
-    await this.lpMining.add('1', lp.address, '1', true, '0', '0', '0', {from: minter});
-    await this.lpMining.add('1', metaLp.address, '1', true, '0', '0', '0', {from: minter});
+    await this.lpMining.add('1', lp.address, '1', true, '0', '0', '0', '0', {from: minter});
+    await this.lpMining.add('1', metaLp.address, '1', true, '0', '0', '0', '0', {from: minter});
     await this.lpMining.setCvpPoolByMetaPool(metaLp.address, lp.address, {from: minter});
 
     // Alice deposits 10 LPs at block #2090
@@ -876,7 +876,7 @@ describe('VestedLPMining', () => {
 
     await this.cvp.transfer(lp.address, ether('50000'), {from: minter});
 
-    await this.lpMining.add('1', lp.address, '1', true, '0', '0', '0', {from: minter});
+    await this.lpMining.add('1', lp.address, '1', true, '0', '0', '0', '0', {from: minter});
 
     const lpMiningClient = await MockVestedLPMiningClient.new();
 
@@ -902,7 +902,7 @@ describe('VestedLPMining', () => {
     })
 
     it('should not boost CVPs is parameters set but there is no deposited cvp balance', async () => {
-      await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('4'), scale('10'), { from: minter });
+      await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('4'), scale('10'), scale('20'), { from: minter });
       await this.lp.approve(this.lpMining.address, '1000', { from: bob });
       await this.lpMining.deposit(0, '100', 0, { from: bob });
       await time.advanceBlockTo(this.shiftBlock('89'));
@@ -923,7 +923,7 @@ describe('VestedLPMining', () => {
     });
 
     it('should boost CVPs is parameters set and deposited balance enough', async () => {
-      await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('4'), scale('10'), { from: minter });
+      await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('4'), scale('10'), scale('20'), { from: minter });
       await this.lp.approve(this.lpMining.address, '1000', { from: bob });
 
       await expectRevert(this.lpMining.deposit(0, '100', '10', { from: bob }), 'SafeERC20: low-level call failed');
@@ -949,8 +949,35 @@ describe('VestedLPMining', () => {
       assert.equal(await this.allCvpOf(bob), '742');
     });
 
+    it('should boost CVPs is parameters set and deposited balance equals max', async () => {
+      await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('4'), scale('10'), scale('20'), { from: minter });
+      await this.lp.approve(this.lpMining.address, '1000', { from: bob });
+
+      await expectRevert(this.lpMining.deposit(0, '100', '10', { from: bob }), 'SafeERC20: low-level call failed');
+
+      await this.cvp.mint(bob, '2000');
+      await this.cvp.approve(this.lpMining.address, '2000', { from: bob });
+      await this.lpMining.deposit(0, '100', '2000', { from: bob });
+
+      await time.advanceBlockTo(this.shiftBlock('89'));
+      await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 90
+      assert.equal(await this.allCvpOf(bob), '0');
+      await time.advanceBlockTo(this.shiftBlock('94'));
+      await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 95
+      assert.equal(await this.allCvpOf(bob), '0');
+      await time.advanceBlockTo(this.shiftBlock('99'));
+      await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 100
+      assert.equal(await this.allCvpOf(bob), '0');
+      await time.advanceBlockTo(this.shiftBlock('100'));
+      await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 101
+      assert.equal(await this.allCvpOf(bob), '106');
+      await time.advanceBlockTo(this.shiftBlock('106'));
+      await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 105
+      assert.equal(await this.allCvpOf(bob), '742');
+    });
+
     it('should not boost if not enough cvp balance', async () => {
-      await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('4'), scale('10'), {from: minter});
+      await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('4'), scale('10'), scale('20'), {from: minter});
       await this.lp.approve(this.lpMining.address, '1000', {from: bob});
 
       await this.cvp.mint(bob, '999');
@@ -968,8 +995,30 @@ describe('VestedLPMining', () => {
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '40040040040');
     });
 
+    it('should not boost if cvp balance excess', async () => {
+      await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('4'), scale('10'), scale('20'), {from: minter});
+      await this.lp.approve(this.lpMining.address, '1000', {from: bob});
+
+      assert.equal((await this.lpMining.cvpBalanceToBoost('100', this.lp.address, true)).toString(), '1000');
+      assert.equal((await this.lpMining.cvpBalanceToBoost('100', this.lp.address, false)).toString(), '2000');
+
+      await this.cvp.mint(bob, '2001');
+      await this.cvp.approve(this.lpMining.address, '2001', {from: bob});
+      await time.advanceBlockTo(this.shiftBlock('99'));
+      await this.lpMining.deposit(0, '100', '2001', {from: bob}); // block 100
+      await time.advanceBlockTo(this.shiftBlock('109'));
+      await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 110
+      assert.equal(await this.allCvpOf(bob), '1000');
+
+      const poolBoost = await this.lpMining.poolBoostByLp('0');
+      assert.equal(poolBoost.lpBoostRate.toString(), scale('2'));
+      assert.equal(poolBoost.cvpBoostRate.toString(), scale('4'));
+      assert.equal(poolBoost.accCvpPerLpBoost.toString(), '200000000000');
+      assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '19990004997');
+    });
+
     it('should correctly boost with lpBoostRate: 2 and cvpBoostRate: 4', async () => {
-      await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('4'), scale('10'), {from: minter});
+      await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('4'), scale('10'), scale('20'), {from: minter});
       await this.lp.approve(this.lpMining.address, '1000', {from: bob});
 
       await this.cvp.mint(bob, '1000');
@@ -982,7 +1031,7 @@ describe('VestedLPMining', () => {
     });
 
     it('should correctly boost with lpBoostRate: 4 and cvpBoostRate: 4', async () => {
-      await this.lpMining.add('100', this.lp.address, '1', true, scale('4'), scale('4'), scale('10'), {from: minter});
+      await this.lpMining.add('100', this.lp.address, '1', true, scale('4'), scale('4'), scale('10'), scale('20'), {from: minter});
       await this.lp.approve(this.lpMining.address, '1000', {from: bob});
 
       await this.cvp.mint(bob, '1000');
@@ -995,7 +1044,7 @@ describe('VestedLPMining', () => {
     });
 
     it('should correctly boost with lpBoostRate: 2 and cvpBoostRate: 8', async () => {
-      await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('8'), scale('10'), {from: minter});
+      await this.lpMining.add('100', this.lp.address, '1', true, scale('2'), scale('8'), scale('10'), scale('20'), {from: minter});
       await this.lp.approve(this.lpMining.address, '1000', {from: bob});
 
       await this.cvp.mint(bob, '1000');
@@ -1008,7 +1057,7 @@ describe('VestedLPMining', () => {
     });
 
     it('should correctly boost with lpBoostRate: 4 and cvpBoostRate: 8', async () => {
-      await this.lpMining.add('100', this.lp.address, '1', true, scale('4'), scale('8'), scale('10'), {from: minter});
+      await this.lpMining.add('100', this.lp.address, '1', true, scale('4'), scale('8'), scale('10'), scale('20'), {from: minter});
       await this.lp.approve(this.lpMining.address, '1000', {from: bob});
 
       await this.cvp.mint(bob, '1000');
@@ -1024,10 +1073,12 @@ describe('VestedLPMining', () => {
       assert.equal(poolBoost.cvpBoostRate.toString(), scale('8'));
       assert.equal(poolBoost.accCvpPerLpBoost.toString(), '400000000000');
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '80000000000');
+      assert.equal((await this.lpMining.lpBoostRatioByToken(this.lp.address)).toString(), scale('10'));
+      assert.equal((await this.lpMining.lpBoostMaxRatioByToken(this.lp.address)).toString(), scale('20'));
     });
 
     it('should correctly enable boost in existing pool with lpBoostRate: 4 and cvpBoostRate: 8', async () => {
-      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', {from: minter});
+      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', '0', {from: minter});
       await this.lp.approve(this.lpMining.address, '1000', {from: bob});
 
       await time.advanceBlockTo(this.shiftBlock('99')); // block 100
@@ -1047,7 +1098,7 @@ describe('VestedLPMining', () => {
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '0');
 
       await this.lpMining.setPoolBoostLastUpdateBlock('0', '0');
-      await this.lpMining.set('0', '100', '1', true, scale('4'), scale('8'), scale('10'), {from: minter});
+      await this.lpMining.set('0', '100', '1', true, scale('4'), scale('8'), scale('10'), scale('20'), {from: minter});
 
       await this.cvp.mint(bob, '1000');
       await this.cvp.approve(this.lpMining.address, '1000', {from: bob});
