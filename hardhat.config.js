@@ -13,6 +13,7 @@ require('./tasks/deployPoolRestrictions');
 require('./tasks/deployMainnetYeti');
 require('./tasks/deployYearnRouter');
 require('./tasks/deployAaveRouter');
+require('./tasks/testVestedLpMiningProxy');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
@@ -68,13 +69,13 @@ const config = {
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
       accounts: getAccounts('mainnet'),
-      gasPrice: 75 * 10 ** 9,
+      gasPrice: 90 * 10 ** 9,
       gasMultiplier: 1.2,
       timeout: 2000000,
     },
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
-      gasPrice: 75 * 10 ** 9,
+      gasPrice: 90 * 10 ** 9,
       gasMultiplier: 2,
       timeout: 2000000,
     },
@@ -104,7 +105,7 @@ const config = {
     settings: {
       optimizer: {
         enabled: !!process.env.ETHERSCAN_KEY || process.env.COMPILE_TARGET === 'release',
-        runs: 2,
+        runs: 200,
       },
     },
     version: '0.6.12',
