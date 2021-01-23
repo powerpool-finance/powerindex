@@ -9,8 +9,8 @@ task('test-vested-lp-mining-proxy', 'Test VestedLpMining').setAction(async (__, 
   const proxyAddress = '0xF09232320eBEAC33fae61b24bB8D7CA192E58507';
   const proxyAdminAddress = '0x4bb5A5b7E10C98884960bbDB9540cD1BaBdEac68';
   const OWNER = '0xB258302C3f209491d604165549079680708581Cc';
-  // const newImplAddress = '0x61a542ddb77064ca3a5c15f8b19c477cf0d8e0ba';
-  const newImplAddress = (await VestedLPMining.new()).address;
+  const newImplAddress = '0x2dc6b1b8dcf81b9060022c68b5611d480ff995c8';
+  // const newImplAddress = (await VestedLPMining.new()).address;
   await forkContractUpgrade(ethers, OWNER, proxyAdminAddress, proxyAddress, newImplAddress)
   const newLpMining = await VestedLPMining.at(proxyAddress);
 
