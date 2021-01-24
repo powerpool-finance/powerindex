@@ -65,7 +65,7 @@ contract BToken is BTokenBase, IERC20 {
 
     string  internal _name;
     string  internal _symbol;
-    uint8   private _decimals = 18;
+    uint8   private _decimals;
 
     function name() public view returns (string memory) {
         return _name;
@@ -76,7 +76,7 @@ contract BToken is BTokenBase, IERC20 {
     }
 
     function decimals() public view returns(uint8) {
-        return _decimals;
+        return 18;
     }
 
     function allowance(address src, address dst) external override view returns (uint) {

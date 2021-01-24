@@ -105,6 +105,7 @@ describe('PowerIndexPool Unit', () => {
   it('should set name and symbol for new pool', async () => {
     assert.equal(await pool.name(), name);
     assert.equal(await pool.symbol(), symbol);
+    assert.equal(await pool.decimals(), '18');
     assert.sameMembers(await pool.getCurrentTokens(), tokens);
     assert.deepEqual(
       _.pick(await pool.getDynamicWeightSettings(tokens[0]), [
