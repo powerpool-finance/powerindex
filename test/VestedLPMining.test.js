@@ -1013,9 +1013,22 @@ describe('VestedLPMining', () => {
 
       await this.lpMining.deposit(0, '100', '2000', {from: bob});
 
+      assert.equal(await this.lpMining.usersPoolBoost('0', bob).then(r => r.balance), '2000');
+
       await expectRevert(this.lpMining.withdraw(0, '0', '1100', {from: bob}), 'BOOST_BOUNDS');
 
+      await this.lpMining.withdraw(0, '0', '100', {from: bob});
+      await this.lpMining.withdraw(0, '0', '900', {from: bob});
+
+      assert.equal(await this.lpMining.usersPoolBoost('0', bob).then(r => r.balance), '1000');
+
+      await expectRevert(this.lpMining.withdraw(0, '0', '100', {from: bob}), 'BOOST_BOUNDS');
+
+      await expectRevert(this.lpMining.withdraw(0, '0', '1100', {from: bob}), 'SafeMath: subtraction overflow');
+
       await this.lpMining.withdraw(0, '0', '1000', {from: bob});
+
+      assert.equal(await this.lpMining.usersPoolBoost('0', bob).then(r => r.balance), '0');
     });
 
     it('should revert deposit and withdraw if excess boost bounds', async () => {
