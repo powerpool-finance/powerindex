@@ -332,6 +332,7 @@ contract VestedLPMining is
     if (_boostAmount != 0) {
       cvp.safeTransferFrom(msg.sender, address(this), _boostAmount);
       userPB.balance = userPB.balance.add(_boostAmount);
+      require(!cvpAmountNotInBoundsToBoost(userPB.balance, user.lptAmount, address(pool.lpToken)), "BOOST_BOUNDS");
     }
     user.cvpAdjust = _computeCvpAdjustmentWithBoost(user.lptAmount, pool, userPB, poolBoost);
     emit Deposit(msg.sender, _pid, _amount, _boostAmount);
@@ -363,6 +364,10 @@ contract VestedLPMining is
     }
     if (_boostAmount != 0) {
       userPB.balance = userPB.balance.sub(_boostAmount);
+      require(
+        userPB.balance == 0 || !cvpAmountNotInBoundsToBoost(userPB.balance, user.lptAmount, address(pool.lpToken)),
+        "BOOST_BOUNDS"
+      );
       cvp.safeTransfer(msg.sender, _boostAmount);
     }
     user.cvpAdjust = _computeCvpAdjustmentWithBoost(user.lptAmount, pool, userPB, poolBoost);
@@ -734,8 +739,7 @@ contract VestedLPMining is
     if (
       poolBoost.cvpBoostRate == 0 ||
       poolBoost.lpBoostRate == 0 ||
-      userPB.balance < cvpBalanceToBoost(lptAmount, address(pool.lpToken), true) ||
-      userPB.balance > cvpBalanceToBoost(lptAmount, address(pool.lpToken), false)
+      cvpAmountNotInBoundsToBoost(userPB.balance, lptAmount, address(pool.lpToken))
     ) {
       return cvpResult;
     }
@@ -747,6 +751,16 @@ contract VestedLPMining is
 
   function _computeCvpAdjustment(uint256 lptAmount, uint256 accCvpPerLpt) private pure returns (uint96) {
     return SafeMath96.fromUint(lptAmount.mul(accCvpPerLpt).div(SCALE), "VLPMining::_computeCvpAdj");
+  }
+
+  function cvpAmountNotInBoundsToBoost(
+    uint256 _cvpAmount,
+    uint256 _lpAmount,
+    address _lpToken
+  ) public view returns (bool) {
+    return
+      _cvpAmount < cvpBalanceToBoost(_lpAmount, _lpToken, true) ||
+      _cvpAmount > cvpBalanceToBoost(_lpAmount, _lpToken, false);
   }
 
   function cvpBalanceToBoost(
