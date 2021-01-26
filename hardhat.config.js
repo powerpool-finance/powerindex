@@ -15,6 +15,7 @@ require('./tasks/deployYearnRouter');
 require('./tasks/deployAaveRouter');
 require('./tasks/deployProxyFactory');
 require('./tasks/deployMainnetAssy');
+require('./tasks/testVestedLpMiningProxy');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
@@ -70,14 +71,14 @@ const config = {
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
       accounts: getAccounts('mainnet'),
-      gasPrice: 140 * 10 ** 9,
+      gasPrice: 90 * 10 ** 9,
       gasMultiplier: 1.2,
       timeout: 2000000,
     },
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
+      gasPrice: 90 * 10 ** 9,
       accounts: getAccounts('mainnet'),
-      gasPrice: 140 * 10 ** 9,
       gasMultiplier: 2,
       timeout: 2000000,
     },

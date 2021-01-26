@@ -30,9 +30,10 @@ interface IVestedLPMining {
     IERC20 _lpToken,
     uint8 _poolType,
     bool _votesEnabled,
-    uint256 _lpBoostMultiplicator,
-    uint256 _cvpBoostMultiplicator,
-    uint256 _poolBoostRate
+    uint256 _lpBoostRate,
+    uint256 _cvpBoostRate,
+    uint256 _lpBoostMinRatio,
+    uint256 _lpBoostMaxRatio
   ) external;
 
   /// @notice Update parameters of the given pool (only the owner may call)
@@ -41,9 +42,10 @@ interface IVestedLPMining {
     uint256 _allocPoint,
     uint8 _poolType,
     bool _votesEnabled,
-    uint256 _lpBoostMultiplicator,
-    uint256 _cvpBoostMultiplicator,
-    uint256 _poolBoostRate
+    uint256 _lpBoostRate,
+    uint256 _cvpBoostRate,
+    uint256 _lpBoostMinRatio,
+    uint256 _lpBoostMaxRatio
   ) external;
 
   /// @notice Set the migrator contract (only the owner may call)
@@ -115,9 +117,9 @@ interface IVestedLPMining {
   event SetCvpPoolByMetaPool(address indexed metaPool, address indexed cvpPool);
   event MigrateLpToken(address indexed oldLpToken, address indexed newLpToken, uint256 indexed pid);
 
-  event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
-  event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-  event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
+  event Deposit(address indexed user, uint256 indexed pid, uint256 amount, uint256 boostAmount);
+  event Withdraw(address indexed user, uint256 indexed pid, uint256 amount, uint256 boostAmount);
+  event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount, uint256 boostAmount);
 
   event CheckpointTotalLpVotes(uint256 lpVotes);
   event CheckpointUserLpVotes(address indexed user, uint256 indexed pid, uint256 lpVotes);

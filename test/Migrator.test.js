@@ -44,7 +44,7 @@ describe('Migrator', () => {
       await this.cvp.transfer(this.reservoir.address, supply, { from: alice });
       await this.reservoir.setApprove(this.cvp.address, this.lpMining.address, supply, { from: alice });
 
-      await this.lpMining.add('100', this.lp1.address, '1', true, '0', '0', '0', { from: alice });
+      await this.lpMining.add('100', this.lp1.address, '1', true, '0', '0', '0', '0', { from: alice });
     });
 
     it('should do the migration successfully', async () => {
