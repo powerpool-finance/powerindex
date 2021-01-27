@@ -114,6 +114,16 @@ contract VestedLPMining is
   mapping(address => uint256) public lpBoostRatioByToken;
   mapping(address => uint256) public lpBoostMaxRatioByToken;
 
+  mapping(uint256 => mapping(address => uint96)) public usersPoolBoostCvpAdjust;
+
+  struct VestedCalc {
+    uint32 prevBlock;
+    uint32 age;
+    uint256 newToVest;
+    uint256 pended;
+    uint256 pendedToVest;
+  }
+
   /// @inheritdoc IVestedLPMining
   function initialize(
     IERC20 _cvp,
@@ -267,7 +277,7 @@ contract VestedLPMining is
 
     _pool.lastUpdateBlock = pools[_pid].lastUpdateBlock;
     _computePoolRewardByBoost(_pool, _poolBoost);
-    uint96 newlyEntitled = _computeCvpToEntitle(user, _pool, userPB, _poolBoost);
+    uint96 newlyEntitled = _computeCvpToEntitle(user, _pool, userPB, _poolBoost, usersPoolBoostCvpAdjust[_pid][_user]);
 
     return uint256(newlyEntitled.add(user.pendedCvp));
   }
@@ -284,7 +294,8 @@ contract VestedLPMining is
 
     _pool.lastUpdateBlock = pools[_pid].lastUpdateBlock;
     _computePoolRewardByBoost(_pool, _poolBoost);
-    (, uint256 newlyVested) = _computeCvpVesting(_user, _pool, _userPB, _poolBoost);
+    (, uint256 newlyVested) =
+      _computeCvpVesting(_user, _pool, _userPB, _poolBoost, usersPoolBoostCvpAdjust[_pid][user]);
 
     return newlyVested;
   }
@@ -323,7 +334,7 @@ contract VestedLPMining is
     UserPoolBoost storage userPB = usersPoolBoost[_pid][msg.sender];
 
     _doPoolUpdate(pool, poolBoost);
-    _vestUserCvp(user, pool, userPB, poolBoost);
+    _vestUserCvp(user, pool, userPB, poolBoost, usersPoolBoostCvpAdjust[_pid][msg.sender]);
 
     if (_amount != 0) {
       pool.lpToken.safeTransferFrom(msg.sender, address(this), _amount);
@@ -334,7 +345,12 @@ contract VestedLPMining is
       userPB.balance = userPB.balance.add(_boostAmount);
       require(!cvpAmountNotInBoundsToBoost(userPB.balance, user.lptAmount, address(pool.lpToken)), "BOOST_BOUNDS");
     }
-    user.cvpAdjust = _computeCvpAdjustmentWithBoost(user.lptAmount, pool, userPB, poolBoost);
+    (user.cvpAdjust, usersPoolBoostCvpAdjust[_pid][msg.sender]) = _computeCvpAdjustmentWithBoost(
+      user.lptAmount,
+      pool,
+      userPB,
+      poolBoost
+    );
     emit Deposit(msg.sender, _pid, _amount, _boostAmount);
 
     _doCheckpointVotes(msg.sender);
@@ -356,7 +372,7 @@ contract VestedLPMining is
     require(user.lptAmount >= _amount, "VLPMining: amount exceeds balance");
 
     _doPoolUpdate(pool, poolBoost);
-    _vestUserCvp(user, pool, userPB, poolBoost);
+    _vestUserCvp(user, pool, userPB, poolBoost, usersPoolBoostCvpAdjust[_pid][msg.sender]);
 
     if (_amount != 0) {
       user.lptAmount = user.lptAmount.sub(_amount);
@@ -370,7 +386,13 @@ contract VestedLPMining is
       );
       cvp.safeTransfer(msg.sender, _boostAmount);
     }
-    user.cvpAdjust = _computeCvpAdjustmentWithBoost(user.lptAmount, pool, userPB, poolBoost);
+
+    (user.cvpAdjust, usersPoolBoostCvpAdjust[_pid][msg.sender]) = _computeCvpAdjustmentWithBoost(
+      user.lptAmount,
+      pool,
+      userPB,
+      poolBoost
+    );
     emit Withdraw(msg.sender, _pid, _amount, _boostAmount);
 
     _doCheckpointVotes(msg.sender);
@@ -528,13 +550,14 @@ contract VestedLPMining is
     User storage user,
     Pool storage pool,
     UserPoolBoost storage userPB,
-    PoolBoost storage poolBoost
+    PoolBoost storage poolBoost,
+    uint96 boostCvpAdjust
   ) internal {
     User memory _user = user;
     UserPoolBoost memory _userPB = userPB;
     uint32 prevVestingBlock = _user.vestingBlock;
     uint32 prevUpdateBlock = _user.lastUpdateBlock;
-    (uint256 newlyEntitled, uint256 newlyVested) = _computeCvpVesting(_user, pool, _userPB, poolBoost);
+    (uint256 newlyEntitled, uint256 newlyVested) = _computeCvpVesting(_user, pool, _userPB, poolBoost, boostCvpAdjust);
 
     if (newlyEntitled != 0) {
       user.pendedCvp = _user.pendedCvp;
@@ -570,47 +593,53 @@ contract VestedLPMining is
     User memory _user,
     Pool memory pool,
     UserPoolBoost memory _userPB,
-    PoolBoost memory _poolBoost
+    PoolBoost memory _poolBoost,
+    uint96 boostCvpAdjust
   ) internal view returns (uint256 newlyEntitled, uint256 newlyVested) {
-    uint32 prevBlock = _user.lastUpdateBlock;
+    VestedCalc memory vc;
+
+    vc.prevBlock = _user.lastUpdateBlock;
     _user.lastUpdateBlock = _currBlock();
-    if (prevBlock >= _user.lastUpdateBlock) {
+    if (vc.prevBlock >= _user.lastUpdateBlock) {
       return (0, 0);
     }
 
-    uint32 age = _user.lastUpdateBlock - prevBlock;
+    vc.age = _user.lastUpdateBlock - vc.prevBlock;
 
     // Tokens which are to be entitled starting from the `user.lastUpdateBlock`, shall be
     // vested proportionally to the number of blocks already minted within the period between
     // the `user.lastUpdateBlock` and `cvpVestingPeriodInBlocks` following the current block
-    newlyEntitled = uint256(_computeCvpToEntitle(_user, pool, _userPB, _poolBoost));
-    uint256 newToVest =
-      newlyEntitled == 0 ? 0 : (newlyEntitled.mul(uint256(age)).div(uint256(age + cvpVestingPeriodInBlocks)));
+    newlyEntitled = uint256(_computeCvpToEntitle(_user, pool, _userPB, _poolBoost, boostCvpAdjust));
+    vc.newToVest = newlyEntitled == 0
+      ? 0
+      : (newlyEntitled.mul(uint256(vc.age)).div(uint256(vc.age + cvpVestingPeriodInBlocks)));
 
     // Tokens which have been pended since the `user.lastUpdateBlock` shall be vested:
     // - in full, if the `user.vestingBlock` has been mined
     // - otherwise, proportionally to the number of blocks already mined so far in the period
     //   between the `user.lastUpdateBlock` and the `user.vestingBlock` (not yet mined)
-    uint256 pended = uint256(_user.pendedCvp);
-    age = _user.lastUpdateBlock >= _user.vestingBlock ? cvpVestingPeriodInBlocks : _user.lastUpdateBlock - prevBlock;
-    uint256 pendedToVest =
-      pended == 0
-        ? 0
-        : (
-          age >= cvpVestingPeriodInBlocks
-            ? pended
-            : pended.mul(uint256(age)).div(uint256(_user.vestingBlock - prevBlock))
-        );
+    vc.pended = uint256(_user.pendedCvp);
+    vc.age = _user.lastUpdateBlock >= _user.vestingBlock
+      ? cvpVestingPeriodInBlocks
+      : _user.lastUpdateBlock - vc.prevBlock;
 
-    newlyVested = pendedToVest.add(newToVest);
+    vc.pendedToVest = vc.pended == 0
+      ? 0
+      : (
+        vc.age >= cvpVestingPeriodInBlocks
+          ? vc.pended
+          : vc.pended.mul(uint256(vc.age)).div(uint256(_user.vestingBlock - vc.prevBlock))
+      );
+
+    newlyVested = vc.pendedToVest.add(vc.newToVest);
     _user.pendedCvp = SafeMath96.fromUint(
       uint256(_user.pendedCvp).add(newlyEntitled).sub(newlyVested),
       "VLPMining::computeCvpVest:1"
     );
 
     // Amount of CVP token pended (i.e. not yet vested) from now
-    uint256 remainingPended = pended == 0 ? 0 : pended.sub(pendedToVest);
-    uint256 unreleasedNewly = newlyEntitled == 0 ? 0 : newlyEntitled.sub(newToVest);
+    uint256 remainingPended = vc.pended == 0 ? 0 : vc.pended.sub(vc.pendedToVest);
+    uint256 unreleasedNewly = newlyEntitled == 0 ? 0 : newlyEntitled.sub(vc.newToVest);
     uint256 pending = remainingPended.add(unreleasedNewly);
 
     // Compute the vesting block (i.e. when the pended tokens to be all vested)
@@ -620,8 +649,8 @@ contract VestedLPMining is
       period = cvpVestingPeriodInBlocks;
     } else {
       // "old" CVPs and, perhaps, "new" CVPs are pending - the weighted average applied
-      age = _user.vestingBlock - _user.lastUpdateBlock;
-      period = ((remainingPended.mul(age)).add(unreleasedNewly.mul(cvpVestingPeriodInBlocks))).div(pending);
+      vc.age = _user.vestingBlock - _user.lastUpdateBlock;
+      period = ((remainingPended.mul(vc.age)).add(unreleasedNewly.mul(cvpVestingPeriodInBlocks))).div(pending);
     }
     _user.vestingBlock =
       _user.lastUpdateBlock +
@@ -717,15 +746,19 @@ contract VestedLPMining is
     User memory user,
     Pool memory pool,
     UserPoolBoost memory userPB,
-    PoolBoost memory poolBoost
+    PoolBoost memory poolBoost,
+    uint96 boostCvpAdjust
   ) private view returns (uint96 cvpResult) {
     if (user.lptAmount == 0) {
       return 0;
     }
+    (uint96 newCvpAdjust, uint96 newBoostCvpAdjust) =
+      _computeCvpAdjustmentWithBoost(user.lptAmount, pool, userPB, poolBoost);
+
     return
-      _computeCvpAdjustmentWithBoost(user.lptAmount, pool, userPB, poolBoost).sub(
-        user.cvpAdjust,
-        "VLPMining::computeCvp:2"
+      newCvpAdjust.add(newBoostCvpAdjust).sub(
+        user.cvpAdjust.add(boostCvpAdjust, "VLPMining::computeCvp:2"),
+        "VLPMining::computeCvp:3"
       );
   }
 
@@ -734,19 +767,18 @@ contract VestedLPMining is
     Pool memory pool,
     UserPoolBoost memory userPB,
     PoolBoost memory poolBoost
-  ) private view returns (uint96 cvpResult) {
-    cvpResult = _computeCvpAdjustment(lptAmount, pool.accCvpPerLpt);
+  ) private view returns (uint96 cvpAdjust, uint96 boostCvpAdjust) {
+    cvpAdjust = _computeCvpAdjustment(lptAmount, pool.accCvpPerLpt);
     if (
       poolBoost.cvpBoostRate == 0 ||
       poolBoost.lpBoostRate == 0 ||
       cvpAmountNotInBoundsToBoost(userPB.balance, lptAmount, address(pool.lpToken))
     ) {
-      return cvpResult;
+      return (cvpAdjust, 0);
     }
-    return
-      cvpResult.add(_computeCvpAdjustment(userPB.balance, poolBoost.accCvpPerCvpBoost)).add(
-        _computeCvpAdjustment(lptAmount, poolBoost.accCvpPerLpBoost)
-      );
+    boostCvpAdjust = _computeCvpAdjustment(userPB.balance, poolBoost.accCvpPerCvpBoost).add(
+      _computeCvpAdjustment(lptAmount, poolBoost.accCvpPerLpBoost)
+    );
   }
 
   function _computeCvpAdjustment(uint256 lptAmount, uint256 accCvpPerLpt) private pure returns (uint96) {

@@ -109,7 +109,7 @@ describe('VestedLPMining (internal math)', () => {
           const currentBlock = this.shiftBlock('50');
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost());
+          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost(), '0');
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -136,7 +136,7 @@ describe('VestedLPMining (internal math)', () => {
           const expectedVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost());
+          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost(), '0');
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -163,7 +163,7 @@ describe('VestedLPMining (internal math)', () => {
           const expectedVesting = expectedEntitled.mul(toBN(`${age}`)).div(toBN(`${age + 1 * vestPeriod}`));
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost());
+          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost(), '0');
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -194,7 +194,7 @@ describe('VestedLPMining (internal math)', () => {
             .div(toBN(`${1 * user.vestingBlock - 1 * user.lastUpdateBlock}`));
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost());
+          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost(), '0');
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -216,7 +216,7 @@ describe('VestedLPMining (internal math)', () => {
           const currentBlock = this.shiftBlock('50');
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost());
+          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost(), '0');
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -258,7 +258,7 @@ describe('VestedLPMining (internal math)', () => {
             .toString();
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost());
+          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost(), '0');
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -290,7 +290,7 @@ describe('VestedLPMining (internal math)', () => {
           const expectedVesting = entitledVesting.add(pendedVesting);
 
           await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost());
+          const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost(), '0');
           const res = tx.receipt.logs[0].args;
 
           assert.equal(res.lastUpdateBlock.toString(), currentBlock);
@@ -326,7 +326,7 @@ describe('VestedLPMining (internal math)', () => {
       const expectedVesting = entitledVesting.add(pendedVesting);
 
       await time.advanceBlockTo(`${1 * currentBlock - 1}`);
-      const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost());
+      const tx = await this.vestingMath.__computeCvpVesting(user, Pool(accCvpPerLpt), UserPoolBoost(), PoolBoost(), '0');
       const res = tx.receipt.logs[0].args;
 
       assert.equal(res.lastUpdateBlock.toString(), currentBlock);
