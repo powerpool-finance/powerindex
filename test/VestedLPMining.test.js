@@ -20,6 +20,11 @@ function addBN(bn1, bn2) {
     .add(toBN(bn2.toString(10)))
     .toString(10);
 }
+function subBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .sub(toBN(bn2.toString(10)))
+    .toString(10);
+}
 function mulBN(bn1, bn2) {
   return toBN(bn1.toString(10))
     .mul(toBN(bn2.toString(10)))
@@ -1227,7 +1232,7 @@ describe('VestedLPMining', () => {
       await this.lp.approve(this.lpMining.address, '1000', {from: bob});
 
       await this.cvp.mint(bob, '1000');
-      await this.cvp.approve(this.lpMining.address, '1000', {from: bob});
+      await this.cvp.approve(this.lpMining.address, '10000', {from: bob});
       await time.advanceBlockTo(this.shiftBlock('99'));
       await this.lpMining.deposit(0, '100', '1000', {from: bob}); // block 100
       await time.advanceBlockTo(this.shiftBlock('109'));
@@ -1247,11 +1252,34 @@ describe('VestedLPMining', () => {
       assert.equal(boostCvpAdjust.toString(), '0');
 
       await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 110
+      assert.equal(await this.allCvpOf(bob), '1344');
 
       user = await this.lpMining.users('0', bob);
       boostCvpAdjust = await this.lpMining.usersPoolBoostCvpAdjust('0', bob);
       assert.equal(user.cvpAdjust.toString(), '1200');
       assert.equal(boostCvpAdjust.toString(), '144');
+
+      const withdrawCvp = '1000';
+      await this.lpMining.withdraw(0, '0', withdrawCvp, {from: bob}); // block 100
+      assert.equal(subBN(await this.allCvpOf(bob), withdrawCvp), '1456');
+      user = await this.lpMining.users('0', bob);
+      boostCvpAdjust = await this.lpMining.usersPoolBoostCvpAdjust('0', bob);
+      assert.equal(user.cvpAdjust.toString(), '1300');
+      assert.equal(boostCvpAdjust.toString(), '0');
+
+      await this.lpMining.deposit(0, '0', '1000', {from: bob}); // block 100
+      assert.equal(await this.allCvpOf(bob), '1556');
+      user = await this.lpMining.users('0', bob);
+      boostCvpAdjust = await this.lpMining.usersPoolBoostCvpAdjust('0', bob);
+      assert.equal(user.cvpAdjust.toString(), '1400');
+      assert.equal(boostCvpAdjust.toString(), '160');
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 110
+      assert.equal(await this.allCvpOf(bob), '1668');
+      user = await this.lpMining.users('0', bob);
+      boostCvpAdjust = await this.lpMining.usersPoolBoostCvpAdjust('0', bob);
+      assert.equal(user.cvpAdjust.toString(), '1500');
+      assert.equal(boostCvpAdjust.toString(), '172');
     });
   });
 });
