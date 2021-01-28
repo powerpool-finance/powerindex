@@ -1029,7 +1029,20 @@ describe('VestedLPMining', () => {
 
       await this.lpMining.deposit(0, '0', 0, { from: bob });
       assert.equal(await this.allCvpOf(bob), '2346');
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
 
+      await time.advanceBlockTo(this.shiftBlock('129'));
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '2588');
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
+
+      await time.advanceBlockTo(this.shiftBlock('139'));
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '2911');
       user = await this.lpMining.users('0', bob);
       assert.equal(user.pendedCvp.toString(), '971');
 
@@ -1037,7 +1050,6 @@ describe('VestedLPMining', () => {
 
       await this.lpMining.deposit(0, '0', 0, { from: bob });
       assert.equal(await this.allCvpOf(bob), '3137');
-
       user = await this.lpMining.users('0', bob);
       assert.equal(user.pendedCvp.toString(), '971');
 
@@ -1045,7 +1057,6 @@ describe('VestedLPMining', () => {
 
       await this.lpMining.deposit(0, '0', 0, { from: bob });
       assert.equal(await this.allCvpOf(bob), '3137');
-
       user = await this.lpMining.users('0', bob);
       assert.equal(user.pendedCvp.toString(), '971');
 
@@ -1053,7 +1064,6 @@ describe('VestedLPMining', () => {
 
       await this.lpMining.deposit(0, '0', 0, { from: bob });
       assert.equal(await this.allCvpOf(bob), '3137');
-
       user = await this.lpMining.users('0', bob);
       assert.equal(user.pendedCvp.toString(), '971');
     });
