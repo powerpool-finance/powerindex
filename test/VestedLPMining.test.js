@@ -998,9 +998,64 @@ describe('VestedLPMining', () => {
       await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 110
       assert.equal(await this.allCvpOf(bob), '1060');
 
+      let user = await this.lpMining.users('0', bob);
+      let userPB = await this.lpMining.usersPoolBoost('0', bob);
+      assert.equal(user.lptAmount.toString(), '100');
+      assert.equal(user.pendedCvp.toString(), '884');
+      assert.equal(user.cvpAdjust.toString(), '1060');
+      assert.equal(userPB.balance.toString(), '1000');
+
       poolBoost = await this.lpMining.poolBoostByLp('0');
       assert.equal(poolBoost.accCvpPerLpBoost.toString(), '200000000000');
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '40000000000');
+
+      await this.lpMining.withdraw(0, '100', '1000', {from: bob});
+      assert.equal(await this.allCvpOf(bob), '2166');
+
+      user = await this.lpMining.users('0', bob);
+      userPB = await this.lpMining.usersPoolBoost('0', bob);
+      assert.equal(user.lptAmount.toString(), '0');
+      assert.equal(user.pendedCvp.toString(), '971');
+      assert.equal(user.cvpAdjust.toString(), '0');
+      assert.equal(userPB.balance.toString(), '0');
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '2185');
+
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
+
+      await time.advanceBlockTo(this.shiftBlock('119'));
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '2346');
+
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
+
+      await time.advanceBlockTo(this.shiftBlock('219'));
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '3137');
+
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
+
+      await time.advanceBlockTo(this.shiftBlock('319'));
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '3137');
+
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
+
+      await time.advanceBlockTo(this.shiftBlock('419'));
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '3137');
+
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
     });
 
     it('should revert deposit and withdraw if not enough for boost', async () => {
