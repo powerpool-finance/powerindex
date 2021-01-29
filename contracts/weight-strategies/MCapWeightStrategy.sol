@@ -105,12 +105,10 @@ contract MCapWeightStrategy is Ownable, BNum {
 
       uint256[2][] memory wightsChange = new uint256[2][](len);
       for (uint256 i = 0; i < len; i++) {
-        uint256 oldShare = bdiv(bmul(oldMCaps[i], 1 ether), oldMarketCapSum);
-        uint256 newShare = bdiv(bmul(newMCaps[i], 1 ether), newMarketCapSum);
-        uint256 changePercent = bdiv(bmul(newShare, 1 ether), oldShare);
-
         (, , , uint256 oldWeight) = pool.getDynamicWeightSettings(tokens[i]);
-        wightsChange[i] = [oldWeight, bdiv(bmul(oldWeight, changePercent), 1 ether)];
+        uint256 numerator = bmul(bdiv(bmul(newMCaps[i], oldWeight), 1 ether), oldMarketCapSum);
+        uint256 newWeight = bdiv(bmul(bdiv(numerator, oldMCaps[i]), 1 ether), newMarketCapSum);
+        wightsChange[i] = [oldWeight, newWeight];
       }
 
       uint256 fromTimestamp = block.timestamp + 1;
