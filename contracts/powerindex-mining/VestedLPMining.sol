@@ -636,7 +636,7 @@ contract VestedLPMining is
       _pool.lastUpdateBlock,
       _pool.accCvpPerLpt,
       _pool.lpToken,
-      SCALE.mul(uint256(_pool.allocPoint)).div(totalAllocPoint).mul(uint256(cvpPerBlock))
+      SCALE.mul(uint256(cvpPerBlock)).mul(uint256(_pool.allocPoint)).div(totalAllocPoint)
     );
   }
 
