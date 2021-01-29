@@ -6,10 +6,13 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
   const wethAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
   const balancerPoolAddress = '0x26607ac599266b21d13c7acf7942c7701a8b699c';
   const uniswapFactoryAddress = '0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f';
+  const oracleAddress = '0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB';
 
   const BPool = artifacts.require('BPool');
+  const MockOracle = artifacts.require('MockOracle');
   const MockERC20 = artifacts.require('MockERC20');
 
+  const oracle = await MockOracle.at(oracleAddress);
   const pool = await BPool.at(balancerPoolAddress);
   const tokensAddresses = await callContract(pool, 'getCurrentTokens', [], 'array');
 
@@ -46,6 +49,7 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
       tokenSymbol: await callContract(token, 'symbol').catch(() => 'MKR'),
       tokenDecimals: await callContract(token, 'decimals').catch(() => '18'),
       balancerBalance,
+      oraclePrice: await callContract(oracle, 'assetPrices', [tokensAddresses[i]]).catch(e => '0'),
       uniswapPair: {
         address: pairAddress,
         tokenReserve,
