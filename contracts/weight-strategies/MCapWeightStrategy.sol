@@ -96,39 +96,39 @@ contract MCapWeightStrategy is Ownable, BNum {
         emit UpdateTokenMCap(address(pool), tokens[i], newMCaps[i]);
       }
 
-      uint256[2][] memory wightsChange = new uint256[2][](len);
+      uint256[3][] memory weightsChange = new uint256[3][](len);
       uint256 totalWeight;
       for (uint256 i = 0; i < len; i++) {
         (, , , uint256 oldWeight) = pool.getDynamicWeightSettings(tokens[i]);
         uint256 newWeight = bdiv(newMCaps[i], newMarketCapSum) * 50;
-        wightsChange[i] = [oldWeight, newWeight];
+        weightsChange[i] = [i, oldWeight, newWeight];
         totalWeight = badd(totalWeight, newWeight);
       }
       console.log("totalWeight", totalWeight);
 
+      weightsChange = sort(weightsChange);
+
       uint256 fromTimestamp = block.timestamp + 1;
       uint256 lenToPush;
       for (uint256 i = 0; i < len; i++) {
-        uint256 wps = _getWeightPerSecond(wightsChange[i][0], wightsChange[i][1], fromTimestamp, fromTimestamp + dwPeriod);
+        uint256 wps = _getWeightPerSecond(weightsChange[i][1], weightsChange[i][2], fromTimestamp, fromTimestamp + dwPeriod);
         if (wps >= minWeightPerSecond && wps <= maxWeightPerSecond) {
           lenToPush++;
         }
       }
+
       PowerIndexPoolController.DynamicWeightInput[] memory dws = new PowerIndexPoolController.DynamicWeightInput[](lenToPush);
 
       uint256 iToPush;
       for (uint256 i = 0; i < len; i++) {
-        uint256 wps = _getWeightPerSecond(wightsChange[i][0], wightsChange[i][1], fromTimestamp, fromTimestamp + dwPeriod);
+        uint256 wps = _getWeightPerSecond(weightsChange[i][1], weightsChange[i][2], fromTimestamp, fromTimestamp + dwPeriod);
         if (wps >= minWeightPerSecond && wps <= maxWeightPerSecond) {
-          dws[iToPush].token = tokens[i];
+          dws[iToPush].token = tokens[weightsChange[i][0]];
           dws[iToPush].fromTimestamp = fromTimestamp;
           dws[iToPush].targetTimestamp = fromTimestamp + dwPeriod;
-          dws[iToPush].targetDenorm = wightsChange[i][1];
+          dws[iToPush].targetDenorm = weightsChange[i][2];
           iToPush++;
         }
-      }
-      if(dws.length > 1) {
-        dws = sort(dws);
       }
 
       if(dws.length > 0) {
@@ -164,29 +164,28 @@ contract MCapWeightStrategy is Ownable, BNum {
     return div(delta, bsub(targetTimestamp, fromTimestamp));
   }
 
-  function quickSort(PowerIndexPoolController.DynamicWeightInput[] memory dws, int left, int right) pure internal {
+  function quickSort(uint256[3][] memory wightsChange, int left, int right) internal {
     int i = left;
     int j = right;
     if (i == j) return;
-    PowerIndexPoolController.DynamicWeightInput memory pivot = dws[uint(left + (right - left) / 2)];
+    uint256[3] memory pivot = wightsChange[uint(left + (right - left) / 2)];
+    int256 pDiff = int256(pivot[2]) - int256(pivot[1]);
     while (i <= j) {
-      while (dws[uint(i)].targetDenorm < pivot.targetDenorm) i++;
-      while (pivot.targetDenorm < dws[uint(j)].targetDenorm) j--;
+      while (int256(wightsChange[uint(i)][2]) - int256(wightsChange[uint(i)][1]) < pDiff) i++;
+      while (pDiff < int256(wightsChange[uint(j)][2]) - int256(wightsChange[uint(j)][1])) j--;
       if (i <= j) {
-        (dws[uint(i)], dws[uint(j)]) = (dws[uint(j)], dws[uint(i)]);
+        (wightsChange[uint(i)], wightsChange[uint(j)]) = (wightsChange[uint(j)], wightsChange[uint(i)]);
         i++;
         j--;
       }
     }
     if (left < j)
-      quickSort(dws, left, j);
+      quickSort(wightsChange, left, j);
     if (i < right)
-      quickSort(dws, i, right);
+      quickSort(wightsChange, i, right);
   }
-  function sort(
-    PowerIndexPoolController.DynamicWeightInput[] memory dws
-  ) internal pure returns (PowerIndexPoolController.DynamicWeightInput[] memory) {
-    quickSort(dws, int(0), int(dws.length - 1));
-    return dws;
+  function sort(uint256[3][] memory wightsChange) internal returns (uint256[3][] memory) {
+    quickSort(wightsChange, int(0), int(wightsChange.length - 1));
+    return wightsChange;
   }
 }
