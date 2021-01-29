@@ -144,6 +144,14 @@ describe.only('MCapWeightStrategy', () => {
 
       return pool;
     };
+
+    this.checkWeights = async (pool, balancerTokens, weights) => {
+      for (let i = 0; i < weights.length; i++) {
+        const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
+        console.log(web3.utils.fromWei(dw.targetDenorm, 'ether'));
+        assertEqualWithAccuracy(dw.targetDenorm, weights[i]);
+      }
+    };
   });
 
   describe('Swaps with Uniswap mainnet values', () => {
@@ -160,7 +168,7 @@ describe.only('MCapWeightStrategy', () => {
       bPoolBalances = [];
 
       for (let i = 0; i < poolsData.length; i++) {
-        const token = await MockERC20.new(poolsData[i].tokenSymbol, poolsData[i].tokenSymbol, poolsData[i].tokenDecimals, ether('10000000000'));
+        const token = await MockERC20.new(poolsData[i].tokenSymbol, poolsData[i].tokenSymbol, poolsData[i].tokenDecimals, poolsData[i].totalSupply);
 
         console.log('token.address', token.address, 'poolsData.oraclePrice', poolsData[i].oraclePrice);
         await oracle.setPrice(token.address, poolsData[i].oraclePrice);
@@ -188,7 +196,7 @@ describe.only('MCapWeightStrategy', () => {
     });
 
     it('swapEthToPipt should work properly', async () => {
-      const weights = [
+      await this.checkWeights(pool, balancerTokens, [
         ether(6.25),
         ether(6.25),
         ether(6.25),
@@ -197,69 +205,86 @@ describe.only('MCapWeightStrategy', () => {
         ether(6.25),
         ether(6.25),
         ether(6.25),
+      ]);
+
+      const newWeights = [
+        ether(7.94592953057478305),
+        ether(1.54516830247446585),
+        ether(6.317922010340309),
+        ether(0.43161699721765335),
+        ether(5.03587915429574795),
+        ether(0.12579764662940395),
+        ether(2.43332774467898765),
+        ether(26.16435861378864915),
       ];
 
-      for (let i = 0; i < weights.length; i++) {
-         const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
-        console.log(web3.utils.fromWei(dw.targetDenorm, 'ether'));
-         // assert.equal(dw.targetDenorm, weights[i]);
-      }
+      let res = await weightStrategy.poke([pool.address]);
+      assert.equal(res.logs.length, 9);
 
-      const newWeights1 = [
-        ether(0.46398364629718255),
-        ether(46.79965906380646755),
-        ether(0.0270725805871184),
-        ether(0.0043592407343403),
-        ether(0.40491285192689245),
-        ether(0.0698515223197297),
-        ether(2.20741631469854565),
-        ether(0.0227447796297234),
-      ];
-
-      let res = await weightStrategy.poke();
-      assert.equal(res.logs.length, 8);
-
-      for (let i = 0; i < weights.length; i++) {
-        const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
-        console.log(web3.utils.fromWei(dw.targetDenorm, 'ether'));
-        assertEqualWithAccuracy(dw.targetDenorm, newWeights1[i]);
-      }
+      await this.checkWeights(pool, balancerTokens, newWeights);
 
       await time.increase(pokePeriod);
-      res = await weightStrategy.poke();
-      assert.equal(res.logs.length, 8);
+      res = await weightStrategy.poke([pool.address]);
+      assert.equal(res.logs.length, 9);
 
-      for (let i = 0; i < weights.length; i++) {
-        const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
-        assertEqualWithAccuracy(dw.targetDenorm, newWeights1[i]);
-      }
+      await this.checkWeights(pool, balancerTokens, newWeights);
 
-      const token0Price = await oracle.assetPrices(balancerTokens[0].address);
-      const newTokenPrice = mulScalarBN(token0Price, ether(1.1));
+      let newTokenPrice = mulScalarBN(await oracle.assetPrices(balancerTokens[0].address), ether(1.1));
       await oracle.setPrice(balancerTokens[0].address, newTokenPrice);
 
-      res = await weightStrategy.poke();
+      res = await weightStrategy.poke([pool.address]);
       assert.equal(res.logs.length, 0);
       await time.increase(pokePeriod);
 
-      res = await weightStrategy.poke();
-      assert.equal(res.logs.length, 8);
+      res = await weightStrategy.poke([pool.address]);
+      assert.equal(res.logs.length, 9);
 
-      const newWeights = [
-        ether(6.875),
-        ether(6.25),
-        ether(6.25),
-        ether(6.25),
-        ether(6.25),
-        ether(6.25),
-        ether(6.25),
-        ether(6.25),
-      ];
+      await this.checkWeights(pool, balancerTokens, [
+        ether(8.60379223011978405),
+        ether(1.52099683513799825),
+        ether(6.2190891225165477),
+        ether(0.4248651009139281),
+        ether(4.9571015944056535),
+        ether(0.1238297615118814),
+        ether(2.3952625695098895),
+        ether(25.7550627858843175),
+      ]);
 
-      for (let i = 0; i < weights.length; i++) {
-        const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
-        assert.equal(dw.targetDenorm, newWeights[i]);
-      }
+      newTokenPrice = mulScalarBN(await oracle.assetPrices(balancerTokens[0].address), ether(2));
+      await oracle.setPrice(balancerTokens[0].address, newTokenPrice);
+
+      await time.increase(pokePeriod);
+      res = await weightStrategy.poke([pool.address]);
+      assert.equal(res.logs.length, 9);
+
+      await this.checkWeights(pool, balancerTokens, [
+        ether(14.6812892181707849),
+        ether(1.29769489077216445),
+        ether(5.3060466617040937),
+        ether(0.36248942666168115),
+        ether(4.22933517249240425),
+        ether(0.10564995608615095),
+        ether(2.0436071441455536),
+        ether(21.973887529967167),
+      ]);
+
+      newTokenPrice = mulScalarBN(await oracle.assetPrices(balancerTokens[7].address), ether(0.5));
+      await oracle.setPrice(balancerTokens[7].address, newTokenPrice);
+
+      await time.increase(pokePeriod);
+      res = await weightStrategy.poke([pool.address]);
+      assert.equal(res.logs.length, 9);
+
+      await this.checkWeights(pool, balancerTokens, [
+        ether(18.8158665777554496),
+        ether(1.6631546154123272),
+        ether(6.80034733723529435),
+        ether(0.46457450613203495),
+        ether(5.420409960981649),
+        ether(0.1354033319636775),
+        ether(2.6191323384596834),
+        ether(14.081111332059884),
+      ]);
     });
   });
 });

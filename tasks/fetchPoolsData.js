@@ -48,6 +48,7 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
       tokenAddress: tokensAddresses[i],
       tokenSymbol: await callContract(token, 'symbol').catch(() => 'MKR'),
       tokenDecimals: await callContract(token, 'decimals').catch(() => '18'),
+      totalSupply: await callContract(token, 'totalSupply'),
       balancerBalance,
       oraclePrice: await callContract(oracle, 'assetPrices', [tokensAddresses[i]]).catch(e => '0'),
       uniswapPair: {

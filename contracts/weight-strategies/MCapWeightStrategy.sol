@@ -33,8 +33,8 @@ contract MCapWeightStrategy is Ownable, BNum {
   }
 
   event SetExcludeTokenBalances(address indexed token, address[] excludeTokenBalances);
-  event InitTokenMCap(address indexed pool, address indexed token, uint256 mCap);
-  event UpdateTokenMCap(address indexed pool, address indexed token, uint256 mCap);
+  event FetchTokenMCap(address indexed pool, address indexed token, uint256 mCap);
+  event UpdatePoolWeights(address indexed pool, uint256 indexed timestamp, address[] tokens, uint256[3][] weightsChange);
 
   constructor(address _oracle, uint256 _dwPeriod) public Ownable() {
     oracle = IPowerOracle(_oracle);
@@ -56,26 +56,15 @@ contract MCapWeightStrategy is Ownable, BNum {
     }
   }
 
-  function initializePool(address _poolAddress) public onlyOwner {
-    address[] memory tokens = PowerIndexPoolInterface(_poolAddress).getCurrentTokens();
-    uint256 len = tokens.length;
-    Pool storage pd = poolsData[_poolAddress];
-    for (uint256 i = 0; i < len; i++) {
-      pd.lastTokenMCap[tokens[i]] = getTokenMarketCap(tokens[i]);
-      emit InitTokenMCap(_poolAddress, tokens[i], pd.lastTokenMCap[tokens[i]]);
-    }
-  }
-
   function addPool(address _poolAddress, address _controller) external onlyOwner {
     pools.add(_poolAddress);
     poolsData[_poolAddress].controller = PowerIndexPoolController(_controller);
-    initializePool(_poolAddress);
   }
 
-  function poke() external {
-    uint256 len = pools.length();
+  function poke(address[] calldata _pools) external {
+    uint256 len = _pools.length;
     for (uint256 i = 0; i < len; i++) {
-      PowerIndexPoolInterface pool = PowerIndexPoolInterface(pools.at(i));
+      PowerIndexPoolInterface pool = PowerIndexPoolInterface(_pools[i]);
 
       Pool storage pd = poolsData[address(pool)];
       if (pd.lastWeightsUpdate + dwPeriod > block.timestamp) {
@@ -92,8 +81,7 @@ contract MCapWeightStrategy is Ownable, BNum {
         newMCaps[i] = getTokenMarketCap(tokens[i]);
         newMarketCapSum = badd(newMarketCapSum, newMCaps[i]);
 
-        pd.lastTokenMCap[tokens[i]] = newMCaps[i];
-        emit UpdateTokenMCap(address(pool), tokens[i], newMCaps[i]);
+        emit FetchTokenMCap(address(pool), tokens[i], newMCaps[i]);
       }
 
       uint256[3][] memory weightsChange = new uint256[3][](len);
@@ -106,22 +94,25 @@ contract MCapWeightStrategy is Ownable, BNum {
       }
       console.log("totalWeight", totalWeight);
 
-      weightsChange = sort(weightsChange);
-
       uint256 fromTimestamp = block.timestamp + 1;
+      uint256 toTimestamp = fromTimestamp + dwPeriod;
       uint256 lenToPush;
       for (uint256 i = 0; i < len; i++) {
-        uint256 wps = _getWeightPerSecond(weightsChange[i][1], weightsChange[i][2], fromTimestamp, fromTimestamp + dwPeriod);
+        uint256 wps = _getWeightPerSecond(weightsChange[i][1], weightsChange[i][2], fromTimestamp, toTimestamp);
         if (wps >= minWeightPerSecond && wps <= maxWeightPerSecond) {
           lenToPush++;
         }
+      }
+
+      if (lenToPush > 1) {
+        sort(weightsChange);
       }
 
       PowerIndexPoolController.DynamicWeightInput[] memory dws = new PowerIndexPoolController.DynamicWeightInput[](lenToPush);
 
       uint256 iToPush;
       for (uint256 i = 0; i < len; i++) {
-        uint256 wps = _getWeightPerSecond(weightsChange[i][1], weightsChange[i][2], fromTimestamp, fromTimestamp + dwPeriod);
+        uint256 wps = _getWeightPerSecond(weightsChange[i][1], weightsChange[i][2], fromTimestamp, toTimestamp);
         if (wps >= minWeightPerSecond && wps <= maxWeightPerSecond) {
           dws[iToPush].token = tokens[weightsChange[i][0]];
           dws[iToPush].fromTimestamp = fromTimestamp;
@@ -136,13 +127,9 @@ contract MCapWeightStrategy is Ownable, BNum {
       }
 
       pd.lastWeightsUpdate = block.timestamp;
+
+      emit UpdatePoolWeights(address(pool), pd.lastWeightsUpdate, tokens, weightsChange);
     }
-  }
-
-  function _updateTokenMCap(address _pool, address _token, uint256 _mCap) internal {
-    poolsData[_pool].lastTokenMCap[_token] = _mCap;
-
-    emit UpdateTokenMCap(_pool, _token, _mCap);
   }
 
   function getTokenMarketCap(address _token) public returns (uint256) {
