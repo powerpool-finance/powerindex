@@ -85,31 +85,26 @@ contract MCapWeightStrategy is Ownable, BNum {
 
       address[] memory tokens = pool.getCurrentTokens();
       uint256 len = tokens.length;
-      uint256[] memory oldMCaps = new uint256[](len);
       uint256[] memory newMCaps = new uint256[](len);
 
-      uint256 oldMarketCapSum;
       uint256 newMarketCapSum;
       for (uint256 i = 0; i < len; i++) {
         newMCaps[i] = getTokenMarketCap(tokens[i]);
         newMarketCapSum = badd(newMarketCapSum, newMCaps[i]);
-        oldMCaps[i] = pd.lastTokenMCap[tokens[i]];
-        if (oldMCaps[i] == 0) {
-          oldMCaps[i] = newMCaps[i];
-        }
-        oldMarketCapSum = badd(oldMarketCapSum, oldMCaps[i]);
 
         pd.lastTokenMCap[tokens[i]] = newMCaps[i];
         emit UpdateTokenMCap(address(pool), tokens[i], newMCaps[i]);
       }
 
       uint256[2][] memory wightsChange = new uint256[2][](len);
+      uint256 totalWeight;
       for (uint256 i = 0; i < len; i++) {
         (, , , uint256 oldWeight) = pool.getDynamicWeightSettings(tokens[i]);
-        uint256 numerator = bmul(bdiv(bmul(newMCaps[i], oldWeight), 1 ether), oldMarketCapSum);
-        uint256 newWeight = bdiv(bmul(bdiv(numerator, oldMCaps[i]), 1 ether), newMarketCapSum);
+        uint256 newWeight = bdiv(newMCaps[i], newMarketCapSum) * 50;
         wightsChange[i] = [oldWeight, newWeight];
+        totalWeight = badd(totalWeight, newWeight);
       }
+      console.log("totalWeight", totalWeight);
 
       uint256 fromTimestamp = block.timestamp + 1;
       uint256 lenToPush;
@@ -122,7 +117,6 @@ contract MCapWeightStrategy is Ownable, BNum {
       PowerIndexPoolController.DynamicWeightInput[] memory dws = new PowerIndexPoolController.DynamicWeightInput[](lenToPush);
 
       uint256 iToPush;
-      uint256 totalWeight;
       for (uint256 i = 0; i < len; i++) {
         uint256 wps = _getWeightPerSecond(wightsChange[i][0], wightsChange[i][1], fromTimestamp, fromTimestamp + dwPeriod);
         if (wps >= minWeightPerSecond && wps <= maxWeightPerSecond) {
@@ -130,14 +124,16 @@ contract MCapWeightStrategy is Ownable, BNum {
           dws[iToPush].fromTimestamp = fromTimestamp;
           dws[iToPush].targetTimestamp = fromTimestamp + dwPeriod;
           dws[iToPush].targetDenorm = wightsChange[i][1];
-          console.log("dws[iToPush].targetDenorm", dws[iToPush].targetDenorm);
-          totalWeight = badd(totalWeight, dws[iToPush].targetDenorm);
           iToPush++;
         }
       }
-      console.log("totalWeight", totalWeight);
+      if(dws.length > 1) {
+        dws = sort(dws);
+      }
 
-      pd.controller.setDynamicWeightListByStrategy(dws);
+      if(dws.length > 0) {
+        pd.controller.setDynamicWeightListByStrategy(dws);
+      }
 
       pd.lastWeightsUpdate = block.timestamp;
     }
@@ -166,5 +162,31 @@ contract MCapWeightStrategy is Ownable, BNum {
   ) internal pure returns (uint256) {
     uint256 delta = targetDenorm > fromDenorm ? bsub(targetDenorm, fromDenorm) : bsub(fromDenorm, targetDenorm);
     return div(delta, bsub(targetTimestamp, fromTimestamp));
+  }
+
+  function quickSort(PowerIndexPoolController.DynamicWeightInput[] memory dws, int left, int right) pure internal {
+    int i = left;
+    int j = right;
+    if (i == j) return;
+    PowerIndexPoolController.DynamicWeightInput memory pivot = dws[uint(left + (right - left) / 2)];
+    while (i <= j) {
+      while (dws[uint(i)].targetDenorm < pivot.targetDenorm) i++;
+      while (pivot.targetDenorm < dws[uint(j)].targetDenorm) j--;
+      if (i <= j) {
+        (dws[uint(i)], dws[uint(j)]) = (dws[uint(j)], dws[uint(i)]);
+        i++;
+        j--;
+      }
+    }
+    if (left < j)
+      quickSort(dws, left, j);
+    if (i < right)
+      quickSort(dws, i, right);
+  }
+  function sort(
+    PowerIndexPoolController.DynamicWeightInput[] memory dws
+  ) internal pure returns (PowerIndexPoolController.DynamicWeightInput[] memory) {
+    quickSort(dws, int(0), int(dws.length - 1));
+    return dws;
   }
 }
