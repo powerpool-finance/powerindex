@@ -15,6 +15,8 @@ const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const ProxyFactory = artifacts.require('ProxyFactory');
 const MCapWeightStrategy = artifacts.require('MCapWeightStrategy');
 const MockOracle = artifacts.require('MockOracle');
+const ethers = require('ethers');
+const pIteration = require('p-iteration');
 
 WETH.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
@@ -148,6 +150,7 @@ describe('MCapWeightStrategy', () => {
 
     beforeEach(async () => {
       oracle = await MockOracle.new();
+      weightStrategy = await MCapWeightStrategy.new(oracle.address, pokePeriod);
       tokens = [];
       balancerTokens = [];
       bPoolBalances = [];
@@ -157,6 +160,13 @@ describe('MCapWeightStrategy', () => {
 
         console.log('token.address', token.address, 'poolsData.oraclePrice', poolsData[i].oraclePrice);
         await oracle.setPrice(token.address, poolsData[i].oraclePrice);
+        const excludeAddresses = await pIteration.map(poolsData[i].excludeBalances, (bal) => {
+          const {address} = ethers.Wallet.createRandom();
+          token.transfer(address, bal);
+          return address;
+        });
+        await weightStrategy.setExcludeTokenBalances(token.address, excludeAddresses);
+
         tokens.push(token);
         bPoolBalances.push(poolsData[i].balancerBalance);
 
@@ -170,7 +180,6 @@ describe('MCapWeightStrategy', () => {
       pool = await this.makePowerIndexPool(balancerTokens, bPoolBalances.filter(b => b !== '0'));
       poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
-      weightStrategy = await MCapWeightStrategy.new(oracle.address, pokePeriod);
       await weightStrategy.addPool(pool.address, poolController.address);
       await poolController.setWeightsStrategy(weightStrategy.address);
 
@@ -190,14 +199,14 @@ describe('MCapWeightStrategy', () => {
       ]);
 
       const newWeights = [
-        ether(7.94592953057478305),
-        ether(1.54516830247446585),
-        ether(6.317922010340309),
-        ether(0.43161699721765335),
-        ether(5.03587915429574795),
-        ether(0.12579764662940395),
-        ether(2.43332774467898765),
-        ether(26.16435861378864915),
+        ether(9.2213040233747008),
+        ether(1.7634472718171779),
+        ether(4.7045983418699305),
+        ether(0.0805348660510209),
+        ether(3.7464541219620122),
+        ether(0.13546105725390025),
+        ether(2.76111233776649315),
+        ether(27.5870879799047642),
       ];
 
       let res = await weightStrategy.poke([pool.address]);
@@ -222,14 +231,14 @@ describe('MCapWeightStrategy', () => {
       assert.equal(res.logs.length, 9);
 
       await this.checkWeights(pool, balancerTokens, [
-        ether(8.60379223011978405),
-        ether(1.52099683513799825),
-        ether(6.2190891225165477),
-        ether(0.4248651009139281),
-        ether(4.9571015944056535),
-        ether(0.1238297615118814),
-        ether(2.3952625695098895),
-        ether(25.7550627858843175),
+        ether(9.95975064826289985),
+        ether(1.7315136443468895),
+        ether(4.6194044757149202),
+        ether(0.0790764893521855),
+        ether(3.67861094219856055),
+        ether(0.13300804206699305),
+        ether(2.71111235522831755),
+        ether(27.08752340282923305),
       ]);
 
       newTokenPrice = mulScalarBN(await oracle.assetPrices(balancerTokens[0].address), ether(2));
@@ -240,14 +249,14 @@ describe('MCapWeightStrategy', () => {
       assert.equal(res.logs.length, 9);
 
       await this.checkWeights(pool, balancerTokens, [
-        ether(14.6812892181707849),
-        ether(1.29769489077216445),
-        ether(5.3060466617040937),
-        ether(0.36248942666168115),
-        ether(4.22933517249240425),
-        ether(0.10564995608615095),
-        ether(2.0436071441455536),
-        ether(21.973887529967167),
+        ether(16.61072726384235695),
+        ether(1.4438966353482103),
+        ether(3.85208779704018785),
+        ether(0.0659413093760726),
+        ether(3.067566911492096),
+        ether(0.1109144389602681),
+        ether(2.26077687608500875),
+        ether(22.58808876785579865),
       ]);
 
       newTokenPrice = mulScalarBN(await oracle.assetPrices(balancerTokens[7].address), ether(0.5));
@@ -258,14 +267,14 @@ describe('MCapWeightStrategy', () => {
       assert.equal(res.logs.length, 9);
 
       await this.checkWeights(pool, balancerTokens, [
-        ether(18.8158665777554496),
-        ether(1.6631546154123272),
-        ether(6.80034733723529435),
-        ether(0.46457450613203495),
-        ether(5.420409960981649),
-        ether(0.1354033319636775),
-        ether(2.6191323384596834),
-        ether(14.081111332059884),
+        ether(21.4575857893881677),
+        ether(1.8652124878020744),
+        ether(4.9760918387462095),
+        ether(0.085182381272472),
+        ether(3.9626549230815687),
+        ether(0.1432782593723283),
+        ether(2.92045092299213655),
+        ether(14.58954339734504205),
       ]);
     });
   });

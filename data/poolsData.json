@@ -4,12 +4,13 @@
   "tokenSymbol": "AAVE",
   "tokenDecimals": "18",
   "totalSupply": "16000000000000000000000000",
-  "balancerBalance": "5484944130787002294412",
-  "oraclePrice": "289133183000000000000",
+  "balancerBalance": "5352991617586468711456",
+  "excludeBalances": [],
+  "oraclePrice": "305766541000000000000",
   "uniswapPair": {
    "address": "0xDFC14d2Af169B0D36C4EFF567Ada9b2E0CAE044f",
-   "tokenReserve": "78141275834786485761816",
-   "ethReserve": "16307575652782713259311",
+   "tokenReserve": "75153750178083276072465",
+   "ethReserve": "16968743285584309838966",
    "isReverse": false
   }
  },
@@ -18,12 +19,13 @@
   "tokenSymbol": "YFI",
   "tokenDecimals": "18",
   "totalSupply": "30000000000000000000000",
-  "balancerBalance": "53210830085133267628",
-  "oraclePrice": "29986635906000000000000",
+  "balancerBalance": "53176845620855729131",
+  "excludeBalances": [],
+  "oraclePrice": "31185939063000000000000",
   "uniswapPair": {
    "address": "0x2fDbAdf3C4D5A8666Bc06645B8358ab803996E28",
-   "tokenReserve": "196730381765958366423",
-   "ethReserve": "4246339122777726779040",
+   "tokenReserve": "193268676505300375841",
+   "ethReserve": "4341355567237668357294",
    "isReverse": false
   }
  },
@@ -32,12 +34,15 @@
   "tokenSymbol": "SNX",
   "tokenDecimals": "18",
   "totalSupply": "216623587725873859037499917",
-  "balancerBalance": "93191909044589988799954",
-  "oraclePrice": "16980158000000000000",
+  "balancerBalance": "94495388137196400575317",
+  "excludeBalances": [
+   "72710636974338305380110909"
+  ],
+  "oraclePrice": "17343641000000000000",
   "uniswapPair": {
    "address": "0x43AE24960e5534731Fc831386c07755A2dc33D47",
-   "tokenReserve": "482321546921431574822261",
-   "ethReserve": "5928158059334387284964",
+   "tokenReserve": "471957196202963759022717",
+   "ethReserve": "6052235076630382655632",
    "isReverse": false
   }
  },
@@ -46,12 +51,15 @@
   "tokenSymbol": "CVP",
   "tokenDecimals": "18",
   "totalSupply": "100000000000000000000000000",
-  "balancerBalance": "632731265567790703104452",
-  "oraclePrice": "2512880000000000000",
+  "balancerBalance": "683015919889735656913526",
+  "excludeBalances": [
+   "82374860684900000000000000"
+  ],
+  "oraclePrice": "2424203000000000000",
   "uniswapPair": {
    "address": "0x12D4444f96C644385D8ab355F6DDf801315b6254",
-   "tokenReserve": "1217874177200177318849093",
-   "ethReserve": "2193550921371232732413",
+   "tokenReserve": "1223666152423717902663670",
+   "ethReserve": "2149498199304660046967",
    "isReverse": false
   }
  },
@@ -60,12 +68,15 @@
   "tokenSymbol": "COMP",
   "tokenDecimals": "18",
   "totalSupply": "10000000000000000000000000",
-  "balancerBalance": "5456986924832105605620",
-  "oraclePrice": "293189566000000000000",
+  "balancerBalance": "5125669206742412952093",
+  "excludeBalances": [
+   "3788923020000000000000000"
+  ],
+  "oraclePrice": "320015570000000000000",
   "uniswapPair": {
    "address": "0xCFfDdeD873554F362Ac02f8Fb1f02E5ada10516f",
-   "tokenReserve": "9083416224595553127100",
-   "ethReserve": "1886679401850413076206",
+   "tokenReserve": "8519692938648452842126",
+   "ethReserve": "2017652203497557634966",
    "isReverse": false
   }
  },
@@ -73,13 +84,14 @@
   "tokenAddress": "0x0d438F3b5175Bebc262bF23753C1E53d03432bDE",
   "tokenSymbol": "wNXM",
   "tokenDecimals": "18",
-  "totalSupply": "1684056388782713446207887",
-  "balancerBalance": "36327094666478842463992",
-  "oraclePrice": "43489969000000000000",
+  "totalSupply": "1675903388782713446207887",
+  "balancerBalance": "38159847255762597501441",
+  "excludeBalances": [],
+  "oraclePrice": "42882795000000000000",
   "uniswapPair": {
    "address": "0x23bFf8ca20AAc06EFDf23cEe3B8ae296A30Dfd27",
-   "tokenReserve": "12100457862340616721067",
-   "ethReserve": "376094383664346763656",
+   "tokenReserve": "12072984682988568183941",
+   "ethReserve": "377240894161046056732",
    "isReverse": false
   }
  },
@@ -88,12 +100,13 @@
   "tokenSymbol": "MKR",
   "tokenDecimals": "18",
   "totalSupply": "995691565977579309980207",
-  "balancerBalance": "1116749448127705471191",
-  "oraclePrice": "1422816819000000000000",
+  "balancerBalance": "1120321441459040098056",
+  "excludeBalances": [],
+  "oraclePrice": "1471217392000000000000",
   "uniswapPair": {
    "address": "0xC2aDdA861F89bBB333c90c492cB837741916A225",
-   "tokenReserve": "7865795312415924976148",
-   "ethReserve": "8031815587977273649197",
+   "tokenReserve": "7710906827672755422208",
+   "ethReserve": "8242615965060479206429",
    "isReverse": false
   }
  },
@@ -102,12 +115,15 @@
   "tokenSymbol": "UNI",
   "tokenDecimals": "18",
   "totalSupply": "1000000000000000000000000000",
-  "balancerBalance": "105078379055727566512671",
-  "oraclePrice": "15232925000000000000",
+  "balancerBalance": "97050421601579324655495",
+  "excludeBalances": [
+   "129000000000000000000000000"
+  ],
+  "oraclePrice": "16803715000000000000",
   "uniswapPair": {
    "address": "0xd3d2E2692501A5c9Ca623199D38826e513033a17",
-   "tokenReserve": "6397864634340083980237946",
-   "ethReserve": "69894275406700528068842",
+   "tokenReserve": "5942159763592664666657640",
+   "ethReserve": "75349617974405439222647",
    "isReverse": false
   }
  },
@@ -115,13 +131,14 @@
   "tokenAddress": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
   "tokenSymbol": "USDC",
   "tokenDecimals": "6",
-  "totalSupply": "5845653440589550",
+  "totalSupply": "5850308310599550",
   "balancerBalance": "0",
+  "excludeBalances": [],
   "oraclePrice": "1000000000000000000000000000000",
   "uniswapPair": {
    "address": "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc",
-   "tokenReserve": "156087822323685",
-   "ethReserve": "112561949903364729649780",
+   "tokenReserve": "153244401274371",
+   "ethReserve": "111927902476836211042219",
    "isReverse": false
   }
  },
@@ -129,13 +146,14 @@
   "tokenAddress": "0x6b175474e89094c44da98b954eedeac495271d0f",
   "tokenSymbol": "DAI",
   "tokenDecimals": "18",
-  "totalSupply": "1614098235844996758236162834",
+  "totalSupply": "1619126384428473984014916584",
   "balancerBalance": "0",
-  "oraclePrice": "1000676000000000000",
+  "excludeBalances": [],
+  "oraclePrice": "1000156000000000000",
   "uniswapPair": {
    "address": "0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11",
-   "tokenReserve": "87978644781584416400482806",
-   "ethReserve": "63556976911456037083610",
+   "tokenReserve": "87657026307544180159854582",
+   "ethReserve": "64122767050061657885573",
    "isReverse": false
   }
  },
@@ -145,11 +163,12 @@
   "tokenDecimals": "6",
   "totalSupply": "15517977739617189",
   "balancerBalance": "0",
+  "excludeBalances": [],
   "oraclePrice": "1000000000000000000000000000000",
   "uniswapPair": {
    "address": "0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852",
-   "tokenReserve": "99767263768033",
-   "ethReserve": "72008786135486809657525",
+   "tokenReserve": "93155227002749",
+   "ethReserve": "68509291699614717051394",
    "isReverse": true
   }
  },
@@ -157,13 +176,14 @@
   "tokenAddress": "0x4Fabb145d64652a948d72533023f6E7A623C7C53",
   "tokenSymbol": "BUSD",
   "tokenDecimals": "18",
-  "totalSupply": "1485072224200000000000000000",
+  "totalSupply": "1488202515080000000000000000",
   "balancerBalance": "0",
+  "excludeBalances": [],
   "oraclePrice": "0",
   "uniswapPair": {
    "address": "0xC2923b8a9683556A3640ccc2961B2F52B5C4459A",
-   "tokenReserve": "26766002327332512847096",
-   "ethReserve": "19243932164574565332",
+   "tokenReserve": "27109912128864976337423",
+   "ethReserve": "19028145386572580011",
    "isReverse": false
   }
  }

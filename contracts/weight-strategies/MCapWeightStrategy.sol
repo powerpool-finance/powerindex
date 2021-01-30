@@ -142,7 +142,7 @@ contract MCapWeightStrategy is Ownable, BNum {
     weightsChange = new uint256[3][](len);
     for (uint256 i = 0; i < len; i++) {
       (, , , uint256 oldWeight) = _pool.getDynamicWeightSettings(_tokens[i]);
-      uint256 newWeight = bdiv(newMCaps[i], newMarketCapSum) * 50;
+      uint256 newWeight = bsub(bdiv(newMCaps[i], newMarketCapSum) * 50, 100);
       weightsChange[i] = [i, oldWeight, newWeight];
     }
 
