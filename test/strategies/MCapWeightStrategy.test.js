@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-const { expectRevert, time, constants } = require('@openzeppelin/test-helpers');
+const { time } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
 const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
 const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
@@ -35,16 +35,6 @@ async function getTimestamp(shift = 0) {
   return currentTimestamp + shift;
 }
 
-function subBN(bn1, bn2) {
-  return toBN(bn1.toString(10))
-    .sub(toBN(bn2.toString(10)))
-    .toString(10);
-}
-function addBN(bn1, bn2) {
-  return toBN(bn1.toString(10))
-    .add(toBN(bn2.toString(10)))
-    .toString(10);
-}
 function divScalarBN(bn1, bn2) {
   return toBN(bn1.toString(10))
     .mul(toBN(ether('1').toString(10)))
@@ -58,10 +48,6 @@ function mulScalarBN(bn1, bn2) {
     .toString(10);
 }
 
-function isBNHigher(bn1, bn2) {
-  return toBN(bn1.toString(10)).gt(toBN(bn2.toString(10)));
-}
-
 function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei = '100000000') {
   bn1 = toBN(bn1.toString(10));
   bn2 = toBN(bn2.toString(10));
@@ -72,7 +58,7 @@ function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei = '100000000') {
   assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));
 }
 
-describe.only('MCapWeightStrategy', () => {
+describe('MCapWeightStrategy', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const swapFee = ether('0.0001');
   const communitySwapFee = ether('0.001');
@@ -81,9 +67,9 @@ describe.only('MCapWeightStrategy', () => {
 
   const poolsData = JSON.parse(fs.readFileSync('data/poolsData.json', { encoding: 'utf8' }));
 
-  let minter, bob, feeManager, feeReceiver, permanentVotingPower;
+  let minter, feeManager, permanentVotingPower;
   before(async function () {
-    [minter, bob, feeManager, feeReceiver, permanentVotingPower] = await web3.eth.getAccounts();
+    [minter, feeManager, permanentVotingPower] = await web3.eth.getAccounts();
   });
 
   beforeEach(async () => {
@@ -155,7 +141,7 @@ describe.only('MCapWeightStrategy', () => {
   });
 
   describe('Swaps with Uniswap mainnet values', () => {
-    let cvp, tokens, balancerTokens, pairs, bPoolBalances, pool, poolController, weightStrategy, oracle;
+    let tokens, balancerTokens, bPoolBalances, pool, poolController, weightStrategy, oracle;
 
     const tokenBySymbol = {};
     const pokePeriod = 60 * 60 * 24;
@@ -164,7 +150,6 @@ describe.only('MCapWeightStrategy', () => {
       oracle = await MockOracle.new();
       tokens = [];
       balancerTokens = [];
-      pairs = [];
       bPoolBalances = [];
 
       for (let i = 0; i < poolsData.length; i++) {
@@ -174,9 +159,6 @@ describe.only('MCapWeightStrategy', () => {
         await oracle.setPrice(token.address, poolsData[i].oraclePrice);
         tokens.push(token);
         bPoolBalances.push(poolsData[i].balancerBalance);
-        if (poolsData[i].tokenSymbol === 'CVP') {
-          cvp = token;
-        }
 
         tokenBySymbol[poolsData[i].tokenSymbol] = {
           token,

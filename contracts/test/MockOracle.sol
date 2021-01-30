@@ -3,12 +3,9 @@
 pragma solidity 0.6.12;
 
 contract MockOracle {
-
   mapping(address => uint256) public prices;
 
-  constructor() public {
-
-  }
+  constructor() public {}
 
   function setPrice(address token, uint256 price) public {
     prices[token] = price;
