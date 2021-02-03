@@ -48,7 +48,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   // 1 ether == 100%
   uint256 public pvpFee;
 
-  address[] public rewardPools;
+  address[] internal rewardPools;
 
   modifier onlyPiToken() {
     require(msg.sender == address(piToken), "ONLY_PI_TOKEN_ALLOWED");
