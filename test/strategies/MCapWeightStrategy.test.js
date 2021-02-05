@@ -15,6 +15,10 @@ const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const ProxyFactory = artifacts.require('ProxyFactory');
 const MCapWeightStrategy = artifacts.require('MCapWeightStrategy');
 const MockOracle = artifacts.require('MockOracle');
+const PowerPoke = artifacts.require('PowerPoke');
+const MockFastGasOracle = artifacts.require('MockFastGasOracle');
+const MockStaking = artifacts.require('MockStaking');
+const MockCvp = artifacts.require('MockCvp');
 const ethers = require('ethers');
 const pIteration = require('p-iteration');
 
@@ -24,11 +28,14 @@ UniswapV2Pair.numberFormat = 'String';
 UniswapV2Router02.numberFormat = 'String';
 MCapWeightStrategy.numberFormat = 'String';
 PowerIndexPool.numberFormat = 'String';
+PowerPoke.numberFormat = 'String';
 
 const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
 
+const { deployProxied, gwei } = require('../helpers');
 function ether(val) {
+
   return web3.utils.toWei(val.toString(), 'ether').toString();
 }
 
@@ -69,9 +76,9 @@ describe('MCapWeightStrategy', () => {
 
   const poolsData = JSON.parse(fs.readFileSync('data/poolsData.json', { encoding: 'utf8' }));
 
-  let minter, feeManager, permanentVotingPower;
+  let minter, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, reservoir;
   before(async function () {
-    [minter, feeManager, permanentVotingPower] = await web3.eth.getAccounts();
+    [minter, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, reservoir] = await web3.eth.getAccounts();
   });
 
   beforeEach(async () => {
@@ -136,24 +143,65 @@ describe('MCapWeightStrategy', () => {
     this.checkWeights = async (pool, balancerTokens, weights) => {
       for (let i = 0; i < weights.length; i++) {
         const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
-        console.log(web3.utils.fromWei(dw.targetDenorm, 'ether'));
         assertEqualWithAccuracy(dw.targetDenorm, weights[i]);
       }
     };
   });
 
   describe('Swaps with Uniswap mainnet values', () => {
-    let tokens, balancerTokens, bPoolBalances, pool, poolController, weightStrategy, oracle;
+    let tokens, balancerTokens, bPoolBalances, pool, poolController, weightStrategy, oracle, poke, fastGasOracle, staking;
 
     const tokenBySymbol = {};
     const pokePeriod = 60 * 60 * 24;
+    let compensationOpts;
 
     beforeEach(async () => {
+      compensationOpts = web3.eth.abi.encodeParameter(
+        {
+          PokeRewardOptions: {
+            to: 'address',
+            compensateInETH: 'bool'
+          },
+        },
+        {
+          to: reporter,
+          compensateInETH: false
+        },
+      );
+
       oracle = await MockOracle.new();
-      weightStrategy = await MCapWeightStrategy.new(oracle.address, pokePeriod);
+
+      const cvpToken = await MockCvp.new();
+      fastGasOracle = await MockFastGasOracle.new(gwei(300 * 1000));
+      staking = await deployProxied(
+        MockStaking,
+        [cvpToken.address],
+        [minter, reservoir, zeroAddress, '0', '0', '60', '60'],
+        { proxyAdminOwner: minter }
+      );
+
+      poke = await deployProxied(
+        PowerPoke,
+        [cvpToken.address, this.weth.address, fastGasOracle.address, uniswapRouter, staking.address],
+        [minter, oracle.address],
+        { proxyAdminOwner: minter }
+      );
+
+      await staking.setSlasher(poke.address);
+
+      weightStrategy = await deployProxied(
+        MCapWeightStrategy,
+        [],
+        [oracle.address, poke.address],
+        { proxyAdminOwner: minter }
+      );
+
       tokens = [];
       balancerTokens = [];
       bPoolBalances = [];
+
+      await oracle.setPrice(this.weth.address, ether(1000));
+      await oracle.setPrice(cvpToken.address, ether(1.5));
 
       for (let i = 0; i < poolsData.length; i++) {
         const token = await MockERC20.new(poolsData[i].tokenSymbol, poolsData[i].tokenSymbol, poolsData[i].tokenDecimals, poolsData[i].totalSupply);
@@ -183,7 +231,22 @@ describe('MCapWeightStrategy', () => {
       await weightStrategy.addPool(pool.address, poolController.address);
       await poolController.setWeightsStrategy(weightStrategy.address);
 
-      await time.increase(12 * 60 * 60);
+      await poke.addClient(weightStrategy.address, weightStrategyOwner, true, gwei(300), pokePeriod / 2, pokePeriod * 2, { from: minter });
+      await cvpToken.approve(poke.address, ether(30000), { from: minter })
+      await poke.addCredit(weightStrategy.address, ether(30000), { from: minter });
+      await poke.setBonusPlan(weightStrategy.address, 1,  true, 25, 17520000, 100 * 1000, { from: weightStrategyOwner });
+
+      const reporterDeposit = ether(10000);
+      await poke.setMinimalDeposit(weightStrategy.address, reporterDeposit, { from: weightStrategyOwner });
+
+      await cvpToken.transfer(reporter, reporterDeposit);
+      await cvpToken.approve(staking.address, reporterDeposit, {from: reporter});
+      await staking.createUser(reporter, reporter, reporterDeposit, {from: reporter})
+
+      await time.increase(60);
+      await staking.executeDeposit('1', {from: reporter});
+
+      await time.increase(pokePeriod);
     });
 
     it('swapEthToPipt should work properly', async () => {
@@ -199,23 +262,23 @@ describe('MCapWeightStrategy', () => {
       ]);
 
       const newWeights = [
-        ether(9.2213040233747008),
-        ether(1.7634472718171779),
-        ether(4.7045983418699305),
-        ether(0.0805348660510209),
-        ether(3.7464541219620122),
-        ether(0.13546105725390025),
-        ether(2.76111233776649315),
-        ether(27.5870879799047642),
+        ether(8.5504593862460114),
+        ether(1.6384501691271029),
+        ether(4.7137743219161787),
+        ether(0.0719481313563952),
+        ether(3.4265860335924222),
+        ether(0.11677658796057875),
+        ether(2.60023151549259805),
+        ether(28.881773854308712),
       ];
 
-      let res = await weightStrategy.poke([pool.address]);
+      let res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 9);
 
       await this.checkWeights(pool, balancerTokens, newWeights);
 
       await time.increase(pokePeriod);
-      res = await weightStrategy.poke([pool.address]);
+      res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 9);
 
       await this.checkWeights(pool, balancerTokens, newWeights);
@@ -223,58 +286,61 @@ describe('MCapWeightStrategy', () => {
       let newTokenPrice = mulScalarBN(await oracle.assetPrices(balancerTokens[0].address), ether(1.1));
       await oracle.setPrice(balancerTokens[0].address, newTokenPrice);
 
-      res = await weightStrategy.poke([pool.address]);
+      res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 0);
+
       await time.increase(pokePeriod);
 
-      res = await weightStrategy.poke([pool.address]);
+      res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 9);
 
       await this.checkWeights(pool, balancerTokens, [
-        ether(9.95975064826289985),
-        ether(1.7315136443468895),
-        ether(4.6194044757149202),
-        ether(0.0790764893521855),
-        ether(3.67861094219856055),
-        ether(0.13300804206699305),
-        ether(2.71111235522831755),
-        ether(27.08752340282923305),
+        ether(9.24736685541669665),
+        ether(1.6109022604212159),
+        ether(4.63451977568272055),
+        ether(0.0707384390560056),
+        ether(3.36897349156646525),
+        ether(0.11481317714422365),
+        ether(2.5565127977966414),
+        ether(28.3961732029160303),
       ]);
 
       newTokenPrice = mulScalarBN(await oracle.assetPrices(balancerTokens[0].address), ether(2));
       await oracle.setPrice(balancerTokens[0].address, newTokenPrice);
 
       await time.increase(pokePeriod);
-      res = await weightStrategy.poke([pool.address]);
+
+      res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 9);
 
       await this.checkWeights(pool, balancerTokens, [
-        ether(16.61072726384235695),
-        ether(1.4438966353482103),
-        ether(3.85208779704018785),
-        ether(0.0659413093760726),
-        ether(3.067566911492096),
-        ether(0.1109144389602681),
-        ether(2.26077687608500875),
-        ether(22.58808876785579865),
+        ether(15.60806386211787435),
+        ether(1.3594716068583721),
+        ether(3.91116096939167945),
+        ether(0.0596975383130789),
+        ether(2.843141957504949),
+        ether(0.09689306313342665),
+        ether(2.15749064767332515),
+        ether(23.9640803550072936),
       ]);
 
       newTokenPrice = mulScalarBN(await oracle.assetPrices(balancerTokens[7].address), ether(0.5));
       await oracle.setPrice(balancerTokens[7].address, newTokenPrice);
 
       await time.increase(pokePeriod);
-      res = await weightStrategy.poke([pool.address]);
+
+      res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 9);
 
       await this.checkWeights(pool, balancerTokens, [
-        ether(21.4575857893881677),
-        ether(1.8652124878020744),
-        ether(4.9760918387462095),
-        ether(0.085182381272472),
-        ether(3.9626549230815687),
-        ether(0.1432782593723283),
-        ether(2.92045092299213655),
-        ether(14.58954339734504205),
+        ether(20.5272244157643101),
+        ether(1.7879334046404201),
+        ether(5.1438333193741365),
+        ether(0.0785122854984897),
+        ether(3.73920900908335655),
+        ether(0.127430645392092),
+        ether(2.83746242268985995),
+        ether(15.75839449755733425),
       ]);
     });
   });

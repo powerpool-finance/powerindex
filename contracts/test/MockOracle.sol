@@ -14,4 +14,8 @@ contract MockOracle {
   function assetPrices(address token) public view returns (uint256) {
     return prices[token];
   }
+
+  function getPriceByAsset(address token) public view returns (uint256) {
+    return prices[token];
+  }
 }

@@ -3,32 +3,15 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
+import "@powerpool/poweroracle/contracts/interfaces/IPowerPoke.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
 import "../interfaces/IPowerOracle.sol";
 import "../PowerIndexPoolController.sol";
 import "../balancer-core/BNum.sol";
 
-contract MCapWeightStrategy is Ownable, BNum {
+contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
   using EnumerableSet for EnumerableSet.AddressSet;
-
-  struct Pool {
-    PowerIndexPoolController controller;
-    uint256 lastWeightsUpdate;
-    mapping(address => uint256) lastTokenMCap;
-  }
-
-  EnumerableSet.AddressSet private pools;
-  mapping(address => address[]) public excludeTokenBalances;
-  mapping(address => Pool) public poolsData;
-
-  IPowerOracle public oracle;
-  uint256 dwPeriod;
-
-  struct TokenConfigItem {
-    address token;
-    address[] excludeTokenBalances;
-  }
 
   event SetExcludeTokenBalances(address indexed token, address[] excludeTokenBalances);
   event FetchTokenMCap(address indexed pool, address indexed token, uint256 mCap);
@@ -40,9 +23,58 @@ contract MCapWeightStrategy is Ownable, BNum {
     uint256 mCapSum
   );
 
-  constructor(address _oracle, uint256 _dwPeriod) public Ownable() {
+  struct TokenConfigItem {
+    address token;
+    address[] excludeTokenBalances;
+  }
+
+  struct PokeVars {
+    PowerIndexPoolInterface pool;
+    uint256 minWPS;
+    uint256 maxWPS;
+    address[] tokens;
+    uint256 tokensLen;
+    uint256 fromTimestamp;
+    uint256 iToPush;
+  }
+
+  struct Pool {
+    PowerIndexPoolController controller;
+    uint256 lastWeightsUpdate;
+    mapping(address => uint256) lastTokenMCap;
+  }
+
+  uint256 internal constant COMPENSATION_GAS_EXTRA = 21_000;
+  uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
+  uint256 internal constant COMPENSATION_PLAN_2_ID = 2;
+
+  EnumerableSet.AddressSet private pools;
+  mapping(address => address[]) public excludeTokenBalances;
+  mapping(address => Pool) public poolsData;
+
+  IPowerOracle public oracle;
+  IPowerPoke public powerPoke;
+
+  modifier onlyReporter(uint256 _reporterId, bytes calldata _rewardOpts) {
+    uint256 gasStart = gasleft();
+    powerPoke.authorizeReporter(_reporterId, msg.sender);
+    _;
+    _reward(_reporterId, gasStart, COMPENSATION_PLAN_1_ID, _rewardOpts);
+  }
+
+  modifier onlyNonReporter(uint256 _reporterId, bytes calldata _rewardOpts) {
+    uint256 gasStart = gasleft();
+    powerPoke.authorizeNonReporter(_reporterId, msg.sender);
+    _;
+    _reward(_reporterId, gasStart, COMPENSATION_PLAN_2_ID, _rewardOpts);
+  }
+
+  constructor() public OwnableUpgradeSafe() {}
+
+  function initialize(address _oracle, address _powerPoke) external initializer {
+    __Ownable_init();
     oracle = IPowerOracle(_oracle);
-    dwPeriod = _dwPeriod;
+    powerPoke = IPowerPoke(_powerPoke);
   }
 
   function setExcludeTokenBalances(address _token, address[] calldata _excludeTokenBalances) external onlyOwner {
@@ -51,12 +83,12 @@ contract MCapWeightStrategy is Ownable, BNum {
     emit SetExcludeTokenBalances(_token, _excludeTokenBalances);
   }
 
-  function setExcludeTokenBalancesList(TokenConfigItem[] calldata tokenConfigItems) external onlyOwner {
-    uint256 len = tokenConfigItems.length;
+  function setExcludeTokenBalancesList(TokenConfigItem[] calldata _tokenConfigItems) external onlyOwner {
+    uint256 len = _tokenConfigItems.length;
     for (uint256 i = 0; i < len; i++) {
-      excludeTokenBalances[tokenConfigItems[i].token] = tokenConfigItems[i].excludeTokenBalances;
+      excludeTokenBalances[_tokenConfigItems[i].token] = _tokenConfigItems[i].excludeTokenBalances;
 
-      emit SetExcludeTokenBalances(tokenConfigItems[i].token, tokenConfigItems[i].excludeTokenBalances);
+      emit SetExcludeTokenBalances(_tokenConfigItems[i].token, _tokenConfigItems[i].excludeTokenBalances);
     }
   }
 
@@ -65,41 +97,82 @@ contract MCapWeightStrategy is Ownable, BNum {
     poolsData[_poolAddress].controller = PowerIndexPoolController(_controller);
   }
 
-  function poke(address[] memory _pools) external {
-    uint256 len = _pools.length;
-    for (uint256 i = 0; i < len; i++) {
-      PowerIndexPoolInterface pool = PowerIndexPoolInterface(_pools[i]);
+  function pokeFromReporter(
+    uint256 _reporterId,
+    address[] memory _pools,
+    bytes calldata _rewardOpts
+  ) external onlyReporter(_reporterId, _rewardOpts) {
+    _poke(_pools, false);
+  }
 
-      Pool storage pd = poolsData[address(pool)];
-      if (pd.lastWeightsUpdate + dwPeriod > block.timestamp) {
+  function pokeFromSlasher(
+    uint256 _reporterId,
+    address[] memory _pools,
+    bytes calldata _rewardOpts
+  ) external onlyReporter(_reporterId, _rewardOpts) {
+    _poke(_pools, true);
+  }
+
+  function getTokenMarketCap(address _token) public view returns (uint256) {
+    uint256 totalSupply = IERC20(_token).totalSupply();
+    uint256 len = excludeTokenBalances[_token].length;
+    for (uint256 i = 0; i < len; i++) {
+      totalSupply = bsub(totalSupply, IERC20(_token).balanceOf(excludeTokenBalances[_token][i]));
+    }
+    return bdiv(bmul(totalSupply, oracle.assetPrices(_token)), 1 ether);
+  }
+
+  function _poke(address[] memory _pools, bool _bySlasher) internal {
+    (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
+    uint256 updatedPools = 0;
+    for (uint256 i = 0; i < _pools.length; i++) {
+      PokeVars memory pv;
+      pv.pool = PowerIndexPoolInterface(_pools[i]);
+
+      Pool storage pd = poolsData[address(pv.pool)];
+      if (pd.lastWeightsUpdate + minInterval > block.timestamp) {
         return;
       }
-      (uint256 minWPS, uint256 maxWPS) = pool.getWeightPerSecondBounds();
+      if (_bySlasher) {
+        require(pd.lastWeightsUpdate + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
+      }
+      (pv.minWPS, pv.maxWPS) = pv.pool.getWeightPerSecondBounds();
 
-      address[] memory tokens = pool.getCurrentTokens();
-      uint256 len = tokens.length;
+      pv.tokens = pv.pool.getCurrentTokens();
+      pv.tokensLen = pv.tokens.length;
 
-      uint256 fromTimestamp = block.timestamp + 1;
-      uint256 toTimestamp = fromTimestamp + dwPeriod;
+      pv.fromTimestamp = block.timestamp + 1;
 
       (uint256[3][] memory weightsChange, uint256 lenToPush) =
-        _computeWeightsChange(pool, tokens, minWPS, maxWPS, fromTimestamp, toTimestamp);
+        _computeWeightsChange(
+          pv.pool,
+          pv.tokens,
+          pv.minWPS,
+          pv.maxWPS,
+          pv.fromTimestamp,
+          pv.fromTimestamp + minInterval
+        );
 
       PowerIndexPoolController.DynamicWeightInput[] memory dws;
       dws = new PowerIndexPoolController.DynamicWeightInput[](lenToPush);
 
-      uint256 iToPush;
-      for (uint256 i = 0; i < len; i++) {
-        uint256 wps = _getWeightPerSecond(weightsChange[i][1], weightsChange[i][2], fromTimestamp, toTimestamp);
-        if (wps > maxWPS) {
-          weightsChange[i][2] = bmul(dwPeriod, maxWPS);
+      for (uint256 i = 0; i < pv.tokensLen; i++) {
+        uint256 wps =
+          _getWeightPerSecond(
+            weightsChange[i][1],
+            weightsChange[i][2],
+            pv.fromTimestamp,
+            pv.fromTimestamp + minInterval
+          );
+        if (wps > pv.maxWPS) {
+          weightsChange[i][2] = bmul(minInterval, pv.maxWPS);
         }
-        if (wps >= minWPS) {
-          dws[iToPush].token = tokens[weightsChange[i][0]];
-          dws[iToPush].fromTimestamp = fromTimestamp;
-          dws[iToPush].targetTimestamp = fromTimestamp + dwPeriod;
-          dws[iToPush].targetDenorm = weightsChange[i][2];
-          iToPush++;
+        if (wps >= pv.minWPS) {
+          dws[pv.iToPush].token = pv.tokens[weightsChange[i][0]];
+          dws[pv.iToPush].fromTimestamp = pv.fromTimestamp;
+          dws[pv.iToPush].targetTimestamp = pv.fromTimestamp + minInterval;
+          dws[pv.iToPush].targetDenorm = weightsChange[i][2];
+          pv.iToPush++;
         }
       }
 
@@ -108,16 +181,23 @@ contract MCapWeightStrategy is Ownable, BNum {
       }
 
       pd.lastWeightsUpdate = block.timestamp;
+      updatedPools++;
     }
+    require(updatedPools > 0, "NO_POOLS_TO_UPDATE");
   }
 
-  function getTokenMarketCap(address _token) public returns (uint256) {
-    uint256 totalSupply = IERC20(_token).totalSupply();
-    uint256 len = excludeTokenBalances[_token].length;
-    for (uint256 i = 0; i < len; i++) {
-      totalSupply = bsub(totalSupply, IERC20(_token).balanceOf(excludeTokenBalances[_token][i]));
-    }
-    return bdiv(bmul(totalSupply, oracle.assetPrices(_token)), 1 ether);
+  function _getMinMaxReportInterval() internal view returns (uint256 min, uint256 max) {
+    return powerPoke.getMinMaxReportIntervals(address(this));
+  }
+
+  function _reward(
+    uint256 _reporterId,
+    uint256 _gasStart,
+    uint256 _compensationPlan,
+    bytes calldata _rewardOpts
+  ) internal {
+    uint256 gasUsed = bsub(_gasStart, gasleft()) + COMPENSATION_GAS_EXTRA;
+    powerPoke.reward(_reporterId, gasUsed, _compensationPlan, _rewardOpts);
   }
 
   function _computeWeightsChange(
@@ -154,7 +234,7 @@ contract MCapWeightStrategy is Ownable, BNum {
     }
 
     if (lenToPush > 1) {
-      sort(weightsChange);
+      _sort(weightsChange);
     }
 
     emit UpdatePoolWeights(address(_pool), block.timestamp, _tokens, weightsChange, newMarketCapSum);
@@ -170,7 +250,7 @@ contract MCapWeightStrategy is Ownable, BNum {
     return div(delta, bsub(targetTimestamp, fromTimestamp));
   }
 
-  function quickSort(
+  function _quickSort(
     uint256[3][] memory wightsChange,
     int256 left,
     int256 right
@@ -189,12 +269,12 @@ contract MCapWeightStrategy is Ownable, BNum {
         j--;
       }
     }
-    if (left < j) quickSort(wightsChange, left, j);
-    if (i < right) quickSort(wightsChange, i, right);
+    if (left < j) _quickSort(wightsChange, left, j);
+    if (i < right) _quickSort(wightsChange, i, right);
   }
 
-  function sort(uint256[3][] memory wightsChange) internal returns (uint256[3][] memory) {
-    quickSort(wightsChange, int256(0), int256(wightsChange.length - 1));
+  function _sort(uint256[3][] memory wightsChange) internal returns (uint256[3][] memory) {
+    _quickSort(wightsChange, int256(0), int256(wightsChange.length - 1));
     return wightsChange;
   }
 }

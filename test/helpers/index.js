@@ -46,17 +46,17 @@ async function advanceBlocks(n) {
  * Deploys a proxied contract
  *
  * @param contract Truffle Contract
- * @param {string[]} args
+ * @param {string[]} constructorArgs
  * @param {object} opts
  * @param {string} opts.deployer
  * @param {string} opts.initializer
  * @param {string} opts.proxyAdminOwner
  * @returns {Promise<any>}
  */
-async function deployProxied(contract, args = [], opts = {}) {
-  const impl = await contract.new();
+async function deployProxied(contract, constructorArgs = [], initializerArgs = [], opts = {}) {
+  const impl = await contract.new(...constructorArgs);
   const adminContract = await createOrGetProxyAdmin(opts.proxyAdminOwner);
-  const data = getInitializerData(impl, args, opts.initializer);
+  const data = getInitializerData(impl, initializerArgs, opts.initializer);
   const proxy = await AdminUpgradeabilityProxy.new(impl.address, adminContract.address, data);
   const instance = await contract.at(proxy.address);
 
@@ -155,6 +155,10 @@ function splitPayload(payload) {
 
 function ether(value) {
   return rEther(value.toString()).toString(10);
+}
+
+function gwei(value) {
+  return web3.utils.toWei(value.toString(), 'gwei').toString();
 }
 
 function mwei(value) {
@@ -304,6 +308,7 @@ module.exports = {
   splitPayload,
   fetchLogs,
   ether,
+  gwei,
   mwei,
   expectExactRevert,
   getResTimestamp,
