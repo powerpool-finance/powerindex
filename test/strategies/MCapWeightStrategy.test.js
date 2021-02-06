@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-const { time } = require('@openzeppelin/test-helpers');
+const { time, expectRevert } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
 const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
 const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
@@ -76,9 +76,9 @@ describe('MCapWeightStrategy', () => {
 
   const poolsData = JSON.parse(fs.readFileSync('data/poolsData.json', { encoding: 'utf8' }));
 
-  let minter, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, reservoir;
+  let minter, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, slasher, reservoir;
   before(async function () {
-    [minter, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, reservoir] = await web3.eth.getAccounts();
+    [minter, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, slasher, reservoir] = await web3.eth.getAccounts();
   });
 
   beforeEach(async () => {
@@ -233,17 +233,24 @@ describe('MCapWeightStrategy', () => {
       await poke.addClient(weightStrategy.address, weightStrategyOwner, true, gwei(300), pokePeriod / 2, pokePeriod * 2, { from: minter });
       await cvpToken.approve(poke.address, ether(30000), { from: minter })
       await poke.addCredit(weightStrategy.address, ether(30000), { from: minter });
-      await poke.setBonusPlan(weightStrategy.address, 1,  true, 25, 17520000, 100 * 1000, { from: weightStrategyOwner });
+      await poke.setBonusPlan(weightStrategy.address, 1,  true, 20, 17520000, 100 * 1000, { from: weightStrategyOwner });
+      await poke.setBonusPlan(weightStrategy.address, 2,  true, 10, 17520000, 100 * 1000, { from: weightStrategyOwner });
 
-      const reporterDeposit = ether(10000);
-      await poke.setMinimalDeposit(weightStrategy.address, reporterDeposit, { from: weightStrategyOwner });
+      const slasherDeposit = ether(10000);
+      const reporterDeposit = ether(20000);
+      await poke.setMinimalDeposit(weightStrategy.address, slasherDeposit, { from: weightStrategyOwner });
 
       await cvpToken.transfer(reporter, reporterDeposit);
       await cvpToken.approve(staking.address, reporterDeposit, {from: reporter});
-      await staking.createUser(reporter, reporter, reporterDeposit, {from: reporter})
+      await staking.createUser(reporter, reporter, reporterDeposit, {from: reporter});
+
+      await cvpToken.transfer(slasher, slasherDeposit);
+      await cvpToken.approve(staking.address, slasherDeposit, {from: slasher});
+      await staking.createUser(slasher, slasher, slasherDeposit, {from: slasher});
 
       await time.increase(60);
       await staking.executeDeposit('1', {from: reporter});
+      await staking.executeDeposit('2', {from: slasher});
 
       await time.increase(pokePeriod);
     });
@@ -271,12 +278,33 @@ describe('MCapWeightStrategy', () => {
         ether(28.881773854308712),
       ];
 
+      await expectRevert(
+        weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: minter}),
+        'INVALID_POKER_KEY'
+      );
+
+      await expectRevert(
+        weightStrategy.pokeFromReporter('2', [pool.address], compensationOpts, {from: slasher}),
+        'NOT_HDH'
+      );
+
+      await expectRevert(
+        weightStrategy.pokeFromSlasher('2', [pool.address], compensationOpts, {from: minter}),
+        'INVALID_POKER_KEY'
+      );
+
       let res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 9);
 
       await this.checkWeights(pool, balancerTokens, newWeights);
 
       await time.increase(pokePeriod);
+
+      await expectRevert(
+        weightStrategy.pokeFromSlasher('2', [pool.address], compensationOpts, {from: slasher}),
+        'MAX_INTERVAL_NOT_REACHED'
+      );
+
       res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 9);
 
@@ -288,9 +316,9 @@ describe('MCapWeightStrategy', () => {
       res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 0);
 
-      await time.increase(pokePeriod);
+      await time.increase(pokePeriod * 2);
 
-      res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
+      res = await weightStrategy.pokeFromSlasher('2', [pool.address], compensationOpts, {from: slasher});
       assert.equal(res.logs.length, 9);
 
       await this.checkWeights(pool, balancerTokens, [

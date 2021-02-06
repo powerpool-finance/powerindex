@@ -109,7 +109,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     uint256 _reporterId,
     address[] memory _pools,
     bytes calldata _rewardOpts
-  ) external onlyReporter(_reporterId, _rewardOpts) {
+  ) external onlyNonReporter(_reporterId, _rewardOpts) {
     _poke(_pools, true);
   }
 
