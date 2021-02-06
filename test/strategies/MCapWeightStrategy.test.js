@@ -148,7 +148,7 @@ describe('MCapWeightStrategy', () => {
     };
   });
 
-  describe('Swaps with Uniswap mainnet values', () => {
+  describe('Weights updating', () => {
     let tokens, balancerTokens, bPoolBalances, pool, poolController, weightStrategy, oracle, poke, fastGasOracle, staking;
 
     const tokenBySymbol = {};
@@ -206,7 +206,6 @@ describe('MCapWeightStrategy', () => {
       for (let i = 0; i < poolsData.length; i++) {
         const token = await MockERC20.new(poolsData[i].tokenSymbol, poolsData[i].tokenSymbol, poolsData[i].tokenDecimals, poolsData[i].totalSupply);
 
-        console.log('token.address', token.address, 'poolsData.oraclePrice', poolsData[i].oraclePrice);
         await oracle.setPrice(token.address, poolsData[i].oraclePrice);
         const excludeAddresses = await pIteration.map(poolsData[i].excludeBalances, (bal) => {
           const {address} = ethers.Wallet.createRandom();
@@ -223,7 +222,7 @@ describe('MCapWeightStrategy', () => {
         };
       }
 
-      balancerTokens =  tokens.filter((t, i) => poolsData[i].balancerBalance !== '0');
+      balancerTokens = tokens.filter((t, i) => poolsData[i].balancerBalance !== '0');
 
       pool = await this.makePowerIndexPool(balancerTokens, bPoolBalances.filter(b => b !== '0'));
       poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
@@ -249,7 +248,7 @@ describe('MCapWeightStrategy', () => {
       await time.increase(pokePeriod);
     });
 
-    it('swapEthToPipt should work properly', async () => {
+    it('pokeFromReporter and pokeFromSlasher should work properly', async () => {
       await this.checkWeights(pool, balancerTokens, [
         ether(6.25),
         ether(6.25),
