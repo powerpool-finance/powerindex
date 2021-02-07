@@ -258,10 +258,6 @@ describe('PowerIndexWrapper', () => {
 
           await router1.setPiTokenEthFee(piTokenEthFee);
 
-          await time.increase(60);
-
-          await poolController.finishReplace();
-
           await poolWrapper.updatePiTokenEthFees([this.token1.address]);
 
           assert.equal(await poolWrapper.ethFeeByPiToken(piToken1.address), ether(0.0001));
