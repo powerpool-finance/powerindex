@@ -3,7 +3,7 @@ require('@nomiclabs/hardhat-ethers');
 
 task('deploy-aave-router', 'Deploy AAVE Router')
   .setAction(async (__, {ethers, network}) => {
-    const PowerIndexPoolController = await artifacts.require('PowerIndexPoolController');
+    const PowerIndexPoolController = await artifacts.require('PiptController');
     const PowerIndexWrapper = await artifacts.require('PowerIndexWrapper');
     const WrappedPiErc20Factory = await artifacts.require('WrappedPiErc20Factory');
     const PowerIndexPool = await artifacts.require('PowerIndexPool');
@@ -23,6 +23,7 @@ task('deploy-aave-router', 'Deploy AAVE Router')
     const stakingAddr = '0x4da27a545c0c5B758a6BA100e3a049001de870f5';
     const admin = '0xb258302c3f209491d604165549079680708581cc';
     const poolAddress = '0x26607ac599266b21d13c7acf7942c7701a8b699c';
+    const weightStrategyAddress = '0x0000000000000000000000000000000000000000';
     const pool = await PowerIndexPool.at(poolAddress);
     const poolRestrictionsAddress = await callContract(pool, 'getRestrictions');
 
@@ -32,6 +33,7 @@ task('deploy-aave-router', 'Deploy AAVE Router')
       poolAddress,
       poolWrapper.address,
       wrapperFactory.address,
+      weightStrategyAddress,
       sendOptions
     )
     await poolWrapper.setController(controller.address, sendOptions);
