@@ -176,10 +176,6 @@ describe('PowerIndexWrapper', () => {
       value: piTokenEthFee
     });
 
-    await time.increase(60);
-
-    await poolController.finishReplace();
-
     this.getTokensToJoinPoolAndApprove = async amountToMint => {
       const poolTotalSupply = await pool.totalSupply();
       const ratio = divScalarBN(amountToMint, poolTotalSupply);
