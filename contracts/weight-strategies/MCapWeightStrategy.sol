@@ -198,16 +198,13 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
 
   function _poke(address[] memory _pools, bool _bySlasher) internal {
     (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
-    uint256 updatedPools = 0;
     for (uint256 i = 0; i < _pools.length; i++) {
       PokeVars memory pv;
       pv.pool = PowerIndexPoolInterface(_pools[i]);
 
       Pool storage pd = poolsData[address(pv.pool)];
       require(pd.active, "NOT_ACTIVE");
-      if (pd.lastWeightsUpdate + minInterval > block.timestamp) {
-        return;
-      }
+      require(pd.lastWeightsUpdate + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
       if (_bySlasher) {
         require(pd.lastWeightsUpdate + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
       }
@@ -256,9 +253,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
       }
 
       pd.lastWeightsUpdate = block.timestamp;
-      updatedPools++;
     }
-    require(updatedPools > 0, "NO_POOLS_TO_UPDATE");
   }
 
   function _reward(

@@ -73,7 +73,7 @@ function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei = '100000000') {
   assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));
 }
 
-describe('MCapWeightStrategy', () => {
+describe.only('MCapWeightStrategy', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const swapFee = ether('0.0001');
   const communitySwapFee = ether('0.001');
@@ -370,7 +370,7 @@ describe('MCapWeightStrategy', () => {
         const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
         assert.equal(targetWeights[i], dw.targetDenorm);
         currentWeights[i] = await pool.getDenormalizedWeight(balancerTokens[i].address);
-        assertEqualWithAccuracy(await pool.getNormalizedWeight(balancerTokens[i].address), normalizedCurrentWeights[i], '500000000000');
+        assertEqualWithAccuracy(await pool.getNormalizedWeight(balancerTokens[i].address), normalizedCurrentWeights[i], '5000000000000');
       }
 
       await weightStrategy.pausePool(pool.address);
@@ -390,7 +390,7 @@ describe('MCapWeightStrategy', () => {
       }
     });
 
-    it('pokeFromReporter and pokeFromSlasher should work properly', async () => {
+    it.only('pokeFromReporter and pokeFromSlasher should work properly', async () => {
       await this.checkWeights(pool, balancerTokens, [
         ether(6.25),
         ether(6.25),
@@ -463,8 +463,10 @@ describe('MCapWeightStrategy', () => {
       let newTokenPrice = mulScalarBN(await oracle.assetPrices(balancerTokens[0].address), ether(1.1));
       await oracle.setPrice(balancerTokens[0].address, newTokenPrice);
 
-      res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
-      assert.equal(res.logs.length, 0);
+      await expectRevert(
+        weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter}),
+        "MIN_INTERVAL_NOT_REACHED"
+      );
 
       await time.increase(pokePeriod * 2);
 
