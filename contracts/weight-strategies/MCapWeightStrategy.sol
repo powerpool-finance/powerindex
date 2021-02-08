@@ -69,6 +69,11 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     _reward(_reporterId, gasStart, COMPENSATION_PLAN_1_ID, _rewardOpts);
   }
 
+  modifier denyContract() {
+    require(msg.sender == tx.origin, "CONTRACT_CALL");
+    _;
+  }
+
   constructor() public OwnableUpgradeSafe() {}
 
   function initialize(address _oracle, address _powerPoke) external initializer {
@@ -135,7 +140,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     uint256 _reporterId,
     address[] memory _pools,
     bytes calldata _rewardOpts
-  ) external onlyReporter(_reporterId, _rewardOpts) {
+  ) external onlyReporter(_reporterId, _rewardOpts) denyContract {
     _poke(_pools, false);
   }
 
@@ -143,7 +148,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     uint256 _reporterId,
     address[] memory _pools,
     bytes calldata _rewardOpts
-  ) external onlyNonReporter(_reporterId, _rewardOpts) {
+  ) external onlyNonReporter(_reporterId, _rewardOpts) denyContract {
     _poke(_pools, true);
   }
 

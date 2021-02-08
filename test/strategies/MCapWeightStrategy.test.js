@@ -19,6 +19,7 @@ const PowerPoke = artifacts.require('PowerPoke');
 const MockFastGasOracle = artifacts.require('MockFastGasOracle');
 const MockStaking = artifacts.require('MockStaking');
 const MockCvp = artifacts.require('MockCvp');
+const MockProxyCall = artifacts.require('MockProxyCall');
 const ethers = require('ethers');
 const pIteration = require('p-iteration');
 
@@ -81,9 +82,9 @@ describe('MCapWeightStrategy', () => {
 
   const poolsData = JSON.parse(fs.readFileSync('data/poolsData.json', { encoding: 'utf8' }));
 
-  let minter, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, slasher, reservoir;
+  let minter, alice, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, slasher, reservoir;
   before(async function () {
-    [minter, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, slasher, reservoir] = await web3.eth.getAccounts();
+    [minter, alice, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, slasher, reservoir] = await web3.eth.getAccounts();
   });
 
   beforeEach(async () => {
@@ -154,7 +155,7 @@ describe('MCapWeightStrategy', () => {
   });
 
   describe('Weights updating', () => {
-    let tokens, balancerTokens, bPoolBalances, pool, poolController, weightStrategy, oracle, poke, fastGasOracle, staking;
+    let tokens, balancerTokens, bPoolBalances, pool, poolController, weightStrategy, oracle, poke, fastGasOracle, staking, cvpToken;
 
     const tokenBySymbol = {};
     const pokePeriod = 14 * 60 * 60 * 24;
@@ -176,7 +177,7 @@ describe('MCapWeightStrategy', () => {
 
       oracle = await MockOracle.new();
 
-      const cvpToken = await MockCvp.new();
+      cvpToken = await MockCvp.new();
       fastGasOracle = await MockFastGasOracle.new(gwei(300 * 1000));
       staking = await deployProxied(
         MockStaking,
@@ -260,6 +261,18 @@ describe('MCapWeightStrategy', () => {
       await staking.executeDeposit('2', {from: slasher});
 
       await time.increase(pokePeriod);
+    });
+
+    it('should deny poking from a contract', async function() {
+      const proxyCall = await MockProxyCall.new();
+      await cvpToken.transfer(alice, ether(30000));
+      await cvpToken.approve(staking.address, ether(30000), {from: alice});
+      await staking.createUser(alice, proxyCall.address, ether(30000), {from: alice});
+      await time.increase(60);
+      await staking.executeDeposit('3', {from: alice});
+
+      const data = weightStrategy.contract.methods.pokeFromReporter(3, [pool.address], '0x').encodeABI();
+      await expectRevert(proxyCall.makeCall(weightStrategy.address, data), 'CONTRACT_CALL');
     });
 
     it('pools getters should work properly', async () => {
@@ -357,7 +370,7 @@ describe('MCapWeightStrategy', () => {
         const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
         assert.equal(targetWeights[i], dw.targetDenorm);
         currentWeights[i] = await pool.getDenormalizedWeight(balancerTokens[i].address);
-        assertEqualWithAccuracy(await pool.getNormalizedWeight(balancerTokens[i].address), normalizedCurrentWeights[i], '50000000000');
+        assertEqualWithAccuracy(await pool.getNormalizedWeight(balancerTokens[i].address), normalizedCurrentWeights[i], '500000000000');
       }
 
       await weightStrategy.pausePool(pool.address);
