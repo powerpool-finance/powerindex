@@ -357,7 +357,7 @@ describe('MCapWeightStrategy', () => {
         const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
         assert.equal(targetWeights[i], dw.targetDenorm);
         currentWeights[i] = await pool.getDenormalizedWeight(balancerTokens[i].address);
-        assertEqualWithAccuracy(await pool.getNormalizedWeight(balancerTokens[i].address), normalizedCurrentWeights[i]);
+        assertEqualWithAccuracy(await pool.getNormalizedWeight(balancerTokens[i].address), normalizedCurrentWeights[i], '50000000000');
       }
 
       await weightStrategy.pausePool(pool.address);
