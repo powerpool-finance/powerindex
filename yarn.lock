@@ -630,9 +630,9 @@
     ganache-core "git+https://github.com/powerpool-finance/ganache-core.git#0a5c84185c26216a152293debbe5dac6769b5212"
     ts-interface-checker "^0.1.9"
 
-"@powerpool/poweroracle@git://github.com/powerpool-finance/power-oracle-contracts.git#b0a9fea":
+"@powerpool/poweroracle@git://github.com/powerpool-finance/power-oracle-contracts.git#9ce4bf9":
   version "1.0.0"
-  resolved "git://github.com/powerpool-finance/power-oracle-contracts.git#b0a9fea05a000f1b4f9b934025b97db1e3fbdad4"
+  resolved "git://github.com/powerpool-finance/power-oracle-contracts.git#9ce4bf915b2d03b4e2e50ab68712165e379d1640"
   dependencies:
     hardhat-typechain "^0.3.4"
 

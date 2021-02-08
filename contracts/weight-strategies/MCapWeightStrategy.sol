@@ -13,6 +13,8 @@ import "../balancer-core/BNum.sol";
 contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
   using EnumerableSet for EnumerableSet.AddressSet;
 
+  event AddPool(address indexed pool, address indexed poolController);
+  event SetPool(address indexed pool, address indexed poolController, bool indexed active);
   event SetExcludeTokenBalances(address indexed token, address[] excludeTokenBalances);
   event FetchTokenMCap(address indexed pool, address indexed token, uint256 mCap);
   event UpdatePoolWeights(
@@ -41,16 +43,14 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
   struct Pool {
     PowerIndexPoolController controller;
     uint256 lastWeightsUpdate;
-    mapping(address => uint256) lastTokenMCap;
+    bool active;
   }
 
-  uint256 internal constant COMPENSATION_GAS_EXTRA = 21_000;
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
-  uint256 internal constant COMPENSATION_PLAN_2_ID = 2;
 
-  EnumerableSet.AddressSet private pools;
-  mapping(address => address[]) public excludeTokenBalances;
+  address[] public pools;
   mapping(address => Pool) public poolsData;
+  mapping(address => address[]) public excludeTokenBalances;
 
   IPowerOracle public oracle;
   IPowerPoke public powerPoke;
@@ -66,7 +66,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     uint256 gasStart = gasleft();
     powerPoke.authorizeNonReporter(_reporterId, msg.sender);
     _;
-    _reward(_reporterId, gasStart, COMPENSATION_PLAN_2_ID, _rewardOpts);
+    _reward(_reporterId, gasStart, COMPENSATION_PLAN_1_ID, _rewardOpts);
   }
 
   constructor() public OwnableUpgradeSafe() {}
@@ -93,8 +93,19 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
   }
 
   function addPool(address _poolAddress, address _controller) external onlyOwner {
-    pools.add(_poolAddress);
+    require(address(poolsData[_poolAddress].controller) == address(0), "ALREADY_EXIST");
+    require(_controller != address(0), "CONTROLLER_CANT_BE_NULL");
+    pools.push(_poolAddress);
     poolsData[_poolAddress].controller = PowerIndexPoolController(_controller);
+    poolsData[_poolAddress].active = true;
+    emit AddPool(_poolAddress, _controller);
+  }
+
+  function setPool(address _poolAddress, address _controller, bool _active) external onlyOwner {
+    require(_controller != address(0), "CONTROLLER_CANT_BE_NULL");
+    poolsData[_poolAddress].controller = PowerIndexPoolController(_controller);
+    poolsData[_poolAddress].active = _active;
+    emit SetPool(_poolAddress, _controller, _active);
   }
 
   function pokeFromReporter(
@@ -122,6 +133,41 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     return bdiv(bmul(totalSupply, oracle.assetPrices(_token)), 1 ether);
   }
 
+  function getExcludeTokenBalancesLength(address _token) external view returns (uint256) {
+    return excludeTokenBalances[_token].length;
+  }
+
+  function getExcludeTokenBalancesList(address _token) external view returns (address[] memory) {
+    return excludeTokenBalances[_token];
+  }
+
+  function getPoolsList() external view returns (address[] memory) {
+    return pools;
+  }
+
+  function getPoolsLength() external view returns (uint256) {
+    return pools.length;
+  }
+
+  function getActivePoolsList() external view returns (address[] memory output) {
+    uint256 len = pools.length;
+    uint256 activeLen = 0;
+
+    for (uint256 i; i < len; i++){
+      if (poolsData[pools[i]].active) {
+        activeLen++;
+      }
+    }
+
+    output = new address[](activeLen);
+    uint256 ai;
+    for (uint256 i; i < len; i++){
+      if (poolsData[pools[i]].active) {
+        output[ai++] = pools[i];
+      }
+    }
+  }
+
   function _poke(address[] memory _pools, bool _bySlasher) internal {
     (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
     uint256 updatedPools = 0;
@@ -130,6 +176,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
       pv.pool = PowerIndexPoolInterface(_pools[i]);
 
       Pool storage pd = poolsData[address(pv.pool)];
+      require(pd.active, "NOT_ACTIVE");
       if (pd.lastWeightsUpdate + minInterval > block.timestamp) {
         return;
       }
@@ -186,18 +233,13 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     require(updatedPools > 0, "NO_POOLS_TO_UPDATE");
   }
 
-  function _getMinMaxReportInterval() internal view returns (uint256 min, uint256 max) {
-    return powerPoke.getMinMaxReportIntervals(address(this));
-  }
-
   function _reward(
     uint256 _reporterId,
     uint256 _gasStart,
     uint256 _compensationPlan,
     bytes calldata _rewardOpts
   ) internal {
-    uint256 gasUsed = bsub(_gasStart, gasleft()) + COMPENSATION_GAS_EXTRA;
-    powerPoke.reward(_reporterId, gasUsed, _compensationPlan, _rewardOpts);
+    powerPoke.reward(_reporterId, bsub(_gasStart, gasleft()), _compensationPlan, _rewardOpts);
   }
 
   function _computeWeightsChange(
@@ -240,6 +282,10 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     emit UpdatePoolWeights(address(_pool), block.timestamp, _tokens, weightsChange, newMarketCapSum);
   }
 
+  function _getMinMaxReportInterval() internal view returns (uint256 min, uint256 max) {
+    return powerPoke.getMinMaxReportIntervals(address(this));
+  }
+
   function _getWeightPerSecond(
     uint256 fromDenorm,
     uint256 targetDenorm,
@@ -254,7 +300,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     uint256[3][] memory wightsChange,
     int256 left,
     int256 right
-  ) internal {
+  ) internal pure {
     int256 i = left;
     int256 j = right;
     if (i == j) return;
@@ -273,7 +319,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     if (i < right) _quickSort(wightsChange, i, right);
   }
 
-  function _sort(uint256[3][] memory wightsChange) internal returns (uint256[3][] memory) {
+  function _sort(uint256[3][] memory wightsChange) internal pure returns (uint256[3][] memory) {
     _quickSort(wightsChange, int256(0), int256(wightsChange.length - 1));
     return wightsChange;
   }

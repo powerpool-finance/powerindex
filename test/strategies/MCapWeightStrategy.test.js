@@ -67,7 +67,7 @@ function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei = '100000000') {
   assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));
 }
 
-describe('MCapWeightStrategy', () => {
+describe.only('MCapWeightStrategy', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const swapFee = ether('0.0001');
   const communitySwapFee = ether('0.001');
@@ -214,6 +214,9 @@ describe('MCapWeightStrategy', () => {
         });
         await weightStrategy.setExcludeTokenBalances(token.address, excludeAddresses);
 
+        assert.sameMembers(await weightStrategy.getExcludeTokenBalancesList(token.address), excludeAddresses);
+        assert.equal(await weightStrategy.getExcludeTokenBalancesLength(token.address), excludeAddresses.length);
+
         tokens.push(token);
         bPoolBalances.push(poolsData[i].balancerBalance);
 
@@ -234,7 +237,6 @@ describe('MCapWeightStrategy', () => {
       await cvpToken.approve(poke.address, ether(30000), { from: minter })
       await poke.addCredit(weightStrategy.address, ether(30000), { from: minter });
       await poke.setBonusPlan(weightStrategy.address, 1,  true, 20, 17520000, 100 * 1000, { from: weightStrategyOwner });
-      await poke.setBonusPlan(weightStrategy.address, 2,  true, 10, 17520000, 100 * 1000, { from: weightStrategyOwner });
 
       const slasherDeposit = ether(10000);
       const reporterDeposit = ether(20000);
@@ -253,6 +255,43 @@ describe('MCapWeightStrategy', () => {
       await staking.executeDeposit('2', {from: slasher});
 
       await time.increase(pokePeriod);
+    });
+
+    it('pools getters should work properly', async () => {
+      let poolData = await weightStrategy.poolsData(pool.address);
+      assert.equal(poolData.controller, poolController.address);
+      assert.equal(poolData.lastWeightsUpdate, '0');
+      assert.equal(poolData.active, true);
+
+      assert.sameMembers(await weightStrategy.getPoolsList(), [pool.address]);
+      assert.sameMembers(await weightStrategy.getActivePoolsList(), [pool.address]);
+      assert.equal(await weightStrategy.getPoolsLength(), '1');
+
+      await expectRevert(weightStrategy.addPool(pool.address, poolController.address), "ALREADY_EXIST");
+      await expectRevert(weightStrategy.addPool(reservoir, reservoir, {from: reporter}), "Ownable");
+
+      await weightStrategy.addPool(reservoir, reservoir);
+      assert.sameMembers(await weightStrategy.getPoolsList(), [pool.address, reservoir]);
+      assert.sameMembers(await weightStrategy.getActivePoolsList(), [pool.address, reservoir]);
+      assert.equal(await weightStrategy.getPoolsLength(), '2');
+
+      await expectRevert(weightStrategy.setPool(reservoir, reservoir, false, {from: reporter}), "Ownable");
+      await weightStrategy.setPool(reservoir, reservoir, false);
+      assert.sameMembers(await weightStrategy.getPoolsList(), [pool.address, reservoir]);
+      assert.sameMembers(await weightStrategy.getActivePoolsList(), [pool.address]);
+      assert.equal(await weightStrategy.getPoolsLength(), '2');
+
+      poolData = await weightStrategy.poolsData(reservoir);
+      assert.equal(poolData.controller, reservoir);
+      assert.equal(poolData.lastWeightsUpdate, '0');
+      assert.equal(poolData.active, false);
+
+      await weightStrategy.setPool(reservoir, reservoir, true);
+      assert.sameMembers(await weightStrategy.getActivePoolsList(), [pool.address, reservoir]);
+
+      await weightStrategy.setPool(reservoir, reservoir, false);
+      await weightStrategy.setPool(pool.address, poolController.address, false);
+      assert.sameMembers(await weightStrategy.getActivePoolsList(), []);
     });
 
     it('pokeFromReporter and pokeFromSlasher should work properly', async () => {
@@ -296,6 +335,9 @@ describe('MCapWeightStrategy', () => {
       let res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 9);
 
+      let poolData = await weightStrategy.poolsData(pool.address);
+      assert.equal(poolData.lastWeightsUpdate, await web3.eth.getBlock(res.receipt.blockNumber).then(b => b.timestamp));
+
       await this.checkWeights(pool, balancerTokens, newWeights);
 
       await time.increase(pokePeriod);
@@ -305,8 +347,20 @@ describe('MCapWeightStrategy', () => {
         'MAX_INTERVAL_NOT_REACHED'
       );
 
+      await weightStrategy.setPool(pool.address, poolController.address, false);
+
+      await expectRevert(
+        weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter}),
+        'NOT_ACTIVE'
+      );
+
+      await weightStrategy.setPool(pool.address, poolController.address, true);
+
       res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 9);
+
+      poolData = await weightStrategy.poolsData(pool.address);
+      assert.equal(poolData.lastWeightsUpdate, await web3.eth.getBlock(res.receipt.blockNumber).then(b => b.timestamp));
 
       await this.checkWeights(pool, balancerTokens, newWeights);
 
