@@ -465,7 +465,7 @@ describe.only('MCapWeightStrategy', () => {
 
       await expectRevert(
         weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter}),
-        "MIN_INTERVAL_NOT_REACHED"
+        'MIN_INTERVAL_NOT_REACHED'
       );
 
       await time.increase(pokePeriod * 2);
