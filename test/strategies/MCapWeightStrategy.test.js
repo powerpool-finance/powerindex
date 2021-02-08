@@ -73,7 +73,7 @@ function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei = '100000000') {
   assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));
 }
 
-describe.only('MCapWeightStrategy', () => {
+describe('MCapWeightStrategy', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const swapFee = ether('0.0001');
   const communitySwapFee = ether('0.001');
@@ -390,7 +390,7 @@ describe.only('MCapWeightStrategy', () => {
       }
     });
 
-    it.only('pokeFromReporter and pokeFromSlasher should work properly', async () => {
+    it('pokeFromReporter and pokeFromSlasher should work properly', async () => {
       await this.checkWeights(pool, balancerTokens, [
         ether(6.25),
         ether(6.25),

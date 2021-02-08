@@ -342,8 +342,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     if (i < right) _quickSort(wightsChange, i, right);
   }
 
-  function _sort(uint256[3][] memory wightsChange) internal pure returns (uint256[3][] memory) {
-    _quickSort(wightsChange, int256(0), int256(wightsChange.length - 1));
-    return wightsChange;
+  function _sort(uint256[3][] memory weightsChange) internal pure {
+    _quickSort(weightsChange, int256(0), int256(weightsChange.length - 1));
   }
 }
