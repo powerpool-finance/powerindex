@@ -101,11 +101,34 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     emit AddPool(_poolAddress, _controller);
   }
 
-  function setPool(address _poolAddress, address _controller, bool _active) external onlyOwner {
+  function setPool(
+    address _poolAddress,
+    address _controller,
+    bool _active
+  ) external onlyOwner {
     require(_controller != address(0), "CONTROLLER_CANT_BE_NULL");
     poolsData[_poolAddress].controller = PowerIndexPoolController(_controller);
     poolsData[_poolAddress].active = _active;
     emit SetPool(_poolAddress, _controller, _active);
+  }
+
+  function pausePool(address _poolAddress) external onlyOwner {
+    poolsData[_poolAddress].active = false;
+    PowerIndexPoolInterface pool = PowerIndexPoolInterface(_poolAddress);
+    address[] memory tokens = pool.getCurrentTokens();
+
+    uint256 len = tokens.length;
+    PowerIndexPoolController.DynamicWeightInput[] memory dws;
+    dws = new PowerIndexPoolController.DynamicWeightInput[](len);
+
+    for (uint256 i = 0; i < len; i++) {
+      dws[i].token = tokens[i];
+      dws[i].fromTimestamp = block.timestamp + 1;
+      dws[i].targetTimestamp = block.timestamp + 2;
+      dws[i].targetDenorm = pool.getDenormalizedWeight(tokens[i]);
+    }
+
+    poolsData[_poolAddress].controller.setDynamicWeightListByStrategy(dws);
   }
 
   function pokeFromReporter(
@@ -153,7 +176,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     uint256 len = pools.length;
     uint256 activeLen = 0;
 
-    for (uint256 i; i < len; i++){
+    for (uint256 i; i < len; i++) {
       if (poolsData[pools[i]].active) {
         activeLen++;
       }
@@ -161,7 +184,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
 
     output = new address[](activeLen);
     uint256 ai;
-    for (uint256 i; i < len; i++){
+    for (uint256 i; i < len; i++) {
       if (poolsData[pools[i]].active) {
         output[ai++] = pools[i];
       }
@@ -264,7 +287,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     weightsChange = new uint256[3][](len);
     for (uint256 i = 0; i < len; i++) {
       (, , , uint256 oldWeight) = _pool.getDynamicWeightSettings(_tokens[i]);
-      uint256 newWeight = bsub(bdiv(newMCaps[i], newMarketCapSum) * 50, 100);
+      uint256 newWeight = bmul(bdiv(newMCaps[i], newMarketCapSum), 25 * BONE);
       weightsChange[i] = [i, oldWeight, newWeight];
     }
 
