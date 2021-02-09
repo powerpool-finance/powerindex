@@ -207,9 +207,9 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
 
   function _poke(address[] memory _pools, bool _bySlasher) internal {
     (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
-    for (uint256 i = 0; i < _pools.length; i++) {
+    for (uint256 pi = 0; pi < _pools.length; pi++) {
       PokeVars memory pv;
-      pv.pool = PowerIndexPoolInterface(_pools[i]);
+      pv.pool = PowerIndexPoolInterface(_pools[pi]);
 
       Pool storage pd = poolsData[address(pv.pool)];
       require(pd.active, "NOT_ACTIVE");
