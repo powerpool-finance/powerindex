@@ -35,6 +35,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     uint256 minWPS;
     uint256 maxWPS;
     address[] tokens;
+    address[] piTokens;
     uint256 tokensLen;
     uint256 fromTimestamp;
     uint256 iToPush;
@@ -42,6 +43,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
 
   struct Pool {
     PowerIndexPoolController controller;
+    PowerIndexWrapperInterface wrapper;
     uint256 lastWeightsUpdate;
     bool active;
   }
@@ -97,11 +99,16 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
     }
   }
 
-  function addPool(address _poolAddress, address _controller) external onlyOwner {
+  function addPool(
+    address _poolAddress,
+    address _controller,
+    address _wrapper
+  ) external onlyOwner {
     require(address(poolsData[_poolAddress].controller) == address(0), "ALREADY_EXIST");
     require(_controller != address(0), "CONTROLLER_CANT_BE_NULL");
     pools.push(_poolAddress);
     poolsData[_poolAddress].controller = PowerIndexPoolController(_controller);
+    poolsData[_poolAddress].wrapper = PowerIndexWrapperInterface(_wrapper);
     poolsData[_poolAddress].active = true;
     emit AddPool(_poolAddress, _controller);
   }
@@ -109,10 +116,12 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
   function setPool(
     address _poolAddress,
     address _controller,
+    address _wrapper,
     bool _active
   ) external onlyOwner {
     require(_controller != address(0), "CONTROLLER_CANT_BE_NULL");
     poolsData[_poolAddress].controller = PowerIndexPoolController(_controller);
+    poolsData[_poolAddress].wrapper = PowerIndexWrapperInterface(_wrapper);
     poolsData[_poolAddress].active = _active;
     emit SetPool(_poolAddress, _controller, _active);
   }
@@ -210,7 +219,12 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
       }
       (pv.minWPS, pv.maxWPS) = pv.pool.getWeightPerSecondBounds();
 
-      pv.tokens = pv.pool.getCurrentTokens();
+      if (address(pd.wrapper) == address(0)) {
+        pv.tokens = pv.pool.getCurrentTokens();
+      } else {
+        pv.tokens = pd.wrapper.getCurrentTokens();
+        pv.piTokens = pv.pool.getCurrentTokens();
+      }
       pv.tokensLen = pv.tokens.length;
 
       pv.fromTimestamp = block.timestamp + 1;
@@ -240,7 +254,11 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
           weightsChange[i][2] = bmul(minInterval, pv.maxWPS);
         }
         if (wps >= pv.minWPS) {
-          dws[pv.iToPush].token = pv.tokens[weightsChange[i][0]];
+          if (address(pd.wrapper) == address(0)) {
+            dws[pv.iToPush].token = pv.tokens[weightsChange[i][0]];
+          } else {
+            dws[pv.iToPush].token = pv.piTokens[weightsChange[i][0]];
+          }
           dws[pv.iToPush].fromTimestamp = pv.fromTimestamp;
           dws[pv.iToPush].targetTimestamp = pv.fromTimestamp + minInterval;
           dws[pv.iToPush].targetDenorm = weightsChange[i][2];
@@ -293,7 +311,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
 
     for (uint256 i = 0; i < len; i++) {
       uint256 wps = _getWeightPerSecond(weightsChange[i][1], weightsChange[i][2], fromTimestamp, toTimestamp);
-      if (wps >= _minWPS && wps <= _maxWPS) {
+      if (wps >= _minWPS) {
         lenToPush++;
       }
     }

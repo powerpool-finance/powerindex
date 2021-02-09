@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-const { time, expectRevert } = require('@openzeppelin/test-helpers');
+const { time, expectRevert, constants } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
 const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
 const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
@@ -20,8 +20,12 @@ const MockFastGasOracle = artifacts.require('MockFastGasOracle');
 const MockStaking = artifacts.require('MockStaking');
 const MockCvp = artifacts.require('MockCvp');
 const MockProxyCall = artifacts.require('MockProxyCall');
+const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
+const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
+const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRouterFactory');
 const ethers = require('ethers');
 const pIteration = require('p-iteration');
+const _ = require('lodash');
 
 WETH.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
@@ -35,6 +39,7 @@ const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
 
 const { deployProxied, gwei } = require('../helpers');
+const {buildBasicRouterConfig, buildBasicRouterArgs} = require('../helpers/builders');
 
 function ether(val) {
   return web3.utils.toWei(val.toString(), 'ether').toString();
@@ -152,6 +157,14 @@ describe('MCapWeightStrategy', () => {
         assertEqualWithAccuracy(dw.targetDenorm, weights[i]);
       }
     };
+
+    this.checkWrappedWeights = async (pool, poolWrapper, balancerTokens, weights) => {
+      for (let i = 0; i < weights.length; i++) {
+        const piTokenAddress = await poolWrapper.piTokenByUnderlying(balancerTokens[i].address);
+        const dw = await pool.getDynamicWeightSettings(piTokenAddress === constants.ZERO_ADDRESS ? balancerTokens[i].address : piTokenAddress);
+        assertEqualWithAccuracy(dw.targetDenorm, weights[i]);
+      }
+    };
   });
 
   describe('Weights updating', () => {
@@ -236,7 +249,7 @@ describe('MCapWeightStrategy', () => {
       pool = await this.makePowerIndexPool(balancerTokens, bPoolBalances.filter(b => b !== '0'));
       poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
-      await weightStrategy.addPool(pool.address, poolController.address);
+      await weightStrategy.addPool(pool.address, poolController.address, zeroAddress);
       await poolController.setWeightsStrategy(weightStrategy.address);
 
       await poke.addClient(weightStrategy.address, weightStrategyOwner, true, gwei(300), pokePeriod, pokePeriod * 2, { from: minter });
@@ -285,16 +298,16 @@ describe('MCapWeightStrategy', () => {
       assert.sameMembers(await weightStrategy.getActivePoolsList(), [pool.address]);
       assert.equal(await weightStrategy.getPoolsLength(), '1');
 
-      await expectRevert(weightStrategy.addPool(pool.address, poolController.address), 'ALREADY_EXIST');
-      await expectRevert(weightStrategy.addPool(reservoir, reservoir, {from: reporter}), 'Ownable');
+      await expectRevert(weightStrategy.addPool(pool.address, poolController.address, zeroAddress), 'ALREADY_EXIST');
+      await expectRevert(weightStrategy.addPool(reservoir, reservoir, zeroAddress, {from: reporter}), 'Ownable');
 
-      await weightStrategy.addPool(reservoir, reservoir);
+      await weightStrategy.addPool(reservoir, reservoir, zeroAddress);
       assert.sameMembers(await weightStrategy.getPoolsList(), [pool.address, reservoir]);
       assert.sameMembers(await weightStrategy.getActivePoolsList(), [pool.address, reservoir]);
       assert.equal(await weightStrategy.getPoolsLength(), '2');
 
-      await expectRevert(weightStrategy.setPool(reservoir, reservoir, false, {from: reporter}), 'Ownable');
-      await weightStrategy.setPool(reservoir, reservoir, false);
+      await expectRevert(weightStrategy.setPool(reservoir, reservoir, zeroAddress, false, {from: reporter}), 'Ownable');
+      await weightStrategy.setPool(reservoir, reservoir, zeroAddress, false);
       assert.sameMembers(await weightStrategy.getPoolsList(), [pool.address, reservoir]);
       assert.sameMembers(await weightStrategy.getActivePoolsList(), [pool.address]);
       assert.equal(await weightStrategy.getPoolsLength(), '2');
@@ -304,11 +317,11 @@ describe('MCapWeightStrategy', () => {
       assert.equal(poolData.lastWeightsUpdate, '0');
       assert.equal(poolData.active, false);
 
-      await weightStrategy.setPool(reservoir, reservoir, true);
+      await weightStrategy.setPool(reservoir, reservoir, zeroAddress, true);
       assert.sameMembers(await weightStrategy.getActivePoolsList(), [pool.address, reservoir]);
 
-      await weightStrategy.setPool(reservoir, reservoir, false);
-      await weightStrategy.setPool(pool.address, poolController.address, false);
+      await weightStrategy.setPool(reservoir, reservoir, zeroAddress, false);
+      await weightStrategy.setPool(pool.address, poolController.address, zeroAddress, false);
       assert.sameMembers(await weightStrategy.getActivePoolsList(), []);
     });
 
@@ -443,14 +456,14 @@ describe('MCapWeightStrategy', () => {
         'MAX_INTERVAL_NOT_REACHED'
       );
 
-      await weightStrategy.setPool(pool.address, poolController.address, false);
+      await weightStrategy.setPool(pool.address, poolController.address, zeroAddress, false);
 
       await expectRevert(
         weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter}),
         'NOT_ACTIVE'
       );
 
-      await weightStrategy.setPool(pool.address, poolController.address, true);
+      await weightStrategy.setPool(pool.address, poolController.address, zeroAddress, true);
 
       res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 9);
@@ -520,6 +533,72 @@ describe('MCapWeightStrategy', () => {
         ether(1.418731211344930025),
         ether(7.879197248778667175),
       ]);
+    });
+
+    it('pokeFromReporter and pokeFromSlasher should work properly', async () => {
+      const defaultFactoryArguments = buildBasicRouterArgs(web3, buildBasicRouterConfig(
+        this.poolRestrictions.address,
+        constants.ZERO_ADDRESS,
+        constants.ZERO_ADDRESS,
+        ether(0),
+        '0',
+        permanentVotingPower,
+        ether(0),
+        []
+      ));
+
+      const piTokenEthFee = ether(0.0001).toString();
+      const poolWrapper = await PowerIndexWrapper.new(pool.address);
+      await poolWrapper.setController(poolController.address);
+
+      const piTokenFactory = await WrappedPiErc20Factory.new();
+      const routerFactory = await BasicPowerIndexRouterFactory.new();
+
+      await poolController.setPoolWrapper(poolWrapper.address);
+      await poolController.setPiTokenFactory(piTokenFactory.address);
+
+      const setWrapperData = pool.contract.methods.setWrapper(poolWrapper.address, true).encodeABI();
+      await poolController.callPool(setWrapperData.slice(0, 10), '0x' + setWrapperData.slice(10));
+
+      await poolController.replacePoolTokenWithNewPiToken(balancerTokens[0].address, routerFactory.address, defaultFactoryArguments, 'W T 1', 'WT1', {
+        value: piTokenEthFee
+      });
+
+      await time.increase(60);
+
+      await poolController.finishReplace();
+
+      await weightStrategy.setPool(pool.address, poolController.address, poolWrapper.address, true);
+
+      await this.checkWrappedWeights(pool, poolWrapper, balancerTokens, [
+        ether(6.25),
+        ether(6.25),
+        ether(6.25),
+        ether(6.25),
+        ether(6.25),
+        ether(6.25),
+        ether(6.25),
+        ether(6.25),
+      ]);
+
+      const newWeights = [
+        ether(4.27522969312300575),
+        ether(0.8192250845635515),
+        ether(2.3568871609580894),
+        ether(0.03597406567819765),
+        ether(1.71329301679621115),
+        ether(0.058388293980289425),
+        ether(1.300115757746299075),
+        ether(14.44088692715435605),
+      ];
+
+      const res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
+      assert.equal(res.logs.length, 9);
+
+      const poolData = await weightStrategy.poolsData(pool.address);
+      assert.equal(poolData.lastWeightsUpdate, await web3.eth.getBlock(res.receipt.blockNumber).then(b => b.timestamp));
+
+      await this.checkWrappedWeights(pool, poolWrapper, balancerTokens, newWeights);
     });
   });
 });
