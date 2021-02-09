@@ -25,7 +25,6 @@ const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRouterFactory');
 const ethers = require('ethers');
 const pIteration = require('p-iteration');
-const _ = require('lodash');
 
 WETH.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
