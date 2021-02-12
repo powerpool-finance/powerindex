@@ -6,7 +6,6 @@ const MockERC20 = artifacts.require('MockERC20');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexBasicRouter = artifacts.require('PowerIndexBasicRouter');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
-const MockRouter = artifacts.require('MockRouter');
 
 MockERC20.numberFormat = 'String';
 PowerIndexBasicRouter.numberFormat = 'String';
@@ -40,21 +39,29 @@ describe('PowerIndex BasicRouter Test', () => {
     );
   });
 
-  describe('weighed underlying', () => {
-    let leakingRouter, piToken, token;
-
-    beforeEach(async () => {
-      token = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
-      piToken = await WrappedPiErc20.new(token.address, stub, 'piToken', 'piTKN');
-      leakingRouter = await MockRouter.new(piToken.address, defaultBasicConfig);
-
-      await piToken.changeRouter(leakingRouter.address, { from: stub });
+  describe('initialization', () => {
+    it('should deny initialization with a RR > 100%', async () => {
+      const basicConfig = Object.assign({}, defaultBasicConfig, { reserveRatio: ether('1.01') });
+      await expectRevert(PowerIndexBasicRouter.new(alice, basicConfig), 'RR_GT_HUNDRED_PCT');
     });
 
-    it('should', async () => {
-      await token.transfer(alice, ether('100'));
-      await token.approve(piToken.address, ether('100'), { from: alice });
-      await piToken.deposit(ether('100'), { from: alice });
+    it('should deny initialization with a pvpFee >= 100%', async () => {
+      const basicConfig = Object.assign({}, defaultBasicConfig, { pvpFee: ether('1') });
+      await expectRevert(PowerIndexBasicRouter.new(alice, basicConfig), 'PVP_FEE_GTE_HUNDRED_PCT');
+    });
+
+    it('should deny initialization with a zero piToken address', async () => {
+      await expectRevert(PowerIndexBasicRouter.new(constants.ZERO_ADDRESS, defaultBasicConfig), 'INVALID_PI_TOKEN');
+    });
+
+    it('should deny initialization with a zero PVP address', async () => {
+      const basicConfig = Object.assign({}, defaultBasicConfig, { pvp: constants.ZERO_ADDRESS });
+      await expectRevert(PowerIndexBasicRouter.new(alice, basicConfig), 'INVALID_PVP_ADDR');
+    });
+
+    it('should deny initialization with a zero PoolRestrictions address', async () => {
+      const basicConfig = Object.assign({}, defaultBasicConfig, { poolRestrictions: constants.ZERO_ADDRESS });
+      await expectRevert(PowerIndexBasicRouter.new(alice, basicConfig), 'INVALID_POOL_RESTRICTIONS_ADDR');
     });
   });
 

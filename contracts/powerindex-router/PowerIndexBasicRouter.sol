@@ -48,7 +48,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   // 1 ether == 100%
   uint256 public pvpFee;
 
-  address[] public rewardPools;
+  address[] internal rewardPools;
 
   modifier onlyPiToken() {
     require(msg.sender == address(piToken), "ONLY_PI_TOKEN_ALLOWED");
@@ -57,8 +57,10 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
 
   constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexNaiveRouter() Ownable() {
     require(_piToken != address(0), "INVALID_PI_TOKEN");
-    require(_basicConfig.pvpFee < HUNDRED_PCT, "PVP_FEE_OVER_THE_LIMIT");
-    require(_basicConfig.pvp != address(0), "INVALID_PVP_ADD");
+    require(_basicConfig.reserveRatio <= HUNDRED_PCT, "RR_GT_HUNDRED_PCT");
+    require(_basicConfig.pvpFee < HUNDRED_PCT, "PVP_FEE_GTE_HUNDRED_PCT");
+    require(_basicConfig.pvp != address(0), "INVALID_PVP_ADDR");
+    require(_basicConfig.poolRestrictions != address(0), "INVALID_POOL_RESTRICTIONS_ADDR");
 
     piToken = WrappedPiErc20Interface(_piToken);
     poolRestrictions = IPoolRestrictions(_basicConfig.poolRestrictions);
@@ -85,7 +87,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     emit SetVotingAndStaking(_voting, _staking);
   }
 
-  function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) external override onlyOwner {
+  function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) public virtual override onlyOwner {
     require(_reserveRatio <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
     reserveRatio = _reserveRatio;
     rebalancingInterval = _rebalancingInterval;

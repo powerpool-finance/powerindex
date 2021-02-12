@@ -520,10 +520,6 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         await router1.setPiTokenEthFee(piTokenEthFee);
         await router1.mockSetRate(ether('0.5'));
 
-        await time.increase(60);
-
-        await poolController.finishReplace();
-
         res = await poolController.replacePoolTokenWithNewPiToken(balancerTokens[1].address, routerFactory.address, defaultFactoryArguments, 'W T 2', 'WT2', {
           value: piTokenEthFee
         });
@@ -534,10 +530,6 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         await router2.mockSetRate(ether('1.5'));
 
         await poolWrapper.updatePiTokenEthFees([balancerTokens[0].address, balancerTokens[1].address]);
-
-        await time.increase(60);
-
-        await poolController.finishReplace();
 
         piTokenTotalEthFee = await poolWrapper.calcEthFeeForTokens([balancerTokens[0].address, balancerTokens[1].address]);
 

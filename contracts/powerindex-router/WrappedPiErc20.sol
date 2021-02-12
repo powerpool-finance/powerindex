@@ -162,10 +162,7 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
           }
           default {
             // If there is a revert reason string hijacked, revert with it
-            mstore(0x40, add(output, size))
-            returndatacopy(output, 0, size)
-            mstore(0x40, add(output, size))
-            revert(output, size)
+            revert(add(data, 32), size)
           }
       }
     }

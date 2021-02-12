@@ -13,6 +13,7 @@ const ExchangeProxy = artifacts.require('ExchangeProxy');
 const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
+const PiptController = artifacts.require('PiptController');
 const MockErc20Migrator = artifacts.require('MockErc20Migrator');
 const PowerIndexRouter = artifacts.require('PowerIndexBasicRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
@@ -171,13 +172,9 @@ describe('PowerIndexPoolController', () => {
 
     poolWrapper = await PowerIndexWrapper.new(pool.address);
     wrapperFactory = await WrappedPiErc20Factory.new();
-    controller = await PowerIndexPoolController.new(pool.address, zeroAddress, wrapperFactory.address, weightsStrategy);
     routerFactory = await BasicPowerIndexRouterFactory.new();
 
     await pool.setWrapper(poolWrapper.address, true);
-    await pool.setController(controller.address);
-    await poolWrapper.setController(controller.address);
-    await controller.setPoolWrapper(poolWrapper.address);
 
     await time.increase(60);
 
@@ -208,6 +205,11 @@ describe('PowerIndexPoolController', () => {
   });
 
   it('setDynamicWeightListByStrategy should work properly', async () => {
+    controller = await PowerIndexPoolController.new(pool.address, zeroAddress, wrapperFactory.address, weightsStrategy);
+    await pool.setController(controller.address);
+    await poolWrapper.setController(controller.address);
+    await controller.setPoolWrapper(poolWrapper.address);
+
     const dwArg = {
       token: this.token2.address,
       targetDenorm: ether('15').toString(),
@@ -236,6 +238,11 @@ describe('PowerIndexPoolController', () => {
   });
 
   it('should allow swapping a token with a new version', async () => {
+    controller = await PowerIndexPoolController.new(pool.address, zeroAddress, wrapperFactory.address, weightsStrategy);
+    await pool.setController(controller.address);
+    await poolWrapper.setController(controller.address);
+    await controller.setPoolWrapper(poolWrapper.address);
+
     this.token3 = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
     this.migrator = await MockErc20Migrator.new(this.token2.address, this.token3.address, alice);
     const amount = await pool.getBalance(this.token2.address);
@@ -255,9 +262,6 @@ describe('PowerIndexPoolController', () => {
       balance: ether('20'),
       denormalizedWeight: ether('25'),
     });
-
-    await time.increase(60);
-    await controller.finishReplace();
 
     const price = (
       await pool.calcSpotPrice(
@@ -306,11 +310,13 @@ describe('PowerIndexPoolController', () => {
   });
 
   it('should allow swapping a token with a new wrapped version', async () => {
+    controller = await PowerIndexPoolController.new(pool.address, zeroAddress, wrapperFactory.address, weightsStrategy);
+    await pool.setController(controller.address);
+    await poolWrapper.setController(controller.address);
+    await controller.setPoolWrapper(poolWrapper.address);
+
     let res = await controller.replacePoolTokenWithNewPiToken(this.token2.address, routerFactory.address, defaultFactoryArgs, 'WrappedTKN2', 'WTKN2');
     const wToken2 = await WrappedPiErc20.at(res.logs.filter(l => l.event === 'ReplacePoolTokenWithPiToken')[0].args.piToken);
-
-    await time.increase(60);
-    await controller.finishReplace();
 
     await expectEvent.inTransaction(res.tx, BasicPowerIndexRouterFactory, 'BuildBasicRouter', {
       builder: controller.address
@@ -321,6 +327,9 @@ describe('PowerIndexPoolController', () => {
       balance: ether('20'),
       denormalizedWeight: ether('25'),
     });
+
+    assert.equal(await pool.isBound(this.token2.address), false);
+    assert.equal(await pool.isBound(wToken2.address), true);
 
     const price = (
       await pool.calcSpotPrice(
@@ -360,6 +369,11 @@ describe('PowerIndexPoolController', () => {
   });
 
   it('should allow swapping a token with existing wrapped version', async () => {
+    controller = await PiptController.new(pool.address, zeroAddress, wrapperFactory.address, weightsStrategy);
+    await pool.setController(controller.address);
+    await poolWrapper.setController(controller.address);
+    await controller.setPoolWrapper(poolWrapper.address);
+
     let res = await wrapperFactory.build(this.token2.address, stub, 'WrappedTKN2', 'WTKN2');
     const wToken2 = await WrappedPiErc20.at(res.logs[0].args.wrappedToken);
     const router = await PowerIndexRouter.new(wToken2.address, defaultBasicConfig);
@@ -385,6 +399,9 @@ describe('PowerIndexPoolController', () => {
         swapFee,
       )
     ).toString(10);
+
+    assert.equal(await pool.isBound(this.token2.address), false);
+    assert.equal(await pool.isBound(wToken2.address), true);
 
     assert.equal(await this.token1.balanceOf(alice), amountToSwap);
     const token1PoolBalanceBefore = await this.token1.balanceOf(pool.address);
@@ -414,14 +431,16 @@ describe('PowerIndexPoolController', () => {
   });
 
   it('should allow making a wrapped token join and exit', async () => {
+    controller = await PowerIndexPoolController.new(pool.address, zeroAddress, wrapperFactory.address, weightsStrategy);
+    await pool.setController(controller.address);
+    await poolWrapper.setController(controller.address);
+    await controller.setPoolWrapper(poolWrapper.address);
+
     let res = await controller.replacePoolTokenWithNewPiToken(this.token2.address, routerFactory.address, defaultFactoryArgs, 'WrappedTKN2', 'WTKN2');
     const wToken2 = await WrappedPiErc20.at(res.logs.filter(l => l.event === 'ReplacePoolTokenWithPiToken')[0].args.piToken);
     assert.equal(await wToken2.balanceOf(pool.address), ether('20'));
     assert.equal(await pool.isBound(this.token2.address), false);
     assert.equal(await pool.isBound(wToken2.address), true);
-
-    await time.increase(60);
-    await controller.finishReplace();
 
     const poolOutAmount = divScalarBN(
       mulScalarBN(amountToSwap, await pool.totalSupply()),

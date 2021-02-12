@@ -176,7 +176,7 @@ contract PowerIndexPool is BPool, Initializable {
     uint256 balance,
     uint256 denorm
   ) public override {
-    require(denorm == MIN_WEIGHT && _dynamicWeights[token].fromTimestamp == 0, "ONLY_NEW_TOKENS_ALLOWED");
+    require(_dynamicWeights[token].fromTimestamp == 0, "ONLY_NEW_TOKENS_ALLOWED");
     super.rebind(token, balance, denorm);
   }
 

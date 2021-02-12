@@ -1,5 +1,16 @@
-function buildBasicRouterConfig(poolRestrictions, voting, staking, reserveRatio, rebalancingInterval, pvp, pvpFee, rewardPools) {
-  return { poolRestrictions, voting, staking, reserveRatio, rebalancingInterval, pvp, pvpFee, rewardPools };
+function buildBasicRouterConfig(poolRestrictions, voting, staking, reserveRatio, rebalancingInterval, pvp, pvpFee, rewardPools, refundMaxGasPrice, refundPct) {
+  return {
+    poolRestrictions,
+    voting,
+    staking,
+    reserveRatio,
+    rebalancingInterval,
+    pvp,
+    pvpFee,
+    rewardPools,
+    refundMaxGasPrice,
+    refundPct,
+  };
 }
 
 // AAVE
@@ -23,6 +34,12 @@ function buildYearnRouterConfig(
 ) {
   return { YCRV, USDC, YFI, uniswapRouter, curveYDeposit, usdcYfiSwapPath };
 }
+
+// SUSHI
+function buildSushiRouterConfig(SUSHI) {
+  return { SUSHI };
+}
+
 
 const BasicConfig = {
   poolRestrictions: 'address',
@@ -52,7 +69,7 @@ function buildAaveRouterArgs(web3, basicConfig, aaveConfig) {
       },
       {
         AaveConfig: {
-          AAVE: 'address'
+          AAVE: 'address',
         },
       },
     ],
@@ -62,22 +79,22 @@ function buildAaveRouterArgs(web3, basicConfig, aaveConfig) {
 
 function buildYearnRouterArgs(web3, basicConfig, yearnConfig) {
   return web3.eth.abi.encodeParameters(
-      [
-        {
-          BasicConfig,
+    [
+      {
+        BasicConfig,
+      },
+      {
+        YearnConfig: {
+          YCRV: 'address',
+          USDC: 'address',
+          YFI: 'address',
+          uniswapRouter: 'address',
+          curveYDeposit: 'address',
+          usdcYfiSwapPath: 'address[]',
         },
-        {
-          YearnConfig: {
-            YCRV: 'address',
-            USDC: 'address',
-            YFI: 'address',
-            uniswapRouter: 'address',
-            curveYDeposit: 'address',
-            usdcYfiSwapPath: 'address[]',
-          },
-        },
-      ],
-      [basicConfig, yearnConfig],
+      },
+    ],
+    [basicConfig, yearnConfig],
   );
 }
 
@@ -85,6 +102,7 @@ module.exports = {
   buildYearnRouterConfig,
   buildBasicRouterConfig,
   buildAaveRouterConfig,
+  buildSushiRouterConfig,
   buildAaveAssetConfigInput,
   buildBasicRouterArgs,
   buildYearnRouterArgs,

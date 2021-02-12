@@ -256,6 +256,7 @@ async function forkReplacePoolTokenWithNewPiToken(
   admin
 ) {
   const MockERC20 = await artifacts.require('MockERC20');
+  const {web3} = MockERC20;
   const token = await MockERC20.at(tokenAddress);
   const PowerIndexPool = await artifacts.require('PowerIndexPool');
   const WrappedPiErc20 = await artifacts.require('WrappedPiErc20');
@@ -263,8 +264,15 @@ async function forkReplacePoolTokenWithNewPiToken(
   const pool = await PowerIndexPool.at(await callContract(controller, 'pool'))
   console.log('pool getBalance before', await callContract(pool, 'getBalance', [token.address]));
 
+  const [account] = await web3.eth.getAccounts();
+  await web3.eth.sendTransaction({
+    from: account,
+    to: admin,
+    value: ether(10)
+  })
   await pool.setController(controller.address, {from: admin});
 
+  console.log('await callContract(pool, "getDenormalizedWeight", [token])', await callContract(pool, 'getDenormalizedWeight', [tokenAddress]));
   const res = await controller.replacePoolTokenWithNewPiToken(
     tokenAddress,
     factoryAddress,
@@ -286,6 +294,7 @@ async function forkReplacePoolTokenWithNewPiToken(
 
   console.log('await callContract(pool, "isBound", [token])', await callContract(pool, 'isBound', [tokenAddress]));
   console.log('await callContract(pool, "isBound", [wrappedTokenAddress])', await callContract(pool, 'isBound', [wrappedTokenAddress]));
+  console.log('await callContract(pool, "getDenormalizedWeight", [wrappedTokenAddress])', await callContract(pool, 'getDenormalizedWeight', [wrappedTokenAddress]));
 
   return {
     token,
