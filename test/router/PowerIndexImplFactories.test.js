@@ -1,5 +1,5 @@
-const { expectEvent } = require('@openzeppelin/test-helpers');
-const { ether } = require('../helpers/index');
+const { expectEvent, constants } = require('@openzeppelin/test-helpers');
+const { ether, artifactFromBytecode } = require('../helpers/index');
 const { buildBasicRouterConfig, buildYearnRouterConfig } = require('../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
@@ -11,6 +11,8 @@ const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
 const BasicPowerIndexRouterFactory = artifacts.require('BasicPowerIndexRouterFactory');
 const AavePowerIndexRouterFactory = artifacts.require('AavePowerIndexRouterFactory');
 const YearnPowerIndexRouterFactory = artifacts.require('YearnPowerIndexRouterFactory');
+
+const StakedAaveV2 = artifactFromBytecode('aave/StakedAaveV2');
 
 MockERC20.numberFormat = 'String';
 PowerIndexBasicRouter.numberFormat = 'String';
@@ -26,7 +28,6 @@ describe('PowerIndex Implementation Factories Test', () => {
     stub,
     token,
     voting,
-    staking,
     poolRestrictions,
     ycrv,
     usdc,
@@ -36,6 +37,7 @@ describe('PowerIndex Implementation Factories Test', () => {
     pvp;
   let defaultBasicConfig;
   let defaultFactoryArguments;
+  let stakedAave;
 
   before(async function() {
     [
@@ -46,7 +48,6 @@ describe('PowerIndex Implementation Factories Test', () => {
       stub,
       token,
       voting,
-      staking,
       poolRestrictions,
       ycrv,
       usdc,
@@ -55,10 +56,29 @@ describe('PowerIndex Implementation Factories Test', () => {
       curveYDeposit,
       pvp,
     ] = await web3.eth.getAccounts();
+    // The staking is AAVE's one, but it's OK that others use it in these test cass.
+    stakedAave = await StakedAaveV2.new(
+      // 0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9
+      alice,
+      alice,
+      // cooldownSeconds
+      864000,
+      // unstakeWindow
+      172800,
+      alice,
+      alice,
+      // distributionDuration
+      12960000,
+      'Staked Aave',
+      'stkAAVE',
+      18,
+      // governance
+      constants.ZERO_ADDRESS,
+    );
     defaultBasicConfig = buildBasicRouterConfig(
       poolRestrictions,
       voting,
-      staking,
+      stakedAave.address,
       ether('0.3'),
       4,
       pvp,
@@ -96,7 +116,7 @@ describe('PowerIndex Implementation Factories Test', () => {
     assert.equal(await router.owner(), deployer);
     assert.equal(await router.reserveRatio(), ether('0.3'));
     assert.equal(await router.rebalancingInterval(), 4);
-    assert.equal(await router.staking(), staking);
+    assert.equal(await router.staking(), stakedAave.address);
     assert.equal(await router.poolRestrictions(), poolRestrictions);
     assert.equal(await router.pvp(), pvp);
     assert.equal(await router.pvpFee(), ether('0.15'));
@@ -153,7 +173,7 @@ describe('PowerIndex Implementation Factories Test', () => {
     assert.equal(await router.owner(), deployer);
     assert.equal(await router.reserveRatio(), ether('0.3'));
     assert.equal(await router.rebalancingInterval(), 4);
-    assert.equal(await router.staking(), staking);
+    assert.equal(await router.staking(), stakedAave.address);
     assert.equal(await router.poolRestrictions(), poolRestrictions);
     assert.equal(await router.pvp(), pvp);
     assert.equal(await router.pvpFee(), ether('0.15'));
@@ -181,7 +201,7 @@ describe('PowerIndex Implementation Factories Test', () => {
     assert.equal(await router.owner(), deployer);
     assert.equal(await router.reserveRatio(), ether('0.3'));
     assert.equal(await router.rebalancingInterval(), 4);
-    assert.equal(await router.staking(), staking);
+    assert.equal(await router.staking(), stakedAave.address);
     assert.equal(await router.poolRestrictions(), poolRestrictions);
     assert.equal(await router.pvp(), pvp);
     assert.equal(await router.pvpFee(), ether('0.15'));
