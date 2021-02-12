@@ -1,5 +1,6 @@
 const { expectRevert, time, ether } = require('@openzeppelin/test-helpers');
 const { createSnapshot, revertToSnapshot } = require('./helpers/blockchain');
+const { advanceBlocks } = require('./helpers');
 const assert = require('chai').assert;
 const CvpToken = artifacts.require('MockCvp');
 const LPMining = artifacts.require('LPMining');
@@ -997,9 +998,74 @@ describe('VestedLPMining', () => {
       await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 110
       assert.equal(await this.allCvpOf(bob), '1060');
 
+      let user = await this.lpMining.users('0', bob);
+      let userPB = await this.lpMining.usersPoolBoost('0', bob);
+      assert.equal(user.lptAmount.toString(), '100');
+      assert.equal(user.pendedCvp.toString(), '884');
+      assert.equal(user.cvpAdjust.toString(), '1060');
+      assert.equal(userPB.balance.toString(), '1000');
+
       poolBoost = await this.lpMining.poolBoostByLp('0');
       assert.equal(poolBoost.accCvpPerLpBoost.toString(), '200000000000');
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '40000000000');
+
+      await this.lpMining.withdraw(0, '100', '1000', {from: bob});
+      assert.equal(await this.allCvpOf(bob), '2166');
+
+      user = await this.lpMining.users('0', bob);
+      userPB = await this.lpMining.usersPoolBoost('0', bob);
+      assert.equal(user.lptAmount.toString(), '0');
+      assert.equal(user.pendedCvp.toString(), '971');
+      assert.equal(user.cvpAdjust.toString(), '0');
+      assert.equal(userPB.balance.toString(), '0');
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '2185');
+
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
+
+      await time.advanceBlockTo(this.shiftBlock('119'));
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '2346');
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
+
+      await time.advanceBlockTo(this.shiftBlock('129'));
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '2588');
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
+
+      await time.advanceBlockTo(this.shiftBlock('139'));
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '2911');
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
+
+      await time.advanceBlockTo(this.shiftBlock('219'));
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '3137');
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
+
+      await time.advanceBlockTo(this.shiftBlock('319'));
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '3137');
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
+
+      await time.advanceBlockTo(this.shiftBlock('419'));
+
+      await this.lpMining.deposit(0, '0', 0, { from: bob });
+      assert.equal(await this.allCvpOf(bob), '3137');
+      user = await this.lpMining.users('0', bob);
+      assert.equal(user.pendedCvp.toString(), '971');
     });
 
     it('should revert deposit and withdraw if not enough for boost', async () => {
@@ -1056,8 +1122,8 @@ describe('VestedLPMining', () => {
       assert.equal((await this.lpMining.lpBoostRatioByToken(this.lp.address)).toString(), scale('10'));
       assert.equal((await this.lpMining.lpBoostMaxRatioByToken(this.lp.address)).toString(), scale('20'));
 
-      await this.cvp.mint(bob, '1000');
-      await this.cvp.approve(this.lpMining.address, '1000', {from: bob});
+      await this.cvp.mint(bob, '1100');
+      await this.cvp.approve(this.lpMining.address, '1100', {from: bob});
       await time.advanceBlockTo(this.shiftBlock('99'));
       await this.lpMining.deposit(0, '100', '1000', {from: bob}); // block 100
 
@@ -1074,12 +1140,14 @@ describe('VestedLPMining', () => {
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '4000000000');
 
       await time.advanceBlockTo(this.shiftBlock('109'));
-      await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 110
-      assert.equal(await this.allCvpOf(bob), '1000');
+      await expectRevert(this.lpMining.deposit(0, '0', 0, { from: bob }), 'BOOST_BOUNDS'); // block 110
+      await expectRevert(this.lpMining.withdraw(0, '0', 0, { from: bob }), 'BOOST_BOUNDS'); // block 110
+      await this.lpMining.deposit(0, '0', '100', { from: bob }); // block 110
+      assert.equal(await this.allCvpOf(bob), '1272');
 
       poolBoost = await this.lpMining.poolBoostByLp('0');
-      assert.equal(poolBoost.accCvpPerLpBoost.toString(), '200000000000');
-      assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '40000000000');
+      assert.equal(poolBoost.accCvpPerLpBoost.toString(), '240000000000');
+      assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '48000000000');
     });
 
     it('should not boost if cvp balance excess', async () => {
@@ -1105,14 +1173,16 @@ describe('VestedLPMining', () => {
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '2000000000');
 
       await time.advanceBlockTo(this.shiftBlock('109'));
-      await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 110
-      assert.equal(await this.allCvpOf(bob), '1000');
+      await expectRevert(this.lpMining.deposit(0, '0', 0, { from: bob }), 'BOOST_BOUNDS'); // block 110
+      await expectRevert(this.lpMining.withdraw(0, '0', 0, { from: bob }), 'BOOST_BOUNDS'); // block 110
+      await this.lpMining.withdraw(0, '0', '100', { from: bob }); // block 110
+      assert.equal(await this.allCvpOf(bob), '1372');
 
       poolBoost = await this.lpMining.poolBoostByLp('0');
       assert.equal(poolBoost.lpBoostRate.toString(), scale('2'));
       assert.equal(poolBoost.cvpBoostRate.toString(), scale('4'));
-      assert.equal(poolBoost.accCvpPerLpBoost.toString(), '200000000000');
-      assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '20000000000');
+      assert.equal(poolBoost.accCvpPerLpBoost.toString(), '240000000000');
+      assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '24000000000');
     });
 
     it('should correctly boost with lpBoostRate: 4 and cvpBoostRate: 4', async () => {
@@ -1160,6 +1230,10 @@ describe('VestedLPMining', () => {
       assert.equal(poolBoost.accCvpPerCvpBoost.toString(), '80000000000');
       assert.equal((await this.lpMining.lpBoostRatioByToken(this.lp.address)).toString(), scale('10'));
       assert.equal((await this.lpMining.lpBoostMaxRatioByToken(this.lp.address)).toString(), scale('20'));
+
+      await advanceBlocks(1);
+      await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 110
+      assert.equal(await this.allCvpOf(bob), '1344');
     });
 
     it('should correctly enable boost in existing pool with lpBoostRate: 4 and cvpBoostRate: 8', async () => {
