@@ -16,6 +16,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
   event AddPool(address indexed pool, address indexed poolController);
   event SetPool(address indexed pool, address indexed poolController, bool indexed active);
   event SetExcludeTokenBalances(address indexed token, address[] excludeTokenBalances);
+  event SetWeightsChangeDuration(uint256 weightsChangeDuration);
   event FetchTokenMCap(address indexed pool, address indexed token, uint256 mCap);
   event UpdatePoolWeights(
     address indexed pool,
@@ -54,6 +55,8 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
   mapping(address => Pool) public poolsData;
   mapping(address => address[]) public excludeTokenBalances;
 
+  uint256 weightsChangeDuration;
+
   IPowerOracle public oracle;
   IPowerPoke public powerPoke;
 
@@ -78,10 +81,21 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
 
   constructor() public OwnableUpgradeSafe() {}
 
-  function initialize(address _oracle, address _powerPoke) external initializer {
+  function initialize(
+    address _oracle,
+    address _powerPoke,
+    uint256 _weightsChangeDuration
+  ) external initializer {
     __Ownable_init();
     oracle = IPowerOracle(_oracle);
     powerPoke = IPowerPoke(_powerPoke);
+    weightsChangeDuration = _weightsChangeDuration;
+  }
+
+  function setWeightsChangeDuration(uint256 _weightsChangeDuration) external onlyOwner {
+    weightsChangeDuration = _weightsChangeDuration;
+
+    emit SetWeightsChangeDuration(_weightsChangeDuration);
   }
 
   function setExcludeTokenBalances(address _token, address[] calldata _excludeTokenBalances) external onlyOwner {
@@ -236,7 +250,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
           pv.minWPS,
           pv.maxWPS,
           pv.fromTimestamp,
-          pv.fromTimestamp + minInterval
+          pv.fromTimestamp + weightsChangeDuration
         );
 
       PowerIndexPoolController.DynamicWeightInput[] memory dws;
@@ -248,7 +262,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
             weightsChange[i][1],
             weightsChange[i][2],
             pv.fromTimestamp,
-            pv.fromTimestamp + minInterval
+            pv.fromTimestamp + weightsChangeDuration
           );
         if (wps > pv.maxWPS) {
           weightsChange[i][2] = bmul(minInterval, pv.maxWPS);
@@ -260,7 +274,7 @@ contract MCapWeightStrategy is OwnableUpgradeSafe, BNum {
             dws[pv.iToPush].token = pv.piTokens[weightsChange[i][0]];
           }
           dws[pv.iToPush].fromTimestamp = pv.fromTimestamp;
-          dws[pv.iToPush].targetTimestamp = pv.fromTimestamp + minInterval;
+          dws[pv.iToPush].targetTimestamp = pv.fromTimestamp + weightsChangeDuration;
           dws[pv.iToPush].targetDenorm = weightsChange[i][2];
           pv.iToPush++;
         }

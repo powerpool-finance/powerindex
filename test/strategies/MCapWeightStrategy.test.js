@@ -170,7 +170,8 @@ describe('MCapWeightStrategy', () => {
     let tokens, balancerTokens, bPoolBalances, pool, poolController, weightStrategy, oracle, poke, fastGasOracle, staking, cvpToken;
 
     const tokenBySymbol = {};
-    const pokePeriod = 14 * 60 * 60 * 24;
+    const pokePeriod = 7 * 60 * 60 * 24;
+    const weightsChangePeriod = 14 * 60 * 60 * 24;
     let compensationOpts;
 
     beforeEach(async () => {
@@ -210,7 +211,7 @@ describe('MCapWeightStrategy', () => {
       weightStrategy = await deployProxied(
         MCapWeightStrategy,
         [],
-        [oracle.address, poke.address],
+        [oracle.address, poke.address, weightsChangePeriod],
         { proxyAdminOwner: minter }
       );
 
@@ -341,6 +342,7 @@ describe('MCapWeightStrategy', () => {
 
       let res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
       assert.equal(res.logs.length, 9);
+      const pokeTimestamp = await web3.eth.getBlock(res.receipt.blockNumber).then(b => b.timestamp);
 
       const targetWeights = [];
       let targetWeightsSum = '0';
@@ -348,6 +350,7 @@ describe('MCapWeightStrategy', () => {
         const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
         targetWeights[i] = dw.targetDenorm;
         targetWeightsSum = addBN(targetWeightsSum, dw.targetDenorm);
+        assert.equal(dw.targetTimestamp, addBN(addBN(pokeTimestamp, weightsChangePeriod), '1'));
       }
 
       const normalizedTargetWeights = [
@@ -365,7 +368,7 @@ describe('MCapWeightStrategy', () => {
         assertEqualWithAccuracy(divScalarBN(dw.targetDenorm, targetWeightsSum), normalizedTargetWeights[i]);
       }
 
-      await time.increase(pokePeriod / 2);
+      await time.increase(weightsChangePeriod / 2);
 
       const normalizedCurrentWeights = [
         ether('0.140336362097930646'),
@@ -385,13 +388,15 @@ describe('MCapWeightStrategy', () => {
         assertEqualWithAccuracy(await pool.getNormalizedWeight(balancerTokens[i].address), normalizedCurrentWeights[i], '5000000000000');
       }
 
-      await weightStrategy.pausePool(pool.address);
+      res = await weightStrategy.pausePool(pool.address);
+      const pauseTimestamp = await web3.eth.getBlock(res.receipt.blockNumber).then(b => b.timestamp);
 
       for (let i = 0; i < balancerTokens.length; i++) {
         const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
         assert.notEqual(targetWeights[i], dw.targetDenorm);
         assertEqualWithAccuracy(dw.targetDenorm, currentWeights[i], '5000000000000');
         assertEqualWithAccuracy(await pool.getNormalizedWeight(balancerTokens[i].address), normalizedCurrentWeights[i], '5000000000000');
+        assert.equal(dw.targetTimestamp, addBN(pauseTimestamp, '2'));
       }
 
       await time.increase(pokePeriod / 2);
