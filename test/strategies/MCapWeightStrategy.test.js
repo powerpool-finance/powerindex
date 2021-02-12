@@ -539,7 +539,7 @@ describe('MCapWeightStrategy', () => {
       ]);
     });
 
-    it('pokeFromReporter and pokeFromSlasher should work properly', async () => {
+    it('pokeFromReporter and pokeFromSlasher should work properly with wrapped tokens', async () => {
       const defaultFactoryArguments = buildBasicRouterArgs(web3, buildBasicRouterConfig(
         this.poolRestrictions.address,
         constants.ZERO_ADDRESS,
@@ -568,22 +568,7 @@ describe('MCapWeightStrategy', () => {
         value: piTokenEthFee
       });
 
-      await time.increase(60);
-
-      await poolController.finishReplace();
-
       await weightStrategy.setPool(pool.address, poolController.address, poolWrapper.address, true);
-
-      await this.checkWrappedWeights(pool, poolWrapper, balancerTokens, [
-        ether(6.25),
-        ether(6.25),
-        ether(6.25),
-        ether(6.25),
-        ether(6.25),
-        ether(6.25),
-        ether(6.25),
-        ether(6.25),
-      ]);
 
       const newWeights = [
         ether(4.27522969312300575),
