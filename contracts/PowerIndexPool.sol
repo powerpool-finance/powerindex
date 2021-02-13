@@ -18,6 +18,7 @@ pragma solidity 0.6.12;
 import "./balancer-core/BPool.sol";
 import "./interfaces/PowerIndexPoolInterface.sol";
 import "@openzeppelin/contracts/proxy/Initializable.sol";
+import "hardhat/console.sol";
 
 contract PowerIndexPool is BPool, Initializable {
   /// @notice The event emitted when a dynamic weight set to token.
@@ -176,8 +177,10 @@ contract PowerIndexPool is BPool, Initializable {
     uint256 balance,
     uint256 denorm
   ) public override {
-    require(_dynamicWeights[token].fromTimestamp == 0, "ONLY_NEW_TOKENS_ALLOWED");
     super.rebind(token, balance, denorm);
+    _dynamicWeights[token].fromTimestamp = 0;
+    _dynamicWeights[token].targetTimestamp = 0;
+    _dynamicWeights[token].targetDenorm = 0;
   }
 
   /*** View Functions ***/

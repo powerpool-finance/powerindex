@@ -15,6 +15,7 @@ require('./tasks/deployYearnRouter');
 require('./tasks/deployAaveRouter');
 require('./tasks/deployProxyFactory');
 require('./tasks/deployMainnetAssy');
+require('./tasks/rebindMCapWeights');
 require('./tasks/testVestedLpMiningProxy');
 
 const fs = require('fs');
@@ -78,7 +79,7 @@ const config = {
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
       gasPrice: 90 * 10 ** 9,
-      accounts: getAccounts('mainnet'),
+      // accounts: getAccounts('mainnet'),
       gasMultiplier: 2,
       timeout: 2000000,
     },
