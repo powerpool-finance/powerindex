@@ -1,15 +1,19 @@
 require('@nomiclabs/hardhat-truffle5');
 
 const fs = require('fs');
+const pIteration = require('p-iteration');
 
 task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
   const wethAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
   const balancerPoolAddress = '0x26607ac599266b21d13c7acf7942c7701a8b699c';
   const uniswapFactoryAddress = '0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f';
+  const oracleAddress = '0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB';
 
   const BPool = artifacts.require('BPool');
+  const MockOracle = artifacts.require('MockOracle');
   const MockERC20 = artifacts.require('MockERC20');
 
+  const oracle = await MockOracle.at(oracleAddress);
   const pool = await BPool.at(balancerPoolAddress);
   const tokensAddresses = await callContract(pool, 'getCurrentTokens', [], 'array');
 
@@ -17,6 +21,13 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
   tokensAddresses.push('0x6b175474e89094c44da98b954eedeac495271d0f'); // DAI
   tokensAddresses.push('0xdac17f958d2ee523a2206206994597c13d831ec7'); // USDT
   tokensAddresses.push('0x4Fabb145d64652a948d72533023f6E7A623C7C53'); // BUSD
+
+  const getExcludeBalancesBySymbol = {
+    'CVP': ['0xb258302c3f209491d604165549079680708581cc'],
+    'SNX': ['0xda4ef8520b1a57d7d63f1e249606d1a459698876'],
+    'UNI': ['0xe3953d9d317b834592ab58ab2c7a6ad22b54075d'],
+    'COMP': ['0x2775b1c75658be0f640272ccb8c72ac986009e38'],
+  };
 
   const UniswapV2Factory = artifacts.require('UniswapV2Factory');
   const UniswapV2Pair = artifacts.require('UniswapV2Pair');
@@ -41,11 +52,19 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
     }
     const balancerBalance = await callContract(pool, 'getBalance', [tokensAddresses[i]]).catch(() => '0');
 
+    const tokenSymbol = await callContract(token, 'symbol').catch(() => 'MKR');
+
+    const excludeBalancesAddresses = getExcludeBalancesBySymbol[tokenSymbol] || [];
+    const excludeBalances = await pIteration.map(excludeBalancesAddresses, (a) => callContract(token, 'balanceOf', [a]))
+
     tokens.push({
       tokenAddress: tokensAddresses[i],
-      tokenSymbol: await callContract(token, 'symbol').catch(() => 'MKR'),
+      tokenSymbol: tokenSymbol,
       tokenDecimals: await callContract(token, 'decimals').catch(() => '18'),
+      totalSupply: await callContract(token, 'totalSupply'),
       balancerBalance,
+      excludeBalances,
+      oraclePrice: await callContract(oracle, 'assetPrices', [tokensAddresses[i]]).catch(() => '0'),
       uniswapPair: {
         address: pairAddress,
         tokenReserve,

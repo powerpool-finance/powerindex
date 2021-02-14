@@ -32,8 +32,11 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
   /** @dev Emitted on finishing pool replacing. */
   event ReplacePoolTokenFinish();
 
-  /** @dev Emitted on bpoolWrapper update. */
-  event SetPoolWrapper(address indexed bpoolWrapper);
+  /** @dev Emitted on poolWrapper update. */
+  event SetPoolWrapper(address indexed poolWrapper);
+
+  /** @dev Emitted on piTokenFactory update. */
+  event SetPiTokenFactory(address indexed piTokenFactory);
 
   /** @dev Emitted on creating piToken. */
   event CreatePiToken(address indexed underlyingToken, address indexed piToken, address indexed router);
@@ -62,6 +65,15 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
   function setPoolWrapper(address _poolWrapper) external onlyOwner {
     poolWrapper = PowerIndexWrapperInterface(_poolWrapper);
     emit SetPoolWrapper(_poolWrapper);
+  }
+
+  /**
+   * @dev Set piTokenFactory contract address.
+   * @param _piTokenFactory Address of PiToken factory.
+   */
+  function setPiTokenFactory(address _piTokenFactory) external onlyOwner {
+    piTokenFactory = WrappedPiErc20FactoryInterface(_piTokenFactory);
+    emit SetPiTokenFactory(_piTokenFactory);
   }
 
   /**

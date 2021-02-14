@@ -547,7 +547,7 @@
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts-ethereum-package/-/contracts-ethereum-package-3.0.0.tgz#d5db971a177c3b37733db2ee4ebdb79c67575d64"
   integrity sha512-Xg33RtX7FGbSK/YnroLhcGNAvH30/C84NRW8KvbSdXXYiLA8YqM1bOA9sAeLjmQxXqYUn/YL4AUVTgDnG51NOw==
 
-"@openzeppelin/contracts@^3.1.0":
+"@openzeppelin/contracts@3.3.0":
   version "3.3.0"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.3.0.tgz#ffdb693c5c349fc33bba420248dd3ac0a2d7c408"
   integrity sha512-AemZEsQYtUp1WRkcmZm1div5ORfTpLquLaziCIrSagjxyKdmObxuaY1yjQ5SHFMctR8rLwp706NXTbiIRJg7pw==
@@ -629,6 +629,12 @@
     debug "^4.1.1"
     ganache-core "git+https://github.com/powerpool-finance/ganache-core.git#0a5c84185c26216a152293debbe5dac6769b5212"
     ts-interface-checker "^0.1.9"
+
+"@powerpool/poweroracle@git://github.com/powerpool-finance/power-oracle-contracts.git#9ce4bf9":
+  version "1.0.0"
+  resolved "git://github.com/powerpool-finance/power-oracle-contracts.git#9ce4bf915b2d03b4e2e50ab68712165e379d1640"
+  dependencies:
+    hardhat-typechain "^0.3.4"
 
 "@resolver-engine/core@^0.2.1":
   version "0.2.1"
@@ -5229,6 +5235,11 @@ hardhat-gas-reporter@^1.0.1:
   dependencies:
     eth-gas-reporter "^0.2.20"
     sha1 "^1.1.1"
+
+hardhat-typechain@^0.3.4:
+  version "0.3.4"
+  resolved "https://registry.yarnpkg.com/hardhat-typechain/-/hardhat-typechain-0.3.4.tgz#6d7d86184152b5a3c83bde0fbbb26224b6fbfd70"
+  integrity sha512-oI9YSutDfZnRlAV1bYTpLkBHw4rkhz9JDWAEXz2PR34ylpgLWxPFbPiHT5QXadGTlBqJUAT6JSTxCK1kADMkjA==
 
 hardhat@^2.0.3:
   version "2.0.7"
