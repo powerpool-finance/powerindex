@@ -18,7 +18,6 @@ pragma solidity 0.6.12;
 import "./balancer-core/BPool.sol";
 import "./interfaces/PowerIndexPoolInterface.sol";
 import "@openzeppelin/contracts/proxy/Initializable.sol";
-import "hardhat/console.sol";
 
 contract PowerIndexPool is BPool, Initializable {
   /// @notice The event emitted when a dynamic weight set to token.

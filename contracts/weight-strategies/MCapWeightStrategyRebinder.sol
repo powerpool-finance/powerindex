@@ -50,7 +50,7 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
     RebindOperation[] memory _ops
   ) public onlyOwner {
     address[] memory tokens = _pool.getCurrentTokens();
-    uint256 len = tokens.length;
+    uint256 len = _ops.length;
 
     for (uint256 i = 0; i < len; i++) {
       if (!_ops[i].opAfter) {
@@ -58,8 +58,10 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
       }
 
       if (_ops[i].newBalance > _ops[i].oldBalance) {
-        IERC20(_ops[i].token).approve(address(_pool), _ops[i].newBalance - _ops[i].oldBalance);
-        _pool.rebind(_ops[i].token, _ops[i].oldBalance + IERC20(_ops[i].token).balanceOf(address(this)), _ops[i].newWeight);
+        _ops[i].oldBalance = _pool.getBalance(_ops[i].token);
+        uint256 amountToAdd = IERC20(_ops[i].token).balanceOf(address(this));
+        IERC20(_ops[i].token).approve(address(_pool), amountToAdd);
+        _pool.rebind(_ops[i].token, _ops[i].oldBalance + amountToAdd, _ops[i].newWeight);
       } else {
         _pool.rebind(_ops[i].token, _ops[i].newBalance, _ops[i].newWeight);
       }
@@ -69,7 +71,7 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
       }
     }
 
-    setController(_pool, _newController);
+//    setController(_pool, _newController);
   }
 
   function _runOperation(RebindOperation memory _op) internal {
@@ -78,7 +80,7 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
         IERC20(_op.opToken).approve(operationsContract, _op.opApproveAmount);
       }
       (bool success, bytes memory resData) = operationsContract.call(_op.opData);
-//      require(success, "NOT_SUCCESS");
+      require(success, "NOT_SUCCESS");
       emit ExecuteOperation(operationsContract, success, _op.opData, resData);
     }
   }
@@ -91,7 +93,7 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
     uint256 len = _tokens.length;
     uint256[] memory oldBalances = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
-      oldBalances[i] = _pool.getBalance(_tokens[i]);
+      oldBalances[i] = IERC20(_tokens[i]).balanceOf(address(_pool));
     }
 
     uint256 now = block.timestamp;
