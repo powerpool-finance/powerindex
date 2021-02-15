@@ -178,17 +178,6 @@ describe('PowerIndexPool Unit', () => {
   });
 
   describe('disabled functions', async () => {
-    it('original rebind should be disabled', async () => {
-      await this.token1.approve(pool.address, ether('1'));
-      await expectRevert(
-        pool.rebind(this.token1.address, ether('1'), ether('10'), { from: controller }),
-        'ONLY_NEW_TOKENS_ALLOWED',
-      );
-      await expectRevert(
-        pool.rebind(this.token1.address, await pool.MIN_WEIGHT(), ether('10'), { from: controller }),
-        'ONLY_NEW_TOKENS_ALLOWED',
-      );
-    });
     it('original bind should be disabled in controller', async () => {
       const poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
       await pool.setController(poolController.address);
