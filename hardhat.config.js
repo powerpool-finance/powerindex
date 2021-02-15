@@ -16,6 +16,7 @@ require('./tasks/deployAaveRouter');
 require('./tasks/deployProxyFactory');
 require('./tasks/deployMainnetAssy');
 require('./tasks/rebindMCapWeights');
+require('./tasks/deployMainnetWeightsStrategy');
 require('./tasks/testVestedLpMiningProxy');
 
 const fs = require('fs');

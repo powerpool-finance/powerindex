@@ -68,9 +68,9 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
       needToBuyUsdSum = addBN(needToBuyUsdSum, usdSumByToken[c.token]);
     }
   })
-  const share = 0.96;
-  console.log('share', share);
-  rebindConfigs[0].newBalance = mulScalarBN(rebindConfigs[0].newBalance, ether(share));
+  const subShare = 0.05;
+  console.log('subShare', subShare);
+  rebindConfigs[0].newBalance = subBN(rebindConfigs[0].newBalance, mulScalarBN(subBN(rebindConfigs[0].oldBalance, rebindConfigs[0].newBalance), ether(subShare)));
   const yfiBalanceToSwap = subBN(rebindConfigs[0].oldBalance, rebindConfigs[0].newBalance);
   console.log('yfiBalanceToSwap', fromEther(yfiBalanceToSwap))
 
@@ -99,12 +99,8 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
     }
   }).then(res => res.filter(r => r));
 
-  console.log('\nbefore:')
-  await pIteration.forEachSeries(tokens, async (t, i) => {
-    const token = await MockERC20.at(t);
-    console.log(await callContract(token, 'symbol'), 'balance', fromEther(await callContract(pool, 'getBalance', [t])), 'weight', fromEther(await callContract(pool, 'getNormalizedWeight', [t])), 'price', fromEther(await callContract(pool, 'getSpotPrice', [t, i === 0 ? tokens[tokens.length - 1] : tokens[i - 1]])));
-  });
-  console.log('balancerPoolUsdTokensSum', fromEther(await instantPrice.balancerPoolUsdTokensSum(poolAddress)));
+  console.log('\nbefore:');
+  await logPrices();
   await pool.setController(rebinder.address, {from: admin});
 
   await rebinder.runRebind(poolAddress, admin, ops, {from: admin, gas: 12000000});
@@ -136,11 +132,8 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
   })
 
   console.log('\nafter:')
-  await pIteration.forEachSeries(tokens, async (t, i) => {
-    const token = await MockERC20.at(t);
-    console.log(await callContract(token, 'symbol'), 'balance', fromEther(await callContract(pool, 'getBalance', [t])), 'weight', fromEther(await callContract(pool, 'getNormalizedWeight', [t])), 'price', fromEther(await callContract(pool, 'getSpotPrice', [t, i === 0 ? tokens[tokens.length - 1] : tokens[i - 1]])));
-  });
-  console.log('balancerPoolUsdTokensSum', fromEther(await instantPrice.balancerPoolUsdTokensSum(poolAddress)));
+  await logPrices();
+
   function ether(amount) {
     return toWei(amount.toString(), 'ether');
   }
@@ -167,6 +160,33 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
   }
   function divScalarBN(bn1, bn2) {
     return divBN(mulBN(bn1, toBN(ether(1))), bn2).toString(10);
+  }
+  async function logPrices() {
+    const totalDenorm = await callContract(pool, 'getTotalDenormalizedWeight', []);
+    const swapFee = await callContract(pool, 'getSwapFee', []);
+
+    await pIteration.forEachSeries(tokens, async (t, i) => {
+      const token = await MockERC20.at(t);
+      const [balance, denorm, totalSupply] = await Promise.all([
+        callContract(pool, 'getBalance', [t]),
+        callContract(pool, 'getDenormalizedWeight', [t]),
+        callContract(pool, 'totalSupply', [])
+      ]);
+      console.log(
+        await callContract(token, 'symbol'),
+        'balance',
+        fromEther(balance),
+        'denorm',
+        fromEther(denorm),
+        'weight',
+        fromEther(await callContract(pool, 'getNormalizedWeight', [t])),
+        'price',
+        fromEther(await callContract(pool, 'getSpotPrice', [t, i === 0 ? tokens[tokens.length - 1] : tokens[i - 1]])),
+        'exit',
+        fromEther(await callContract(pool, 'calcPoolInGivenSingleOut', [balance, denorm, totalSupply, totalDenorm, ether(1), swapFee])),
+      );
+    });
+    console.log('balancerPoolUsdTokensSum', fromEther(await instantPrice.balancerPoolUsdTokensSum(poolAddress)));
   }
 });
 

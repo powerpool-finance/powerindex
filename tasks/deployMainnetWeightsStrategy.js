@@ -1,7 +1,7 @@
 require('@nomiclabs/hardhat-truffle5');
 
 task('deploy-mainnet-weights-strategy', 'Deploy YETI').setAction(async (__, {ethers, network}) => {
-  const {impersonateAccount, gwei} = require('../test/helpers');
+  const {impersonateAccount, gwei, fromEther, ethUsed} = require('../test/helpers');
   const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
   const MCapWeightStrategy = artifacts.require('MCapWeightStrategy');
@@ -16,6 +16,7 @@ task('deploy-mainnet-weights-strategy', 'Deploy YETI').setAction(async (__, {eth
   console.log('deployer', deployer);
   const sendOptions = { from: deployer };
 
+  const weightsChangeDuration = 24 * 60 * 60;
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const admin = '0xb258302c3f209491d604165549079680708581cc';
   const proxyAdminAddr = '0x7696f9208f9e195ba31e6f4B2D07B6462C8C42bb';
@@ -25,16 +26,17 @@ task('deploy-mainnet-weights-strategy', 'Deploy YETI').setAction(async (__, {eth
 
   const weightStrategyImpl = await MCapWeightStrategy.new(sendOptions);
   console.log('weightStrategyImpl.address', weightStrategyImpl.address);
-  const weightStrategyProxy = await proxies.VestedLpMiningProxy(
+  const weightStrategyProxy = await proxies.WeightStrategyProxy(
     weightStrategyImpl.address,
     proxyAdminAddr,
-    [oracleAddress, powerPokeAddress],
+    [oracleAddress, powerPokeAddress, weightsChangeDuration],
     sendOptions,
   );
   console.log('weightStrategyProxy.address', weightStrategyProxy.address);
+  const weightStrategy = await MCapWeightStrategy.at(weightStrategyProxy.address);
 
-  const controller = await PowerIndexPoolController.new(poolAddress, zeroAddress, zeroAddress, weightStrategyProxy.address);
-  await weightStrategyProxy.addPool(poolAddress, controller.address);
+  const controller = await PowerIndexPoolController.new(poolAddress, zeroAddress, zeroAddress, weightStrategy.address);
+  await weightStrategy.addPool(poolAddress, controller.address, zeroAddress);
 
   const excludeBalances = [
     {token: '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9', excludeTokenBalances: ['0x25F2226B597E8F9514B3F68F00f494cF4f286491', '0x317625234562B1526Ea2FaC4030Ea499C5291de4']}, // AAVE
@@ -42,9 +44,9 @@ task('deploy-mainnet-weights-strategy', 'Deploy YETI').setAction(async (__, {eth
     {token: '0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f', excludeTokenBalances: ['0x971e78e0c92392a4e39099835cf7e6ab535b2227', '0xda4ef8520b1a57d7d63f1e249606d1a459698876']}, // SNX
   ];
 
-  await weightStrategyProxy.setExcludeTokenBalancesList(excludeBalances);
+  await weightStrategy.setExcludeTokenBalancesList(excludeBalances);
 
-  await weightStrategyProxy.transferOwnership(admin);
+  await weightStrategy.transferOwnership(admin);
 
   //TODO: calculate maxWPS
   if (network.name !== 'mainnetfork') {
@@ -64,9 +66,27 @@ task('deploy-mainnet-weights-strategy', 'Deploy YETI').setAction(async (__, {eth
   await pool.setController(controller.address, {from: admin});
 
   const powerPoke = await PowerPoke.at(powerPokeAddress);
-  await powerPoke.addClient(weightStrategyProxy.address, deployer, true, MAX_GAS_PRICE, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, {from: admin});
-  await powerPoke.setMinimalDeposit(weightStrategyProxy.address, MIN_SLASHING_DEPOSIT, {from: admin});
-  await powerPoke.setBonusPlan(weightStrategyProxy.address, '1', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, PER_GAS, {from: admin});
+  await powerPoke.addClient(weightStrategy.address, admin, true, MAX_GAS_PRICE, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, {from: admin});
+  await powerPoke.setMinimalDeposit(weightStrategy.address, MIN_SLASHING_DEPOSIT, {from: admin});
+  await powerPoke.setBonusPlan(weightStrategy.address, '1', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, PER_GAS, {from: admin});
+  await powerPoke.setFixedCompensations(weightStrategy.address, 200000, 60000, {from: admin});
+
+  const cvp = await PowerIndexPool.at('0x38e4adb44ef08f22f5b5b76a8f0c2d0dcbe7dca1');
+  await cvp.approve(powerPoke.address, ether(10000), {from: admin});
+  await powerPoke.addCredit(weightStrategy.address, ether(10000), {from: admin});
+
+  const pokerReporter = '0xabdf215fce6c5b0c1b40b9f2068204a9e7c49627';
+  await impersonateAccount(ethers, pokerReporter);
+  const testWallet = ethers.Wallet.createRandom();
+  const powerPokeOpts = web3.eth.abi.encodeParameter(
+    { PowerPokeRewardOpts: {to: 'address', compensateInETH: 'bool'} },
+    {to: testWallet.address, compensateInETH: true},
+  );
+  const res = await weightStrategy.pokeFromReporter('1', [poolAddress], powerPokeOpts, {from: pokerReporter});
+
+  console.log('powerPoke rewards', fromEther(await powerPoke.rewards('1')));
+  console.log('ETH used', await ethUsed(web3, res.receipt));
+  console.log('ETH compensation', fromEther(await web3.eth.getBalance(testWallet.address)));
 
   function ether(amount) {
     return toWei(amount.toString(), 'ether');

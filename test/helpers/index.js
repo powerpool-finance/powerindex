@@ -92,6 +92,12 @@ function getInitializerData(impl, args, initializer) {
   }
 }
 
+async function ethUsed(web3, receipt) {
+  const tx = await web3.eth.getTransaction(receipt.transactionHash);
+  return fromEther(new BigNumber(receipt.gasUsed.toString()).multipliedBy(new BigNumber(tx.gasPrice.toString())).toString());
+}
+
+
 /**
  * Fetches logs of a given contract for a given tx,
  * since Truffle provides logs for a calle contract only.
@@ -155,6 +161,10 @@ function splitPayload(payload) {
 
 function ether(value) {
   return rEther(value.toString()).toString(10);
+}
+
+function fromEther(value) {
+  return web3.utils.fromWei(value, 'ether');
 }
 
 function gwei(value) {
@@ -317,6 +327,8 @@ module.exports = {
   splitPayload,
   fetchLogs,
   ether,
+  fromEther,
+  ethUsed,
   gwei,
   mwei,
   expectExactRevert,
