@@ -11,7 +11,6 @@ import "../balancer-core/BNum.sol";
 import "./MCapWeightAbstract.sol";
 
 contract MCapWeightStrategy is MCapWeightAbstract {
-
   event AddPool(address indexed pool, address indexed poolController);
   event SetPool(address indexed pool, address indexed poolController, bool indexed active);
   event SetWeightsChangeDuration(uint256 weightsChangeDuration);

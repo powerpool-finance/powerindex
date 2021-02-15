@@ -1,3 +1,5 @@
+pragma solidity 0.6.12;
+
 interface InstantUniswapPrice {
   function contractUsdTokensSum(address _contract, address[] memory _tokens) external view returns (uint256);
 

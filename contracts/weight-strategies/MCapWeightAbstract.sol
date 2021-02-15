@@ -9,7 +9,6 @@ import "../interfaces/PowerIndexPoolInterface.sol";
 import "../interfaces/IPowerOracle.sol";
 
 contract MCapWeightAbstract is BNum, OwnableUpgradeSafe {
-
   event SetExcludeTokenBalances(address indexed token, address[] excludeTokenBalances);
   event FetchTokenMCap(address indexed pool, address indexed token, uint256 mCap);
   event UpdatePoolWeights(

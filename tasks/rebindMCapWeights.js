@@ -5,18 +5,14 @@ const axios = require('axios');
 const _ = require('lodash');
 
 task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers, network}) => {
-  const {impersonateAccount, forkContractUpgrade} = require('../test/helpers');
+  const {forkContractUpgrade} = require('../test/helpers');
   const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
-  const UniswapV2Router02 = artifacts.require('UniswapV2Router02');
   const MCapWeightStrategyRebinder = artifacts.require('MCapWeightStrategyRebinder');
   const MockERC20 = await artifacts.require('MockERC20');
-  const PowerPoke = await artifacts.require('PowerPoke');
 
   const { web3 } = PowerIndexPoolController;
   const { toWei, fromWei, toBN } = web3.utils;
-
-  const proxies = require('../migrations/helpers/proxies')(web3);
 
   const [deployer] = await web3.eth.getAccounts();
   console.log('deployer', deployer);
@@ -28,7 +24,6 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
   const oracleAddress = '0x50f8D7f4db16AA926497993F020364f739EDb988';
   const oneInchAddress = '0x111111125434b319222CdBf8C261674aDB56F3ae';
   const poolAddress = '0xfa2562da1bba7b954f26c74725df51fb62646313';
-  const powerPokeAddress = '0x04D7aA22ef7181eE3142F5063e026Af1BbBE5B96';
   const fetchOneInchApiSeller = '0x906B629c11Afa6A328899e8F3a113e64eA87B7eD';
 
   const rebinder = await MCapWeightStrategyRebinder.new(oracleAddress, oneInchAddress, sendOptions);
@@ -59,37 +54,21 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
   const tokens = await callContract(pool, 'getCurrentTokens');
 
 
-  // console.log('res.receipt.logs', res.receipt.logs[res.receipt.logs.length - 1]);
-  // console.log('\nafter:')
-  // await pIteration.forEachSeries(tokens, async (t, i) => {
-  //   const token = await MockERC20.at(t);
-  //   console.log(await callContract(token, 'symbol'), 'balance', fromEther(await callContract(pool, 'getBalance', [t])), 'weight', fromEther(await callContract(pool, 'getNormalizedWeight', [t])), 'price', fromEther(await callContract(pool, 'getSpotPrice', [t, i === 0 ? tokens[tokens.length - 1] : tokens[i - 1]])));
-  // });
-  // return;
-
   const rebindConfigs = await callContract(rebinder, 'getRebindConfigs', [poolAddress, tokens, '2']).then(configs => configs.map(c => _.pick(c, ['token', 'newWeight', 'oldBalance', 'newBalance'])));
 
   const instantPriceAddress = '0x1af9747615abce1db5c482e865699ba5a2d9c804';
   const instantPrice = await InstantUniswapPrice.at(instantPriceAddress);
   const yfi = '0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e';
 
-  console.log('rebindConfigs', rebindConfigs);
   let needToBuyUsdSum = '0';
   const usdSumByToken = {};
-  await pIteration.mapSeries(rebindConfigs, async (c, i) => {
+  await pIteration.mapSeries(rebindConfigs, async (c) => {
     if (isBnGreater(c.newBalance, c.oldBalance)) {
       usdSumByToken[c.token] = await instantPrice.usdcTokensSum([c.token], [subBN(c.newBalance, c.oldBalance)]);
       needToBuyUsdSum = addBN(needToBuyUsdSum, usdSumByToken[c.token]);
-    } else {
-      // // const diff = subBN(c.oldBalance, c.newBalance);
-      // console.log('c[i].newBalance before', c.newBalance, 'mulScalarBN(c.newBalance, ether(0.9))', mulScalarBN(c.newBalance, ether(0.9)))
-      // // console.log('diff', diff, 'mulScalarBN(diff, ether(0.5))', mulScalarBN(diff, ether(0.5)))
-      // // c.newBalance = subBN(c.newBalance, mulScalarBN(diff, ether(0.5)));
-      // c.newBalance = mulScalarBN(c.newBalance, ether(0.9));
-      // console.log('c[i].newBalance after', c.newBalance)
     }
   })
-  const share = 0.931;
+  const share = 0.96;
   console.log('share', share);
   rebindConfigs[0].newBalance = mulScalarBN(rebindConfigs[0].newBalance, ether(share));
   const yfiBalanceToSwap = subBN(rebindConfigs[0].oldBalance, rebindConfigs[0].newBalance);
@@ -110,8 +89,6 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
     } else {
       const tokenShare = divScalarBN(usdSumByToken[c.token], needToBuyUsdSum);
       const yfiAmountToSwap = mulScalarBN(yfiBalanceToSwap, tokenShare);
-      console.log('yfiAmountToSwap', fromEther(yfiAmountToSwap))
-      console.log('getBalance', await pool.getBalance(c.token).then(r => r.toString(10)))
 
       yfiSwaps.push({
         amount: yfiAmountToSwap,
@@ -122,17 +99,6 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
     }
   }).then(res => res.filter(r => r));
 
-  // const uRouter = await UniswapV2Router02.at('0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D');
-  // await uRouter.swapExactETHForTokens(ether(50000), ['0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', '0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f'], rebinder.address, Math.round(new Date().getTime() / 1000) + 100, {
-  //   value: ether(10000)
-  // });
-  // await uRouter.swapExactETHForTokens(ether(5000), ['0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9'], rebinder.address, Math.round(new Date().getTime() / 1000) + 100, {
-  //   value: ether(10000)
-  // });
-  // await uRouter.swapExactETHForTokens(ether(20000), ['0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2'], rebinder.address, Math.round(new Date().getTime() / 1000) + 100, {
-  //   value: ether(10000)
-  // });
-
   console.log('\nbefore:')
   await pIteration.forEachSeries(tokens, async (t, i) => {
     const token = await MockERC20.at(t);
@@ -141,9 +107,7 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
   console.log('balancerPoolUsdTokensSum', fromEther(await instantPrice.balancerPoolUsdTokensSum(poolAddress)));
   await pool.setController(rebinder.address, {from: admin});
 
-  // console.log('ops', ops);
-  let res = await rebinder.runRebind(poolAddress, admin, ops, {from: admin, gas: 12000000});
-  // console.log('res.receipt.logs', res.receipt.logs[res.receipt.logs.length - 1].filter(l => l.event === 'ExecuteOperation').map(l => l.args.outData));
+  await rebinder.runRebind(poolAddress, admin, ops, {from: admin, gas: 12000000});
 
   await pIteration.forEachSeries(yfiSwaps, async (s) => {
     const {data} = await axios.get(oneInchApi, {
@@ -168,9 +132,7 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
       opAfter: false
     }
 
-    res = await rebinder.runRebind(poolAddress, admin, [operation], {from: admin, gas: 12000000});
-
-    // console.log('res.receipt.logs', res.receipt.logs[res.receipt.logs.length - 1].filter(l => l.event === 'ExecuteOperation').map(l => l.args.outData));
+    await rebinder.runRebind(poolAddress, admin, [operation], {from: admin, gas: 12000000});
   })
 
   console.log('\nafter:')

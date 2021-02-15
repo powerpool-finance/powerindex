@@ -7,7 +7,6 @@ import "./MCapWeightAbstract.sol";
 import "../PowerIndexPoolController.sol";
 
 contract MCapWeightStrategyRebinder is MCapWeightAbstract {
-
   event SetOperationsContract(address indexed operationsContract);
   event ExecuteOperation(address indexed operationsContract, bool indexed success, bytes inData, bytes outData);
 
@@ -57,21 +56,21 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
         _runOperation(_ops[i]);
       }
 
-      if (_ops[i].newBalance > _ops[i].oldBalance) {
-        _ops[i].oldBalance = _pool.getBalance(_ops[i].token);
-        uint256 amountToAdd = IERC20(_ops[i].token).balanceOf(address(this));
-        IERC20(_ops[i].token).approve(address(_pool), amountToAdd);
-        _pool.rebind(_ops[i].token, _ops[i].oldBalance + amountToAdd, _ops[i].newWeight);
-      } else {
-        _pool.rebind(_ops[i].token, _ops[i].newBalance, _ops[i].newWeight);
+      if (_ops[i].token != address(0)) {
+        if (_ops[i].newBalance > _ops[i].oldBalance) {
+          _ops[i].oldBalance = _pool.getBalance(_ops[i].token);
+          uint256 amountToAdd = IERC20(_ops[i].token).balanceOf(address(this));
+          IERC20(_ops[i].token).approve(address(_pool), amountToAdd);
+          _pool.rebind(_ops[i].token, _ops[i].oldBalance + amountToAdd, _ops[i].newWeight);
+        } else {
+          _pool.rebind(_ops[i].token, _ops[i].newBalance, _ops[i].newWeight);
+        }
       }
 
       if (_ops[i].opAfter) {
         _runOperation(_ops[i]);
       }
     }
-
-//    setController(_pool, _newController);
   }
 
   function _runOperation(RebindOperation memory _op) internal {
@@ -105,7 +104,12 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
       uint256 ti = wc[0];
       uint256 oldWeight = wc[1] / _oldWeightDiv;
       uint256 newWeight = wc[2];
-      configs[i] = RebindConfig(_tokens[ti], newWeight, oldBalances[ti], bmul(oldBalances[ti], bdiv(newWeight, oldWeight)));
+      configs[i] = RebindConfig(
+        _tokens[ti],
+        newWeight,
+        oldBalances[ti],
+        bmul(oldBalances[ti], bdiv(newWeight, oldWeight))
+      );
     }
   }
 }

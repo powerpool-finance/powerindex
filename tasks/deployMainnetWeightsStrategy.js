@@ -1,13 +1,10 @@
 require('@nomiclabs/hardhat-truffle5');
 
-const pIteration = require('p-iteration');
-
 task('deploy-mainnet-weights-strategy', 'Deploy YETI').setAction(async (__, {ethers, network}) => {
-  const {impersonateAccount, callContract} = require('../test/helpers');
+  const {impersonateAccount, gwei} = require('../test/helpers');
   const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
   const MCapWeightStrategy = artifacts.require('MCapWeightStrategy');
-  const MockERC20 = await artifacts.require('MockERC20');
   const PowerPoke = await artifacts.require('PowerPoke');
 
   const { web3 } = PowerIndexPoolController;
@@ -34,14 +31,15 @@ task('deploy-mainnet-weights-strategy', 'Deploy YETI').setAction(async (__, {eth
     [oracleAddress, powerPokeAddress],
     sendOptions,
   );
+  console.log('weightStrategyProxy.address', weightStrategyProxy.address);
 
   const controller = await PowerIndexPoolController.new(poolAddress, zeroAddress, zeroAddress, weightStrategyProxy.address);
   await weightStrategyProxy.addPool(poolAddress, controller.address);
 
   const excludeBalances = [
-    {token: '0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f', excludeTokenBalances: ['0xda4ef8520b1a57d7d63f1e249606d1a459698876']}, // SNX
-    // {token: '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', excludeTokenBalances: ['0x8798249c2e607446efb7ad49ec89dd1865ff4272']}, // SUSHI
-    // {token: '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', excludeTokenBalances: ['0x8798249c2e607446efb7ad49ec89dd1865ff4272']}, // SUSHI
+    {token: '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9', excludeTokenBalances: ['0x25F2226B597E8F9514B3F68F00f494cF4f286491', '0x317625234562B1526Ea2FaC4030Ea499C5291de4']}, // AAVE
+    {token: '0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e', excludeTokenBalances: ['0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52']}, // YFI
+    {token: '0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f', excludeTokenBalances: ['0x971e78e0c92392a4e39099835cf7e6ab535b2227', '0xda4ef8520b1a57d7d63f1e249606d1a459698876']}, // SNX
   ];
 
   await weightStrategyProxy.setExcludeTokenBalancesList(excludeBalances);
@@ -66,16 +64,11 @@ task('deploy-mainnet-weights-strategy', 'Deploy YETI').setAction(async (__, {eth
   await pool.setController(controller.address, {from: admin});
 
   const powerPoke = await PowerPoke.at(powerPokeAddress);
-  await powerPoke.addClient(oracle.address, deployer, true, MAX_GAS_PRICE, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, {from: admin});
-  await powerPoke.setMinimalDeposit(oracle.address, MIN_SLASHING_DEPOSIT, {from: admin});
-  await powerPoke.setBonusPlan(oracle.address, '1', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, PER_GAS, {from: admin});
+  await powerPoke.addClient(weightStrategyProxy.address, deployer, true, MAX_GAS_PRICE, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, {from: admin});
+  await powerPoke.setMinimalDeposit(weightStrategyProxy.address, MIN_SLASHING_DEPOSIT, {from: admin});
+  await powerPoke.setBonusPlan(weightStrategyProxy.address, '1', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, PER_GAS, {from: admin});
 
   function ether(amount) {
     return toWei(amount.toString(), 'ether');
   }
 });
-
-function callContract(contract, method, args = []) {
-  console.log(method, args);
-  return contract.contract.methods[method].apply(contract.contract, args).call();
-}
