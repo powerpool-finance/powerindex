@@ -142,4 +142,15 @@ contract MCapWeightAbstract is BNum, OwnableUpgradeSafe {
   function _sort(uint256[3][] memory weightsChange) internal pure {
     _quickSort(weightsChange, int256(0), int256(weightsChange.length - 1));
   }
+
+  function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+    if (a == 0) {
+      return 0;
+    }
+
+    uint256 c = a * b;
+    require(c / a == b, "SafeMath: multiplication overflow");
+
+    return c;
+  }
 }

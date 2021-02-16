@@ -407,6 +407,79 @@ describe('MCapWeightStrategy', () => {
       }
     });
 
+    it('maxWeightPerSecond should work properly', async () => {
+      const wpsBoundsSig = pool.contract._jsonInterface.filter(item => item.name === 'setWeightPerSecondBounds')[0]
+        .signature;
+      const maxWeightPerSecond = (0.25 / (60 * 60 * 24)).toFixed(18);
+      const setWpsBoundsArgs = web3.eth.abi.encodeParameters(
+        ['uint', 'uint'],
+        ['0', ether(maxWeightPerSecond)],
+      );
+      await poolController.callPool(wpsBoundsSig, setWpsBoundsArgs);
+
+      const denormalizedBefore = [
+        ether('6.25'),
+        ether('6.25'),
+        ether('6.25'),
+        ether('6.25'),
+        ether('6.25'),
+        ether('6.25'),
+        ether('6.25'),
+        ether('6.25'),
+      ];
+      const normalizedBefore = [
+        ether('0.125'),
+        ether('0.125'),
+        ether('0.125'),
+        ether('0.125'),
+        ether('0.125'),
+        ether('0.125'),
+        ether('0.125'),
+        ether('0.125'),
+      ];
+      for (let i = 0; i < balancerTokens.length; i++) {
+        assert.equal(await pool.getDenormalizedWeight(balancerTokens[i].address), denormalizedBefore[i]);
+        assert.equal(await pool.getNormalizedWeight(balancerTokens[i].address), normalizedBefore[i]);
+      }
+
+      let res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
+      assert.equal(res.logs.length, 9);
+      const pokeTimestamp = await web3.eth.getBlock(res.receipt.blockNumber).then(b => b.timestamp);
+
+      let targetWeightsSum = '0';
+      for (let i = 0; i < balancerTokens.length; i++) {
+        const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
+        targetWeightsSum = addBN(targetWeightsSum, dw.targetDenorm);
+        assert.equal(dw.targetTimestamp, addBN(addBN(pokeTimestamp, weightsChangePeriod), '1'));
+      }
+
+      const targetWeights = [
+        ether('4.27522969312300575'),
+        ether('2.7499999999994176'),
+        ether('2.7499999999994176'),
+        ether('2.7499999999994176'),
+        ether('2.7499999999994176'),
+        ether('2.7499999999994176'),
+        ether('2.7499999999994176'),
+        ether('9.7500000000005824'),
+      ];
+      const normalizedTargetWeights = [
+        ether('0.140055610919336512'),
+        ether('0.090089412189393756'),
+        ether('0.090089412189393756'),
+        ether('0.090089412189393756'),
+        ether('0.090089412189393756'),
+        ether('0.090089412189393756'),
+        ether('0.090089412189393756'),
+        ether('0.31940791594430095'),
+      ];
+      for (let i = 0; i < balancerTokens.length; i++) {
+        const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
+        assertEqualWithAccuracy(dw.targetDenorm, targetWeights[i]);
+        assertEqualWithAccuracy(divScalarBN(dw.targetDenorm, targetWeightsSum), normalizedTargetWeights[i]);
+      }
+    });
+
     it('pokeFromReporter and pokeFromSlasher should work properly', async () => {
       await this.checkWeights(pool, balancerTokens, [
         ether(6.25),

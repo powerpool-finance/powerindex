@@ -214,9 +214,15 @@ contract MCapWeightStrategy is MCapWeightAbstract {
             pv.fromTimestamp,
             pv.fromTimestamp + weightsChangeDuration
           );
+
         if (wps > pv.maxWPS) {
-          weightsChange[i][2] = bmul(minInterval, pv.maxWPS);
+          if (weightsChange[i][1] > weightsChange[i][2]) {
+            weightsChange[i][2] = bsub(weightsChange[i][1], mul(weightsChangeDuration, pv.maxWPS));
+          } else {
+            weightsChange[i][2] = badd(weightsChange[i][1], mul(weightsChangeDuration, pv.maxWPS));
+          }
         }
+
         if (wps >= pv.minWPS) {
           if (address(pd.wrapper) == address(0)) {
             dws[pv.iToPush].token = pv.tokens[weightsChange[i][0]];
