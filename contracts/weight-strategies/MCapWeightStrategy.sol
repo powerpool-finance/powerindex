@@ -194,7 +194,7 @@ contract MCapWeightStrategy is MCapWeightAbstract {
       pv.fromTimestamp = block.timestamp + 1;
 
       (uint256[3][] memory weightsChange, uint256 lenToPush) =
-        computeWeightsChange(
+        _computeWeightsChangeWithEvent(
           pv.pool,
           pv.tokens,
           pv.minWPS,

@@ -16,7 +16,7 @@ contract MCapWeightAbstract is BNum, OwnableUpgradeSafe {
     uint256 indexed timestamp,
     address[] tokens,
     uint256[3][] weightsChange,
-    uint256 mCapSum
+    uint256[] newMCaps
   );
 
   struct TokenConfigItem {
@@ -66,6 +66,26 @@ contract MCapWeightAbstract is BNum, OwnableUpgradeSafe {
     return excludeTokenBalances[_token];
   }
 
+  function _computeWeightsChangeWithEvent(
+    PowerIndexPoolInterface _pool,
+    address[] memory _tokens,
+    uint256 _minWPS,
+    uint256 _maxWPS,
+    uint256 fromTimestamp,
+    uint256 toTimestamp
+  ) internal returns (uint256[3][] memory weightsChange, uint256 lenToPush) {
+    uint256[] memory newMCaps;
+    (weightsChange, lenToPush, newMCaps) = computeWeightsChange(
+      _pool,
+      _tokens,
+      _minWPS,
+      _maxWPS,
+      fromTimestamp,
+      toTimestamp
+    );
+    emit UpdatePoolWeights(address(_pool), block.timestamp, _tokens, weightsChange, newMCaps);
+  }
+
   function computeWeightsChange(
     PowerIndexPoolInterface _pool,
     address[] memory _tokens,
@@ -73,16 +93,22 @@ contract MCapWeightAbstract is BNum, OwnableUpgradeSafe {
     uint256 _maxWPS,
     uint256 fromTimestamp,
     uint256 toTimestamp
-  ) public returns (uint256[3][] memory weightsChange, uint256 lenToPush) {
+  )
+    public
+    view
+    returns (
+      uint256[3][] memory weightsChange,
+      uint256 lenToPush,
+      uint256[] memory newMCaps
+    )
+  {
     uint256 len = _tokens.length;
-    uint256[] memory newMCaps = new uint256[](len);
+    newMCaps = new uint256[](len);
 
     uint256 newMarketCapSum;
     for (uint256 i = 0; i < len; i++) {
       newMCaps[i] = getTokenMarketCap(_tokens[i]);
       newMarketCapSum = badd(newMarketCapSum, newMCaps[i]);
-
-      emit FetchTokenMCap(address(_pool), _tokens[i], newMCaps[i]);
     }
 
     weightsChange = new uint256[3][](len);
@@ -102,8 +128,6 @@ contract MCapWeightAbstract is BNum, OwnableUpgradeSafe {
     if (lenToPush > 1) {
       _sort(weightsChange);
     }
-
-    emit UpdatePoolWeights(address(_pool), block.timestamp, _tokens, weightsChange, newMarketCapSum);
   }
 
   function getWeightPerSecond(

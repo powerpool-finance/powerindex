@@ -88,7 +88,7 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
     PowerIndexPoolInterface _pool,
     address[] memory _tokens,
     uint256 _oldWeightDiv
-  ) external returns (RebindConfig[] memory configs) {
+  ) external view returns (RebindConfig[] memory configs) {
     uint256 len = _tokens.length;
     uint256[] memory oldBalances = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
@@ -96,7 +96,7 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
     }
 
     uint256 now = block.timestamp;
-    (uint256[3][] memory weightsChange, ) = computeWeightsChange(_pool, _tokens, 0, 100 ether, now, now + 1);
+    (uint256[3][] memory weightsChange, , ) = computeWeightsChange(_pool, _tokens, 0, 100 ether, now, now + 1);
 
     configs = new RebindConfig[](len);
     for (uint256 i = 0; i < len; i++) {
@@ -112,8 +112,4 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
       );
     }
   }
-}
-
-interface IERC20Symbol {
-  function symbol() external view returns (string calldata);
 }

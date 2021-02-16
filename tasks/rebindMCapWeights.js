@@ -25,7 +25,9 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
   const oneInchAddress = '0x111111125434b319222CdBf8C261674aDB56F3ae';
   const poolAddress = '0xfa2562da1bba7b954f26c74725df51fb62646313';
   const fetchOneInchApiSeller = '0x906B629c11Afa6A328899e8F3a113e64eA87B7eD';
+  const controllerAddress = admin; //TODO: set controller contract
 
+  // 1-st stage:
   const rebinder = await MCapWeightStrategyRebinder.new(oracleAddress, oneInchAddress, sendOptions);
   console.log('rebinder', rebinder.address);
 
@@ -37,22 +39,21 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
 
   await rebinder.setExcludeTokenBalancesList(excludeBalances);
 
-  await rebinder.transferOwnership(admin);
-
-  if (network.name !== 'mainnetfork') {
-    return;
-  }
-  await web3.eth.sendTransaction({
-    from: deployer,
-    to: admin,
-    value: ether(1)
-  })
+  // 2-st stage:
   const InstantUniswapPrice = artifacts.require('InstantUniswapPrice');
-  await forkContractUpgrade(ethers, admin, proxyAdminAddr, poolAddress, (await PowerIndexPool.new()).address);
 
   const pool = await PowerIndexPool.at(poolAddress);
   const tokens = await callContract(pool, 'getCurrentTokens');
 
+  if (network.name === 'mainnetfork') {
+    await web3.eth.sendTransaction({
+      from: deployer,
+      to: admin,
+      value: ether(1)
+    });
+    await forkContractUpgrade(ethers, admin, proxyAdminAddr, poolAddress, (await PowerIndexPool.new()).address);
+    await pool.setController(rebinder.address, {from: admin});
+  }
 
   const rebindConfigs = await callContract(rebinder, 'getRebindConfigs', [poolAddress, tokens, '2']).then(configs => configs.map(c => _.pick(c, ['token', 'newWeight', 'oldBalance', 'newBalance'])));
 
@@ -101,9 +102,8 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
 
   console.log('\nbefore:');
   await logPrices();
-  await pool.setController(rebinder.address, {from: admin});
 
-  await rebinder.runRebind(poolAddress, admin, ops, {from: admin, gas: 12000000});
+  await rebinder.runRebind(poolAddress, admin, ops, {from: deployer, gas: 12000000});
 
   await pIteration.forEachSeries(yfiSwaps, async (s) => {
     const {data} = await axios.get(oneInchApi, {
@@ -128,11 +128,14 @@ task('rebind-mcap-weights', 'Rebind MCap weights').setAction(async (__, {ethers,
       opAfter: false
     }
 
-    await rebinder.runRebind(poolAddress, admin, [operation], {from: admin, gas: 12000000});
-  })
+    await rebinder.runRebind(poolAddress, admin, [operation], {from: deployer, gas: 12000000});
+  });
 
   console.log('\nafter:')
   await logPrices();
+
+  await rebinder.setController(poolAddress, controllerAddress);
+  console.log('\npool controller', await pool.getController());
 
   function ether(amount) {
     return toWei(amount.toString(), 'ether');
