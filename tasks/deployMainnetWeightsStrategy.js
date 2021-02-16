@@ -1,7 +1,7 @@
 require('@nomiclabs/hardhat-truffle5');
 
 task('deploy-mainnet-weights-strategy', 'Deploy Mainnet Weights Strategy').setAction(async (__, {ethers, network}) => {
-  const {impersonateAccount, gwei, fromEther, ethUsed} = require('../test/helpers');
+  const {impersonateAccount, gwei, fromEther, ethUsed, deployProxied} = require('../test/helpers');
   const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
   const MCapWeightStrategy = artifacts.require('MCapWeightStrategy');
@@ -9,8 +9,6 @@ task('deploy-mainnet-weights-strategy', 'Deploy Mainnet Weights Strategy').setAc
 
   const { web3 } = PowerIndexPoolController;
   const { toWei } = web3.utils;
-
-  const proxies = require('../migrations/helpers/proxies')(web3);
 
   const [deployer] = await web3.eth.getAccounts();
   console.log('deployer', deployer);
@@ -24,16 +22,18 @@ task('deploy-mainnet-weights-strategy', 'Deploy Mainnet Weights Strategy').setAc
   const poolAddress = '0xfa2562da1bba7b954f26c74725df51fb62646313';
   const powerPokeAddress = '0x04D7aA22ef7181eE3142F5063e026Af1BbBE5B96';
 
-  const weightStrategyImpl = await MCapWeightStrategy.new(sendOptions);
-  console.log('weightStrategyImpl.address', weightStrategyImpl.address);
-  const weightStrategyProxy = await proxies.WeightStrategyProxy(
-    weightStrategyImpl.address,
-    proxyAdminAddr,
+  const weightStrategy =  await deployProxied(
+    MCapWeightStrategy,
+    [],
     [oracleAddress, powerPokeAddress, weightsChangeDuration],
-    sendOptions,
+    {
+      proxyAdmin: proxyAdminAddr,
+      // proxyAdminOwner: admin,
+      implementation: ''
+    }
   );
-  console.log('weightStrategyProxy.address', weightStrategyProxy.address);
-  const weightStrategy = await MCapWeightStrategy.at(weightStrategyProxy.address);
+  console.log('weightStrategyProxy.address', weightStrategy.address);
+  console.log('weightStrategyImplementation.address', weightStrategy.initialImplementation.address);
 
   const controller = await PowerIndexPoolController.new(poolAddress, zeroAddress, zeroAddress, weightStrategy.address);
   console.log('controller.address', controller.address);

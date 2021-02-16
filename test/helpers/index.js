@@ -47,21 +47,30 @@ async function advanceBlocks(n) {
  *
  * @param contract Truffle Contract
  * @param {string[]} constructorArgs
+ * @param {string[]} initializerArgs
  * @param {object} opts
  * @param {string} opts.deployer
  * @param {string} opts.initializer
  * @param {string} opts.proxyAdminOwner
  * @returns {Promise<any>}
  */
-async function deployProxied(contract, constructorArgs = [], initializerArgs = [], opts = {}) {
-  const impl = await contract.new(...constructorArgs);
-  const adminContract = await createOrGetProxyAdmin(opts.proxyAdminOwner);
+async function deployProxied(
+  contract,
+  constructorArgs = [],
+  initializerArgs = [],
+  opts = {}
+) {
+  console.log('constructorArgs', JSON.stringify(constructorArgs));
+  const impl = opts.implementation ? await contract.at(opts.implementation) : await contract.new(...constructorArgs);
+  const adminContract = opts.proxyAdmin ? await ProxyAdmin.at(opts.proxyAdmin) : await createOrGetProxyAdmin(opts.proxyAdminOwner);
   const data = getInitializerData(impl, initializerArgs, opts.initializer);
+  console.log('AdminUpgradeabilityProxy.new', impl.address, adminContract.address, data)
   const proxy = await AdminUpgradeabilityProxy.new(impl.address, adminContract.address, data);
   const instance = await contract.at(proxy.address);
 
   instance.proxy = proxy;
   instance.initialImplementation = impl;
+  instance.adminContract = adminContract;
 
   return instance;
 }
