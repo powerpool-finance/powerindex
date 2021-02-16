@@ -1,6 +1,6 @@
 require('@nomiclabs/hardhat-truffle5');
 
-task('deploy-mainnet-weights-strategy', 'Deploy YETI').setAction(async (__, {ethers, network}) => {
+task('deploy-mainnet-weights-strategy', 'Deploy Mainnet Weights Strategy').setAction(async (__, {ethers, network}) => {
   const {impersonateAccount, gwei, fromEther, ethUsed} = require('../test/helpers');
   const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
@@ -36,6 +36,7 @@ task('deploy-mainnet-weights-strategy', 'Deploy YETI').setAction(async (__, {eth
   const weightStrategy = await MCapWeightStrategy.at(weightStrategyProxy.address);
 
   const controller = await PowerIndexPoolController.new(poolAddress, zeroAddress, zeroAddress, weightStrategy.address);
+  console.log('controller.address', controller.address);
   await weightStrategy.addPool(poolAddress, controller.address, zeroAddress);
 
   const excludeBalances = [
