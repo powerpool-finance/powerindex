@@ -214,7 +214,7 @@ describe('PowerIndexPoolController', () => {
     const setControllerSig = pool.contract._jsonInterface.filter(item => item.name === 'setController')[0]
       .signature;
     const setControllerArgs = web3.eth.abi.encodeParameters(['address'], [newController.address]);
-    await expectRevert(controller.callPool(setControllerSig, setControllerArgs, {from: alice}), "Ownable");
+    await expectRevert(controller.callPool(setControllerSig, setControllerArgs, {from: alice}), 'Ownable');
     await controller.callPool(setControllerSig, setControllerArgs);
 
     assert.equal(await pool.getController(), newController.address);

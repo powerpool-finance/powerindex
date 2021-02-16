@@ -12,7 +12,7 @@ task('deploy-mainnet-weights-strategy', 'Deploy Mainnet Weights Strategy').setAc
 
   const [deployer] = await web3.eth.getAccounts();
   console.log('deployer', deployer);
-  const sendOptions = { from: deployer };
+  // const sendOptions = { from: deployer };
 
   const weightsChangeDuration = 24 * 60 * 60;
   const zeroAddress = '0x0000000000000000000000000000000000000000';
