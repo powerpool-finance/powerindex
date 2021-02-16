@@ -35,30 +35,9 @@ module.exports = web3 => {
       txOptions,
     );
 
-
-    const WeightStrategyProxy = async (logicAddr, adminAddr, argsArray, txOptions = { gas: '5000000' }) =>
-        await Proxy.new(
-            logicAddr,
-            adminAddr,
-            web3.eth.abi.encodeFunctionCall(
-                {
-                    name: 'initialize',
-                    type: 'function',
-                    inputs: [
-                        { name: '_oracle', type: 'address' },
-                        { name: '_powerPoke', type: 'address' },
-                        { name: '_weightsChangeDuration', type: 'uint256' },
-                    ],
-                },
-                argsArray,
-            ),
-            txOptions,
-        );
-
   return {
     Admin,
     Proxy,
     VestedLpMiningProxy,
-    WeightStrategyProxy,
   };
 };
