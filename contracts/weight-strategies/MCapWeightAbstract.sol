@@ -113,7 +113,7 @@ contract MCapWeightAbstract is BNum, OwnableUpgradeSafe {
 
     weightsChange = new uint256[3][](len);
     for (uint256 i = 0; i < len; i++) {
-      (, , , uint256 oldWeight) = _pool.getDynamicWeightSettings(_tokens[i]);
+      uint256 oldWeight = _pool.getDenormalizedWeight(_tokens[i]);
       uint256 newWeight = bmul(bdiv(newMCaps[i], newMarketCapSum), 25 * BONE);
       weightsChange[i] = [i, oldWeight, newWeight];
     }
