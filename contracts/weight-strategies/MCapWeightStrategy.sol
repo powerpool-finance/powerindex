@@ -197,6 +197,7 @@ contract MCapWeightStrategy is MCapWeightAbstract {
         _computeWeightsChangeWithEvent(
           pv.pool,
           pv.tokens,
+          pv.piTokens,
           pv.minWPS,
           pv.maxWPS,
           pv.fromTimestamp,

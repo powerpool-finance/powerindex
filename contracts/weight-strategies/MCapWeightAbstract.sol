@@ -69,6 +69,7 @@ contract MCapWeightAbstract is BNum, OwnableUpgradeSafe {
   function _computeWeightsChangeWithEvent(
     PowerIndexPoolInterface _pool,
     address[] memory _tokens,
+    address[] memory _piTokens,
     uint256 _minWPS,
     uint256 _maxWPS,
     uint256 fromTimestamp,
@@ -78,6 +79,7 @@ contract MCapWeightAbstract is BNum, OwnableUpgradeSafe {
     (weightsChange, lenToPush, newMCaps) = computeWeightsChange(
       _pool,
       _tokens,
+      _piTokens,
       _minWPS,
       _maxWPS,
       fromTimestamp,
@@ -89,6 +91,7 @@ contract MCapWeightAbstract is BNum, OwnableUpgradeSafe {
   function computeWeightsChange(
     PowerIndexPoolInterface _pool,
     address[] memory _tokens,
+    address[] memory _piTokens,
     uint256 _minWPS,
     uint256 _maxWPS,
     uint256 fromTimestamp,
@@ -113,7 +116,12 @@ contract MCapWeightAbstract is BNum, OwnableUpgradeSafe {
 
     weightsChange = new uint256[3][](len);
     for (uint256 i = 0; i < len; i++) {
-      uint256 oldWeight = _pool.getDenormalizedWeight(_tokens[i]);
+      uint256 oldWeight;
+      if (_piTokens.length == _tokens.length) {
+        oldWeight = _pool.getDenormalizedWeight(_piTokens[i]);
+      } else {
+        oldWeight = _pool.getDenormalizedWeight(_tokens[i]);
+      }
       uint256 newWeight = bmul(bdiv(newMCaps[i], newMarketCapSum), 25 * BONE);
       weightsChange[i] = [i, oldWeight, newWeight];
     }
