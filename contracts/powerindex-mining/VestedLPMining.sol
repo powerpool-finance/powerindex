@@ -452,6 +452,18 @@ contract VestedLPMining is
     return _getPriorVotes(account, blockNumber);
   }
 
+  function getPriorVotes(
+    address account,
+    uint256 blockNumber,
+    uint32 userCheckpointId,
+    uint32 sharedCheckpointId
+  ) external view returns (uint96) {
+    if (!votingEnabled[account]) {
+      return 0;
+    }
+    return _getPriorVotes(account, blockNumber, userCheckpointId, sharedCheckpointId);
+  }
+
   /// @inheritdoc IVestedLPMining
   function getCheckpoint(address account, uint32 checkpointId)
     external

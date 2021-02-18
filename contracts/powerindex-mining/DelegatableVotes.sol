@@ -65,7 +65,7 @@ abstract contract DelegatableVotes {
    * @return The number of votes the account had as of the given block
    */
   function _getPriorVotes(address account, uint256 blockNumber) internal view returns (uint96) {
-    return getPriorVotes(account, blockNumber, 0, 0);
+    return _getPriorVotes(account, blockNumber, 0, 0);
   }
 
   /**
@@ -79,12 +79,12 @@ abstract contract DelegatableVotes {
    * @param userCheckpointId ID of the checkpoint to look for the shared data first
    * @return The number of votes the account had as of the given block
    */
-  function getPriorVotes(
+  function _getPriorVotes(
     address account,
     uint256 blockNumber,
     uint32 userCheckpointId,
     uint32 sharedCheckpointId
-  ) public view returns (uint96) {
+  ) internal view returns (uint96) {
     (uint192 userData, uint32 userDataBlockNumber) = book[account].getPriorData(blockNumber, userCheckpointId);
     if (userData == 0) return 0;
 

@@ -40,4 +40,13 @@ contract MockDelegatableVotes is DelegatableVotes {
   function getPriorVotes(address account, uint256 blockNumber) external view returns (uint96) {
     return _getPriorVotes(account, blockNumber);
   }
+
+  function getPriorVotes(
+    address account,
+    uint256 blockNumber,
+    uint32 userCheckpointId,
+    uint32 sharedCheckpointId
+  ) public view returns (uint96) {
+    return _getPriorVotes(account, blockNumber, userCheckpointId, sharedCheckpointId);
+  }
 }
