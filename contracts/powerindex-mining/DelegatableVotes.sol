@@ -48,7 +48,7 @@ abstract contract DelegatableVotes {
    * @param account The address to get votes balance
    * @return The number of current votes for `account`
    */
-  function getCurrentVotes(address account) external view returns (uint96) {
+  function _getCurrentVotes(address account) internal view returns (uint96) {
     (uint192 userData, uint32 userDataBlockNumber) = book[account].getLatestData();
     if (userData == 0) return 0;
 
@@ -64,7 +64,7 @@ abstract contract DelegatableVotes {
    * @param blockNumber The block number to get votes at
    * @return The number of votes the account had as of the given block
    */
-  function getPriorVotes(address account, uint256 blockNumber) public view returns (uint96) {
+  function _getPriorVotes(address account, uint256 blockNumber) internal view returns (uint96) {
     return getPriorVotes(account, blockNumber, 0, 0);
   }
 

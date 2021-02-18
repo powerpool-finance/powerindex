@@ -81,6 +81,7 @@ describe('VestedLPMining', () => {
     await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '1000', this.shiftBlock('0'), '100', {
       from: minter,
     });
+
     const cvp = await this.lpMining.cvp();
     assert.equal(cvp.valueOf(), this.cvp.address);
   });
@@ -99,6 +100,11 @@ describe('VestedLPMining', () => {
           '10', // _cvpVestingPeriodInBlocks
           { from: minter }
         );
+
+        await this.lpMining.setVotingEnabled(true, {from: carol});
+        await this.lpMining.setVotingEnabled(true, {from: bob});
+        await this.lpMining.setVotingEnabled(true, {from: alice});
+
         await this.prepareReservoir();
 
         await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter });
@@ -185,6 +191,11 @@ describe('VestedLPMining', () => {
       await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('300'), '100', {
         from: minter,
       });
+
+      await this.lpMining.setVotingEnabled(true, {from: carol});
+      await this.lpMining.setVotingEnabled(true, {from: bob});
+      await this.lpMining.setVotingEnabled(true, {from: alice});
+
       await this.prepareReservoir();
 
       await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter });
@@ -200,6 +211,7 @@ describe('VestedLPMining', () => {
       // Carol deposits 30 LPs at block 318
       await time.advanceBlockTo(this.shiftBlock('317'));
       await this.lpMining.deposit(0, '30', 0, { from: carol });
+
       // Alice deposits 10 more LPs at block 320. At this point:
       //   Alice should have: 4*100 + 4*1/3*100 + 2*1/6*100 = 566
       //   VestedLPMining should have the remaining: 10000 - 566 = 9434
@@ -210,6 +222,27 @@ describe('VestedLPMining', () => {
       assert.equal(await this.allCvpOf(alice), '566');
       assert.equal(await this.cvpBalanceOf(bob), '0');
       assert.equal(await this.cvpBalanceOf(carol), '0');
+
+      let bobUser = await this.lpMining.users(0, bob);
+      let carolUser = await this.lpMining.users(0, carol);
+      assert.equal(bobUser.cvpAdjust.toString(), '800');
+      assert.equal(carolUser.cvpAdjust.toString(), '1599');
+
+      await expectRevert(this.lpMining.updateCvpAdjust('0', [bob, carol], ['700', '1499'], {from: bob}), 'Ownable');
+      await this.lpMining.updateCvpAdjust('0', [bob, carol], ['700', '1499'], {from: minter});
+
+      bobUser = await this.lpMining.users(0, bob);
+      carolUser = await this.lpMining.users(0, carol);
+      assert.equal(bobUser.cvpAdjust.toString(), '700');
+      assert.equal(carolUser.cvpAdjust.toString(), '1499');
+
+      await this.lpMining.updateCvpAdjust('0', [carol, bob], ['1599', '800'], {from: minter});
+
+      bobUser = await this.lpMining.users(0, bob);
+      carolUser = await this.lpMining.users(0, carol);
+      assert.equal(bobUser.cvpAdjust.toString(), '800');
+      assert.equal(carolUser.cvpAdjust.toString(), '1599');
+
       // Bob withdraws 5 LPs at block 330. At this point:
       //   Bob should have: 4*2/3*100 + 2*2/6*100 + 10*2/7*100 = 619
       await time.advanceBlockTo(this.shiftBlock('329'));
@@ -265,13 +298,13 @@ describe('VestedLPMining', () => {
       // In 100 blocks after the withdrawal, the entire amount is vested.
       await time.advanceBlockTo(this.shiftBlock('439'));
       await this.lpMining.withdraw(0, '0', 0, { from: alice });
-      assert.equal(await this.cvpBalanceOf(alice), '1370');
+      assert.equal(await this.cvpBalanceOf(alice), '1159');
       await time.advanceBlockTo(this.shiftBlock('449'));
       await this.lpMining.withdraw(0, '0', 0, { from: bob });
       assert.equal(await this.cvpBalanceOf(bob), '1183');
       await time.advanceBlockTo(this.shiftBlock('459'));
       await this.lpMining.withdraw(0, '0', 0, { from: carol });
-      assert.equal(await this.cvpBalanceOf(carol), '2447');
+      assert.equal(await this.cvpBalanceOf(carol), '2657');
       assert.equal((await this.lpMining.cvpVestingPool()).toString() * 1 <= 1, true);
     });
 
@@ -374,6 +407,11 @@ describe('VestedLPMining', () => {
       await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('700'), '100', {
         from: minter,
       });
+
+      await this.lpMining.setVotingEnabled(true, {from: carol});
+      await this.lpMining.setVotingEnabled(true, {from: bob});
+      await this.lpMining.setVotingEnabled(true, {from: alice});
+
       await this.prepareReservoir();
 
       await this.cvp.transfer(this.lp.address, '5000000000', { from: minter });
@@ -668,6 +706,12 @@ describe('VestedLPMining', () => {
     this.lpMining.initialize(this.cvp.address, this.reservoir.address, ether('1'), this.shiftBlock('2000'), '200', {
       from: minter,
     });
+
+    await this.lpMining.setVotingEnabled(true, {from: carol});
+    await this.lpMining.setVotingEnabled(true, {from: bob});
+    await this.lpMining.setVotingEnabled(true, {from: alice});
+    await this.lpMining.setVotingEnabled(true, {from: dan});
+
     await this.prepareReservoir();
 
     const lp = await MockERC20.new('LPToken', 'LP', '18', ether('1000'), { from: minter });
@@ -690,8 +734,22 @@ describe('VestedLPMining', () => {
     // console.log('logs', logs.map(e => e.args));
     const firstBlockNumber = await web3.eth.getBlockNumber(); // block #2090
     await time.advanceBlock();
+
     assert.equal(await this.lpMining.getCurrentVotes(alice), ether('1250').toString());
     assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), ether('1250').toString());
+
+    await this.lpMining.setVotingEnabled(false, {from: alice});
+
+    assert.equal(await this.lpMining.getCurrentVotes(alice), ether('0').toString());
+    assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), ether('0').toString());
+
+    await this.lpMining.setVotingEnabled(true, {from: alice});
+
+    await time.advanceBlockTo(this.shiftBlock('2100'));
+
+    assert.equal(await this.lpMining.getCurrentVotes(alice), ether('1250').toString());
+    assert.equal((await this.lpMining.getPriorVotes(alice, firstBlockNumber)).toString(), ether('1250').toString());
+
     await time.advanceBlockTo(this.shiftBlock('2105'));
     assert.equal((await this.lpMining.pendingCvp('1', alice)).toString(), ether('7.5').toString());
 
@@ -769,6 +827,12 @@ describe('VestedLPMining', () => {
     this.lpMining.initialize(this.cvp.address, this.reservoir.address, ether('1'), this.shiftBlock('2000'), '200', {
       from: minter,
     });
+
+    await this.lpMining.setVotingEnabled(true, {from: carol});
+    await this.lpMining.setVotingEnabled(true, {from: bob});
+    await this.lpMining.setVotingEnabled(true, {from: alice});
+    await this.lpMining.setVotingEnabled(true, {from: dan});
+
     await this.prepareReservoir();
 
     const lp = await MockERC20.new('LPToken', 'LP', '18', ether('1000'), { from: minter });
@@ -871,6 +935,11 @@ describe('VestedLPMining', () => {
     await this.lpMining.initialize(this.cvp.address, this.reservoir.address, ether('1'), this.shiftBlock('2000'), '100', {
       from: minter,
     });
+
+    await this.lpMining.setVotingEnabled(true, {from: carol});
+    await this.lpMining.setVotingEnabled(true, {from: bob});
+    await this.lpMining.setVotingEnabled(true, {from: alice});
+
     await this.prepareReservoir();
 
     const lp = await MockERC20.new('LPToken', 'LP', '18', ether('1000'), { from: minter });
@@ -899,6 +968,11 @@ describe('VestedLPMining', () => {
       await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('100'), '50', {
         from: minter,
       });
+
+      await this.lpMining.setVotingEnabled(true, {from: carol});
+      await this.lpMining.setVotingEnabled(true, {from: bob});
+      await this.lpMining.setVotingEnabled(true, {from: alice});
+
       await this.prepareReservoir();
     })
 
@@ -1020,52 +1094,52 @@ describe('VestedLPMining', () => {
       assert.equal(userPB.balance.toString(), '0');
 
       await this.lpMining.deposit(0, '0', 0, { from: bob });
-      assert.equal(await this.allCvpOf(bob), '2185');
+      assert.equal(await this.allCvpOf(bob), '2166');
 
       user = await this.lpMining.users('0', bob);
-      assert.equal(user.pendedCvp.toString(), '971');
+      assert.equal(user.pendedCvp.toString(), '952');
 
       await time.advanceBlockTo(this.shiftBlock('119'));
 
       await this.lpMining.deposit(0, '0', 0, { from: bob });
-      assert.equal(await this.allCvpOf(bob), '2346');
+      assert.equal(await this.allCvpOf(bob), '2166');
       user = await this.lpMining.users('0', bob);
-      assert.equal(user.pendedCvp.toString(), '971');
+      assert.equal(user.pendedCvp.toString(), '794');
 
       await time.advanceBlockTo(this.shiftBlock('129'));
 
       await this.lpMining.deposit(0, '0', 0, { from: bob });
-      assert.equal(await this.allCvpOf(bob), '2588');
+      assert.equal(await this.allCvpOf(bob), '2166');
       user = await this.lpMining.users('0', bob);
-      assert.equal(user.pendedCvp.toString(), '971');
+      assert.equal(user.pendedCvp.toString(), '596');
 
       await time.advanceBlockTo(this.shiftBlock('139'));
 
       await this.lpMining.deposit(0, '0', 0, { from: bob });
-      assert.equal(await this.allCvpOf(bob), '2911');
+      assert.equal(await this.allCvpOf(bob), '2166');
       user = await this.lpMining.users('0', bob);
-      assert.equal(user.pendedCvp.toString(), '971');
+      assert.equal(user.pendedCvp.toString(), '398');
 
       await time.advanceBlockTo(this.shiftBlock('219'));
 
       await this.lpMining.deposit(0, '0', 0, { from: bob });
-      assert.equal(await this.allCvpOf(bob), '3137');
+      assert.equal(await this.allCvpOf(bob), '2166');
       user = await this.lpMining.users('0', bob);
-      assert.equal(user.pendedCvp.toString(), '971');
+      assert.equal(user.pendedCvp.toString(), '0');
 
       await time.advanceBlockTo(this.shiftBlock('319'));
 
       await this.lpMining.deposit(0, '0', 0, { from: bob });
-      assert.equal(await this.allCvpOf(bob), '3137');
+      assert.equal(await this.allCvpOf(bob), '2166');
       user = await this.lpMining.users('0', bob);
-      assert.equal(user.pendedCvp.toString(), '971');
+      assert.equal(user.pendedCvp.toString(), '0');
 
       await time.advanceBlockTo(this.shiftBlock('419'));
 
       await this.lpMining.deposit(0, '0', 0, { from: bob });
-      assert.equal(await this.allCvpOf(bob), '3137');
+      assert.equal(await this.allCvpOf(bob), '2166');
       user = await this.lpMining.users('0', bob);
-      assert.equal(user.pendedCvp.toString(), '971');
+      assert.equal(user.pendedCvp.toString(), '0');
     });
 
     it('should revert deposit and withdraw if not enough for boost', async () => {
