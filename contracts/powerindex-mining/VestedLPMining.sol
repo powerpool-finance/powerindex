@@ -262,24 +262,6 @@ contract VestedLPMining is
   }
 
   /// @inheritdoc IVestedLPMining
-  /// @dev Anyone may call, so we have to trust the migrator contract
-  function migrate(uint256 _pid) public override nonReentrant {
-    require(address(migrator) != address(0), "VLPMining: no migrator");
-    Pool storage pool = pools[_pid];
-    IERC20 lpToken = pool.lpToken;
-    uint256 bal = lpToken.balanceOf(address(this));
-    lpToken.safeApprove(address(migrator), bal);
-    IERC20 newLpToken = migrator.migrate(lpToken, pool.poolType);
-    require(bal == newLpToken.balanceOf(address(this)), "VLPMining: invalid migration");
-    pool.lpToken = newLpToken;
-
-    delete poolPidByAddress[address(lpToken)];
-    poolPidByAddress[address(newLpToken)] = _pid;
-
-    emit MigrateLpToken(address(lpToken), address(newLpToken), _pid);
-  }
-
-  /// @inheritdoc IVestedLPMining
   function pendingCvp(uint256 _pid, address _user) external view override returns (uint256) {
     if (_pid >= pools.length) return 0;
 
