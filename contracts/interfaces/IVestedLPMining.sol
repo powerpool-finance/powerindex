@@ -60,9 +60,6 @@ interface IVestedLPMining {
 
   function setCvpPoolByMetaPool(address _metaPool, address _cvpPool) external;
 
-  /// @notice Migrate LP token to another LP contract
-  function migrate(uint256 _pid) external;
-
   /// @notice Return the amount of pending CVPs entitled to the given user of the pool
   function pendingCvp(uint256 _pid, address _user) external view returns (uint256);
 
