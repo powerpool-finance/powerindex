@@ -32,4 +32,21 @@ contract MockDelegatableVotes is DelegatableVotes {
   ) internal pure override returns (uint96 votes) {
     votes = uint96(userData + sharedData);
   }
+
+  function getCurrentVotes(address account) external view returns (uint96) {
+    return _getCurrentVotes(account);
+  }
+
+  function getPriorVotes(address account, uint256 blockNumber) external view returns (uint96) {
+    return _getPriorVotes(account, blockNumber);
+  }
+
+  function getPriorVotes(
+    address account,
+    uint256 blockNumber,
+    uint32 userCheckpointId,
+    uint32 sharedCheckpointId
+  ) public view returns (uint96) {
+    return _getPriorVotes(account, blockNumber, userCheckpointId, sharedCheckpointId);
+  }
 }
