@@ -4,7 +4,7 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
-import "@powerpool/poweroracle/contracts/interfaces/IPowerPoke.sol";
+import "@powerpool/power-oracle/contracts/interfaces/IPowerPoke.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
 import "../interfaces/IPowerOracle.sol";
 import "../PowerIndexPoolController.sol";

@@ -17,12 +17,12 @@
     "test-ganache": "hardhat test --network ganache"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "3.3.0",
+    "@openzeppelin/contracts": "3.4.0",
     "@openzeppelin/contracts-ethereum-package": "^3.0.0",
     "@openzeppelin/hardhat-upgrades": "^1.3.0",
     "@openzeppelin/truffle-upgrades": "^1.2.1",
     "@openzeppelin/upgrades": "^2.8.0",
-    "@powerpool/poweroracle": "git://github.com/powerpool-finance/power-oracle-contracts.git#9ce4bf9",
+    "@powerpool/power-oracle": "git://github.com/powerpool-finance/power-oracle-contracts.git#9ce4bf9",
     "@truffle/hdwallet-provider": "^1.1.1",
     "bignumber.js": "^9.0.1",
     "eslint": "^7.4.0",
