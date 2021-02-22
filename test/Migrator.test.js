@@ -10,7 +10,7 @@ const Migrator = artifacts.require('Migrator');
 const Reservoir = artifacts.require('Reservoir');
 const { web3 } = Reservoir;
 
-describe('Migrator', () => {
+describe.skip('Migrator', () => {
   let alice, bob, minter;
   before(async function () {
     [alice, bob, minter] = await web3.eth.getAccounts();

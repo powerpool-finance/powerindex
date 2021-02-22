@@ -204,6 +204,22 @@ describe('PowerIndexPoolController', () => {
     ).toString(10);
   });
 
+  it('migration to new controller should work properly', async () => {
+    controller = await PowerIndexPoolController.new(pool.address, zeroAddress, wrapperFactory.address, weightsStrategy);
+    await pool.setController(controller.address);
+    assert.equal(await pool.getController(), controller.address);
+
+    const newController = await PowerIndexPoolController.new(pool.address, zeroAddress, wrapperFactory.address, weightsStrategy);
+
+    const setControllerSig = pool.contract._jsonInterface.filter(item => item.name === 'setController')[0]
+      .signature;
+    const setControllerArgs = web3.eth.abi.encodeParameters(['address'], [newController.address]);
+    await expectRevert(controller.callPool(setControllerSig, setControllerArgs, {from: alice}), 'Ownable');
+    await controller.callPool(setControllerSig, setControllerArgs);
+
+    assert.equal(await pool.getController(), newController.address);
+  });
+
   it('setDynamicWeightListByStrategy should work properly', async () => {
     controller = await PowerIndexPoolController.new(pool.address, zeroAddress, wrapperFactory.address, weightsStrategy);
     await pool.setController(controller.address);

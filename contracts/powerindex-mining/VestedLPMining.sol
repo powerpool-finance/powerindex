@@ -114,6 +114,8 @@ contract VestedLPMining is
   mapping(address => uint256) public lpBoostRatioByToken;
   mapping(address => uint256) public lpBoostMaxRatioByToken;
 
+  mapping(address => bool) public votingEnabled;
+
   /// @inheritdoc IVestedLPMining
   function initialize(
     IERC20 _cvp,
@@ -235,22 +237,28 @@ contract VestedLPMining is
     emit SetCvpPoolByMetaPool(_metaPool, _cvpPool);
   }
 
-  /// @inheritdoc IVestedLPMining
-  /// @dev Anyone may call, so we have to trust the migrator contract
-  function migrate(uint256 _pid) public override nonReentrant {
-    require(address(migrator) != address(0), "VLPMining: no migrator");
-    Pool storage pool = pools[_pid];
-    IERC20 lpToken = pool.lpToken;
-    uint256 bal = lpToken.balanceOf(address(this));
-    lpToken.safeApprove(address(migrator), bal);
-    IERC20 newLpToken = migrator.migrate(lpToken, pool.poolType);
-    require(bal == newLpToken.balanceOf(address(this)), "VLPMining: invalid migration");
-    pool.lpToken = newLpToken;
+  function updateCvpAdjust(
+    uint256 _pid,
+    address[] calldata _users,
+    uint96[] calldata _cvpAdjust
+  ) external onlyOwner {
+    uint256 len = _users.length;
+    require(len == _cvpAdjust.length, "Lengths not match");
+    for (uint256 i = 0; i < len; i++) {
+      users[_pid][_users[i]].cvpAdjust = _cvpAdjust[i];
+    }
+  }
 
-    delete poolPidByAddress[address(lpToken)];
-    poolPidByAddress[address(newLpToken)] = _pid;
-
-    emit MigrateLpToken(address(lpToken), address(newLpToken), _pid);
+  function updatePendedCvp(
+    uint256 _pid,
+    address[] calldata _users,
+    uint96[] calldata _pendedCvp
+  ) external onlyOwner {
+    uint256 len = _users.length;
+    require(len == _pendedCvp.length, "Lengths not match");
+    for (uint256 i = 0; i < len; i++) {
+      users[_pid][_users[i]].pendedCvp = _pendedCvp[i];
+    }
   }
 
   /// @inheritdoc IVestedLPMining
@@ -339,7 +347,9 @@ contract VestedLPMining is
     user.cvpAdjust = _computeCvpAdjustmentWithBoost(user.lptAmount, pool, userPB, poolBoost);
     emit Deposit(msg.sender, _pid, _amount, _boostAmount);
 
-    _doCheckpointVotes(msg.sender);
+    if (votingEnabled[msg.sender]) {
+      _doCheckpointVotes(msg.sender);
+    }
   }
 
   /// @inheritdoc IVestedLPMining
@@ -374,7 +384,9 @@ contract VestedLPMining is
     user.cvpAdjust = _computeCvpAdjustmentWithBoost(user.lptAmount, pool, userPB, poolBoost);
     emit Withdraw(msg.sender, _pid, _amount, _boostAmount);
 
-    _doCheckpointVotes(msg.sender);
+    if (votingEnabled[msg.sender]) {
+      _doCheckpointVotes(msg.sender);
+    }
   }
 
   /// @inheritdoc IVestedLPMining
@@ -403,12 +415,47 @@ contract VestedLPMining is
     user.vestingBlock = 0;
     userPB.balance = 0;
 
-    _doCheckpointVotes(msg.sender);
+    if (votingEnabled[msg.sender]) {
+      _doCheckpointVotes(msg.sender);
+    }
+  }
+
+  function setVotingEnabled(bool _isEnabled) public nonReentrant {
+    votingEnabled[msg.sender] = _isEnabled;
+    if (_isEnabled) {
+      _doCheckpointVotes(msg.sender);
+    }
   }
 
   /// @inheritdoc IVestedLPMining
   function checkpointVotes(address _user) public override nonReentrant {
     _doCheckpointVotes(_user);
+  }
+
+  function getCurrentVotes(address account) external view returns (uint96) {
+    if (!votingEnabled[account]) {
+      return 0;
+    }
+    return _getCurrentVotes(account);
+  }
+
+  function getPriorVotes(address account, uint256 blockNumber) external view returns (uint96) {
+    if (!votingEnabled[account]) {
+      return 0;
+    }
+    return _getPriorVotes(account, blockNumber);
+  }
+
+  function getPriorVotes(
+    address account,
+    uint256 blockNumber,
+    uint32 userCheckpointId,
+    uint32 sharedCheckpointId
+  ) external view returns (uint96) {
+    if (!votingEnabled[account]) {
+      return 0;
+    }
+    return _getPriorVotes(account, blockNumber, userCheckpointId, sharedCheckpointId);
   }
 
   /// @inheritdoc IVestedLPMining
@@ -537,7 +584,7 @@ contract VestedLPMining is
     uint32 prevUpdateBlock = _user.lastUpdateBlock;
     (uint256 newlyEntitled, uint256 newlyVested) = _computeCvpVesting(_user, pool, _userPB, poolBoost);
 
-    if (newlyEntitled != 0) {
+    if (newlyEntitled != 0 || newlyVested != 0) {
       user.pendedCvp = _user.pendedCvp;
     }
     if (newlyVested != 0) {
