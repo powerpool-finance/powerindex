@@ -25,10 +25,10 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     address indexed caller,
     address indexed token,
     uint256 indexed swapType,
-    uint256 xcvpCvpAfter,
     uint256 amountIn,
     uint256 amountOut,
-    uint256 xcvpCvpBefore
+    uint256 xcvpCvpBefore,
+    uint256 xcvpCvpAfter
   );
   event SetCvpAmountOut(uint256 cvpAmountOut);
   event SetCustomPath(address indexed token_, address router_, address[] path);

@@ -169,13 +169,14 @@ contract CVPMakerViewer is CVPMakerStorage {
   // How many CVP can get for the current token_ balance
   function estimateUniLikeStrategyOut(address token_) public view returns (uint256) {
     uint256 balance = IERC20(token_).balanceOf(address(this));
-    if (balance == 0) {
-      return 0;
-    }
     return _estimateUniLikeStrategyOut(token_, balance);
   }
 
   function _estimateUniLikeStrategyOut(address token_, uint256 balance_) internal view returns (uint256) {
+    if (balance_ == 0) {
+      return 0;
+    }
+
     address router = getRouter(token_);
     address[] memory path = getPath(token_);
     uint256[] memory results = IUniswapV2Router02(router).getAmountsOut(balance_, path);

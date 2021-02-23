@@ -1,4 +1,4 @@
-const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
+const { constants, time, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 const { ether, gwei, deployProxied } = require('../helpers/index');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
@@ -30,7 +30,7 @@ const ETH = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
 const { web3 } = MockERC20;
 
-describe.only('CVPMaker test', () => {
+describe('CVPMaker test', () => {
   let deployer, owner, alice;
   let cvp;
   let weth;
@@ -134,115 +134,207 @@ describe.only('CVPMaker test', () => {
     assert.equal(await cvpMaker.uniswapRouter(), uniswapRouter.address);
     assert.equal(await cvpMaker.powerPoke(), powerPoke.address);
     assert.equal(await cvpMaker.cvpAmountOut(), ether(3000));
+    await expectRevert(cvpMaker.initialize(alice, ether(20)), 'Contract instance has already been initialized');
+  });
+
+  it('should deny initialization with 0 cvpAmountOut', async () => {
+    const cvpMaker = await MockCVPMaker.new(
+      cvp.address,
+      xCvp.address,
+      weth.address,
+      uniswapRouter.address,
+      constants.ZERO_ADDRESS,
+    );
+    await expectRevert(cvpMaker.initialize(powerPoke.address, ether(0)),'CVP_AMOUNT_OUT_0');
   });
 
   // describe('poker interface');
   // describe('slasher interface');
   describe('swapping', () => {
     describe('unconfigured token', () => {
-      it('should send CVP directly to the xCVP', async () => {
-        await cvp.transfer(xCvp.address, ether(725));
-        await cvp.transfer(cvpMaker.address, ether(5000));
-        assert.equal(await cvpMaker.estimateCvpAmountOut(cvp.address), ether(5000));
-        assert.equal(await cvpMaker.estimateSwapAmountIn(cvp.address), ether(2000));
+      describe('with enough balance', () => {
+        it('should send CVP directly to the xCVP', async () => {
+          await cvp.transfer(xCvp.address, ether(725));
+          await cvp.transfer(cvpMaker.address, ether(5000));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(cvp.address), ether(5000));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(cvp.address), ether(2000));
 
-        assert.equal(await cvp.balanceOf(cvpMaker.address), ether(5000));
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
+          assert.equal(await cvp.balanceOf(cvpMaker.address), ether(5000));
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
 
-        const res = await cvpMaker.mockSwap(cvp.address);
-        expectEvent(res, 'Swap', {
-          swapType: '1',
-          caller: deployer,
-          token: cvp.address,
-          amountIn: ether(2000),
-          amountOut: ether(2000),
-          xcvpCvpBefore: ether(725),
-          xcvpCvpAfter: ether(2725),
+          const res = await cvpMaker.mockSwap(cvp.address);
+          expectEvent(res, 'Swap', {
+            swapType: '1',
+            caller: deployer,
+            token: cvp.address,
+            amountIn: ether(2000),
+            amountOut: ether(2000),
+            xcvpCvpBefore: ether(725),
+            xcvpCvpAfter: ether(2725),
+          });
+          assert.equal(await cvp.balanceOf(cvpMaker.address), ether(3000));
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
         });
-        assert.equal(await cvp.balanceOf(cvpMaker.address), ether(3000));
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
+
+        it('should swap the token through token->ETH->CVP uniswap pairs', async () => {
+          await dai.transfer(cvpMaker.address, ether(8000));
+          await cvp.transfer(xCvp.address, ether(725));
+
+          assert.equal(await cvpMaker.estimateCvpAmountOut(dai.address), ether('2385.602600975004141233'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(dai.address), ether('6706.892169261616443894'));
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
+          assert.equal(await dai.balanceOf(cvpMaker.address), ether(8000));
+
+          const res = await cvpMaker.mockSwap(dai.address);
+          expectEvent(res, 'Swap', {
+            swapType: '4',
+            caller: deployer,
+            token: dai.address,
+            amountIn: '6706892169261616443894',
+            amountOut: ether(2000),
+            xcvpCvpBefore: ether(725),
+            xcvpCvpAfter: ether(2725),
+          });
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
+          assert.equal(
+            await dai.balanceOf(cvpMaker.address),
+            BigInt(ether(8000)) - BigInt(ether('6706.892169261616443894')),
+          );
+        });
+
+        it('should swap WETH using WETH-CVP uniswap pair', async () => {
+          await cvp.transfer(xCvp.address, ether(725));
+
+          await weth.deposit({ value: ether(4) });
+          await weth.transfer(cvpMaker.address, ether(4));
+
+          assert.equal(await cvpMaker.estimateCvpAmountOut(weth.address), ether('2392.790457551655283998'));
+          assert.equal(await cvpMaker.estimateEthStrategyOut(weth.address), ether('2392.790457551655283998'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(weth.address), ether('3.343374568186039725'));
+          assert.equal(await cvpMaker.estimateEthStrategyIn(), ether('3.343374568186039725'));
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
+          assert.equal(await weth.balanceOf(cvpMaker.address), ether(4));
+          const res = await cvpMaker.mockSwap(weth.address);
+          expectEvent(res, 'Swap', {
+            swapType: '2',
+            caller: deployer,
+            token: weth.address,
+            amountIn: ether('3.343374568186039725'),
+            amountOut: ether(2000),
+            xcvpCvpBefore: ether(725),
+            xcvpCvpAfter: ether(2725),
+          });
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
+          assert.equal(await weth.balanceOf(cvpMaker.address), BigInt(ether(4)) - BigInt(ether('3.343374568186039725')));
+        });
+
+        it('should wrap ETH into WETH and swap it using WETH-CVP uniswap pair', async () => {
+          await cvp.transfer(xCvp.address, ether(725));
+          await web3.eth.sendTransaction({ from: alice, to: cvpMaker.address, value: ether(4) });
+
+          assert.equal(await cvpMaker.estimateCvpAmountOut(ETH), ether('2392.790457551655283998'));
+          assert.equal(await cvpMaker.estimateEthStrategyOut(ETH), ether('2392.790457551655283998'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(ETH), ether('3.343374568186039725'));
+          assert.equal(await cvpMaker.estimateEthStrategyIn(), ether('3.343374568186039725'));
+
+          assert.equal(await web3.eth.getBalance(cvpMaker.address), ether(4));
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
+
+          const res = await cvpMaker.mockSwap(ETH);
+          expectEvent(res, 'Swap', {
+            swapType: '2',
+            caller: deployer,
+            token: ETH,
+            amountIn: ether('3.343374568186039725'),
+            amountOut: ether(2000),
+            xcvpCvpBefore: ether(725),
+            xcvpCvpAfter: ether(2725),
+          });
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
+          assert.equal(await web3.eth.getBalance(cvpMaker.address), ether(0));
+          assert.equal(await weth.balanceOf(cvpMaker.address), BigInt(ether(4)) - BigInt(ether('3.343374568186039725')));
+        });
       });
 
-      it('should swap the token through token->ETH->CVP uniswap pairs', async () => {
-        await dai.transfer(cvpMaker.address, ether(8000));
-        await cvp.transfer(xCvp.address, ether(725));
+      describe('with insufficient balance', () => {
+        it('should revert if CVP balance is not enough for a swap', async () => {
+          await cvp.transfer(cvpMaker.address, ether('1999.999'))
+          assert.equal(await cvp.balanceOf(cvpMaker.address), ether('1999.999'));
 
-        assert.equal(await cvpMaker.estimateCvpAmountOut(dai.address), ether('2385.602600975004141233'));
-        assert.equal(await cvpMaker.estimateSwapAmountIn(dai.address), ether('6706.892169261616443894'));
-
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
-        assert.equal(await dai.balanceOf(cvpMaker.address), ether(8000));
-
-        const res = await cvpMaker.mockSwap(dai.address);
-        expectEvent(res, 'Swap', {
-          swapType: '4',
-          caller: deployer,
-          token: dai.address,
-          amountIn: '6706892169261616443894',
-          amountOut: ether(2000),
-          xcvpCvpBefore: ether(725),
-          xcvpCvpAfter: ether(2725),
+          assert.equal(await cvpMaker.estimateCvpAmountOut(cvp.address), ether('1999.999'));
+          await expectRevert(cvpMaker.mockSwap(cvp.address), 'ERC20: transfer amount exceeds balance');
         });
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
-        assert.equal(
-          await dai.balanceOf(cvpMaker.address),
-          BigInt(ether(8000)) - BigInt(ether('6706.892169261616443894')),
-        );
+
+        it('should revert if non-CVP balance is not enough for a swap', async () => {
+          const insufficientAmount = ether('6706');
+          await dai.transfer(cvpMaker.address, insufficientAmount)
+          assert.equal(await dai.balanceOf(cvpMaker.address), insufficientAmount);
+
+          assert.equal(await cvpMaker.estimateSwapAmountIn(dai.address), ether('6706.892169261616443894'));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(dai.address), ether('1999.733956269714881646'));
+
+          await expectRevert(cvpMaker.mockSwap(dai.address), 'TRANSFER_FROM_FAILED');
+        });
+
+        it('should revert if  WETH balance is not enough for a swap', async () => {
+          await weth.deposit({ value: ether(4) });
+          await weth.transfer(cvpMaker.address, ether('3.3'));
+
+          assert.equal(await weth.balanceOf(cvpMaker.address), ether('3.3'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(weth.address), ether('3.343374568186039725'));
+          assert.equal(await cvpMaker.estimateEthStrategyOut(weth.address), ether('1974.053505166562651492'));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(weth.address), ether('1974.053505166562651492'));
+
+          await expectRevert(cvpMaker.mockSwap(weth.address), 'TRANSFER_FROM_FAILED');
+        });
+
+        it('should revert if ETH balance is not enough for a swap', async () => {
+          await web3.eth.sendTransaction({ from: alice, to: cvpMaker.address, value: ether('3.3') });
+
+          assert.equal(await web3.eth.getBalance(cvpMaker.address), ether('3.3'));
+          assert.equal(await weth.balanceOf(cvpMaker.address), ether(0));
+
+          assert.equal(await cvpMaker.estimateSwapAmountIn(ETH), ether('3.343374568186039725'));
+          assert.equal(await cvpMaker.estimateEthStrategyOut(ETH), ether('1974.053505166562651492'));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(ETH), ether('1974.053505166562651492'));
+
+          await expectRevert(cvpMaker.mockSwap(ETH), 'TRANSFER_FROM_FAILED');
+        });
       });
 
-      it('should swap WETH using WETH-CVP uniswap pair', async () => {
-        await cvp.transfer(xCvp.address, ether(725));
-
-        await weth.deposit({ value: ether(4) });
-        await weth.transfer(cvpMaker.address, ether(4));
-
-        assert.equal(await cvpMaker.estimateCvpAmountOut(weth.address), ether('2392.790457551655283998'));
-        assert.equal(await cvpMaker.estimateEthStrategyOut(weth.address), ether('2392.790457551655283998'));
-        assert.equal(await cvpMaker.estimateSwapAmountIn(weth.address), ether('3.343374568186039725'));
-        assert.equal(await cvpMaker.estimateEthStrategyIn(), ether('3.343374568186039725'));
-
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
-        assert.equal(await weth.balanceOf(cvpMaker.address), ether(4));
-        const res = await cvpMaker.mockSwap(weth.address);
-        expectEvent(res, 'Swap', {
-          swapType: '2',
-          caller: deployer,
-          token: weth.address,
-          amountIn: ether('3.343374568186039725'),
-          amountOut: ether(2000),
-          xcvpCvpBefore: ether(725),
-          xcvpCvpAfter: ether(2725),
-        });
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
-        assert.equal(await weth.balanceOf(cvpMaker.address), BigInt(ether(4)) - BigInt(ether('3.343374568186039725')));
-      });
-
-      it('should wrap ETH into WETH and swap it using WETH-CVP uniswap pair', async () => {
-        await cvp.transfer(xCvp.address, ether(725));
-        await web3.eth.sendTransaction({ from: alice, to: cvpMaker.address, value: ether(4) });
-
-        assert.equal(await cvpMaker.estimateCvpAmountOut(ETH), ether('2392.790457551655283998'));
-        assert.equal(await cvpMaker.estimateEthStrategyOut(ETH), ether('2392.790457551655283998'));
-        assert.equal(await cvpMaker.estimateSwapAmountIn(ETH), ether('3.343374568186039725'));
-        assert.equal(await cvpMaker.estimateEthStrategyIn(), ether('3.343374568186039725'));
-
-        assert.equal(await web3.eth.getBalance(cvpMaker.address), ether(4));
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
-
-        const res = await cvpMaker.mockSwap(ETH);
-        expectEvent(res, 'Swap', {
-          swapType: '2',
-          caller: deployer,
-          token: ETH,
-          amountIn: ether('3.343374568186039725'),
-          amountOut: ether(2000),
-          xcvpCvpBefore: ether(725),
-          xcvpCvpAfter: ether(2725),
+      describe('with 0 balance', () => {
+        it('should revert if CVP balance is 0', async () => {
+          assert.equal(await cvp.balanceOf(cvpMaker.address), ether(0));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(cvp.address), ether(0));
+          await expectRevert(cvpMaker.mockSwap(cvp.address), 'ERC20: transfer amount exceeds balance');
         });
 
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
-        assert.equal(await web3.eth.getBalance(cvpMaker.address), ether(0));
-        assert.equal(await weth.balanceOf(cvpMaker.address), BigInt(ether(4)) - BigInt(ether('3.343374568186039725')));
+        it('should revert if non-CVP balance is 0', async () => {
+          assert.equal(await dai.balanceOf(cvpMaker.address), ether(0));
+          assert.equal(await cvpMaker.estimateEthStrategyOut(dai.address), ether(0));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(dai.address), ether(0));
+          await expectRevert(cvpMaker.mockSwap(dai.address), 'TRANSFER_FROM_FAILED');
+        });
+
+        it('should revert if both ETH and WETH balances are 0 for ETH', async () => {
+          assert.equal(await web3.eth.getBalance(cvpMaker.address), ether(0));
+          assert.equal(await weth.balanceOf(cvpMaker.address), ether(0));
+          assert.equal(await cvpMaker.estimateEthStrategyOut(ETH), ether(0));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(ETH), ether(0));
+
+          await expectRevert(cvpMaker.mockSwap(ETH), 'ETH_BALANCE_IS_0');
+        });
+
+        it('should revert if  WETH balance is 0 for ETH', async () => {
+          assert.equal(await weth.balanceOf(cvpMaker.address), ether(0));
+          assert.equal(await cvpMaker.estimateEthStrategyOut(weth.address), ether(0));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(weth.address), ether(0));
+
+          await expectRevert(cvpMaker.mockSwap(weth.address), 'TRANSFER_FROM_FAILED');
+        });
       });
     });
 
@@ -258,130 +350,177 @@ describe.only('CVPMaker test', () => {
         sushi = await MockERC20.new('SUSHI', 'SUSHI', '18', ether(1e15));
       });
 
-      it('should swap using a custom Uniswap path', async () => {
-        // UNI->USDC->DAI->WETH->CVP
-        // UNI-USDC: 24.924993787445298479
-        // DAI->USDC: 0.996999999502995500
-        await makeUniswapPair(uni, usdc, ether(4e6), ether(1e8), true);
-        await makeUniswapPair(usdc, dai, ether(2e9), ether(2e9), true);
-        assert.equal(
-          (await uniswapRouter.getAmountsOut(ether(1), [uni.address, usdc.address]))[1],
-          ether('24.924993787445298479'),
-        );
-        assert.equal(
-          (await uniswapRouter.getAmountsOut(ether(1), [uni.address, usdc.address, dai.address]))[2],
-          ether('24.850218497316279064'),
-        );
+      describe('using a custom uniswap path', async () => {
+        beforeEach(async () => {
+          // UNI->USDC->DAI->WETH->CVP
+          // UNI-USDC: 24.924993787445298479
+          // DAI->USDC: 0.996999999502995500
+          await makeUniswapPair(uni, usdc, ether(4e6), ether(1e8), true);
+          await makeUniswapPair(usdc, dai, ether(2e9), ether(2e9), true);
+          assert.equal(
+            (await uniswapRouter.getAmountsOut(ether(1), [uni.address, usdc.address]))[1],
+            ether('24.924993787445298479'),
+          );
+          assert.equal(
+            (await uniswapRouter.getAmountsOut(ether(1), [uni.address, usdc.address, dai.address]))[2],
+            ether('24.850218497316279064'),
+          );
 
-        await cvpMaker.setCustomPath(
-          uni.address,
-          uniswapRouter.address,
-          [uni.address, usdc.address, dai.address, weth.address, cvp.address],
-          { from: owner },
-        );
-        await cvp.transfer(xCvp.address, ether(725));
-        await uni.transfer(cvpMaker.address, ether(500));
-
-        // INs
-        assert.equal(await cvpMaker.estimateEthStrategyIn(), ether('3.343374568186039725'));
-        assert.equal(await cvpMaker.estimateUniLikeStrategyIn(uni.address), ether('269.911675708212223606'));
-        assert.equal(
-          (
-            await uniswapRouter.getAmountsIn(ether('3.343374568186039725'), [
-              uni.address,
-              usdc.address,
-              dai.address,
-              weth.address,
-            ])
-          )[0],
-          ether('269.911675708212223606'),
-        );
-
-        // OUTs
-        assert.equal(await cvpMaker.estimateCvpAmountOut(uni.address), ether('3704.671561101249231727'));
-        assert.equal(await cvpMaker.estimateUniLikeStrategyOut(uni.address), ether('3704.671561101249231727'));
-        assert.equal(
-          (
-            await uniswapRouter.getAmountsOut(ether(500), [
-              uni.address,
-              usdc.address,
-              dai.address,
-              weth.address,
-              cvp.address,
-            ])
-          )[4],
-          ether('3704.671561101249231727'),
-        );
-
-        assert.equal(await uni.balanceOf(cvpMaker.address), ether(500));
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
-        const res = await cvpMaker.mockSwap(uni.address);
-        expectEvent(res, 'Swap', {
-          swapType: '4',
-          caller: deployer,
-          token: uni.address,
-          amountIn: ether('269.911675708212223606'),
-          amountOut: ether(2000),
-          xcvpCvpBefore: ether(725),
-          xcvpCvpAfter: ether(2725),
+          await cvpMaker.setCustomPath(
+            uni.address,
+            uniswapRouter.address,
+            [uni.address, usdc.address, dai.address, weth.address, cvp.address],
+            { from: owner },
+          );
+          await cvp.transfer(xCvp.address, ether(725));
         });
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
-        assert.equal(
-          await uni.balanceOf(cvpMaker.address),
-          (BigInt(ether(500)) - BigInt(ether('269.911675708212223606'))).toString(),
-        );
+
+        it('should swap if the balance is enough', async () => {
+          await uni.transfer(cvpMaker.address, ether(500));
+          // INs
+          assert.equal(await cvpMaker.estimateEthStrategyIn(), ether('3.343374568186039725'));
+          assert.equal(await cvpMaker.estimateUniLikeStrategyIn(uni.address), ether('269.911675708212223606'));
+          assert.equal(
+            (
+              await uniswapRouter.getAmountsIn(ether('3.343374568186039725'), [
+                uni.address,
+                usdc.address,
+                dai.address,
+                weth.address,
+              ])
+            )[0],
+            ether('269.911675708212223606'),
+          );
+
+          // OUTs
+          assert.equal(await cvpMaker.estimateCvpAmountOut(uni.address), ether('3704.671561101249231727'));
+          assert.equal(await cvpMaker.estimateUniLikeStrategyOut(uni.address), ether('3704.671561101249231727'));
+          assert.equal(
+            (
+              await uniswapRouter.getAmountsOut(ether(500), [
+                uni.address,
+                usdc.address,
+                dai.address,
+                weth.address,
+                cvp.address,
+              ])
+            )[4],
+            ether('3704.671561101249231727'),
+          );
+
+          assert.equal(await uni.balanceOf(cvpMaker.address), ether(500));
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
+          const res = await cvpMaker.mockSwap(uni.address);
+          expectEvent(res, 'Swap', {
+            swapType: '4',
+            caller: deployer,
+            token: uni.address,
+            amountIn: ether('269.911675708212223606'),
+            amountOut: ether(2000),
+            xcvpCvpBefore: ether(725),
+            xcvpCvpAfter: ether(2725),
+          });
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
+          assert.equal(
+            await uni.balanceOf(cvpMaker.address),
+            (BigInt(ether(500)) - BigInt(ether('269.911675708212223606'))).toString(),
+          );
+        });
+
+        it('should revert if the balance is not enough', async () => {
+          await uni.transfer(cvpMaker.address, ether(269));
+          assert.equal(await uni.balanceOf(cvpMaker.address), ether(269));
+
+          assert.equal(await cvpMaker.estimateCvpAmountOut(uni.address), ether('1993.245157172728270489'));
+          assert.equal(await cvpMaker.estimateUniLikeStrategyIn(uni.address), ether('269.911675708212223606'));
+
+          await expectRevert(cvpMaker.mockSwap(uni.address), 'TRANSFER_FROM_FAILED');
+        });
+
+        it('should revert if the balance is 0', async () => {
+          assert.equal(await uni.balanceOf(cvpMaker.address), ether(0));
+
+          assert.equal(await cvpMaker.estimateCvpAmountOut(uni.address), ether(0));
+          assert.equal(await cvpMaker.estimateUniLikeStrategyIn(uni.address), ether('269.911675708212223606'));
+
+          await expectRevert(cvpMaker.mockSwap(uni.address), 'TRANSFER_FROM_FAILED');
+        });
       });
 
-      it('should use a custom non-Uniswap path if the one is set', async () => {
-        // SUSHI->WETH@Sushi && WETH->CVP@Uni
-        // SUSHI-WETH: 14.242855114267635867
-        await makeSushiPair(sushi, weth, ether(1.5e8), ether(1e6), true);
-        assert.equal(
-          (await sushiRouter.getAmountsOut(ether(1), [sushi.address, weth.address]))[1],
-          ether('0.006646666622488489'),
-        );
+      describe('with a custom non-uniswap path', () => {
+        beforeEach(async () => {
+          // SUSHI->WETH@Sushi && WETH->CVP@Uni
+          // SUSHI-WETH: 14.242855114267635867
+          await makeSushiPair(sushi, weth, ether(1.5e8), ether(1e6), true);
+          assert.equal(
+            (await sushiRouter.getAmountsOut(ether(1), [sushi.address, weth.address]))[1],
+            ether('0.006646666622488489'),
+          );
 
-        await cvpMaker.setCustomPath(sushi.address, sushiRouter.address, [sushi.address, weth.address], {
-          from: owner,
+          await cvpMaker.setCustomPath(sushi.address, sushiRouter.address, [sushi.address, weth.address], {
+            from: owner,
+          });
+
+          await cvp.transfer(xCvp.address, ether(725));
+        })
+
+        it('should use a custom non-Uniswap path if the one is set', async () => {
+          await sushi.transfer(cvpMaker.address, ether(600));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(sushi.address), ether('2385.602600975004141233'));
+
+          // INs
+          assert.equal(await cvpMaker.estimateEthStrategyIn(), ether('3.343374568186039725'));
+          assert.equal(await cvpMaker.estimateUniLikeStrategyIn(sushi.address), ether('503.016912694621233293'));
+          assert.equal(
+            (await sushiRouter.getAmountsIn(ether('3.343374568186039725'), [sushi.address, weth.address]))[0],
+            ether('503.016912694621233293'),
+          );
+
+          // OUTs
+          assert.equal(await cvpMaker.estimateCvpAmountOut(sushi.address), ether('2385.602600975004141233'));
+          assert.equal(await cvpMaker.estimateUniLikeStrategyOut(sushi.address), ether('2385.602600975004141233'));
+          assert.equal(
+            (await sushiRouter.getAmountsOut(ether('503.016912694621233293'), [sushi.address, weth.address]))[1],
+            ether('3.343374568186039725'),
+          );
+
+          assert.equal(await sushi.balanceOf(cvpMaker.address), ether(600));
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
+          const res = await cvpMaker.mockSwap(sushi.address);
+          expectEvent(res, 'Swap', {
+            swapType: '4',
+            caller: deployer,
+            token: sushi.address,
+            amountIn: ether('503.016912694621233293'),
+            amountOut: ether(2000),
+            xcvpCvpBefore: ether(725),
+            xcvpCvpAfter: ether(2725),
+          });
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
+          assert.equal(
+            await sushi.balanceOf(cvpMaker.address),
+            (BigInt(ether(600)) - BigInt(ether('503.016912694621233293'))).toString(),
+          );
         });
 
-        await cvp.transfer(xCvp.address, ether(725));
-        await sushi.transfer(cvpMaker.address, ether(600));
-        assert.equal(await cvpMaker.estimateCvpAmountOut(sushi.address), ether('2385.602600975004141233'));
+        it('should revert if the balance is not enough', async () => {
+          await sushi.transfer(cvpMaker.address, ether(503));
+          assert.equal(await sushi.balanceOf(cvpMaker.address), ether(503));
 
-        // INs
-        assert.equal(await cvpMaker.estimateEthStrategyIn(), ether('3.343374568186039725'));
-        assert.equal(await cvpMaker.estimateUniLikeStrategyIn(sushi.address), ether('503.016912694621233293'));
-        assert.equal(
-          (await sushiRouter.getAmountsIn(ether('3.343374568186039725'), [sushi.address, weth.address]))[0],
-          ether('503.016912694621233293'),
-        );
+          assert.equal(await cvpMaker.estimateCvpAmountOut(sushi.address), ether('1999.932755415266269483'));
+          assert.equal(await cvpMaker.estimateUniLikeStrategyIn(sushi.address), ether('503.016912694621233293'));
 
-        // OUTs
-        assert.equal(await cvpMaker.estimateCvpAmountOut(sushi.address), ether('2385.602600975004141233'));
-        assert.equal(await cvpMaker.estimateUniLikeStrategyOut(sushi.address), ether('2385.602600975004141233'));
-        assert.equal(
-          (await sushiRouter.getAmountsOut(ether('503.016912694621233293'), [sushi.address, weth.address]))[1],
-          ether('3.343374568186039725'),
-        );
-
-        assert.equal(await sushi.balanceOf(cvpMaker.address), ether(600));
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
-        const res = await cvpMaker.mockSwap(sushi.address);
-        expectEvent(res, 'Swap', {
-          swapType: '4',
-          caller: deployer,
-          token: sushi.address,
-          amountIn: ether('503.016912694621233293'),
-          amountOut: ether(2000),
-          xcvpCvpBefore: ether(725),
-          xcvpCvpAfter: ether(2725),
+          await expectRevert(cvpMaker.mockSwap(sushi.address), 'TRANSFER_FROM_FAILED');
         });
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
-        assert.equal(
-          await sushi.balanceOf(cvpMaker.address),
-          (BigInt(ether(600)) - BigInt(ether('503.016912694621233293'))).toString(),
-        );
+
+        it('should revert if the balance is 0', async () => {
+          assert.equal(await sushi.balanceOf(cvpMaker.address), ether(0));
+
+          assert.equal(await cvpMaker.estimateCvpAmountOut(sushi.address), ether(0));
+          assert.equal(await cvpMaker.estimateUniLikeStrategyIn(sushi.address), ether('503.016912694621233293'));
+
+          await expectRevert(cvpMaker.mockSwap(sushi.address), 'TRANSFER_FROM_FAILED');
+        });
       });
     });
 
@@ -455,15 +594,19 @@ describe.only('CVPMaker test', () => {
         return await PowerIndexPool.at(logNewPool.args.pool);
       }
 
+      let bpool;
       describe('strategy1 token (including CVP)', () => {
-        it('should use the strategy1 when configured', async () => {
+        beforeEach(async () => {
           uni = await MockERC20.new('UNI', 'UNI', '18', ether(1e15));
           comp = await MockERC20.new('COMP', 'COMP', '18', ether(1e15));
           const balances = [ether(25e6), ether(15e6), ether(10e6)];
           const weights = [ether(25), ether(15), ether(10)];
-          const bpool = await buildBPool([uni, comp, cvp], balances, weights);
+          bpool = await buildBPool([uni, comp, cvp], balances, weights);
 
           await cvpMaker.setCustomStrategy(bpool.address, 1, { from: owner });
+        })
+
+        it('should swap if there is enough assets', async () => {
           await bpool.transfer(cvpMaker.address, ether(5));
 
           assert.equal(await cvpMaker.cvpAmountOut(), ether(2000));
@@ -487,6 +630,25 @@ describe.only('CVPMaker test', () => {
           assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
           assert.equal(await bpool.balanceOf(cvpMaker.address), ether('4.995663862614869500'));
         });
+
+        it('should revert if the balance is not enough', async () => {
+          await bpool.transfer(cvpMaker.address, ether('0.00403'));
+          assert.equal(await bpool.balanceOf(cvpMaker.address), ether('0.00403'));
+
+          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('1998.718896764590400000'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.004032583285954600'));
+
+          await expectRevert(cvpMaker.mockSwap(bpool.address), 'ERR_INSUFFICIENT_BAL');
+        });
+
+        it('should revert if the balance is 0', async () => {
+          assert.equal(await bpool.balanceOf(cvpMaker.address), ether(0));
+
+          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether(0));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.004032583285954600'));
+
+          await expectRevert(cvpMaker.mockSwap(bpool.address), 'ERR_INSUFFICIENT_BAL');
+        });
       });
 
       describe('strategy2 token (without CVP)', () => {
@@ -494,6 +656,7 @@ describe.only('CVPMaker test', () => {
         let sushi;
         let snx;
         let bpool;
+
         beforeEach(async () => {
           aave = await MockERC20.new('AAVE', 'AAVE', '18', ether(1e15));
           sushi = await MockERC20.new('SUSHI', 'SUSHI', '18', ether(1e15));
@@ -514,12 +677,6 @@ describe.only('CVPMaker test', () => {
           );
 
           await cvpMaker.setCustomStrategy(bpool.address, 2, { from: owner });
-        });
-
-        it('should estimate cvpAmountOut correctly', async () => {
-          await cvpMaker.syncStrategy2Tokens(bpool.address, { from: alice });
-          await bpool.transfer(cvpMaker.address, ether('7.5315748682815781'));
-          assert.equal(await cvpMaker.cvpAmountOut(), ether(2000));
         });
 
         it('should use the strategy2 when configured', async () => {
@@ -572,6 +729,27 @@ describe.only('CVPMaker test', () => {
           const expectedBPoolLeftover = (BigInt(ether(10)) - BigInt(ether('7.5315748682815781'))).toString();
           assert.equal(expectedBPoolLeftover, ether('2.4684251317184219'));
           assert.equal(await bpool.balanceOf(cvpMaker.address), expectedBPoolLeftover);
+        });
+
+        it('should revert if the balance is not enough', async () => {
+          await cvpMaker.syncStrategy2Tokens(bpool.address, { from: alice });
+          await bpool.transfer(cvpMaker.address, ether('7.53'));
+          assert.equal(await bpool.balanceOf(cvpMaker.address), ether('7.53'));
+
+          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('1999.598159831058041455'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('7.5315748682815781'));
+
+          await expectRevert(cvpMaker.mockSwap(bpool.address), 'ERR_INSUFFICIENT_BAL');
+        });
+
+        it('should revert if the balance is 0', async () => {
+          await cvpMaker.syncStrategy2Tokens(bpool.address, { from: alice });
+          assert.equal(await bpool.balanceOf(cvpMaker.address), ether(0));
+
+          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether(0));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('7.5315748682815781'));
+
+          await expectRevert(cvpMaker.mockSwap(bpool.address), 'ERR_INSUFFICIENT_BAL');
         });
       });
     });
