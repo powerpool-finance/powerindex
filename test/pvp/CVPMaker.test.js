@@ -662,17 +662,21 @@ describe('CVPMaker test', () => {
           sushi = await MockERC20.new('SUSHI', 'SUSHI', '18', ether(1e15));
           snx = await MockERC20.new('SNX', 'SNX', '18', ether(1e15));
 
-          // AAVE-ETH: 4.984995029959955129
           // CVP-ETH: 598.19940359519461559
+          // AAVE-DAI: 4.984995029959955129
+          // SUSHI-DAI: 14.242855114267635867
+          // SNX-DAI: 19.880179604183832888
           await makeUniswapPair(aave, weth, ether(5e6), ether(1e6), true);
+          await makeSushiPair(sushi, weth, ether(1.5e8), ether(1e6), true);
+          await makeUniswapPair(snx, weth, ether(1e8), ether(1e6), true);
           assert.equal(
-            (await uniswapRouter.getAmountsOut(ether(1), [aave.address, weth.address, dai.address]))[2],
-            ether('397.603441673593838952'),
+            (await uniswapRouter.getAmountsOut(ether(1), [snx.address, weth.address, dai.address]))[2],
+            ether('19.880179604183832888'),
           );
 
           bpool = await buildBPool(
             [aave, sushi, snx],
-            [ether(125), ether(2000), ether(1000)],
+            [ether(12500), ether(2e5), ether(1e5)],
             [ether(25), ether(15), ether(10)],
           );
 
@@ -700,25 +704,25 @@ describe('CVPMaker test', () => {
           // Out AAVE / In (bPool)
           assert.equal(
             await cvpMaker.bPoolGetExitAmountIn(bpool.address, aave.address, ether('18.029280024896818398')),
-            ether('7.5315748682815781'),
+            ether('0.0725058031454588'),
           );
           // Out CVP / In (bPool)
-          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('7.5315748682815781'));
+          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.0725058031454588'));
           // Out CVP / In (bPool)
-          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('7.5315748682815781'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.0725058031454588'));
 
           // >>> Amounts OUT
           // In bPool / Out (AAVE)
-          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, aave.address, ether(10)), ether('23.63125'));
+          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, aave.address, ether(10)), ether('2363.125'));
           // In AAVE / Out (CVP)
           assert.equal(
             (await uniswapRouter.getAmountsOut(ether('23.63125'), [aave.address, weth.address, cvp.address]))[2],
             ether('2818.734497440659813346'),
           );
           // In bPool / Out (CVP)
-          assert.equal(await cvpMaker.estimateStrategy2Out(bpool.address), ether('2621.424809337240640422'));
+          assert.equal(await cvpMaker.estimateStrategy2Out(bpool.address), ether('261915.564701491379018883'));
           // In bPool / Out (CVP)
-          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('2621.424809337240640422'));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('261915.564701491379018883'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
           assert.equal(await bpool.balanceOf(cvpMaker.address), ether(10));
@@ -726,18 +730,74 @@ describe('CVPMaker test', () => {
           await cvpMaker.mockSwap(bpool.address);
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
-          const expectedBPoolLeftover = (BigInt(ether(10)) - BigInt(ether('7.5315748682815781'))).toString();
-          assert.equal(expectedBPoolLeftover, ether('2.4684251317184219'));
+          const expectedBPoolLeftover = (BigInt(ether(10)) - BigInt(ether('0.0725058031454588'))).toString();
+          assert.equal(expectedBPoolLeftover, ether('9.927494196854541200'));
           assert.equal(await bpool.balanceOf(cvpMaker.address), expectedBPoolLeftover);
+        });
+
+        it('should iterate over the tokens after an each swap', async () => {
+          await cvpMaker.syncStrategy2Tokens(bpool.address, { from: alice });
+
+          await bpool.transfer(cvpMaker.address, ether(100));
+
+          // initial swap
+          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.0725058031454588'));
+          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), ether(0));
+          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), aave.address);
+          await cvpMaker.mockSwap(bpool.address);
+
+          // second swap
+          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.081722936763776726'));
+          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '1');
+          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), sushi.address);
+          await cvpMaker.mockSwap(bpool.address);
+
+          // third swap
+          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.072693329380864298'));
+          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '2');
+          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), snx.address);
+          await cvpMaker.mockSwap(bpool.address);
+
+          // fourth swap
+          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.072447738033226438'));
+          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '0');
+          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), aave.address);
+          await cvpMaker.mockSwap(bpool.address);
+
+          // fifth swap
+          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.081760909948550247'));
+          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '1');
+          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), sushi.address);
+          await cvpMaker.mockSwap(bpool.address);
+
+          // expected the sixth swap, but unbind instead
+          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.072792940476284364'));
+          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '2');
+          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), snx.address);
+          await bpool.unbind(snx.address);
+          await cvpMaker.syncStrategy2Tokens(bpool.address, { from: alice });
+          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.090430495162160678'));
+          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '0');
+          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), aave.address);
+          await cvpMaker.mockSwap(bpool.address);
+
+          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.102216584492803626'));
+          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '1');
+          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), sushi.address);
+          await cvpMaker.mockSwap(bpool.address);
+
+          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.090388216833249222'));
+          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '0');
+          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), aave.address);
         });
 
         it('should revert if the balance is not enough', async () => {
           await cvpMaker.syncStrategy2Tokens(bpool.address, { from: alice });
-          await bpool.transfer(cvpMaker.address, ether('7.53'));
-          assert.equal(await bpool.balanceOf(cvpMaker.address), ether('7.53'));
+          await bpool.transfer(cvpMaker.address, ether('0.072'));
+          assert.equal(await bpool.balanceOf(cvpMaker.address), ether('0.072'));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('1999.598159831058041455'));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('7.5315748682815781'));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('1986.053043590001535860'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.0725058031454588'));
 
           await expectRevert(cvpMaker.mockSwap(bpool.address), 'ERR_INSUFFICIENT_BAL');
         });
@@ -747,7 +807,7 @@ describe('CVPMaker test', () => {
           assert.equal(await bpool.balanceOf(cvpMaker.address), ether(0));
 
           assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether(0));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('7.5315748682815781'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.0725058031454588'));
 
           await expectRevert(cvpMaker.mockSwap(bpool.address), 'ERR_INSUFFICIENT_BAL');
         });
