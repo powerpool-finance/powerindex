@@ -31,13 +31,13 @@ contract CVPMakerViewer is CVPMakerStorage {
   event SetCustomPath(address indexed token_, address router_, address[] path);
   event SetCustomStrategy(address indexed token, uint256 strategyId);
 
-  //0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
+  // 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
   address public immutable uniswapRouter;
 
-  //0x38e4adb44ef08f22f5b5b76a8f0c2d0dcbe7dca1
+  // 0x38e4adb44ef08f22f5b5b76a8f0c2d0dcbe7dca1
   address public immutable cvp;
 
-  //0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+  // 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
   address public immutable weth;
 
   address public immutable xcvp;
@@ -161,7 +161,7 @@ contract CVPMakerViewer is CVPMakerStorage {
     return _estimateEthStrategyOut(balanceIn);
   }
 
-  function _estimateEthStrategyOut(uint256 _balanceIn) public view returns (uint256) {
+  function _estimateEthStrategyOut(uint256 _balanceIn) internal view returns (uint256) {
     uint256[] memory results = IUniswapV2Router02(uniswapRouter).getAmountsOut(_balanceIn, _wethCVPPath());
     return results[1];
   }

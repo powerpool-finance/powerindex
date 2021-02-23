@@ -21,7 +21,15 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
   /// @notice The event emitted when the owner updates the powerOracleStaking address
   event SetPowerPoke(address powerPoke);
-  event Swap(address indexed caller, address indexed token, uint256 amountOut);
+  event Swap(
+    address indexed caller,
+    address indexed token,
+    uint256 indexed swapType,
+    uint256 xcvpCvpAfter,
+    uint256 amountIn,
+    uint256 amountOut,
+    uint256 xcvpCvpBefore
+  );
   event SetCvpAmountOut(uint256 cvpAmountOut);
   event SetCustomPath(address indexed token_, address router_, address[] path);
   event SetCustomStrategy(address indexed token, uint256 strategyId);
@@ -95,55 +103,53 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
   function _swap(address token_) internal {
     uint256 cvpBefore = IERC20(cvp).balanceOf(xcvp);
-    require(token_ != cvp, "CANT_BE_CVP");
     lastSwapAt = block.timestamp;
     uint256 cvpAmountOut_ = cvpAmountOut;
-
-    emit Swap(msg.sender, token_, cvpAmountOut_);
-
-    // Nothing to convert yet
-    if (token_ == address(0)) {
-      return;
-    }
+    uint256 swapType = 0;
+    uint256 amountIn = 0;
 
     // Just transfer CVPs to xCVP contract
     if (token_ == cvp) {
-      IERC20(cvp).transfer(xcvp, cvpAmountOut);
-      return;
-    }
+      swapType = 1;
+      IERC20(cvp).transfer(xcvp, cvpAmountOut_);
+      amountIn = cvpAmountOut_;
+    } else if (token_ == weth || token_ == ETH) {
+      // Wrap ETH -> WETH
+      if (token_ == ETH) {
+        amountIn = address(this).balance;
+        require(amountIn > 0, "ETH_BALANCE_IS_0");
+        TokenInterface(weth).deposit{ value: amountIn }();
+      }
 
-    // Wrap ETH -> WETH
-    if (token_ == ETH) {
-      uint256 balance = address(this).balance;
-      require(balance > 0, "ETH_BALANCE_IS_0");
-      TokenInterface(weth).deposit{ value: balance }();
-    }
-
-    // Use a single pair path to swap WETH -> CVP
-    if (token_ == weth || token_ == ETH) {
-      _swapWETHToCVP();
-      return;
-    }
-
-    uint256 customStrategyId = customStrategies[token_];
-    if (customStrategyId > 0) {
-      _executeCustomStrategy(token_, customStrategyId);
-      // Use a Uniswap-like strategy
+      // Use a single pair path to swap WETH -> CVP
+      amountIn = _swapWETHToCVP();
+      swapType = 2;
     } else {
-      _executeUniLikeStrategy(token_);
+      uint256 customStrategyId = customStrategies[token_];
+      if (customStrategyId > 0) {
+        amountIn = _executeCustomStrategy(token_, customStrategyId);
+        swapType = 3;
+        // Use a Uniswap-like strategy
+      } else {
+        amountIn = _executeUniLikeStrategy(token_);
+        swapType = 4;
+      }
     }
-    require(IERC20(cvp).balanceOf(xcvp) >= cvpBefore.add(cvpAmountOut), "LESS_THAN_CVP_AMOUNT_OUT");
+    uint256 cvpAfter = IERC20(cvp).balanceOf(xcvp);
+    require(cvpAfter >= cvpBefore.add(cvpAmountOut), "LESS_THAN_CVP_AMOUNT_OUT");
+
+    emit Swap(msg.sender, token_, swapType, amountIn, cvpAmountOut_, cvpBefore, cvpAfter);
   }
 
-  function _executeUniLikeStrategy(address token_) internal {
+  function _executeUniLikeStrategy(address token_) internal returns (uint256 amountOut) {
     address router = getRouter(token_);
     address[] memory path = getPath(token_);
 
     if (router == uniswapRouter) {
-      _swapTokensForExactCVP(router, token_, path);
+      amountOut = _swapTokensForExactCVP(router, token_, path);
     } else {
       uint256 wethAmountIn = estimateEthStrategyIn();
-      _swapTokensForExactWETH(router, token_, path, wethAmountIn);
+      amountOut = _swapTokensForExactWETH(router, token_, path, wethAmountIn);
       _swapWETHToCVP();
     }
   }
@@ -153,55 +159,61 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     address token_,
     address[] memory path_,
     uint256 amountOut_
-  ) internal {
-    IERC20(token_).approve(router_, uint256(-1));
-    IUniswapV2Router02(router_).swapTokensForExactTokens(
-      amountOut_,
-      uint256(-1),
-      path_,
-      address(this),
-      block.timestamp + 1800
-    );
+  ) internal returns (uint256 amountIn) {
+    IERC20(token_).approve(router_, type(uint256).max);
+    uint256[] memory amounts =
+      IUniswapV2Router02(router_).swapTokensForExactTokens(
+        amountOut_,
+        type(uint256).max,
+        path_,
+        address(this),
+        block.timestamp + 1800
+      );
     IERC20(token_).approve(router_, 0);
+    return amounts[0];
   }
 
-  function _swapWETHToCVP() internal {
+  function _swapWETHToCVP() internal returns (uint256) {
     address[] memory path = new address[](2);
 
     path[0] = weth;
     path[1] = cvp;
     IERC20(weth).approve(uniswapRouter, type(uint256).max);
-    IUniswapV2Router02(uniswapRouter).swapTokensForExactTokens(
-      cvpAmountOut,
-      uint256(-1),
-      path,
-      xcvp,
-      block.timestamp + 1800
-    );
+    uint256[] memory amounts =
+      IUniswapV2Router02(uniswapRouter).swapTokensForExactTokens(
+        cvpAmountOut,
+        type(uint256).max,
+        path,
+        xcvp,
+        block.timestamp + 1800
+      );
     IERC20(weth).approve(uniswapRouter, 0);
+    return amounts[0];
   }
 
   function _swapTokensForExactCVP(
     address router_,
     address token_,
     address[] memory path_
-  ) internal {
+  ) internal returns (uint256) {
     IERC20(token_).approve(router_, type(uint256).max);
-    IUniswapV2Router02(router_).swapTokensForExactTokens(
-      cvpAmountOut,
-      uint256(-1),
-      path_,
-      xcvp,
-      block.timestamp + 1800
-    );
+    uint256[] memory amounts =
+      IUniswapV2Router02(router_).swapTokensForExactTokens(
+        cvpAmountOut,
+        type(uint256).max,
+        path_,
+        xcvp,
+        block.timestamp + 1800
+      );
     IERC20(token_).approve(router_, 0);
+    return amounts[0];
   }
 
-  function _executeCustomStrategy(address token_, uint256 strategyId_) internal {
+  function _executeCustomStrategy(address token_, uint256 strategyId_) internal returns (uint256 amountIn) {
     if (strategyId_ == 1) {
-      _customStrategy1(token_);
+      return _customStrategy1(token_);
     } else if (strategyId_ == 2) {
-      _customStrategy2(token_);
+      return _customStrategy2(token_);
     } else {
       revert("INVALID_STRATEGY_ID");
     }
@@ -210,22 +222,21 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   /*** CUSTOM STRATEGIES ***/
 
   // Tokens with underlying CVP - PIPT & YETI - like
-  function _customStrategy1(address token_) internal {
+  function _customStrategy1(address token_) internal returns (uint256 amountIn) {
     uint256 cvpAmountOut_ = cvpAmountOut;
     BPoolInterface bPool = BPoolInterface(token_);
     (, , uint256 communityExitFee, ) = bPool.getCommunityFee();
     uint256 amountOutWithFee = calcBPoolAmountOutWithCommunityFee(cvpAmountOut_, communityExitFee);
 
     IERC20(token_).approve(token_, type(uint256).max);
-    bPool.exitswapExternAmountOut(cvp, amountOutWithFee, type(uint256).max);
-
+    amountIn = bPool.exitswapExternAmountOut(cvp, amountOutWithFee, type(uint256).max);
     IERC20(token_).approve(token_, 0);
 
     IERC20(cvp).transfer(xcvp, cvpAmountOut_);
   }
 
   // Tokens without underlying CVP - ASSY-like
-  function _customStrategy2(address token_) internal {
+  function _customStrategy2(address token_) internal returns (uint256 amountIn) {
     Strategy2Config storage config = strategy2Config[token_];
     uint256 nextIndex = config.nextIndex;
     address tokenToExit = config.tokens[nextIndex];
@@ -241,7 +252,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     uint256 amountOutWithFee = calcBPoolAmountOutWithCommunityFee(tokenAmountUniIn, communityExitFee);
 
     IERC20(token_).approve(token_, type(uint256).max);
-    BPoolInterface(token_).exitswapExternAmountOut(tokenToExit, amountOutWithFee, type(uint256).max);
+    amountIn = BPoolInterface(token_).exitswapExternAmountOut(tokenToExit, amountOutWithFee, type(uint256).max);
     IERC20(token_).approve(token_, 0);
 
     _executeUniLikeStrategy(tokenToExit);

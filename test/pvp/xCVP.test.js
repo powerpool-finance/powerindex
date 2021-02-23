@@ -8,7 +8,7 @@ xCVP.numberFormat = 'String';
 
 const { web3 } = MockERC20;
 
-describe('xCVP test', () => {
+describe.only('xCVP test', () => {
   let deployer, bob, alice;
   let cvp;
   let xCvp;
