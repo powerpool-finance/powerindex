@@ -48,7 +48,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
   modifier onlySlasher(uint256 slasherId_, bytes calldata rewardOpts_) {
     uint256 gasStart = gasleft();
-    powerPoke.authorizeReporter(slasherId_, msg.sender);
+    powerPoke.authorizeNonReporter(slasherId_, msg.sender);
     _;
     powerPoke.reward(slasherId_, gasStart.sub(gasleft()), COMPENSATION_PLAN_1_ID, rewardOpts_);
   }
@@ -76,20 +76,20 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   }
 
   function swapFromReporter(
-    address token_,
     uint256 reporterId_,
+    address token_,
     bytes calldata rewardOpts_
-  ) external onlyReporter(reporterId_, rewardOpts_) onlyEOA {
+  ) external onlyEOA onlyReporter(reporterId_, rewardOpts_) {
     (uint256 minInterval, ) = _getMinMaxReportInterval();
     require(block.timestamp.sub(lastSwapAt) > minInterval, "MIN_INTERVAL_NOT_REACHED");
     _swap(token_);
   }
 
   function swapFromSlasher(
-    address token_,
     uint256 slasherId_,
+    address token_,
     bytes calldata rewardOpts_
-  ) external onlySlasher(slasherId_, rewardOpts_) onlyEOA {
+  ) external onlyEOA onlySlasher(slasherId_, rewardOpts_) {
     (, uint256 maxInterval) = _getMinMaxReportInterval();
     require(block.timestamp.sub(lastSwapAt) > maxInterval, "MAX_INTERVAL_NOT_REACHED");
     _swap(token_);
@@ -136,7 +136,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
       }
     }
     uint256 cvpAfter = IERC20(cvp).balanceOf(xcvp);
-    require(cvpAfter >= cvpBefore.add(cvpAmountOut), "LESS_THAN_CVP_AMOUNT_OUT");
+    require(cvpAfter >= cvpBefore.add((cvpAmountOut_ * 99) / 100), "LESS_THAN_CVP_AMOUNT_OUT");
 
     emit Swap(msg.sender, token_, swapType, amountIn, cvpAmountOut_, cvpBefore, cvpAfter);
   }

@@ -3,8 +3,9 @@
 pragma solidity 0.6.12;
 
 import "../pvp/CVPMaker.sol";
+import "../pvp/CVPMakerLens.sol";
 
-contract MockCVPMaker is CVPMaker {
+contract MockCVPMaker is CVPMakerLens, CVPMaker {
   constructor(
     address cvp_,
     address xcvp_,

@@ -1,6 +1,7 @@
 const { constants, time, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 const { ether, gwei, deployProxied } = require('../helpers/index');
 const assert = require('chai').assert;
+const MockProxyCall = artifacts.require('MockProxyCall');
 const MockERC20 = artifacts.require('MockERC20');
 const xCVP = artifacts.require('xCVP');
 const MockCVPMaker = artifacts.require('MockCVPMaker');
@@ -25,13 +26,14 @@ PowerPoke.numberFormat = 'String';
 UniswapV2Router022.numberFormat = 'String';
 PowerIndexPool.numberFormat = 'String';
 MockWETH.numberFormat = 'String';
+MockStaking.numberFormat = 'String';
 
 const ETH = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
 const { web3 } = MockERC20;
 
 describe('CVPMaker test', () => {
-  let deployer, owner, alice;
+  let deployer, owner, cvpMakerClientOwner, alice, bob, charlie, reporter, slasher;
   let cvp;
   let weth;
   let xCvp;
@@ -40,6 +42,8 @@ describe('CVPMaker test', () => {
   let sushiFactory;
   let uniswapRouter;
   let powerPoke;
+  let staking;
+  let oracle;
 
   let usdc;
   let uni;
@@ -48,9 +52,10 @@ describe('CVPMaker test', () => {
 
   let makeUniswapPair;
   let makeSushiPair;
+  const pokePeriod = 7 * 60 * 60 * 24;
 
   before(async function() {
-    [deployer, owner, alice] = await web3.eth.getAccounts();
+    [deployer, owner, cvpMakerClientOwner, alice, bob, charlie, reporter, slasher] = await web3.eth.getAccounts();
     dai = await MockERC20.new('DAI', 'DAI', '18', ether(1e15));
     weth = await MockWETH.new();
     await weth.deposit({ value: ether(1e9) });
@@ -79,10 +84,14 @@ describe('CVPMaker test', () => {
 
     cvp = await MockERC20.new('CVP', 'CVP', '18', ether(1e12));
 
-    const oracle = await MockOracle.new();
+    oracle = await MockOracle.new();
     const fastGasOracle = await MockFastGasOracle.new(gwei(300 * 1000));
-    const staking = await MockStaking.new(cvp.address);
-    await staking.initialize(deployer, deployer, constants.ZERO_ADDRESS, '0', '0', '60', '60');
+    staking = await deployProxied(
+      MockStaking,
+      [cvp.address],
+      [owner, bob, constants.ZERO_ADDRESS, '0', '0', '60', '60'],
+      { proxyAdminOwner: owner }
+    );
     powerPoke = await PowerPoke.new(
       cvp.address,
       weth.address,
@@ -145,10 +154,114 @@ describe('CVPMaker test', () => {
       uniswapRouter.address,
       constants.ZERO_ADDRESS,
     );
-    await expectRevert(cvpMaker.initialize(powerPoke.address, ether(0)),'CVP_AMOUNT_OUT_0');
+    await expectRevert(cvpMaker.initialize(powerPoke.address, ether(0)), 'CVP_AMOUNT_OUT_0');
   });
 
-  // describe('poker interface');
+  describe('poker interface', () => {
+    let compensationOpts;
+
+    beforeEach(async () => {
+      compensationOpts = web3.eth.abi.encodeParameter(
+        {
+          PokeRewardOptions: {
+            to: 'address',
+            compensateInETH: 'bool'
+          },
+        },
+        {
+          to: reporter,
+          compensateInETH: false
+        },
+      );
+
+      await staking.setSlasher(powerPoke.address, { from: owner });
+      await powerPoke.addClient(cvpMaker.address, cvpMakerClientOwner, true, gwei(300), pokePeriod, pokePeriod * 2, { from: deployer });
+      await cvp.approve(powerPoke.address, ether(30000), { from: deployer })
+      await powerPoke.addCredit(cvpMaker.address, ether(30000), { from: deployer });
+      await powerPoke.setBonusPlan(cvpMaker.address, 1,  true, 20, 17520000, 100 * 1000, { from: cvpMakerClientOwner });
+
+      const slasherDeposit = ether(10000);
+      const reporterDeposit = ether(20000);
+      await powerPoke.setMinimalDeposit(cvpMaker.address, slasherDeposit, { from: cvpMakerClientOwner });
+
+      await cvp.transfer(reporter, reporterDeposit);
+      await cvp.approve(staking.address, reporterDeposit, {from: reporter});
+      await staking.createUser(reporter, reporter, reporterDeposit, {from: reporter});
+
+      await cvp.transfer(slasher, slasherDeposit);
+      await cvp.approve(staking.address, slasherDeposit, {from: slasher});
+      await staking.createUser(slasher, slasher, slasherDeposit, {from: slasher});
+      await time.increase(60);
+      await staking.executeDeposit('1', {from: reporter});
+      await staking.executeDeposit('2', {from: slasher});
+
+      await time.increase(pokePeriod);
+      await oracle.setPrice(weth.address, ether(1000));
+      await oracle.setPrice(cvp.address, ether(1.5));
+    });
+
+    describe('from reporter', () => {
+      it('should deny poking from a contract', async function() {
+        const proxyCall = await MockProxyCall.new();
+        await cvp.transfer(alice, ether(30000));
+        await cvp.approve(staking.address, ether(30000), {from: alice});
+        await staking.createUser(alice, proxyCall.address, ether(30000), {from: alice});
+        await time.increase(60);
+
+        const data = cvpMaker.contract.methods.swapFromReporter(3, dai.address, '0x').encodeABI();
+        await expectRevert(proxyCall.makeCall(cvpMaker.address, data), 'NOT_EOA');
+      });
+
+      it('should allow poking form the reporter', async () => {
+        await dai.transfer(cvpMaker.address, ether(8000));
+
+        assert.equal(await dai.balanceOf(cvpMaker.address), ether(8000));
+        assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
+        await cvpMaker.swapFromReporter(1, dai.address, compensationOpts, { from: reporter });
+        assert.equal(await dai.balanceOf(cvpMaker.address), ether('1293.107830738383556106'));
+        assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
+      })
+
+      it('should deny poking from non-valid reporter', async () => {
+        await dai.transfer(cvpMaker.address, ether(8000));
+        await expectRevert(cvpMaker.swapFromReporter(1, dai.address, compensationOpts, { from: alice }), 'INVALID_POKER_KEY');
+      })
+    })
+
+    describe('from slasher', () => {
+      it('should deny poking from a contract', async function() {
+        const proxyCall = await MockProxyCall.new();
+        await cvp.transfer(alice, ether(15000));
+        await cvp.approve(staking.address, ether(15000), {from: alice});
+        await staking.createUser(alice, proxyCall.address, ether(15000), {from: alice});
+        await time.increase(60);
+
+        const data = cvpMaker.contract.methods.swapFromSlasher(3, dai.address, '0x').encodeABI();
+        await expectRevert(proxyCall.makeCall(cvpMaker.address, data), 'NOT_EOA');
+      });
+
+      it('should allow poking form the reporter', async () => {
+        await dai.transfer(cvpMaker.address, ether(8000));
+
+        assert.equal(await dai.balanceOf(cvpMaker.address), ether(8000));
+        assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
+        await cvpMaker.swapFromSlasher(2, dai.address, compensationOpts, { from: slasher });
+        assert.equal(await dai.balanceOf(cvpMaker.address), ether('1293.107830738383556106'));
+        assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
+      })
+
+      it('should deny poking from reporter', async () => {
+        await dai.transfer(cvpMaker.address, ether(8000));
+        await expectRevert(cvpMaker.swapFromSlasher(1, dai.address, compensationOpts, { from: reporter }), 'IS_HDH');
+      })
+
+      it('should deny poking from non-valid reporter', async () => {
+        await dai.transfer(cvpMaker.address, ether(8000));
+        await expectRevert(cvpMaker.swapFromSlasher(2, dai.address, compensationOpts, { from: alice }), 'INVALID_POKER_KEY');
+      })
+    })
+  });
+
   // describe('slasher interface');
   describe('swapping', () => {
     describe('unconfigured token', () => {
@@ -227,7 +340,10 @@ describe('CVPMaker test', () => {
             xcvpCvpAfter: ether(2725),
           });
           assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
-          assert.equal(await weth.balanceOf(cvpMaker.address), BigInt(ether(4)) - BigInt(ether('3.343374568186039725')));
+          assert.equal(
+            await weth.balanceOf(cvpMaker.address),
+            BigInt(ether(4)) - BigInt(ether('3.343374568186039725')),
+          );
         });
 
         it('should wrap ETH into WETH and swap it using WETH-CVP uniswap pair', async () => {
@@ -255,13 +371,16 @@ describe('CVPMaker test', () => {
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
           assert.equal(await web3.eth.getBalance(cvpMaker.address), ether(0));
-          assert.equal(await weth.balanceOf(cvpMaker.address), BigInt(ether(4)) - BigInt(ether('3.343374568186039725')));
+          assert.equal(
+            await weth.balanceOf(cvpMaker.address),
+            BigInt(ether(4)) - BigInt(ether('3.343374568186039725')),
+          );
         });
       });
 
       describe('with insufficient balance', () => {
         it('should revert if CVP balance is not enough for a swap', async () => {
-          await cvp.transfer(cvpMaker.address, ether('1999.999'))
+          await cvp.transfer(cvpMaker.address, ether('1999.999'));
           assert.equal(await cvp.balanceOf(cvpMaker.address), ether('1999.999'));
 
           assert.equal(await cvpMaker.estimateCvpAmountOut(cvp.address), ether('1999.999'));
@@ -270,7 +389,7 @@ describe('CVPMaker test', () => {
 
         it('should revert if non-CVP balance is not enough for a swap', async () => {
           const insufficientAmount = ether('6706');
-          await dai.transfer(cvpMaker.address, insufficientAmount)
+          await dai.transfer(cvpMaker.address, insufficientAmount);
           assert.equal(await dai.balanceOf(cvpMaker.address), insufficientAmount);
 
           assert.equal(await cvpMaker.estimateSwapAmountIn(dai.address), ether('6706.892169261616443894'));
@@ -462,7 +581,7 @@ describe('CVPMaker test', () => {
           });
 
           await cvp.transfer(xCvp.address, ether(725));
-        })
+        });
 
         it('should use a custom non-Uniswap path if the one is set', async () => {
           await sushi.transfer(cvpMaker.address, ether(600));
@@ -604,7 +723,7 @@ describe('CVPMaker test', () => {
           bpool = await buildBPool([uni, comp, cvp], balances, weights);
 
           await cvpMaker.setCustomStrategy(bpool.address, 1, { from: owner });
-        })
+        });
 
         it('should swap if there is enough assets', async () => {
           await bpool.transfer(cvpMaker.address, ether(5));
@@ -815,20 +934,65 @@ describe('CVPMaker test', () => {
     });
   });
 
-  // describe('owner interface', () => {
-  //   describe('setCvpAmountOut()');
-  //   describe('setCustomStrategy()');
-  //   describe('setRouter()');
-  //   describe('setCustomPath()');
-  // });
-  //
-  // describe('permissionless interface', () => {
-  //   describe('syncStrategy2Tokens()', () => {
-  //     it('should update token list to the new one with the same length');
-  //     it('should update token list to the new one with a smaller length');
-  //     it('should update token list to the new one with a bigger length');
-  //   });
-  // });
-  // TODO: deny non-CVP ending custom uniswap path
-  // TODO: deny non-WETH ending custom non-uniswap path
+  describe('owner interface', () => {
+    describe('setCvpAmountOut()', () => {
+      it('should allow the owner changing the value', async () => {
+        await cvpMaker.setCvpAmountOut(123, { from: owner });
+        assert.equal(await cvpMaker.cvpAmountOut(), 123);
+      });
+
+      it('should deny setting 0 amount', async () => {
+        await expectRevert(cvpMaker.setCvpAmountOut(0, { from: owner }), 'CVP_AMOUNT_OUT_0');
+      });
+
+      it('should deny calling from non-owner', async () => {
+        await expectRevert(cvpMaker.setCvpAmountOut(123, { from: alice }), 'Ownable: caller is not the owner');
+      });
+    });
+
+    describe('setCustomStrategy()', () => {
+      it('should allow the owner changing the value', async () => {
+        await cvpMaker.setCustomStrategy(alice, 1, { from: owner });
+        await cvpMaker.setCustomStrategy(bob, 12, { from: owner });
+        await cvpMaker.setCustomStrategy(charlie, 0, { from: owner });
+        assert.equal(await cvpMaker.customStrategies(alice), 1);
+        assert.equal(await cvpMaker.customStrategies(bob), 12);
+        assert.equal(await cvpMaker.customStrategies(charlie), 0);
+      });
+
+      it('should deny calling from non-owner', async () => {
+        await expectRevert(cvpMaker.setCustomStrategy(bob, 123, { from: alice }), 'Ownable: caller is not the owner');
+      });
+    });
+
+    describe('setCustomPath()', () => {
+      it('should allow the owner changing the value', async () => {
+        await cvpMaker.setCustomPath(dai.address, alice, [bob, charlie, weth.address], { from: owner });
+        assert.equal(await cvpMaker.routers(dai.address), alice);
+        assert.equal(await cvpMaker.getRouter(dai.address), alice);
+        assert.sameMembers(await cvpMaker.getPath(dai.address), [bob, charlie, weth.address]);
+      });
+
+      it('should deny setting non-CVP ending path for the uniswap router', async () => {
+        await expectRevert(
+          cvpMaker.setCustomPath(dai.address, uniswapRouter.address, [bob, charlie, weth.address], { from: owner }),
+          'NON_CVP_END_ON_UNISWAP_PATH',
+        );
+      });
+
+      it('should deny setting non-WETH ending path for a non-uniswap router', async () => {
+        await expectRevert(
+          cvpMaker.setCustomPath(dai.address, alice, [bob, charlie, cvp.address], { from: owner }),
+          'NON_WETH_END_ON_NON_UNISWAP_PATH',
+        );
+      });
+
+      it('should deny calling from non-owner', async () => {
+        await expectRevert(
+          cvpMaker.setCustomPath(dai.address, alice, [bob, charlie, weth.address], { from: alice }),
+          'Ownable: caller is not the owner',
+        );
+      });
+    });
+  });
 });

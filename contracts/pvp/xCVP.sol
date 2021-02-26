@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
-contract xCVP is ERC20("Permanent Voting Power", "xCVP") {
+contract xCVP is ERC20("Permanent Voting Power Token", "xCVP") {
   using SafeMath for uint256;
   IERC20 public immutable cvp;
 
