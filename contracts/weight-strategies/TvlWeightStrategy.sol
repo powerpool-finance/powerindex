@@ -3,7 +3,6 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "./MCapWeightAbstract.sol";
 import "./WeightValueStrategy.sol";
 
 contract TvlWeightStrategy is WeightValueStrategy {
