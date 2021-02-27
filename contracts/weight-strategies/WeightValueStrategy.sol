@@ -38,7 +38,7 @@ contract WeightValueStrategy is WeightValueAbstract {
   address[] public pools;
   mapping(address => Pool) public poolsData;
 
-  uint256 weightsChangeDuration;
+  uint256 public weightsChangeDuration;
 
   IPowerPoke public powerPoke;
 
@@ -245,7 +245,11 @@ contract WeightValueStrategy is WeightValueAbstract {
     }
   }
 
-  function _updatePoolByPoke(address _pool, address[] memory _tokens, uint256[] memory _newTokenValues) internal virtual {
+  function _updatePoolByPoke(
+    address _pool,
+    address[] memory _tokens,
+    uint256[] memory _newTokenValues
+  ) internal virtual {
     poolsData[_pool].lastWeightsUpdate = block.timestamp;
   }
 

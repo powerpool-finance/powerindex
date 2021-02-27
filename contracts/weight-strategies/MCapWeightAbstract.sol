@@ -25,10 +25,7 @@ abstract contract MCapWeightAbstract is WeightValueAbstract {
     }
   }
 
-  function getTokenMCap(
-    PowerIndexPoolInterface _pool,
-    address _token
-  ) public view returns (uint256) {
+  function getTokenMCap(PowerIndexPoolInterface _pool, address _token) public view returns (uint256) {
     uint256 totalSupply = IERC20(_token).totalSupply();
     uint256 len = excludeTokenBalances[_token].length;
     for (uint256 i = 0; i < len; i++) {

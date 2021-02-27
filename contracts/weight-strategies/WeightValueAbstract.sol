@@ -24,17 +24,11 @@ abstract contract WeightValueAbstract is BNum, OwnableUpgradeSafe {
 
   IPowerOracle public oracle;
 
-  function getTokenValue(
-    PowerIndexPoolInterface _pool,
-    address _token
-  ) public view virtual returns (uint256) {
+  function getTokenValue(PowerIndexPoolInterface _pool, address _token) public view virtual returns (uint256) {
     return getTVL(_pool, _token);
   }
 
-  function getTVL(
-    PowerIndexPoolInterface _pool,
-    address _token
-  ) public view returns (uint256) {
+  function getTVL(PowerIndexPoolInterface _pool, address _token) public view returns (uint256) {
     uint256 balance = _pool.getBalance(_token);
     return bdiv(bmul(balance, oracle.assetPrices(_token)), 1 ether);
   }
@@ -47,7 +41,14 @@ abstract contract WeightValueAbstract is BNum, OwnableUpgradeSafe {
     uint256 _maxWPS,
     uint256 fromTimestamp,
     uint256 toTimestamp
-  ) internal returns (uint256[3][] memory weightsChange, uint256 lenToPush, uint256[] memory newTokensValues) {
+  )
+    internal
+    returns (
+      uint256[3][] memory weightsChange,
+      uint256 lenToPush,
+      uint256[] memory newTokensValues
+    )
+  {
     (weightsChange, lenToPush, newTokensValues) = computeWeightsChange(
       _pool,
       _tokens,
