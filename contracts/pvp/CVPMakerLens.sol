@@ -104,6 +104,8 @@ abstract contract CVPMakerLens is CVPMakerViewer {
       return estimateStrategy1Out(token_);
     } else if (strategyId_ == 2) {
       return estimateStrategy2Out(token_);
+    } else if (strategyId_ == 3) {
+      return estimateStrategy3Out(token_);
     } else {
       revert("INVALID_STRATEGY_ID");
     }
@@ -114,6 +116,8 @@ abstract contract CVPMakerLens is CVPMakerViewer {
       return estimateStrategy1In(token_);
     } else if (strategyId_ == 2) {
       return estimateStrategy2In(token_);
+    } else if (strategyId_ == 3) {
+      return estimateStrategy3In(token_);
     } else {
       revert("INVALID_STRATEGY_ID");
     }
@@ -138,9 +142,9 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     uint256 uniLikeAmountIn = estimateUniLikeStrategyIn(tokenToExit);
 
     (, , uint256 communityExitFee, ) = BPoolInterface(bPoolToken_).getCommunityFee();
-    uint256 amountOutWithFee = calcBPoolAmountOutWithCommunityFee(uniLikeAmountIn, communityExitFee);
+    uint256 amountOutGross = calcBPoolGrossAmount(uniLikeAmountIn, communityExitFee);
 
-    return bPoolGetExitAmountIn(bPoolToken_, tokenToExit, amountOutWithFee);
+    return bPoolGetExitAmountIn(bPoolToken_, tokenToExit, amountOutGross);
   }
 
   // Hom many CVP tokens can be returned by exiting with the all bPool balance and swapping the exit amount
@@ -155,6 +159,75 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     (uint256 amountOutWithFee, ) =
       BPoolInterface(bPoolToken_).calcAmountWithCommunityFee(tokenAmountOut, communityExitFee, address(this));
     return _estimateUniLikeStrategyOut(tokenToExit, amountOutWithFee);
+  }
+
+  function estimateStrategy3In(address token_) public view returns (uint256) {
+    Strategy3Config storage config = strategy3Config[token_];
+
+    (uint256 communitySwapFee, , , ) = BPoolInterface(config.bpool).getCommunityFee();
+    uint256 amountOutGross = calcBPoolGrossAmount(cvpAmountOut, communitySwapFee);
+
+    return bPoolGetSwapAmountIn(config.bpool, token_, cvp, amountOutGross);
+  }
+
+  function estimateStrategy3Out(address token_) public view returns (uint256) {
+    Strategy3Config storage config = strategy3Config[token_];
+
+    uint256 amountOutNet = bPoolGetSwapAmountOut(config.bpool, token_, cvp, IERC20(token_).balanceOf(address(this)));
+    (uint256 communitySwapFee, , , ) = BPoolInterface(config.bpool).getCommunityFee();
+    (uint256 amountOutGross, ) =
+      BPoolInterface(config.bpool).calcAmountWithCommunityFee(amountOutNet, communitySwapFee, address(this));
+    return amountOutGross;
+  }
+
+  function bPoolGetSwapAmountIn(
+    address bpool_,
+    address tokenIn_,
+    address tokenOut_,
+    uint256 amountOut_
+  ) public view returns (uint256) {
+    BPoolInterface bpool = BPoolInterface(bpool_);
+
+    return
+      BMath(bpool_).calcInGivenOut(
+        // tokenBalanceIn
+        IERC20(tokenIn_).balanceOf(bpool_),
+        // tokenWeightIn
+        bpool.getDenormalizedWeight(tokenIn_),
+        // tokenBalanceOut
+        IERC20(tokenOut_).balanceOf(bpool_),
+        // tokenWeightOut
+        bpool.getDenormalizedWeight(tokenOut_),
+        // tokenAmountOut
+        amountOut_,
+        // swapFee
+        bpool.getSwapFee()
+      );
+  }
+
+  function bPoolGetSwapAmountOut(
+    address bpool_,
+    address tokenIn_,
+    address tokenOut_,
+    uint256 amountIn_
+  ) public view returns (uint256) {
+    BPoolInterface bpool = BPoolInterface(bpool_);
+
+    return
+      BMath(bpool_).calcOutGivenIn(
+        // tokenBalanceIn
+        IERC20(tokenIn_).balanceOf(bpool_),
+        // tokenWeightIn
+        bpool.getDenormalizedWeight(tokenIn_),
+        // tokenBalanceOut
+        IERC20(tokenOut_).balanceOf(bpool_),
+        // tokenWeightOut
+        bpool.getDenormalizedWeight(tokenOut_),
+        // tokenAmountOut
+        amountIn_,
+        // swapFee
+        bpool.getSwapFee()
+      );
   }
 
   function bPoolGetExitAmountIn(

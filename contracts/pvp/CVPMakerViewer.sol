@@ -108,16 +108,19 @@ contract CVPMakerViewer is CVPMakerStorage {
 
   /*** CUSTOM STRATEGIES OUT ***/
 
-  function calcBPoolAmountOutWithCommunityFee(uint256 tokenAmountIn_, uint256 communityFee_)
+  /**
+   * Calculates the gross amount based on a net and a fee values
+   */
+  function calcBPoolGrossAmount(uint256 tokenAmountNet_, uint256 communityFee_)
     public
     view
-    returns (uint256 tokenAmountInAfterFee)
+    returns (uint256 tokenAmountGross)
   {
     if (address(_restrictions) != address(0) && _restrictions.isWithoutFee(address(this))) {
-      return (tokenAmountIn_);
+      return (tokenAmountNet_);
     }
     uint256 adjustedIn = bsub(BONE, communityFee_);
-    return bdiv(tokenAmountIn_, adjustedIn);
+    return bdiv(tokenAmountNet_, adjustedIn);
   }
 
   function bsub(uint256 a, uint256 b) internal pure returns (uint256) {

@@ -650,6 +650,7 @@ describe('CVPMaker test', () => {
       }
 
       async function buildBPool(tokens_, balances, weights) {
+        assert(tokens_.length <= 3, 'NOT_SUPPORTED > 3');
         const [first, second, third] = tokens_;
         const name = 'My Pool';
         const symbol = 'MP';
@@ -929,6 +930,70 @@ describe('CVPMaker test', () => {
           assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.0725058031454588'));
 
           await expectRevert(cvpMaker.mockSwap(bpool.address), 'ERR_INSUFFICIENT_BAL');
+        });
+      });
+
+      describe('strategy3 token swap at a pool containing CVP', () => {
+        let mkr;
+        let snx;
+        let bpool;
+
+        beforeEach(async () => {
+          mkr = await MockERC20.new('COMP', 'COMP', '18', ether(1e15));
+          snx = await MockERC20.new('SNX', 'SNX', '18', ether(1e15));
+
+          bpool = await buildBPool(
+            // CVP: 5
+            // MKR: 2000
+            // SNX: 20
+            [cvp, mkr, snx],
+            [ether(125e4), ether(1875), ether(125e3)],
+            [ether(25), ether(15), ether(10)],
+          );
+
+          await cvpMaker.setCustomStrategy(mkr.address, 3, { from: owner });
+          await cvpMaker.setCustomStrategy3Config(mkr.address, bpool.address, { from: owner });
+        });
+
+        it('should use the strategy3 when configured', async () => {
+          await mkr.transfer(cvpMaker.address, ether(16));
+
+          // >>> Amounts IN
+          assert.equal(await cvpMaker.estimateStrategy3In(mkr.address), ether('5.328284134427424242'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(mkr.address), ether('5.328284134427424242'));
+
+          // >>> Amounts OUT
+          assert.equal(await cvpMaker.estimateStrategy3Out(mkr.address), ether('5978.8154354782954375'));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(mkr.address), ether('5978.8154354782954375'));
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
+          assert.equal(await mkr.balanceOf(cvpMaker.address), ether(16));
+
+          await cvpMaker.mockSwap(mkr.address);
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
+          const expectedBPoolLeftover = (BigInt(ether(16)) - BigInt(ether('5.328284134427424242'))).toString();
+          assert.equal(expectedBPoolLeftover, ether('10.671715865572575758'));
+          assert.equal(await mkr.balanceOf(cvpMaker.address), expectedBPoolLeftover);
+        });
+
+        it('should revert if the balance is not enough', async () => {
+          await mkr.transfer(cvpMaker.address, ether('5.3'));
+          assert.equal(await mkr.balanceOf(cvpMaker.address), ether('5.3'));
+
+          assert.equal(await cvpMaker.estimateCvpAmountOut(mkr.address), ether('1989.407104249429312500'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(mkr.address), ether('5.328284134427424242'));
+
+          await expectRevert(cvpMaker.mockSwap(mkr.address), 'ERC20: transfer amount exceeds balance');
+        });
+
+        it('should revert if the balance is 0', async () => {
+          assert.equal(await mkr.balanceOf(cvpMaker.address), ether(0));
+
+          assert.equal(await cvpMaker.estimateCvpAmountOut(mkr.address), ether(0));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(mkr.address), ether('5.328284134427424242'));
+
+          await expectRevert(cvpMaker.mockSwap(mkr.address), 'ERC20: transfer amount exceeds balance');
         });
       });
     });

@@ -214,6 +214,8 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
       return _customStrategy1(token_);
     } else if (strategyId_ == 2) {
       return _customStrategy2(token_);
+    } else if (strategyId_ == 3) {
+      return _customStrategy3(token_);
     } else {
       revert("INVALID_STRATEGY_ID");
     }
@@ -226,10 +228,10 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     uint256 cvpAmountOut_ = cvpAmountOut;
     BPoolInterface bPool = BPoolInterface(token_);
     (, , uint256 communityExitFee, ) = bPool.getCommunityFee();
-    uint256 amountOutWithFee = calcBPoolAmountOutWithCommunityFee(cvpAmountOut_, communityExitFee);
+    uint256 amountOutGross = calcBPoolGrossAmount(cvpAmountOut_, communityExitFee);
 
     IERC20(token_).approve(token_, type(uint256).max);
-    amountIn = bPool.exitswapExternAmountOut(cvp, amountOutWithFee, type(uint256).max);
+    amountIn = bPool.exitswapExternAmountOut(cvp, amountOutGross, type(uint256).max);
     IERC20(token_).approve(token_, 0);
 
     IERC20(cvp).transfer(xcvp, cvpAmountOut_);
@@ -249,13 +251,29 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
     uint256 tokenAmountUniIn = estimateUniLikeStrategyIn(tokenToExit);
     (, , uint256 communityExitFee, ) = BPoolInterface(token_).getCommunityFee();
-    uint256 amountOutWithFee = calcBPoolAmountOutWithCommunityFee(tokenAmountUniIn, communityExitFee);
+    uint256 amountOutGross = calcBPoolGrossAmount(tokenAmountUniIn, communityExitFee);
 
     IERC20(token_).approve(token_, type(uint256).max);
-    amountIn = BPoolInterface(token_).exitswapExternAmountOut(tokenToExit, amountOutWithFee, type(uint256).max);
+    amountIn = BPoolInterface(token_).exitswapExternAmountOut(tokenToExit, amountOutGross, type(uint256).max);
     IERC20(token_).approve(token_, 0);
 
     _executeUniLikeStrategy(tokenToExit);
+  }
+
+  // Tokens available for swap on PowerPool pools
+  function _customStrategy3(address token_) internal returns (uint256 amountIn) {
+    Strategy3Config storage config = strategy3Config[token_];
+    BPoolInterface bpool = BPoolInterface(config.bpool);
+
+    (uint256 communitySwapFee, , , ) = bpool.getCommunityFee();
+    uint256 cvpAmountOut_ = cvpAmountOut;
+    uint256 amountOutGross = calcBPoolGrossAmount(cvpAmountOut_, communitySwapFee);
+
+    IERC20(token_).approve(address(bpool), type(uint256).max);
+    (amountIn, ) = bpool.swapExactAmountOut(token_, type(uint256).max, cvp, amountOutGross, type(uint256).max);
+    IERC20(token_).approve(address(bpool), 0);
+
+    IERC20(cvp).transfer(xcvp, cvpAmountOut_);
   }
 
   /*** PERMISSIONLESS METHODS ***/
@@ -283,6 +301,10 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   function setCustomStrategy(address token_, uint256 strategyId_) external onlyOwner {
     customStrategies[token_] = strategyId_;
     emit SetCustomStrategy(token_, strategyId_);
+  }
+
+  function setCustomStrategy3Config(address token_, address bpool_) external onlyOwner {
+    strategy3Config[token_] = Strategy3Config(bpool_);
   }
 
   function setCustomPath(
