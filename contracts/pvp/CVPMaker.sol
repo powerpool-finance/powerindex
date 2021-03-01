@@ -75,13 +75,22 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     __Ownable_init();
   }
 
+  function skipFromReporter(
+    uint256 reporterId_,
+    bytes calldata rewardOpts_
+  ) external onlyEOA onlyReporter(reporterId_, rewardOpts_) {
+    (uint256 minInterval, ) = _getMinMaxReportInterval();
+    require(block.timestamp.sub(lastReporterPokeFrom) > minInterval, "MIN_INTERVAL_NOT_REACHED");
+    lastReporterPokeFrom = block.timestamp;
+  }
+
   function swapFromReporter(
     uint256 reporterId_,
     address token_,
     bytes calldata rewardOpts_
   ) external onlyEOA onlyReporter(reporterId_, rewardOpts_) {
     (uint256 minInterval, ) = _getMinMaxReportInterval();
-    require(block.timestamp.sub(lastSwapAt) > minInterval, "MIN_INTERVAL_NOT_REACHED");
+    require(block.timestamp.sub(lastReporterPokeFrom) > minInterval, "MIN_INTERVAL_NOT_REACHED");
     _swap(token_);
   }
 
@@ -91,7 +100,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     bytes calldata rewardOpts_
   ) external onlyEOA onlySlasher(slasherId_, rewardOpts_) {
     (, uint256 maxInterval) = _getMinMaxReportInterval();
-    require(block.timestamp.sub(lastSwapAt) > maxInterval, "MAX_INTERVAL_NOT_REACHED");
+    require(block.timestamp.sub(lastReporterPokeFrom) > maxInterval, "MAX_INTERVAL_NOT_REACHED");
     _swap(token_);
   }
 
@@ -103,7 +112,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
   function _swap(address token_) internal {
     uint256 cvpBefore = IERC20(cvp).balanceOf(xcvp);
-    lastSwapAt = block.timestamp;
+    lastReporterPokeFrom = block.timestamp;
     uint256 cvpAmountOut_ = cvpAmountOut;
     uint256 swapType = 0;
     uint256 amountIn = 0;

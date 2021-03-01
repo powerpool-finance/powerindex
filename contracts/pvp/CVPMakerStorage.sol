@@ -19,7 +19,7 @@ contract CVPMakerStorage is OwnableUpgradeSafe {
 
   uint256 public cvpAmountOut;
 
-  uint256 public lastSwapAt;
+  uint256 public lastReporterPokeFrom;
 
   IPoolRestrictions internal _restrictions;
 

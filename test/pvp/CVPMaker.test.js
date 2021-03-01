@@ -222,6 +222,24 @@ describe('CVPMaker test', () => {
         assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
       })
 
+      it('should deny poking too early', async () => {
+        await dai.transfer(cvpMaker.address, ether(20000));
+        await cvpMaker.swapFromReporter(1, dai.address, compensationOpts, { from: reporter });
+        await expectRevert(cvpMaker.skipFromReporter(1, compensationOpts, { from: reporter }), 'MIN_INTERVAL_NOT_REACHED');
+        await time.increase(pokePeriod - 2);
+        await expectRevert(cvpMaker.skipFromReporter(1, compensationOpts, { from: reporter }), 'MIN_INTERVAL_NOT_REACHED');
+        await time.increase(3);
+        await cvpMaker.swapFromReporter(1, dai.address, compensationOpts, { from: reporter });
+      })
+
+      it('should allow poking skip form the reporter when there is nothing to convert', async () => {
+        await cvpMaker.skipFromReporter(1, compensationOpts, { from: reporter });
+        await expectRevert(cvpMaker.skipFromReporter(1, compensationOpts, { from: reporter }), 'MIN_INTERVAL_NOT_REACHED');
+        await time.increase(pokePeriod - 2);
+        await expectRevert(cvpMaker.skipFromReporter(1, compensationOpts, { from: reporter }), 'MIN_INTERVAL_NOT_REACHED');
+        await time.increase(3);
+      })
+
       it('should deny poking from non-valid reporter', async () => {
         await dai.transfer(cvpMaker.address, ether(8000));
         await expectRevert(cvpMaker.swapFromReporter(1, dai.address, compensationOpts, { from: alice }), 'INVALID_POKER_KEY');
