@@ -236,7 +236,6 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
   function _redeem(uint256 _xSushi) internal {
     require(_xSushi > 0, "CANT_REDEEM_0");
 
-    _callStaking(IERC20(0).approve.selector, abi.encode(staking, _xSushi));
     _callStaking(ISushiBar(0).leave.selector, abi.encode(_xSushi));
 
     emit Redeem(msg.sender, _xSushi);

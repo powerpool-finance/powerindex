@@ -187,7 +187,6 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   function _redeem(uint256 _amount) internal {
     require(_amount > 0, "CANT_REDEEM_0");
 
-    _callStaking(IERC20(0).approve.selector, abi.encode(staking, _amount));
     _callStaking(IStakedAave(0).redeem.selector, abi.encode(address(piToken), _amount));
 
     emit Redeem(msg.sender, _amount);
