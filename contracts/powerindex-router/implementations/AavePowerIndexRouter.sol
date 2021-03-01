@@ -46,7 +46,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   }
 
   function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) public override onlyOwner {
-    if (staking != address (0)) {
+    if (staking != address(0)) {
       require(_rebalancingInterval < IStakedAave(staking).UNSTAKE_WINDOW(), "REBALANCING_GT_UNSTAKE");
     }
     PowerIndexBasicRouter.setReserveConfig(_reserveRatio, _rebalancingInterval);
