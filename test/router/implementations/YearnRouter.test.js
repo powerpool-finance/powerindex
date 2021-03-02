@@ -269,10 +269,25 @@ describe('YearnRouter Tests', () => {
 
     describe('setUsdcYfiSwapPath()', () => {
       it('should allow the owner setting a new pvpFee', async () => {
-        const res = await yfiRouter.setUsdcYfiSwapPath([alice, bob], { from: piGov });
+        const res = await yfiRouter.setUsdcYfiSwapPath([usdc.address, yfi.address], { from: piGov });
         expectEvent(res, 'SetUsdcYfiSwapPath', {
-          usdcYfiSwapPath: [alice, bob],
+          usdcYfiSwapPath: [usdc.address, yfi.address],
         });
+      });
+
+      it('should deny non-usdc first argument', async () => {
+        await expectRevert(
+          yfiRouter.setUsdcYfiSwapPath([alice, yfi.address], { from: alice }),
+          'Ownable: caller is not the owner',
+        );
+      });
+
+
+      it('should deny non-yfi last argument', async () => {
+        await expectRevert(
+          yfiRouter.setUsdcYfiSwapPath([usdc.address, alice], { from: alice }),
+          'Ownable: caller is not the owner',
+        );
       });
 
       it('should deny non-owner setting a new uniswap router', async () => {

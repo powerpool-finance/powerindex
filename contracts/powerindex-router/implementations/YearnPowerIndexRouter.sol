@@ -170,6 +170,9 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   }
 
   function setUsdcYfiSwapPath(address[] calldata _usdcYfiSwapPath) external onlyOwner {
+    require(_usdcYfiSwapPath[0] == address(USDC), "0_NOT_USDC");
+    require(_usdcYfiSwapPath[_usdcYfiSwapPath.length - 1] == address(YFI), "LAST_NOT_YFI");
+
     usdcYfiSwapPath = _usdcYfiSwapPath;
     emit SetUsdcYfiSwapPath(_usdcYfiSwapPath);
   }
