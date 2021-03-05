@@ -65,7 +65,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
   /**
    * @notice Wraps the router's SUSHIs into piTokens and transfers it to the pools proportionally their SUSHI balances
    */
-  function distributeRewards() external {
+  function distributeRewards() external onlyEOA {
     uint256 pendingReward = SUSHI.balanceOf(address(this));
     require(pendingReward > 0, "NO_PENDING_REWARD");
 

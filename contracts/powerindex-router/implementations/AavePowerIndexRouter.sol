@@ -75,7 +75,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     emit ClaimRewards(msg.sender, rewardsPending);
   }
 
-  function distributeRewards() external {
+  function distributeRewards() external onlyEOA {
     uint256 pendingReward = AAVE.balanceOf(address(this));
     require(pendingReward > 0, "NO_PENDING_REWARD");
 

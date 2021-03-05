@@ -101,9 +101,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     emit Exit(msg.sender, yfiBalanceAfter - yfiBalanceBefore, yCrvReward);
   }
 
-  function distributeRewards() external {
-    require(tx.origin == msg.sender, "ONLY_EOA");
-  
+  function distributeRewards() external onlyEOA {
     uint256 poolsLen = rewardPools.length;
     require(poolsLen > 0, "MISSING_REWARD_POOLS");
     require(usdcYfiSwapPath.length > 0, "MISSING_REWARD_SWAP_PATH");
