@@ -11,6 +11,7 @@ import "../interfaces/IUniswapV2Pair.sol";
 import "../interfaces/IUniswapV2Router02.sol";
 import "../interfaces/TokenInterface.sol";
 import "../interfaces/BPoolInterface.sol";
+import "../powerindex-router/PowerIndexWrapper.sol";
 import "../balancer-core/BMath.sol";
 import "./CVPMakerStorage.sol";
 import "./CVPMakerViewer.sol";
@@ -75,10 +76,11 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     __Ownable_init();
   }
 
-  function skipFromReporter(
-    uint256 reporterId_,
-    bytes calldata rewardOpts_
-  ) external onlyEOA onlyReporter(reporterId_, rewardOpts_) {
+  function skipFromReporter(uint256 reporterId_, bytes calldata rewardOpts_)
+    external
+    onlyEOA
+    onlyReporter(reporterId_, rewardOpts_)
+  {
     (uint256 minInterval, ) = _getMinMaxReportInterval();
     require(block.timestamp.sub(lastReporterPokeFrom) > minInterval, "MIN_INTERVAL_NOT_REACHED");
     lastReporterPokeFrom = block.timestamp;
@@ -232,55 +234,75 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
   /*** CUSTOM STRATEGIES ***/
 
-  // Tokens with underlying CVP - PIPT & YETI - like
-  function _customStrategy1(address token_) internal returns (uint256 amountIn) {
+  // Pool tokens with CVP - PIPT & YETI - like
+  function _customStrategy1(address bPoolToken_) internal returns (uint256 amountIn) {
     uint256 cvpAmountOut_ = cvpAmountOut;
-    BPoolInterface bPool = BPoolInterface(token_);
-    (, , uint256 communityExitFee, ) = bPool.getCommunityFee();
+    Strategy1Config storage config = strategy1Config[bPoolToken_];
+    address iBPool = bPoolToken_;
+
+    if (config.bPool != address(0)) {
+      iBPool = config.bPool;
+    }
+
+    (, , uint256 communityExitFee, ) = BPoolInterface(bPoolToken_).getCommunityFee();
     uint256 amountOutGross = calcBPoolGrossAmount(cvpAmountOut_, communityExitFee);
 
-    IERC20(token_).approve(token_, type(uint256).max);
-    amountIn = bPool.exitswapExternAmountOut(cvp, amountOutGross, type(uint256).max);
-    IERC20(token_).approve(token_, 0);
+    uint256 currentBalance = IERC20(bPoolToken_).balanceOf(address(this));
+    IERC20(bPoolToken_).approve(iBPool, currentBalance);
+    amountIn = BPoolInterface(iBPool).exitswapExternAmountOut(cvp, amountOutGross, currentBalance);
+    IERC20(bPoolToken_).approve(iBPool, 0);
 
     IERC20(cvp).transfer(xcvp, cvpAmountOut_);
   }
 
-  // Tokens without underlying CVP - ASSY-like
-  function _customStrategy2(address token_) internal returns (uint256 amountIn) {
-    Strategy2Config storage config = strategy2Config[token_];
+  // Pool tokens without CVP - ASSY-like
+  function _customStrategy2(address bPoolToken_) internal returns (uint256 amountIn) {
+    Strategy2Config storage config = strategy2Config[bPoolToken_];
     uint256 nextIndex = config.nextIndex;
-    address tokenToExit = config.tokens[nextIndex];
-    require(tokenToExit != address(0), "INVALID_EXIT_TOKEN");
+    address underlyingOrPiToExit = config.tokens[nextIndex];
+    require(underlyingOrPiToExit != address(0), "INVALID_EXIT_TOKEN");
+
+    address underlyingToken = underlyingOrPiToExit;
     if (nextIndex + 1 >= config.tokens.length) {
       config.nextIndex = 0;
     } else {
       config.nextIndex = nextIndex + 1;
     }
 
-    uint256 tokenAmountUniIn = estimateUniLikeStrategyIn(tokenToExit);
-    (, , uint256 communityExitFee, ) = BPoolInterface(token_).getCommunityFee();
+    address iBPool = bPoolToken_;
+
+    if (config.bPool != address(0)) {
+      iBPool = config.bPool;
+      address underlyingCandidate = PowerIndexWrapper(config.bPool).underlyingByPiToken(underlyingOrPiToExit);
+      if (underlyingCandidate != address(0)) {
+        underlyingToken = underlyingCandidate;
+      }
+    }
+
+    uint256 tokenAmountUniIn = estimateUniLikeStrategyIn(underlyingToken);
+    (, , uint256 communityExitFee, ) = BPoolInterface(bPoolToken_).getCommunityFee();
     uint256 amountOutGross = calcBPoolGrossAmount(tokenAmountUniIn, communityExitFee);
 
-    IERC20(token_).approve(token_, type(uint256).max);
-    amountIn = BPoolInterface(token_).exitswapExternAmountOut(tokenToExit, amountOutGross, type(uint256).max);
-    IERC20(token_).approve(token_, 0);
+    uint256 currentBalance = IERC20(bPoolToken_).balanceOf(address(this));
+    IERC20(bPoolToken_).approve(iBPool, currentBalance);
+    amountIn = BPoolInterface(iBPool).exitswapExternAmountOut(underlyingToken, amountOutGross, currentBalance);
+    IERC20(bPoolToken_).approve(iBPool, 0);
 
-    _executeUniLikeStrategy(tokenToExit);
+    _executeUniLikeStrategy(underlyingToken);
   }
 
   // Tokens available for swap on PowerPool pools
   function _customStrategy3(address token_) internal returns (uint256 amountIn) {
     Strategy3Config storage config = strategy3Config[token_];
-    BPoolInterface bpool = BPoolInterface(config.bpool);
+    BPoolInterface bPool = BPoolInterface(config.bPool);
 
-    (uint256 communitySwapFee, , , ) = bpool.getCommunityFee();
+    (uint256 communitySwapFee, , , ) = bPool.getCommunityFee();
     uint256 cvpAmountOut_ = cvpAmountOut;
     uint256 amountOutGross = calcBPoolGrossAmount(cvpAmountOut_, communitySwapFee);
 
-    IERC20(token_).approve(address(bpool), type(uint256).max);
-    (amountIn, ) = bpool.swapExactAmountOut(token_, type(uint256).max, cvp, amountOutGross, type(uint256).max);
-    IERC20(token_).approve(address(bpool), 0);
+    IERC20(token_).approve(address(bPool), type(uint256).max);
+    (amountIn, ) = bPool.swapExactAmountOut(token_, type(uint256).max, cvp, amountOutGross, type(uint256).max);
+    IERC20(token_).approve(address(bPool), 0);
 
     IERC20(cvp).transfer(xcvp, cvpAmountOut_);
   }
@@ -312,8 +334,16 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     emit SetCustomStrategy(token_, strategyId_);
   }
 
-  function setCustomStrategy3Config(address token_, address bpool_) external onlyOwner {
-    strategy3Config[token_] = Strategy3Config(bpool_);
+  function setCustomStrategy1Config(address token_, address bPool_) external onlyOwner {
+    strategy1Config[token_].bPool = bPool_;
+  }
+
+  function setCustomStrategy2Config(address token_, address bPool_) external onlyOwner {
+    strategy2Config[token_].bPool = bPool_;
+  }
+
+  function setCustomStrategy3Config(address token_, address bPool_) external onlyOwner {
+    strategy3Config[token_] = Strategy3Config(bPool_);
   }
 
   function setCustomPath(

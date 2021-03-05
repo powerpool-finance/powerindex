@@ -1,5 +1,6 @@
 const { constants, time, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 const { ether, gwei, deployProxied } = require('../helpers/index');
+const { buildBasicRouterConfig } = require('../helpers/builders');
 const assert = require('chai').assert;
 const MockProxyCall = artifacts.require('MockProxyCall');
 const MockERC20 = artifacts.require('MockERC20');
@@ -18,6 +19,12 @@ const ProxyFactory = artifacts.require('ProxyFactory');
 const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
 const PowerIndexPool = artifacts.require('PowerIndexPool');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
+const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
+const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
+const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
+const BasicPowerIndexRouterFactory = artifacts.require('BasicPowerIndexRouterFactory');
+const PoolRestrictions = artifacts.require('PoolRestrictions');
+const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 
 MockERC20.numberFormat = 'String';
 xCVP.numberFormat = 'String';
@@ -27,20 +34,22 @@ UniswapV2Router022.numberFormat = 'String';
 PowerIndexPool.numberFormat = 'String';
 MockWETH.numberFormat = 'String';
 MockStaking.numberFormat = 'String';
+PowerIndexPoolController.numberFormat = 'String';
 
 const ETH = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
 const { web3 } = MockERC20;
 
 describe('CVPMaker test', () => {
-  let deployer, owner, cvpMakerClientOwner, alice, bob, charlie, reporter, slasher;
+  let deployer, owner, cvpMakerClientOwner, alice, bob, charlie, reporter, slasher, stub;
   let cvp;
   let weth;
   let xCvp;
   let cvpMaker;
   let uniswapFactory;
-  let sushiFactory;
   let uniswapRouter;
+  let sushiFactory;
+  let sushiRouter;
   let powerPoke;
   let staking;
   let oracle;
@@ -50,12 +59,13 @@ describe('CVPMaker test', () => {
   let comp;
   let dai;
 
+  let makePair;
   let makeUniswapPair;
   let makeSushiPair;
   const pokePeriod = 7 * 60 * 60 * 24;
 
   before(async function() {
-    [deployer, owner, cvpMakerClientOwner, alice, bob, charlie, reporter, slasher] = await web3.eth.getAccounts();
+    [deployer, owner, cvpMakerClientOwner, alice, bob, charlie, reporter, slasher, stub] = await web3.eth.getAccounts();
     dai = await MockERC20.new('DAI', 'DAI', '18', ether(1e15));
     weth = await MockWETH.new();
     await weth.deposit({ value: ether(1e9) });
@@ -64,9 +74,11 @@ describe('CVPMaker test', () => {
   beforeEach(async () => {
     uniswapFactory = await UniswapV2Factory.new(alice);
     uniswapRouter = await UniswapV2Router022.new(uniswapFactory.address, weth.address);
+    sushiFactory = await UniswapV2Factory.new(alice);
+    sushiRouter = await UniswapV2Router022.new(sushiFactory.address, weth.address);
 
-    async function makePair(factory, tokenA, tokenB, balanceA, balanceB) {
-      const res = await uniswapFactory.createPairMock2(tokenA.address, tokenB.address);
+    makePair = async function(factory, tokenA, tokenB, balanceA, balanceB) {
+      const res = await factory.createPairMock2(tokenA.address, tokenB.address);
       const pair = await UniswapV2Pair.at(res.logs[0].args.pair);
       await tokenA.transfer(pair.address, balanceA);
       await tokenB.transfer(pair.address, balanceB);
@@ -476,14 +488,11 @@ describe('CVPMaker test', () => {
     });
 
     describe('token with custom settings', () => {
-      let sushiRouter;
       let sushi;
 
       beforeEach(async () => {
         uni = await MockERC20.new('UNI', 'UNI', '18', ether(1e15));
         usdc = await MockERC20.new('USDC', 'USDC', '6', ether(1e15));
-        sushiFactory = await UniswapV2Factory.new(alice);
-        sushiRouter = await UniswapV2Router022.new(uniswapFactory.address, weth.address);
         sushi = await MockERC20.new('SUSHI', 'SUSHI', '18', ether(1e15));
       });
 
@@ -647,7 +656,7 @@ describe('CVPMaker test', () => {
           assert.equal(await cvpMaker.estimateCvpAmountOut(sushi.address), ether('1999.932755415266269483'));
           assert.equal(await cvpMaker.estimateUniLikeStrategyIn(sushi.address), ether('503.016912694621233293'));
 
-          await expectRevert(cvpMaker.mockSwap(sushi.address), 'TRANSFER_FROM_FAILED');
+          await expectRevert(cvpMaker.mockSwap(sushi.address), 'TransferHelper: TRANSFER_FROM_FAILED');
         });
 
         it('should revert if the balance is 0', async () => {
@@ -656,12 +665,12 @@ describe('CVPMaker test', () => {
           assert.equal(await cvpMaker.estimateCvpAmountOut(sushi.address), ether(0));
           assert.equal(await cvpMaker.estimateUniLikeStrategyIn(sushi.address), ether('503.016912694621233293'));
 
-          await expectRevert(cvpMaker.mockSwap(sushi.address), 'TRANSFER_FROM_FAILED');
+          await expectRevert(cvpMaker.mockSwap(sushi.address), 'TransferHelper: TRANSFER_FROM_FAILED');
         });
       });
     });
 
-    describe('bpool strategires', () => {
+    describe('bpool strategies', () => {
       async function getTimestamp(shift = 0) {
         const currentTimestamp = (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp;
         return currentTimestamp + shift;
@@ -751,10 +760,40 @@ describe('CVPMaker test', () => {
 
           // In
           assert.equal(
-            await cvpMaker.bPoolGetExitAmountIn(bpool.address, cvp.address, ether(2000)),
+            await cvpMaker.bPoolGetExitAmountIn(bpool.address, cvp.address, ether(2000), false),
             ether('0.0040325832859546'),
           );
           assert.equal(await cvpMaker.estimateStrategy1In(bpool.address), ether('0.0040325832859546'));
+
+          // Out
+          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, cvp.address, ether(5)), ether('2244093.1'));
+          assert.equal(await cvpMaker.estimateStrategy1Out(bpool.address), ether('2244093.1'));
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
+          assert.equal(await bpool.balanceOf(cvpMaker.address), ether(5));
+
+          await cvpMaker.mockSwap(bpool.address);
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
+          assert.equal(await bpool.balanceOf(cvpMaker.address), ether('4.995663862614869500'));
+        });
+
+        it('should swap a pool with a wrapper', async () => {
+          const poolWrapper = await PowerIndexWrapper.new(bpool.address);
+
+          await bpool.setWrapper(poolWrapper.address, true);
+          await cvpMaker.setCustomStrategy1Config(bpool.address, poolWrapper.address, { from: owner });
+
+          await bpool.transfer(cvpMaker.address, ether(5));
+
+          assert.equal(await cvpMaker.cvpAmountOut(), ether(2000));
+
+          // In
+          assert.equal(
+            await cvpMaker.bPoolGetExitAmountIn(bpool.address, cvp.address, ether(2000), false),
+            ether('0.0040325832859546'),
+          );
+          assert.equal(await cvpMaker.estimateStrategy1In(bpool.address), ether('0.004032583285954601'));
 
           // Out
           assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, cvp.address, ether(5)), ether('2244093.1'));
@@ -776,7 +815,7 @@ describe('CVPMaker test', () => {
           assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('1998.718896764590400000'));
           assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.004032583285954600'));
 
-          await expectRevert(cvpMaker.mockSwap(bpool.address), 'ERR_INSUFFICIENT_BAL');
+          await expectRevert(cvpMaker.mockSwap(bpool.address), 'LIMIT_IN');
         });
 
         it('should revert if the balance is 0', async () => {
@@ -785,7 +824,7 @@ describe('CVPMaker test', () => {
           assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether(0));
           assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.004032583285954600'));
 
-          await expectRevert(cvpMaker.mockSwap(bpool.address), 'ERR_INSUFFICIENT_BAL');
+          await expectRevert(cvpMaker.mockSwap(bpool.address), 'LIMIT_IN');
         });
       });
 
@@ -841,7 +880,7 @@ describe('CVPMaker test', () => {
           );
           // Out AAVE / In (bPool)
           assert.equal(
-            await cvpMaker.bPoolGetExitAmountIn(bpool.address, aave.address, ether('18.029280024896818398')),
+            await cvpMaker.bPoolGetExitAmountIn(bpool.address, aave.address, ether('18.029280024896818398'), false),
             ether('0.0725058031454588'),
           );
           // Out CVP / In (bPool)
@@ -873,8 +912,122 @@ describe('CVPMaker test', () => {
           assert.equal(await bpool.balanceOf(cvpMaker.address), expectedBPoolLeftover);
         });
 
+        it('should use the strategy 2 with a pool comprised of pooled tokens', async () => {
+          await cvpMaker.setCustomPath(sushi.address, sushiRouter.address, [sushi.address, weth.address], {
+            from: owner,
+          });
+          const poolRestrictions = await PoolRestrictions.new();
+          const defaultBasicConfig = buildBasicRouterConfig(
+            poolRestrictions.address,
+            constants.ZERO_ADDRESS,
+            constants.ZERO_ADDRESS,
+            ether(0),
+            '0',
+            stub,
+            ether(0),
+            []
+          );
+          const defaultFactoryArgs = web3.eth.abi.encodeParameter({
+            BasicConfig: {
+              poolRestrictions: 'address',
+              voting: 'address',
+              staking: 'address',
+              reserveRatio: 'uint256',
+              rebalancingInterval: 'uint256',
+              pvp: 'address',
+              pvpFee: 'uint256',
+              rewardPools: 'address[]',
+            }
+          }, defaultBasicConfig);
+
+          const poolWrapper = await PowerIndexWrapper.new(bpool.address);
+          const wrapperFactory = await WrappedPiErc20Factory.new();
+          const routerFactory = await BasicPowerIndexRouterFactory.new();
+
+          await bpool.setWrapper(poolWrapper.address, true);
+          // const controller = await PowerIndexPoolController.new(pool.address, constants.ZERO_ADDRESS, wrapperFactory.address, weightsStrategy);
+          const controller = await PowerIndexPoolController.new(bpool.address, constants.ZERO_ADDRESS, wrapperFactory.address, constants.ZERO_ADDRESS);
+          await bpool.setController(controller.address);
+          await poolWrapper.setController(controller.address);
+          await controller.setPoolWrapper(poolWrapper.address);
+          await cvpMaker.setCustomStrategy2Config(bpool.address, poolWrapper.address, { from: owner });
+
+          let res = await controller.replacePoolTokenWithNewPiToken(aave.address, routerFactory.address, defaultFactoryArgs, 'piAAVE', 'piAAVE');
+          const piAAVE = await WrappedPiErc20.at(res.logs.filter(l => l.event === 'ReplacePoolTokenWithPiToken')[0].args.piToken);
+          res = await controller.replacePoolTokenWithNewPiToken(sushi.address, routerFactory.address, defaultFactoryArgs, 'piSUSHI', 'piSUSHI');
+          const piSUSHI = await WrappedPiErc20.at(res.logs.filter(l => l.event === 'ReplacePoolTokenWithPiToken')[0].args.piToken);
+          res = await controller.replacePoolTokenWithNewPiToken(snx.address, routerFactory.address, defaultFactoryArgs, 'piSNX', 'piSNX');
+          const piSNX = await WrappedPiErc20.at(res.logs.filter(l => l.event === 'ReplacePoolTokenWithPiToken')[0].args.piToken);
+
+          assert.equal(await bpool.isBound(aave.address), false);
+          assert.equal(await bpool.isBound(sushi.address), false);
+          assert.equal(await bpool.isBound(snx.address), false);
+          assert.equal(await bpool.isBound(piAAVE.address), true);
+          assert.equal(await bpool.isBound(piSUSHI.address), true);
+          assert.equal(await bpool.isBound(piSNX.address), true);
+
+          await cvpMaker.syncStrategy2Tokens(bpool.address, { from: alice });
+          await bpool.transfer(cvpMaker.address, ether(10));
+
+          const tokens = await cvpMaker.getStrategy2Tokens(bpool.address);
+          assert.equal(tokens[0], piSUSHI.address);
+          assert.equal(tokens[1], piAAVE.address);
+          assert.equal(tokens[2], piSNX.address);
+          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), ether(0));
+          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), piSUSHI.address);
+
+          // >>> Amounts IN
+          // Out CVP / In WETH
+          assert.equal(
+            (await uniswapRouter.getAmountsIn(ether(2000), [weth.address, cvp.address]))[0],
+            ether('3.343374568186039725')
+          );
+          // Out WETH / In SUSHI
+          assert.equal(
+            (await sushiRouter.getAmountsIn(ether('3.343374568186039725'), [sushi.address, weth.address]))[0],
+            ether('503.016912694621233293')
+          );
+          // Out piSUSHI / In (bPool w/o fee)
+          assert.equal(
+            await cvpMaker.bPoolGetExitAmountIn(poolWrapper.address, piSUSHI.address, ether('503.016912694621233293'), true),
+            ether('0.076051883797598301'),
+          );
+          // Out CVP / In (bPool)
+          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.081781687070504901'));
+          // Out CVP / In (bPool)
+          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.081781687070504901'));
+
+          // >>> Amounts OUT
+          // In bPool / Out (AAVE)
+          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, piAAVE.address, ether(10)), ether('2363.125'));
+          // In AAVE / Out (CVP)
+          assert.equal(
+            (await uniswapRouter.getAmountsOut(ether('23.63125'), [aave.address, weth.address, cvp.address]))[2],
+            ether('2818.734497440659813346'),
+          );
+          // In bPool / Out (CVP)
+          assert.equal(await cvpMaker.estimateStrategy2Out(bpool.address), ether('217330.717104796911649766'));
+          // In bPool / Out (CVP)
+          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('217330.717104796911649766'));
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
+          assert.equal(await bpool.balanceOf(cvpMaker.address), ether(10));
+
+          await cvpMaker.mockSwap(bpool.address);
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
+          const expectedBPoolLeftover = (BigInt(ether(10)) - BigInt(ether('0.081781687070504901'))).toString();
+          assert.equal(expectedBPoolLeftover, ether('9.918218312929495099'));
+          assert.equal(await bpool.balanceOf(cvpMaker.address), BigInt(expectedBPoolLeftover) + 1n);
+          // Transfer some unwrapped tokens to the CVPMaker
+          // Try unwrap using the pool
+        });
+
         it('should iterate over the tokens after an each swap', async () => {
           await cvpMaker.syncStrategy2Tokens(bpool.address, { from: alice });
+          await cvpMaker.setCustomPath(sushi.address, sushiRouter.address, [sushi.address, weth.address], {
+            from: owner,
+          });
 
           await bpool.transfer(cvpMaker.address, ether(100));
 
@@ -937,7 +1090,7 @@ describe('CVPMaker test', () => {
           assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('1986.053043590001535860'));
           assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.0725058031454588'));
 
-          await expectRevert(cvpMaker.mockSwap(bpool.address), 'ERR_INSUFFICIENT_BAL');
+          await expectRevert(cvpMaker.mockSwap(bpool.address), 'LIMIT_IN');
         });
 
         it('should revert if the balance is 0', async () => {
@@ -947,7 +1100,7 @@ describe('CVPMaker test', () => {
           assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether(0));
           assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.0725058031454588'));
 
-          await expectRevert(cvpMaker.mockSwap(bpool.address), 'ERR_INSUFFICIENT_BAL');
+          await expectRevert(cvpMaker.mockSwap(bpool.address), 'LIMIT_IN');
         });
       });
 
