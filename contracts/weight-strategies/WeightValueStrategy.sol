@@ -72,6 +72,7 @@ contract WeightValueStrategy is WeightValueAbstract {
     oracle = IPowerOracle(_oracle);
     powerPoke = IPowerPoke(_powerPoke);
     weightsChangeDuration = _weightsChangeDuration;
+    totalWeight = 25 * BONE;
   }
 
   function setWeightsChangeDuration(uint256 _weightsChangeDuration) external onlyOwner {

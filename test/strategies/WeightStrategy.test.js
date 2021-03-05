@@ -704,6 +704,8 @@ describe('WeightStrategy', () => {
       });
 
       it('pokeFromReporter and pokeFromSlasher should work properly', async () => {
+        assert.equal(await weightStrategy.getBalance(pool.address, tokens[0].address).then(b => b.toString()), ether('1592790.087971389044436628'));
+
         await this.checkWeights(pool, balancerTokens, [
           ether(6.25),
           ether(6.25),

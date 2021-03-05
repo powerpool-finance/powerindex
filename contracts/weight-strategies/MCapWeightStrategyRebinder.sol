@@ -30,9 +30,10 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
   address public operationsContract;
 
   constructor(address _oracle, address _operationsContract) public OwnableUpgradeSafe() {
+    __Ownable_init();
     oracle = IPowerOracle(_oracle);
     operationsContract = _operationsContract;
-    __Ownable_init();
+    totalWeight = 25 * BONE;
   }
 
   function setOperationsContract(address _operationsContract) public onlyOwner {

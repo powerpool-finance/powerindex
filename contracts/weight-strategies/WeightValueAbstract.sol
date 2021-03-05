@@ -17,12 +17,15 @@ abstract contract WeightValueAbstract is BNum, OwnableUpgradeSafe {
     uint256[] newTokenValues
   );
 
+  event SetTotalWeight(uint256 totalWeight);
+
   struct TokenConfigItem {
     address token;
     address[] excludeTokenBalances;
   }
 
   IPowerOracle public oracle;
+  uint256 public totalWeight;
 
   function getTokenValue(PowerIndexPoolInterface _pool, address _token) public view virtual returns (uint256) {
     return getTVL(_pool, _token);
@@ -31,6 +34,11 @@ abstract contract WeightValueAbstract is BNum, OwnableUpgradeSafe {
   function getTVL(PowerIndexPoolInterface _pool, address _token) public view returns (uint256) {
     uint256 balance = _pool.getBalance(_token);
     return bdiv(bmul(balance, oracle.assetPrices(_token)), 1 ether);
+  }
+
+  function setTotalWeight(uint256 _totalWeight) external onlyOwner {
+    totalWeight = _totalWeight;
+    emit SetTotalWeight(_totalWeight);
   }
 
   function _computeWeightsChangeWithEvent(
@@ -95,7 +103,7 @@ abstract contract WeightValueAbstract is BNum, OwnableUpgradeSafe {
       } else {
         oldWeight = _pool.getDenormalizedWeight(_tokens[i]);
       }
-      uint256 newWeight = bmul(bdiv(newTokenValues[i], newTokenValueSum), 25 * BONE);
+      uint256 newWeight = bmul(bdiv(newTokenValues[i], newTokenValueSum), totalWeight);
       weightsChange[i] = [i, oldWeight, newWeight];
     }
 
