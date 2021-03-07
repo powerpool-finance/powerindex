@@ -13,6 +13,7 @@ require('./tasks/deployPoolRestrictions');
 require('./tasks/deployMainnetYeti');
 require('./tasks/deployYearnRouter');
 require('./tasks/deployAaveRouter');
+require('./tasks/deploySushiRouter');
 require('./tasks/deployProxyFactory');
 require('./tasks/deployMainnetAssy');
 require('./tasks/rebindMCapWeights');

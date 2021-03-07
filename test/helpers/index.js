@@ -272,14 +272,16 @@ async function forkReplacePoolTokenWithNewPiToken(
   tokenAddress,
   factoryAddress,
   routerArgs,
-  admin
+  admin,
+  type = 'aave'
 ) {
   const MockERC20 = await artifacts.require('MockERC20');
   const {web3} = MockERC20;
   const token = await MockERC20.at(tokenAddress);
   const PowerIndexPool = await artifacts.require('PowerIndexPool');
   const WrappedPiErc20 = await artifacts.require('WrappedPiErc20');
-  const AavePowerIndexRouter = await artifacts.require('AavePowerIndexRouter');
+  console.log(routerArgs.SUSHI ? 'SushiPowerIndexRouter' : 'AavePowerIndexRouter');
+  const PowerIndexRouter = await artifacts.require(type === 'aave' ? 'AavePowerIndexRouter' : 'SushiPowerIndexRouter');
   const pool = await PowerIndexPool.at(await callContract(controller, 'pool'))
   console.log('pool getBalance before', await callContract(pool, 'getBalance', [token.address]));
 
@@ -289,7 +291,7 @@ async function forkReplacePoolTokenWithNewPiToken(
     to: admin,
     value: ether(10)
   })
-  await pool.setController(controller.address, {from: admin});
+  // await pool.setController(controller.address, {from: admin});
 
   console.log('await callContract(pool, "getDenormalizedWeight", [token])', await callContract(pool, 'getDenormalizedWeight', [tokenAddress]));
   const res = await controller.replacePoolTokenWithNewPiToken(
@@ -303,11 +305,13 @@ async function forkReplacePoolTokenWithNewPiToken(
 
   const wrappedTokenAddress = res.logs.filter(l => l.event === 'CreatePiToken')[0].args.piToken;
   const wrappedToken = await WrappedPiErc20.at(wrappedTokenAddress);
-  const router = await AavePowerIndexRouter.at(await callContract(wrappedToken, 'router', []));
+  const router = await PowerIndexRouter.at(await callContract(wrappedToken, 'router', []));
 
   await increaseTime(60);
 
-  await controller.finishReplace();
+  if(controller.finishReplace) {
+    await controller.finishReplace();
+  }
 
   await wrappedToken.pokeRouter();
 
