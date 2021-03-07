@@ -26,6 +26,7 @@ const BasicPowerIndexRouterFactory = artifacts.require('BasicPowerIndexRouterFac
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 
+WrappedPiErc20.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
 xCVP.numberFormat = 'String';
 MockCVPMaker.numberFormat = 'String';
@@ -63,12 +64,39 @@ describe('CVPMaker test', () => {
   let makeUniswapPair;
   let makeSushiPair;
   const pokePeriod = 7 * 60 * 60 * 24;
+  let poolRestrictions;
+  let defaultBasicConfig;
+  let defaultFactoryArgs;
 
   before(async function() {
     [deployer, owner, cvpMakerClientOwner, alice, bob, charlie, reporter, slasher, stub] = await web3.eth.getAccounts();
     dai = await MockERC20.new('DAI', 'DAI', '18', ether(1e15));
     weth = await MockWETH.new();
     await weth.deposit({ value: ether(1e9) });
+    poolRestrictions = await PoolRestrictions.new();
+    defaultBasicConfig = buildBasicRouterConfig(
+      poolRestrictions.address,
+      constants.ZERO_ADDRESS,
+      constants.ZERO_ADDRESS,
+      ether(0),
+      '0',
+      stub,
+      ether(0),
+      []
+    );
+    defaultFactoryArgs = web3.eth.abi.encodeParameter({
+      BasicConfig: {
+        poolRestrictions: 'address',
+        voting: 'address',
+        staking: 'address',
+        reserveRatio: 'uint256',
+        rebalancingInterval: 'uint256',
+        pvp: 'address',
+        pvpFee: 'uint256',
+        rewardPools: 'address[]',
+      }
+    }, defaultBasicConfig);
+
   });
 
   beforeEach(async () => {
@@ -916,30 +944,6 @@ describe('CVPMaker test', () => {
           await cvpMaker.setCustomPath(sushi.address, sushiRouter.address, [sushi.address, weth.address], {
             from: owner,
           });
-          const poolRestrictions = await PoolRestrictions.new();
-          const defaultBasicConfig = buildBasicRouterConfig(
-            poolRestrictions.address,
-            constants.ZERO_ADDRESS,
-            constants.ZERO_ADDRESS,
-            ether(0),
-            '0',
-            stub,
-            ether(0),
-            []
-          );
-          const defaultFactoryArgs = web3.eth.abi.encodeParameter({
-            BasicConfig: {
-              poolRestrictions: 'address',
-              voting: 'address',
-              staking: 'address',
-              reserveRatio: 'uint256',
-              rebalancingInterval: 'uint256',
-              pvp: 'address',
-              pvpFee: 'uint256',
-              rewardPools: 'address[]',
-            }
-          }, defaultBasicConfig);
-
           const poolWrapper = await PowerIndexWrapper.new(bpool.address);
           const wrapperFactory = await WrappedPiErc20Factory.new();
           const routerFactory = await BasicPowerIndexRouterFactory.new();
@@ -1019,8 +1023,6 @@ describe('CVPMaker test', () => {
           const expectedBPoolLeftover = (BigInt(ether(10)) - BigInt(ether('0.081781687070504901'))).toString();
           assert.equal(expectedBPoolLeftover, ether('9.918218312929495099'));
           assert.equal(await bpool.balanceOf(cvpMaker.address), BigInt(expectedBPoolLeftover) + 1n);
-          // Transfer some unwrapped tokens to the CVPMaker
-          // Try unwrap using the pool
         });
 
         it('should iterate over the tokens after an each swap', async () => {
@@ -1123,7 +1125,7 @@ describe('CVPMaker test', () => {
           );
 
           await cvpMaker.setCustomStrategy(mkr.address, 3, { from: owner });
-          await cvpMaker.setCustomStrategy3Config(mkr.address, bpool.address, { from: owner });
+          await cvpMaker.setCustomStrategy3Config(mkr.address, bpool.address, constants.ZERO_ADDRESS, constants.ZERO_ADDRESS, { from: owner });
         });
 
         it('should use the strategy3 when configured', async () => {
@@ -1148,6 +1150,52 @@ describe('CVPMaker test', () => {
           assert.equal(await mkr.balanceOf(cvpMaker.address), expectedBPoolLeftover);
         });
 
+        it('should use the strategy3 with wrapped tokens', async () => {
+          const poolWrapper = await PowerIndexWrapper.new(bpool.address);
+          const wrapperFactory = await WrappedPiErc20Factory.new();
+          const routerFactory = await BasicPowerIndexRouterFactory.new();
+
+          await bpool.setWrapper(poolWrapper.address, true);
+          const controller = await PowerIndexPoolController.new(bpool.address, constants.ZERO_ADDRESS, wrapperFactory.address, constants.ZERO_ADDRESS);
+          await bpool.setController(controller.address);
+          await poolWrapper.setController(controller.address);
+          await controller.setPoolWrapper(poolWrapper.address);
+
+          let res = await controller.replacePoolTokenWithNewPiToken(mkr.address, routerFactory.address, defaultFactoryArgs, 'piMKR', 'piMKR');
+          const piMKR = await WrappedPiErc20.at(res.logs.filter(l => l.event === 'ReplacePoolTokenWithPiToken')[0].args.piToken);
+          await cvpMaker.setCustomStrategy3Config(piMKR.address, bpool.address, poolWrapper.address, mkr.address, { from: owner });
+          await cvpMaker.setCustomStrategy(piMKR.address, 3, { from: owner });
+
+          await mkr.approve(piMKR.address, ether(16));
+          await piMKR.deposit(ether(16));
+          await piMKR.transfer(cvpMaker.address, ether(16));
+          await mkr.transfer(cvpMaker.address, ether(9));
+          await mkr.transfer(piMKR.address, ether(10));
+
+          assert.equal(await bpool.isBound(mkr.address), false);
+          assert.equal(await bpool.isBound(piMKR.address), true);
+
+          // >>> Estimate piMKR In
+          assert.equal(await cvpMaker.estimateStrategy3In(piMKR.address), ether('5.356461205471461388'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(piMKR.address), ether('5.356461205471461388'));
+
+          // >>> Estimate CVP Out
+          assert.equal(await cvpMaker.estimateStrategy3Out(piMKR.address), ether('6010.219527361525312491'));
+          assert.equal(await cvpMaker.estimateCvpAmountOut(piMKR.address), ether('6010.219527361525312491'));
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
+          assert.equal(await mkr.balanceOf(cvpMaker.address), ether(9));
+          assert.equal(await piMKR.balanceOf(cvpMaker.address), ether(16));
+
+          await cvpMaker.mockSwap(piMKR.address);
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
+          assert.equal(await mkr.balanceOf(cvpMaker.address), ether('19.728150111292155743'));
+          assert.equal(await piMKR.balanceOf(cvpMaker.address), '1');
+
+          assert.equal(await mkr.balanceOf(cvpMaker.address), ether('19.728150111292155743'));
+        });
+
         it('should revert if the balance is not enough', async () => {
           await mkr.transfer(cvpMaker.address, ether('5.3'));
           assert.equal(await mkr.balanceOf(cvpMaker.address), ether('5.3'));
@@ -1155,7 +1203,7 @@ describe('CVPMaker test', () => {
           assert.equal(await cvpMaker.estimateCvpAmountOut(mkr.address), ether('1989.407104249429312500'));
           assert.equal(await cvpMaker.estimateSwapAmountIn(mkr.address), ether('5.328284134427424242'));
 
-          await expectRevert(cvpMaker.mockSwap(mkr.address), 'ERC20: transfer amount exceeds balance');
+          await expectRevert(cvpMaker.mockSwap(mkr.address), 'LIMIT_IN');
         });
 
         it('should revert if the balance is 0', async () => {
@@ -1164,7 +1212,7 @@ describe('CVPMaker test', () => {
           assert.equal(await cvpMaker.estimateCvpAmountOut(mkr.address), ether(0));
           assert.equal(await cvpMaker.estimateSwapAmountIn(mkr.address), ether('5.328284134427424242'));
 
-          await expectRevert(cvpMaker.mockSwap(mkr.address), 'ERC20: transfer amount exceeds balance');
+          await expectRevert(cvpMaker.mockSwap(mkr.address), 'LIMIT_IN');
         });
       });
     });

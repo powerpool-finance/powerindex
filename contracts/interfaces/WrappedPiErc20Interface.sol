@@ -16,6 +16,12 @@ interface WrappedPiErc20Interface is IERC20 {
 
   function approveUnderlying(address _to, uint256 _amount) external;
 
+  function getPiEquivalentForUnderlying(uint256 _underlyingAmount) external view returns (uint256);
+
+  function getUnderlyingEquivalentForPi(uint256 _piAmount) external view returns (uint256);
+
+  function balanceOfUnderlying(address account) external view returns (uint256);
+
   function callExternal(
     address voting,
     bytes4 signature,

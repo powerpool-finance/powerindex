@@ -44,6 +44,8 @@ contract CVPMakerStorage is OwnableUpgradeSafe {
 
   struct Strategy3Config {
     address bPool;
+    address bPoolWrapper;
+    address underlying;
   }
 
   mapping(address => Strategy1Config) public strategy1Config;

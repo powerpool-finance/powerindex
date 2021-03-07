@@ -189,72 +189,135 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     return _estimateUniLikeStrategyOut(tokenToEstimate, amountOutWithFee);
   }
 
-  function estimateStrategy3In(address token_) public view returns (uint256) {
-    Strategy3Config storage config = strategy3Config[token_];
+  /**
+   * Estimates the amount of the given tokens required to be swapped for the cvpAmountOut. For a piToken it doesn't
+   * include the underlying balance, while the actual swap will.
+   * @param underlyingOrPiToken_ Either a piToken or it's underlying to swap for CVP
+   * @return amountIn in the given tokens
+   */
+  function estimateStrategy3In(address underlyingOrPiToken_) public view returns (uint256) {
+    Strategy3Config storage config = strategy3Config[underlyingOrPiToken_];
+    bool wrappedMode = false;
 
-    (uint256 communitySwapFee, , , ) = BPoolInterface(config.bPool).getCommunityFee();
+    BPoolInterface bPool = BPoolInterface(config.bPool);
+    BPoolInterface bPoolWrapper = config.bPoolWrapper != address(0) ? BPoolInterface(config.bPoolWrapper) : bPool;
+
+    (uint256 communitySwapFee, , , ) = bPool.getCommunityFee();
     uint256 amountOutGross = calcBPoolGrossAmount(cvpAmountOut, communitySwapFee);
 
-    return bPoolGetSwapAmountIn(config.bPool, token_, cvp, amountOutGross);
+    address tokenIn = underlyingOrPiToken_;
+
+    uint256 amountIn =
+      bPoolGetSwapAmountIn({
+      bPool_: address(bPool),
+      bPoolWrapper_: address(bPoolWrapper),
+      tokenIn_: underlyingOrPiToken_,
+      tokenOut_: cvp,
+      amountOut_: amountOutGross
+      });
+
+    if (config.underlying != address(0)) {
+      return WrappedPiErc20Interface(underlyingOrPiToken_).getUnderlyingEquivalentForPi(amountIn);
+    } else {
+      return amountIn;
+    }
   }
 
-  function estimateStrategy3Out(address token_) public view returns (uint256) {
-    Strategy3Config storage config = strategy3Config[token_];
+  /**
+   * Estimates the amount of CVP can be received by swapping the given tokens
+   * @param underlyingOrPiToken_ Either a piToken or it's underlying to swap for CVP
+   * @return amountOut The estimated amount of CVP tokens
+   */
+  function estimateStrategy3Out(address underlyingOrPiToken_) public view returns (uint256) {
+    Strategy3Config storage config = strategy3Config[underlyingOrPiToken_];
+    address tokenIn = underlyingOrPiToken_;
+    uint256 balance;
 
-    uint256 amountOutNet = bPoolGetSwapAmountOut(config.bPool, token_, cvp, IERC20(token_).balanceOf(address(this)));
+    BPoolInterface bPool = BPoolInterface(config.bPool);
+    BPoolInterface bPoolWrapper = config.bPoolWrapper != address(0) ? BPoolInterface(config.bPoolWrapper) : bPool;
+
+    if (config.underlying != address(0)) {
+      tokenIn = config.underlying;
+      balance = WrappedPiErc20Interface(underlyingOrPiToken_).getUnderlyingEquivalentForPi(IERC20(underlyingOrPiToken_).balanceOf(address(this)));
+    } else {
+      balance = IERC20(underlyingOrPiToken_).balanceOf(address(this));
+    }
+
+    uint256 amountOutNet =
+      bPoolGetSwapAmountOut({
+        bPool_: address(bPool),
+        bPoolWrapper_: address(bPoolWrapper),
+        tokenIn_: underlyingOrPiToken_,
+        tokenOut_: cvp,
+        amountIn_: balance
+      });
+
     (uint256 communitySwapFee, , , ) = BPoolInterface(config.bPool).getCommunityFee();
     (uint256 amountOutGross, ) =
       BPoolInterface(config.bPool).calcAmountWithCommunityFee(amountOutNet, communitySwapFee, address(this));
     return amountOutGross;
   }
 
+  /**
+   * Estimates the amountIn based on amountOut.
+   * @param bPool_ The BPool
+   * @param bPoolWrapper_ The BPool wrapper. The same address as BPool in case if it doesn't have a wrapper.
+   * @param tokenIn_ The token itself or the corresponding piToken
+   * @param tokenOut_ The token itself or the corresponding piToken
+   * @param amountOut_ The amount out
+   * @return amountIn The estimated amount in
+   */
   function bPoolGetSwapAmountIn(
     address bPool_,
+    address bPoolWrapper_,
     address tokenIn_,
     address tokenOut_,
     uint256 amountOut_
   ) public view returns (uint256) {
     BPoolInterface bPool = BPoolInterface(bPool_);
+    BPoolInterface bPoolWrapper = BPoolInterface(bPoolWrapper_);
 
     return
-      BMath(bPool_).calcInGivenOut(
+      BMath(address(bPoolWrapper)).calcInGivenOut(
         // tokenBalanceIn
         IERC20(tokenIn_).balanceOf(bPool_),
         // tokenWeightIn
-        bPool.getDenormalizedWeight(tokenIn_),
+        bPoolWrapper.getDenormalizedWeight(tokenIn_),
         // tokenBalanceOut
         IERC20(tokenOut_).balanceOf(bPool_),
         // tokenWeightOut
-        bPool.getDenormalizedWeight(tokenOut_),
+        bPoolWrapper.getDenormalizedWeight(tokenOut_),
         // tokenAmountOut
         amountOut_,
         // swapFee
-        bPool.getSwapFee()
+        bPoolWrapper.getSwapFee()
       );
   }
 
   function bPoolGetSwapAmountOut(
     address bPool_,
+    address bPoolWrapper_,
     address tokenIn_,
     address tokenOut_,
     uint256 amountIn_
   ) public view returns (uint256) {
     BPoolInterface bPool = BPoolInterface(bPool_);
+    BPoolInterface bPoolWrapper = BPoolInterface(bPoolWrapper_);
 
     return
-      BMath(bPool_).calcOutGivenIn(
+      BMath(address(bPoolWrapper)).calcOutGivenIn(
         // tokenBalanceIn
         IERC20(tokenIn_).balanceOf(bPool_),
         // tokenWeightIn
-        bPool.getDenormalizedWeight(tokenIn_),
+        bPoolWrapper.getDenormalizedWeight(tokenIn_),
         // tokenBalanceOut
         IERC20(tokenOut_).balanceOf(bPool_),
         // tokenWeightOut
-        bPool.getDenormalizedWeight(tokenOut_),
+        bPoolWrapper.getDenormalizedWeight(tokenOut_),
         // tokenAmountOut
         amountIn_,
         // swapFee
-        bPool.getSwapFee()
+        bPoolWrapper.getSwapFee()
       );
   }
 

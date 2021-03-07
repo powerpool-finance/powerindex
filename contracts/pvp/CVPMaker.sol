@@ -237,7 +237,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   // Pool tokens with CVP - PIPT & YETI - like
   function _customStrategy1(address bPoolToken_) internal returns (uint256 amountIn) {
     uint256 cvpAmountOut_ = cvpAmountOut;
-    Strategy1Config storage config = strategy1Config[bPoolToken_];
+    Strategy1Config memory config = strategy1Config[bPoolToken_];
     address iBPool = bPoolToken_;
 
     if (config.bPool != address(0)) {
@@ -292,18 +292,39 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   }
 
   // Tokens available for swap on PowerPool pools
-  function _customStrategy3(address token_) internal returns (uint256 amountIn) {
-    Strategy3Config storage config = strategy3Config[token_];
+  function _customStrategy3(address underlyingOrPiToken_) internal returns (uint256 amountIn) {
+    Strategy3Config memory config = strategy3Config[underlyingOrPiToken_];
     BPoolInterface bPool = BPoolInterface(config.bPool);
+    BPoolInterface bPoolWrapper = config.bPoolWrapper != address(0) ? BPoolInterface(config.bPoolWrapper) : bPool;
+    address tokenIn = underlyingOrPiToken_;
+
+    if (config.underlying != address(0)) {
+      tokenIn = config.underlying;
+      uint256 underlyingBalance = WrappedPiErc20Interface(underlyingOrPiToken_).balanceOfUnderlying(address(this));
+      if (underlyingBalance > 0) {
+        WrappedPiErc20Interface(underlyingOrPiToken_).withdraw(underlyingBalance);
+      }
+    }
 
     (uint256 communitySwapFee, , , ) = bPool.getCommunityFee();
     uint256 cvpAmountOut_ = cvpAmountOut;
     uint256 amountOutGross = calcBPoolGrossAmount(cvpAmountOut_, communitySwapFee);
 
-    IERC20(token_).approve(address(bPool), type(uint256).max);
-    (amountIn, ) = bPool.swapExactAmountOut(token_, type(uint256).max, cvp, amountOutGross, type(uint256).max);
-    IERC20(token_).approve(address(bPool), 0);
-
+    uint256 currentBalance = IERC20(tokenIn).balanceOf(address(this));
+    IERC20(tokenIn).approve(address(bPoolWrapper), currentBalance);
+    (amountIn, ) = bPoolWrapper.swapExactAmountOut(
+      // tokenIn
+      tokenIn,
+      // maxAmountIn
+      currentBalance,
+      // tokenOut
+      cvp,
+      // tokenAmountOut
+      amountOutGross,
+      // maxPrice
+      type(uint64).max
+    );
+    IERC20(tokenIn).approve(address(bPoolWrapper), 0);
     IERC20(cvp).transfer(xcvp, cvpAmountOut_);
   }
 
@@ -342,8 +363,13 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     strategy2Config[token_].bPool = bPool_;
   }
 
-  function setCustomStrategy3Config(address token_, address bPool_) external onlyOwner {
-    strategy3Config[token_] = Strategy3Config(bPool_);
+  function setCustomStrategy3Config(
+    address token_,
+    address bPool_,
+    address bPoolWrapper,
+    address underlying_
+  ) external onlyOwner {
+    strategy3Config[token_] = Strategy3Config(bPool_, bPoolWrapper, underlying_);
   }
 
   function setCustomPath(
