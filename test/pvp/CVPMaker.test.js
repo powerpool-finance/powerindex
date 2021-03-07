@@ -130,7 +130,7 @@ describe('CVPMaker test', () => {
       MockStaking,
       [cvp.address],
       [owner, bob, constants.ZERO_ADDRESS, '0', '0', '60', '60'],
-      { proxyAdminOwner: owner }
+      { proxyAdminOwner: deployer }
     );
     powerPoke = await PowerPoke.new(
       cvp.address,
@@ -175,7 +175,7 @@ describe('CVPMaker test', () => {
       MockCVPMaker,
       [cvp.address, xCvp.address, weth.address, uniswapRouter.address, constants.ZERO_ADDRESS],
       [powerPoke.address, ether(3000)],
-      { proxyAdminOwner: owner },
+      { proxyAdminOwner: deployer },
     );
     assert.equal(await cvpMaker.cvp(), cvp.address);
     assert.equal(await cvpMaker.xcvp(), xCvp.address);
