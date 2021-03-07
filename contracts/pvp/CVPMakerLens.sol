@@ -209,11 +209,11 @@ abstract contract CVPMakerLens is CVPMakerViewer {
 
     uint256 amountIn =
       bPoolGetSwapAmountIn({
-      bPool_: address(bPool),
-      bPoolWrapper_: address(bPoolWrapper),
-      tokenIn_: underlyingOrPiToken_,
-      tokenOut_: cvp,
-      amountOut_: amountOutGross
+        bPool_: address(bPool),
+        bPoolWrapper_: address(bPoolWrapper),
+        tokenIn_: underlyingOrPiToken_,
+        tokenOut_: cvp,
+        amountOut_: amountOutGross
       });
 
     if (config.underlying != address(0)) {
@@ -238,7 +238,9 @@ abstract contract CVPMakerLens is CVPMakerViewer {
 
     if (config.underlying != address(0)) {
       tokenIn = config.underlying;
-      balance = WrappedPiErc20Interface(underlyingOrPiToken_).getUnderlyingEquivalentForPi(IERC20(underlyingOrPiToken_).balanceOf(address(this)));
+      balance = WrappedPiErc20Interface(underlyingOrPiToken_).getUnderlyingEquivalentForPi(
+        IERC20(underlyingOrPiToken_).balanceOf(address(this))
+      );
     } else {
       balance = IERC20(underlyingOrPiToken_).balanceOf(address(this));
     }
