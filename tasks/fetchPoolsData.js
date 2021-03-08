@@ -12,6 +12,7 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
   const BPool = artifacts.require('BPool');
   const MockOracle = artifacts.require('MockOracle');
   const MockERC20 = artifacts.require('MockERC20');
+  const MockVault = artifacts.require('MockVault');
 
   const oracle = await MockOracle.at(oracleAddress);
   const pool = await BPool.at(balancerPoolAddress);
@@ -75,6 +76,21 @@ task('fetch-pools-data', 'Fetch pools data').setAction(async () => {
   }
 
   fs.writeFileSync('./data/poolsData.json', JSON.stringify(tokens, null, ' '));
+
+  const vaultsPool = await BPool.at('0x9ba60ba98413a60db4c651d4afe5c937bbd8044b');
+  const vaults = await callContract(vaultsPool, 'getCurrentTokens');
+  const vaultsData = [];
+
+  for (let i = 0; i < vaults.length; i++) {
+    const vault = await MockVault.at(vaults[i]);
+    vaultsData[i] = {
+      address: vaults[i],
+      totalSupply: await callContract(vault, 'totalSupply'),
+      usdtValue: await callContract(vault, 'balance'),
+      balancerBalance: await callContract(vaultsPool, 'getBalance', [vaults[i]])
+    }
+  }
+  fs.writeFileSync('./data/vaultsData.json', JSON.stringify(vaultsData, null, ' '));
 });
 
 async function callContract(contract, method, args = [], type = null) {
