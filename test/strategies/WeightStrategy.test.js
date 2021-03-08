@@ -14,7 +14,6 @@ const PoolRestrictions = artifacts.require('PoolRestrictions');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const ProxyFactory = artifacts.require('ProxyFactory');
 const MCapWeightStrategy = artifacts.require('MCapWeightStrategy');
-const TvlWeightStrategy = artifacts.require('TvlWeightStrategy');
 const MockOracle = artifacts.require('MockOracle');
 const PowerPoke = artifacts.require('PowerPoke');
 const MockFastGasOracle = artifacts.require('MockFastGasOracle');
@@ -674,7 +673,8 @@ describe('WeightStrategy', () => {
       });
     });
 
-    describe('TvlWeightStrategy', () => {
+    describe.skip('TvlWeightStrategy', () => {
+      let TvlWeightStrategy;
       beforeEach(async () => {
         weightStrategy = await deployProxied(
           TvlWeightStrategy,
