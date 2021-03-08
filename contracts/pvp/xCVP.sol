@@ -15,12 +15,12 @@ contract xCVP is ERC20("Permanent Voting Power Token", "xCVP") {
   }
 
   function enter(uint256 _amount) public {
-    uint256 totalSushi = cvp.balanceOf(address(this));
+    uint256 totalCVP = cvp.balanceOf(address(this));
     uint256 totalShares = totalSupply();
-    if (totalShares == 0 || totalSushi == 0) {
+    if (totalShares == 0 || totalCVP == 0) {
       _mint(msg.sender, _amount);
     } else {
-      uint256 what = _amount.mul(totalShares).div(totalSushi);
+      uint256 what = _amount.mul(totalShares).div(totalCVP);
       _mint(msg.sender, what);
     }
     cvp.transferFrom(msg.sender, address(this), _amount);

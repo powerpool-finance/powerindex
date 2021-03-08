@@ -6,13 +6,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@powerpool/power-oracle/contracts/interfaces/IPowerPoke.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
-import "../interfaces/IUniswapV2Pair.sol";
 import "../interfaces/IUniswapV2Router02.sol";
 import "../interfaces/TokenInterface.sol";
 import "../interfaces/BPoolInterface.sol";
 import "../powerindex-router/PowerIndexWrapper.sol";
-import "../balancer-core/BMath.sol";
 import "./CVPMakerStorage.sol";
 import "./CVPMakerViewer.sol";
 
@@ -22,6 +19,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
   /// @notice The event emitted when the owner updates the powerOracleStaking address
   event SetPowerPoke(address powerPoke);
+  /// @notice The event emitted when a poker calls swapFromReporter to convert token to CVP
   event Swap(
     address indexed caller,
     address indexed token,
@@ -31,8 +29,11 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     uint256 xcvpCvpBefore,
     uint256 xcvpCvpAfter
   );
+  /// @notice The event emitted when the owner updates cvpAmountOut value
   event SetCvpAmountOut(uint256 cvpAmountOut);
+  /// @notice The event emitted when the owner updates a token custom uni-like path
   event SetCustomPath(address indexed token_, address router_, address[] path);
+  /// @notice The event emitted when the owner assigns a custom strategy for the token
   event SetCustomStrategy(address indexed token, uint256 strategyId);
 
   modifier onlyEOA() {
@@ -76,6 +77,11 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     __Ownable_init();
   }
 
+  /**
+   * @notice The skip call from the reporter when there is nothing to convert to CVP
+   * @param reporterId_ The current reporter id
+   * @param rewardOpts_ Custom settings for the reporter reward
+   */
   function skipFromReporter(uint256 reporterId_, bytes calldata rewardOpts_)
     external
     onlyEOA
@@ -86,6 +92,12 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     lastReporterPokeFrom = block.timestamp;
   }
 
+  /**
+   * @notice The swap call from the reporter
+   * @param reporterId_ The current reporter id
+   * @param token_ The token to swap to CVP
+   * @param rewardOpts_ Custom settings for the reporter reward
+   */
   function swapFromReporter(
     uint256 reporterId_,
     address token_,
@@ -96,6 +108,12 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     _swap(token_);
   }
 
+  /**
+   * @notice The swap call from a slasher in case if the reporter has missed his call
+   * @param slasherId_ The current slasher id
+   * @param token_ The token to swap to CVP
+   * @param rewardOpts_ Custom settings for the slasher reward
+   */
   function swapFromSlasher(
     uint256 slasherId_,
     address token_,
@@ -234,14 +252,19 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
   /*** CUSTOM STRATEGIES ***/
 
-  // Pool tokens with CVP - PIPT & YETI - like
+  /**
+   * @notice The Strategy 1 exits a PowerIndex pool to CVP token. The pool should have CVP token bound.
+   * (For PIPT & YETI - like pools)
+   * @param bPoolToken_ PowerIndex Pool Token
+   * @return amountIn The amount of bPoolToken_ used as an input for the swap
+   */
   function _customStrategy1(address bPoolToken_) internal returns (uint256 amountIn) {
     uint256 cvpAmountOut_ = cvpAmountOut;
     Strategy1Config memory config = strategy1Config[bPoolToken_];
     address iBPool = bPoolToken_;
 
-    if (config.bPool != address(0)) {
-      iBPool = config.bPool;
+    if (config.bPoolWrapper != address(0)) {
+      iBPool = config.bPoolWrapper;
     }
 
     (, , uint256 communityExitFee, ) = BPoolInterface(bPoolToken_).getCommunityFee();
@@ -255,7 +278,12 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     IERC20(cvp).transfer(xcvp, cvpAmountOut_);
   }
 
-  // Pool tokens without CVP - ASSY-like
+  /**
+   * @notice The Strategy 2 exits from a PowerIndex pool token to one of it's bound tokens. Then it swaps this token
+   * for CVP using a uniswap-like strategy. The pool should have CVP token bound. (For ASSY - like pools)
+   * @param bPoolToken_ PowerIndex Pool Token
+   * @return amountIn The amount of bPoolToken_ used as an input for the swap
+   */
   function _customStrategy2(address bPoolToken_) internal returns (uint256 amountIn) {
     Strategy2Config storage config = strategy2Config[bPoolToken_];
     uint256 nextIndex = config.nextIndex;
@@ -271,9 +299,9 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
     address iBPool = bPoolToken_;
 
-    if (config.bPool != address(0)) {
-      iBPool = config.bPool;
-      address underlyingCandidate = PowerIndexWrapper(config.bPool).underlyingByPiToken(underlyingOrPiToExit);
+    if (config.bPoolWrapper != address(0)) {
+      iBPool = config.bPoolWrapper;
+      address underlyingCandidate = PowerIndexWrapper(config.bPoolWrapper).underlyingByPiToken(underlyingOrPiToExit);
       if (underlyingCandidate != address(0)) {
         underlyingToken = underlyingCandidate;
       }
@@ -291,7 +319,12 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     _executeUniLikeStrategy(underlyingToken);
   }
 
-  // Tokens available for swap on PowerPool pools
+  /**
+   * @notice The Strategy 3 swaps the given token at the corresponding PowerIndex pool for CVP
+   * @param underlyingOrPiToken_ Token to swap for CVP. If it is a piToken, all the balance is swapped for it's
+   * underlying first.
+   * @return amountIn The amount used as an input for the swap. For a piToken it returns the amount in underlying tokens.
+   */
   function _customStrategy3(address underlyingOrPiToken_) internal returns (uint256 amountIn) {
     Strategy3Config memory config = strategy3Config[underlyingOrPiToken_];
     BPoolInterface bPool = BPoolInterface(config.bPool);
@@ -330,6 +363,10 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
   /*** PERMISSIONLESS METHODS ***/
 
+  /**
+   * @notice Syncs the bound tokens for the Strategy2 PowerIndex pool token
+   * @param token_ The pool token to sync
+   */
   function syncStrategy2Tokens(address token_) external {
     require(customStrategies[token_] == 2, "CUSTOM_STRATEGY_2_FORBIDDEN");
 
@@ -355,21 +392,21 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     emit SetCustomStrategy(token_, strategyId_);
   }
 
-  function setCustomStrategy1Config(address token_, address bPool_) external onlyOwner {
-    strategy1Config[token_].bPool = bPool_;
+  function setCustomStrategy1Config(address bPoolToken_, address bPoolWrapper_) external onlyOwner {
+    strategy1Config[bPoolToken_].bPoolWrapper = bPoolWrapper_;
   }
 
-  function setCustomStrategy2Config(address token_, address bPool_) external onlyOwner {
-    strategy2Config[token_].bPool = bPool_;
+  function setCustomStrategy2Config(address bPoolToken, address bPoolWrapper_) external onlyOwner {
+    strategy2Config[bPoolToken].bPoolWrapper = bPoolWrapper_;
   }
 
   function setCustomStrategy3Config(
     address token_,
     address bPool_,
-    address bPoolWrapper,
+    address bPoolWrapper_,
     address underlying_
   ) external onlyOwner {
-    strategy3Config[token_] = Strategy3Config(bPool_, bPoolWrapper, underlying_);
+    strategy3Config[token_] = Strategy3Config(bPool_, bPoolWrapper_, underlying_);
   }
 
   function setCustomPath(

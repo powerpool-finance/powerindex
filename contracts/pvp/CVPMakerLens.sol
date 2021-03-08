@@ -126,19 +126,26 @@ abstract contract CVPMakerLens is CVPMakerViewer {
 
   // Hom many bPool tokens to burn to get the current cvpAmountOut
   function estimateStrategy1In(address bPoolToken_) public view returns (uint256) {
-    Strategy1Config storage config = strategy1Config[bPoolToken_];
-    bool wrapperMode = false;
-    address iBPool = bPoolToken_;
-    if (config.bPool != address(0)) {
-      wrapperMode = true;
-      iBPool = config.bPool;
-    }
-    return bPoolGetExitAmountIn(iBPool, cvp, cvpAmountOut, wrapperMode);
+    Strategy1Config memory config = strategy1Config[bPoolToken_];
+    return
+      bPoolGetExitAmountIn({
+        bPool_: bPoolToken_,
+        bPoolWrapper_: config.bPoolWrapper != address(0) ? config.bPoolWrapper : bPoolToken_,
+        tokenOut_: cvp,
+        amountOut_: cvpAmountOut
+      });
   }
 
   // Hom many CVP tokens will be received in the case of burning all the available bPool tokens
   function estimateStrategy1Out(address bPoolToken_) public view returns (uint256) {
-    return bPoolGetExitAmountOut(bPoolToken_, cvp, IERC20(bPoolToken_).balanceOf(address(this)));
+    Strategy1Config memory config = strategy1Config[bPoolToken_];
+    return
+      bPoolGetExitAmountOut({
+        bPool_: bPoolToken_,
+        bPoolWrapper_: config.bPoolWrapper != address(0) ? config.bPoolWrapper : bPoolToken_,
+        tokenOut_: cvp,
+        amountIn_: IERC20(bPoolToken_).balanceOf(address(this))
+      });
   }
 
   // Hom many bPool tokens to burn to get the current cvpAmountOut by swapping the exitToken token with
@@ -148,11 +155,9 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     Strategy2Config storage config = strategy2Config[bPoolToken_];
     address underlyingOrPiToExit = config.tokens[config.nextIndex];
     address underlyingToken = underlyingOrPiToExit;
-    address iBPool = bPoolToken_;
 
-    if (config.bPool != address(0)) {
-      iBPool = config.bPool;
-      address underlyingCandidate = PowerIndexWrapper(config.bPool).underlyingByPiToken(underlyingOrPiToExit);
+    if (config.bPoolWrapper != address(0)) {
+      address underlyingCandidate = PowerIndexWrapper(config.bPoolWrapper).underlyingByPiToken(underlyingOrPiToExit);
       if (underlyingCandidate != address(0)) {
         underlyingToken = underlyingCandidate;
       }
@@ -162,7 +167,13 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     (, , uint256 communityExitFee, ) = BPoolInterface(bPoolToken_).getCommunityFee();
     uint256 amountOutGross = calcBPoolGrossAmount(uniLikeAmountIn, communityExitFee);
 
-    return bPoolGetExitAmountIn(iBPool, underlyingOrPiToExit, amountOutGross, config.bPool != address(0));
+    return
+      bPoolGetExitAmountIn({
+        bPool_: bPoolToken_,
+        bPoolWrapper_: config.bPoolWrapper != address(0) ? config.bPoolWrapper : bPoolToken_,
+        tokenOut_: underlyingOrPiToExit,
+        amountOut_: amountOutGross
+      });
   }
 
   // Hom many CVP tokens can be returned by exiting with the all bPool balance and swapping the exit amount
@@ -172,17 +183,21 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     Strategy2Config storage config = strategy2Config[bPoolToken_];
     address tokenToExit = config.tokens[config.nextIndex];
     address tokenToEstimate = tokenToExit;
-    address iBPool = config.bPool == address(0) ? bPoolToken_ : config.bPool;
 
-    if (config.bPool != address(0)) {
-      address underlyingCandidate = PowerIndexWrapper(config.bPool).underlyingByPiToken(tokenToExit);
+    if (config.bPoolWrapper != address(0)) {
+      address underlyingCandidate = PowerIndexWrapper(config.bPoolWrapper).underlyingByPiToken(tokenToExit);
       if (underlyingCandidate != address(0)) {
         tokenToEstimate = underlyingCandidate;
       }
     }
 
     uint256 tokenAmountOut =
-      bPoolGetExitAmountOut(bPoolToken_, tokenToExit, IERC20(bPoolToken_).balanceOf(address(this)));
+      bPoolGetExitAmountOut({
+        bPool_: bPoolToken_,
+        bPoolWrapper_: config.bPoolWrapper != address(0) ? config.bPoolWrapper : bPoolToken_,
+        tokenOut_: tokenToExit,
+        amountIn_: IERC20(bPoolToken_).balanceOf(address(this))
+      });
     (, , uint256 communityExitFee, ) = BPoolInterface(bPoolToken_).getCommunityFee();
     (uint256 amountOutWithFee, ) =
       BPoolInterface(bPoolToken_).calcAmountWithCommunityFee(tokenAmountOut, communityExitFee, address(this));
@@ -277,22 +292,21 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     uint256 amountOut_
   ) public view returns (uint256) {
     BPoolInterface bPool = BPoolInterface(bPool_);
-    BPoolInterface bPoolWrapper = BPoolInterface(bPoolWrapper_);
 
     return
-      BMath(address(bPoolWrapper)).calcInGivenOut(
+      BMath(bPoolWrapper_).calcInGivenOut(
         // tokenBalanceIn
         IERC20(tokenIn_).balanceOf(bPool_),
         // tokenWeightIn
-        bPoolWrapper.getDenormalizedWeight(tokenIn_),
+        bPool.getDenormalizedWeight(tokenIn_),
         // tokenBalanceOut
         IERC20(tokenOut_).balanceOf(bPool_),
         // tokenWeightOut
-        bPoolWrapper.getDenormalizedWeight(tokenOut_),
+        bPool.getDenormalizedWeight(tokenOut_),
         // tokenAmountOut
         amountOut_,
         // swapFee
-        bPoolWrapper.getSwapFee()
+        bPool.getSwapFee()
       );
   }
 
@@ -304,61 +318,49 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     uint256 amountIn_
   ) public view returns (uint256) {
     BPoolInterface bPool = BPoolInterface(bPool_);
-    BPoolInterface bPoolWrapper = BPoolInterface(bPoolWrapper_);
 
     return
-      BMath(address(bPoolWrapper)).calcOutGivenIn(
+      BMath(bPoolWrapper_).calcOutGivenIn(
         // tokenBalanceIn
         IERC20(tokenIn_).balanceOf(bPool_),
         // tokenWeightIn
-        bPoolWrapper.getDenormalizedWeight(tokenIn_),
+        bPool.getDenormalizedWeight(tokenIn_),
         // tokenBalanceOut
         IERC20(tokenOut_).balanceOf(bPool_),
         // tokenWeightOut
-        bPoolWrapper.getDenormalizedWeight(tokenOut_),
+        bPool.getDenormalizedWeight(tokenOut_),
         // tokenAmountOut
         amountIn_,
         // swapFee
-        bPoolWrapper.getSwapFee()
+        bPool.getSwapFee()
       );
   }
 
   /**
    * @param bPool_ Either a pool or a wrapper contract, should be used in combination with the wrapperMode_ param
+   * @param bPoolWrapper_ The BPool wrapper. The same address as BPool in the case if it doesn't have a wrapper.
+   * @param tokenOut_ The token out address
+   * @param amountOut_ The expected amount for the exit
+   * @return amountIn The estimated amount in in pool tokens.
    */
   function bPoolGetExitAmountIn(
     address bPool_,
+    address bPoolWrapper_,
     address tokenOut_,
-    uint256 amountOut_,
-    bool wrapperMode_
+    uint256 amountOut_
   ) public view returns (uint256) {
     BPoolInterface bPool = BPoolInterface(bPool_);
-    uint256 totalSupply;
-    uint256 totalDenormalizedWeight;
-    address totalSupplyKeeper;
-
-    if (wrapperMode_) {
-      PowerIndexWrapper wrapper = PowerIndexWrapper(bPool_);
-      BPoolInterface actualBPool = wrapper.bpool();
-      totalSupply = actualBPool.totalSupply();
-      totalDenormalizedWeight = actualBPool.getTotalDenormalizedWeight();
-      totalSupplyKeeper = address(actualBPool);
-    } else {
-      totalSupply = bPool.totalSupply();
-      totalDenormalizedWeight = bPool.getTotalDenormalizedWeight();
-      totalSupplyKeeper = bPool_;
-    }
 
     return
-      BMath(bPool_).calcPoolInGivenSingleOut(
+      BMath(bPoolWrapper_).calcPoolInGivenSingleOut(
         // tokenBalanceOut
-        IERC20(tokenOut_).balanceOf(totalSupplyKeeper),
+        IERC20(tokenOut_).balanceOf(bPool_),
         // tokenWeightOut
         bPool.getDenormalizedWeight(tokenOut_),
         // poolSupply
-        totalSupply,
+        bPool.totalSupply(),
         // totalWeight (denormalized)
-        totalDenormalizedWeight,
+        bPool.getTotalDenormalizedWeight(),
         // tokenAmountOut
         amountOut_,
         // swapFee
@@ -368,13 +370,14 @@ abstract contract CVPMakerLens is CVPMakerViewer {
 
   function bPoolGetExitAmountOut(
     address bPool_,
+    address bPoolWrapper_,
     address tokenOut_,
     uint256 amountIn_
   ) public view returns (uint256) {
     BPoolInterface bPool = BPoolInterface(bPool_);
 
     return
-      BMath(bPool_).calcSingleOutGivenPoolIn(
+      BMath(bPoolWrapper_).calcSingleOutGivenPoolIn(
         // tokenBalanceOut
         IERC20(tokenOut_).balanceOf(bPool_),
         // tokenWeightOut

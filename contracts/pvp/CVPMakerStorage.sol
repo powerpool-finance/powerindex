@@ -2,16 +2,8 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@powerpool/power-oracle/contracts/interfaces/IPowerPoke.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
-import "../interfaces/IUniswapV2Pair.sol";
-import "../interfaces/IUniswapV2Router02.sol";
-import "../interfaces/TokenInterface.sol";
-import "../interfaces/BPoolInterface.sol";
-import "../balancer-core/BMath.sol";
+import "@powerpool/power-oracle/contracts/interfaces/IPowerPoke.sol";
 import "../interfaces/IPoolRestrictions.sol";
 
 contract CVPMakerStorage is OwnableUpgradeSafe {
@@ -33,11 +25,11 @@ contract CVPMakerStorage is OwnableUpgradeSafe {
   mapping(address => uint256) public customStrategies;
 
   struct Strategy1Config {
-    address bPool;
+    address bPoolWrapper;
   }
 
   struct Strategy2Config {
-    address bPool;
+    address bPoolWrapper;
     uint256 nextIndex;
     address[] tokens;
   }

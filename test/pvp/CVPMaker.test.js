@@ -698,7 +698,7 @@ describe('CVPMaker test', () => {
       });
     });
 
-    describe('bpool strategies', () => {
+    describe('powerindex custom strategies', () => {
       async function getTimestamp(shift = 0) {
         const currentTimestamp = (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp;
         return currentTimestamp + shift;
@@ -788,13 +788,13 @@ describe('CVPMaker test', () => {
 
           // In
           assert.equal(
-            await cvpMaker.bPoolGetExitAmountIn(bpool.address, cvp.address, ether(2000), false),
+            await cvpMaker.bPoolGetExitAmountIn(bpool.address, bpool.address, cvp.address, ether(2000)),
             ether('0.0040325832859546'),
           );
           assert.equal(await cvpMaker.estimateStrategy1In(bpool.address), ether('0.0040325832859546'));
 
           // Out
-          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, cvp.address, ether(5)), ether('2244093.1'));
+          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, bpool.address, cvp.address, ether(5)), ether('2244093.1'));
           assert.equal(await cvpMaker.estimateStrategy1Out(bpool.address), ether('2244093.1'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
@@ -818,14 +818,14 @@ describe('CVPMaker test', () => {
 
           // In
           assert.equal(
-            await cvpMaker.bPoolGetExitAmountIn(bpool.address, cvp.address, ether(2000), false),
-            ether('0.0040325832859546'),
+            await cvpMaker.bPoolGetExitAmountIn(bpool.address, poolWrapper.address, cvp.address, ether(2000)),
+            ether('0.004032583285954601'),
           );
           assert.equal(await cvpMaker.estimateStrategy1In(bpool.address), ether('0.004032583285954601'));
 
           // Out
-          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, cvp.address, ether(5)), ether('2244093.1'));
-          assert.equal(await cvpMaker.estimateStrategy1Out(bpool.address), ether('2244093.1'));
+          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, poolWrapper.address, cvp.address, ether(5)), ether('2244093.099999999999999990'));
+          assert.equal(await cvpMaker.estimateStrategy1Out(bpool.address), ether('2244093.099999999999999990'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
           assert.equal(await bpool.balanceOf(cvpMaker.address), ether(5));
@@ -908,7 +908,7 @@ describe('CVPMaker test', () => {
           );
           // Out AAVE / In (bPool)
           assert.equal(
-            await cvpMaker.bPoolGetExitAmountIn(bpool.address, aave.address, ether('18.029280024896818398'), false),
+            await cvpMaker.bPoolGetExitAmountIn(bpool.address, bpool.address, aave.address, ether('18.029280024896818398')),
             ether('0.0725058031454588'),
           );
           // Out CVP / In (bPool)
@@ -918,7 +918,7 @@ describe('CVPMaker test', () => {
 
           // >>> Amounts OUT
           // In bPool / Out (AAVE)
-          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, aave.address, ether(10)), ether('2363.125'));
+          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, bpool.address, aave.address, ether(10)), ether('2363.125'));
           // In AAVE / Out (CVP)
           assert.equal(
             (await uniswapRouter.getAmountsOut(ether('23.63125'), [aave.address, weth.address, cvp.address]))[2],
@@ -940,7 +940,7 @@ describe('CVPMaker test', () => {
           assert.equal(await bpool.balanceOf(cvpMaker.address), expectedBPoolLeftover);
         });
 
-        it('should use the strategy 2 with a pool comprised of pooled tokens', async () => {
+        it('should use the strategy 2 with a pool comprised of piTokens tokens', async () => {
           await cvpMaker.setCustomPath(sushi.address, sushiRouter.address, [sushi.address, weth.address], {
             from: owner,
           });
@@ -993,7 +993,7 @@ describe('CVPMaker test', () => {
           );
           // Out piSUSHI / In (bPool w/o fee)
           assert.equal(
-            await cvpMaker.bPoolGetExitAmountIn(poolWrapper.address, piSUSHI.address, ether('503.016912694621233293'), true),
+            await cvpMaker.bPoolGetExitAmountIn(bpool.address, poolWrapper.address, piSUSHI.address, ether('503.016912694621233293')),
             ether('0.076051883797598301'),
           );
           // Out CVP / In (bPool)
@@ -1003,7 +1003,10 @@ describe('CVPMaker test', () => {
 
           // >>> Amounts OUT
           // In bPool / Out (AAVE)
-          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, piAAVE.address, ether(10)), ether('2363.125'));
+          assert.equal(await cvpMaker.bPoolGetExitAmountOut(
+            bpool.address, poolWrapper.address, piAAVE.address, ether(10)),
+            ether('2363.124999999999999990')
+          );
           // In AAVE / Out (CVP)
           assert.equal(
             (await uniswapRouter.getAmountsOut(ether('23.63125'), [aave.address, weth.address, cvp.address]))[2],

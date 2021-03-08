@@ -2,25 +2,16 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../interfaces/IUniswapV2Router02.sol";
 import "./CVPMakerStorage.sol";
 
 contract CVPMakerViewer is CVPMakerStorage {
   using SafeMath for uint256;
-  using SafeMath for uint256;
 
   address internal constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
   uint256 internal constant BONE = 10**18;
-
-  /// @notice The event emitted when the owner updates the powerOracleStaking address
-  event SetPowerPoke(address powerPoke);
-  event Swap(address indexed caller, address indexed token, uint256 amountOut);
-  event SetCvpAmountOut(uint256 cvpAmountOut);
-  event SetCustomPath(address indexed token_, address router_, address[] path);
-  event SetCustomStrategy(address indexed token, uint256 strategyId);
 
   // 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
   address public immutable uniswapRouter;
@@ -91,7 +82,11 @@ contract CVPMakerViewer is CVPMakerStorage {
     return results[0];
   }
 
-  // How many token_s need to swap for cvpAmountOut
+  /**
+   * @notice Estimates how much token_ need to swap for cvpAmountOut
+   * @param token_ The token to swap for CVP
+   * @return The estimated token_ amount in
+   */
   function estimateUniLikeStrategyIn(address token_) public view returns (uint256) {
     address router = getRouter(token_);
     address[] memory path = getPath(token_);
@@ -109,7 +104,8 @@ contract CVPMakerViewer is CVPMakerStorage {
   /*** CUSTOM STRATEGIES OUT ***/
 
   /**
-   * Calculates the gross amount based on a net and a fee values
+   * @notice Calculates the gross amount based on a net and a fee values. The function is opposite to
+   * the BPool.calcAmountWithCommunityFee().
    */
   function calcBPoolGrossAmount(uint256 tokenAmountNet_, uint256 communityFee_)
     public
