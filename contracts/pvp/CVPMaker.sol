@@ -323,7 +323,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
    * @notice The Strategy 3 swaps the given token at the corresponding PowerIndex pool for CVP
    * @param underlyingOrPiToken_ Token to swap for CVP. If it is a piToken, all the balance is swapped for it's
    * underlying first.
-   * @return amountIn The amount used as an input for the swap. For a piToken it returns the amount in underlying tokens.
+   * @return amountIn The amount used as an input for the swap. For a piToken it returns the amount in underlying tokens
    */
   function _customStrategy3(address underlyingOrPiToken_) internal returns (uint256 amountIn) {
     Strategy3Config memory config = strategy3Config[underlyingOrPiToken_];
