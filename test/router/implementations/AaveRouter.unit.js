@@ -27,6 +27,7 @@ const StakedAaveV2 = artifactFromBytecode('aave/StakedAaveV2');
 const AaveGovernanceV2 = artifactFromBytecode('aave/AaveGovernanceV2');
 const AaveGovernanceStrategy = artifactFromBytecode('aave/AaveGovernanceStrategy');
 const AaveExecutor = artifactFromBytecode('aave/AaveExecutor');
+const MockPoke = artifacts.require('MockPoke');
 
 MockERC20.numberFormat = 'String';
 AavePowerIndexRouter.numberFormat = 'String';
@@ -133,10 +134,12 @@ describe('AaveRouter Tests', () => {
 
       poolRestrictions = await PoolRestrictions.new();
       piAave = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'piAAVE');
+      const poke = await MockPoke.new();
       aaveRouter = await AavePowerIndexRouter.new(
         piAave.address,
         buildBasicRouterConfig(
           poolRestrictions.address,
+          poke.address,
           constants.ZERO_ADDRESS,
           stakedAave.address,
           ether('0.2'),
@@ -161,10 +164,12 @@ describe('AaveRouter Tests', () => {
     });
 
     it('should deny initializing contract with rebalancingInterval LT UNSTAKE_WINDOW', async () => {
+      const poke = await MockPoke.new();
       await expectRevert(AavePowerIndexRouter.new(
         piAave.address,
         buildBasicRouterConfig(
           poolRestrictions.address,
+          poke.address,
           constants.ZERO_ADDRESS,
           stakedAave.address,
           ether('0.2'),
@@ -574,8 +579,8 @@ describe('AaveRouter Tests', () => {
           await increaseTimeTo(increaseTo);
         }
 
-        const claimRes = await aaveRouter.claimRewards({ from: bob });
-        const distributeRes = await aaveRouter.distributeRewards({ from: bob });
+        const claimRes = await aaveRouter.poke(true, { from: bob });
+        const distributeRes = await aaveRouter.poke(true, { from: bob });
 
         // The following assertions will fail when running coverage
         expectEvent(claimRes, 'ClaimRewards', {
@@ -617,23 +622,25 @@ describe('AaveRouter Tests', () => {
         assert.equal(await piAave.balanceOf(aaveRouter.address), '1');
       });
 
-      it('should revert claimRewards() if there is no reward available', async () => {
+      it('should revert poke(true, ) if there is no reward available', async () => {
         await stakedAave.configureAssets(
           [buildAaveAssetConfigInput(0, '0', stakedAave.address)],
           { from: emissionManager },
         );
-        await expectRevert(aaveRouter.claimRewards({ from: alice }), 'NOTHING_TO_CLAIM');
+        await expectRevert(aaveRouter.poke(true, { from: alice }), 'NOTHING_TO_CLAIM');
       });
 
       it('should revert distribute rewards() if there is no yCrv on the balance', async () => {
-        await expectRevert(aaveRouter.distributeRewards({ from: bob }), 'NO_PENDING_REWARD');
+        await expectRevert(aaveRouter.poke(true, { from: bob }), 'NO_PENDING_REWARD');
       });
 
       it('should revert distributing rewards when missing reward pools config', async () => {
+        const poke = await MockPoke.new();
         const router = await AavePowerIndexRouter.new(
           piAave.address,
           buildBasicRouterConfig(
             poolRestrictions.address,
+            poke.address,
             constants.ZERO_ADDRESS,
             stakedAave.address,
             ether('0.2'),
@@ -648,17 +655,19 @@ describe('AaveRouter Tests', () => {
         );
         await aaveRouter.migrateToNewRouter(piAave.address, router.address, { from: piGov });
         await time.increase(1);
-        await router.claimRewards({ from: bob });
-        await expectRevert(router.distributeRewards({ from: bob }), 'MISSING_REWARD_POOLS');
+        await router.poke(true, { from: bob });
+        await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
       });
 
       it('should correctly distribute pvpFee', async () => {
         const poolA = await MockGulpingBPool.new();
         const poolB = await MockGulpingBPool.new();
+        const poke = await MockPoke.new();
         const router = await AavePowerIndexRouter.new(
           piAave.address,
           buildBasicRouterConfig(
             poolRestrictions.address,
+            poke.address,
             constants.ZERO_ADDRESS,
             stakedAave.address,
             ether('0.2'),
@@ -677,8 +686,8 @@ describe('AaveRouter Tests', () => {
 
         await aaveRouter.migrateToNewRouter(piAave.address, router.address, { from: piGov });
         await time.increase(1);
-        await router.claimRewards({ from: bob });
-        const res = await router.distributeRewards({ from: bob });
+        await router.poke(true, { from: bob });
+        const res = await router.poke(true, { from: bob });
 
         expectEvent(res, 'DistributeRewards', {
           sender: bob,

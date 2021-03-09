@@ -11,6 +11,7 @@ const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
 const BasicPowerIndexRouterFactory = artifacts.require('BasicPowerIndexRouterFactory');
 const AavePowerIndexRouterFactory = artifacts.require('AavePowerIndexRouterFactory');
 const YearnPowerIndexRouterFactory = artifacts.require('YearnPowerIndexRouterFactory');
+const MockPoke = artifacts.require('MockPoke');
 
 const StakedAaveV2 = artifactFromBytecode('aave/StakedAaveV2');
 
@@ -75,8 +76,10 @@ describe('PowerIndex Implementation Factories Test', () => {
       // governance
       constants.ZERO_ADDRESS,
     );
+    const poke = await MockPoke.new();
     defaultBasicConfig = buildBasicRouterConfig(
       poolRestrictions,
+      poke.address,
       voting,
       stakedAave.address,
       ether('0.3'),

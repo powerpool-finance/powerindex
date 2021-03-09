@@ -16,6 +16,7 @@ const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRouterFactory');
 const PowerIndexBasicRouter = artifacts.require('MockPowerIndexBasicRouter');
 const ProxyFactory = artifacts.require('ProxyFactory');
+const MockPoke = artifacts.require('MockPoke');
 
 const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
@@ -87,8 +88,10 @@ describe('PowerIndexWrapper', () => {
   let minter, alice, communityWallet, poolRestrictions, stub;
   before(async function () {
     [minter, alice, communityWallet, poolRestrictions, stub] = await web3.eth.getAccounts();
+    const poke = await MockPoke.new();
     defaultFactoryArguments = buildBasicRouterArgs(web3, buildBasicRouterConfig(
       poolRestrictions,
+      poke.address,
       constants.ZERO_ADDRESS,
       constants.ZERO_ADDRESS,
       ether(0),

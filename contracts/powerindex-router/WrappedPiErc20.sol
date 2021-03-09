@@ -24,6 +24,7 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
   event Approve(address indexed to, uint256 amount);
   event ChangeRouter(address indexed newRouter);
   event SetEthFee(uint256 newEthFee);
+  event WithdrawEthFee(uint256 value);
   event CallExternal(address indexed destination, bytes4 indexed inputSig, bytes inputData, bytes outputData);
 
   modifier onlyRouter() {
@@ -39,10 +40,6 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
   ) public ERC20(_name, _symbol) {
     underlying = IERC20(_token);
     router = _router;
-  }
-
-  function pokeRouter() external nonReentrant {
-    PowerIndexNaiveRouterInterface(router).piTokenCallback(0);
   }
 
   /**
@@ -61,8 +58,6 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
 
     emit Deposit(_msgSender(), _depositAmount, mintAmount);
 
-    PowerIndexNaiveRouterInterface(router).piTokenCallback{ value: msg.value }(0);
-
     return mintAmount;
   }
 
@@ -73,8 +68,6 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
   function withdraw(uint256 _withdrawAmount) external payable override nonReentrant returns (uint256) {
     require(msg.value >= ethFee, "FEE");
     require(_withdrawAmount > 0, "ZERO_WITHDRAWAL");
-
-    PowerIndexNaiveRouterInterface(router).piTokenCallback{ value: msg.value }(_withdrawAmount);
 
     uint256 burnAmount = getPiEquivalentForUnderlying(_withdrawAmount);
     require(burnAmount > 0, "ZERO_PI_FOR_BURN");
@@ -112,6 +105,11 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
   function setEthFee(uint256 _ethFee) external override onlyRouter {
     ethFee = _ethFee;
     emit SetEthFee(_ethFee);
+  }
+
+  function withdrawEthFee(address payable _receiver) external override onlyRouter {
+    emit WithdrawEthFee(address(this).balance);
+    _receiver.transfer(address(this).balance);
   }
 
   function approveUnderlying(address _to, uint256 _amount) external override onlyRouter {

@@ -49,7 +49,7 @@ function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
   assert.equal(diff.lte(toBN(accuracyWei)), true, message);
 }
 
-describe('Balancer', () => {
+describe.skip('Balancer', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const name = 'My Pool';
   const symbol = 'MP';

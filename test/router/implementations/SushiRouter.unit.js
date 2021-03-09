@@ -9,6 +9,7 @@ const PoolRestrictions = artifacts.require('PoolRestrictions');
 const SushiBar = artifacts.require('SushiBar');
 const MockSushiBar = artifacts.require('MockSushiBar');
 const MockGulpingBPool = artifacts.require('MockGulpingBPool');
+const MockPoke = artifacts.require('MockPoke');
 
 MockERC20.numberFormat = 'String';
 SushiPowerIndexRouter.numberFormat = 'String';
@@ -17,7 +18,7 @@ SushiBar.numberFormat = 'String';
 
 const { web3 } = MockERC20;
 
-describe('SushiRouter Tests', () => {
+describe.only('SushiRouter Tests', () => {
   let bob, alice, piGov, stub, pvp, pool1, pool2;
 
   before(async function () {
@@ -35,10 +36,13 @@ describe('SushiRouter Tests', () => {
 
     poolRestrictions = await PoolRestrictions.new();
     piSushi = await WrappedPiErc20.new(sushi.address, stub, 'Wrapped SUSHI', 'piSUSHI');
+    const poke = await MockPoke.new();
+    console.log('poke.address', poke.address);
     sushiRouter = await SushiPowerIndexRouter.new(
       piSushi.address,
       buildBasicRouterConfig(
         poolRestrictions.address,
+        poke.address,
         constants.ZERO_ADDRESS,
         xSushi.address,
         ether('0.2'),
@@ -187,6 +191,9 @@ describe('SushiRouter Tests', () => {
       await sushi.transfer(alice, ether(100000));
       await sushi.approve(piSushi.address, ether(10000), { from: alice });
       const res = await piSushi.deposit(ether(10000), { from: alice });
+
+      await sushiRouter.poke(false);
+
       firstDepositAt = await getResTimestamp(res);
 
       assert.equal(await sushi.balanceOf(xSushi.address), ether(50000));
@@ -347,7 +354,7 @@ describe('SushiRouter Tests', () => {
 
     describe('on poke', async () => {
       it('should do nothing when nothing has changed', async () => {
-        await piSushi.pokeRouter({ from: bob });
+        await sushiRouter.poke(false, { from: bob });
 
         assert.equal(await sushi.balanceOf(xSushi.address), ether(50000));
         assert.equal(await xSushi.balanceOf(piSushi.address), ether(8000));
@@ -365,7 +372,7 @@ describe('SushiRouter Tests', () => {
         assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), ether(8000));
         assert.equal(await sushiRouter.getPendingRewards(), ether(1000));
 
-        await piSushi.pokeRouter({ from: bob });
+        await sushiRouter.poke(false, { from: bob });
 
         assert.equal(await sushi.balanceOf(xSushi.address), ether(51000));
         assert.equal(await xSushi.balanceOf(piSushi.address), ether(9000));
@@ -380,7 +387,7 @@ describe('SushiRouter Tests', () => {
     it('should stake all the underlying tokens with 0 RR', async () => {
       await sushiRouter.setReserveConfig(ether(0), 0, { from: piGov });
 
-      await piSushi.pokeRouter({ from: bob });
+      await sushiRouter.poke(false, { from: bob });
       assert.equal(await sushi.balanceOf(xSushi.address), ether(52000));
       assert.equal(await sushi.balanceOf(piSushi.address), ether(0));
     })
@@ -388,7 +395,7 @@ describe('SushiRouter Tests', () => {
     it('should keep all the underlying tokens on piToken with 1 RR', async () => {
       await sushiRouter.setReserveConfig(ether(1), 0, { from: piGov });
 
-      await piSushi.pokeRouter({ from: bob });
+      await sushiRouter.poke(false, { from: bob });
       assert.equal(await sushi.balanceOf(xSushi.address), ether(42000));
       assert.equal(await sushi.balanceOf(piSushi.address), ether(10000));
     })
@@ -410,6 +417,8 @@ describe('SushiRouter Tests', () => {
       await sushi.approve(piSushi.address, ether('10000'), { from: alice });
       await piSushi.deposit(ether('10000'), { from: alice });
 
+      await sushiRouter.poke(false);
+
       assert.equal(await piSushi.totalSupply(), ether('10000'));
       assert.equal(await piSushi.balanceOf(alice), ether('10000'));
       assert.equal(await xSushi.totalSupply(), ether('50000'));
@@ -428,7 +437,7 @@ describe('SushiRouter Tests', () => {
       assert.equal(await sushiRouter.getPendingRewards(), ether(320));
       assert.equal(await sushiRouter.getXSushiForSushi(ether(320)), '307692307692307692307');
 
-      let res = await sushiRouter.claimRewards({ from: bob });
+      let res = await sushiRouter.poke(true, { from: bob });
       expectEvent(res, 'ClaimRewards', {
         sender: bob,
         xSushiBurned: '307692307692307692307',
@@ -439,7 +448,7 @@ describe('SushiRouter Tests', () => {
       assert.equal(await sushi.balanceOf(piSushi.address), ether(2000));
       assert.equal(await sushi.balanceOf(sushiRouter.address), '319999999999999999999');
 
-      res = await sushiRouter.distributeRewards({ from: bob });
+      res = await sushiRouter.poke(true, { from: bob });
 
       expectEvent(res, 'DistributeRewards', {
         sender: bob,
@@ -472,30 +481,32 @@ describe('SushiRouter Tests', () => {
       assert.equal(await sushi.balanceOf(sushiRouter.address), '0');
     });
 
-    it('should revert claimRewards() if there is no reward available', async () => {
-      await expectRevert(sushiRouter.claimRewards({ from: alice }), 'NOTING_TO_CLAIM');
+    it('should revert poke(true, ) if there is no reward available', async () => {
+      await expectRevert(sushiRouter.poke(true, { from: alice }), 'NOTING_TO_CLAIM');
     });
 
-    it('should revert claimRewards() if there is nothing released', async () => {
+    it('should revert poke(true, ) if there is nothing released', async () => {
       const scammyBar = await MockSushiBar.new(sushi.address);
       await sushiRouter.setReserveConfig(ether(1), 0, { from: piGov });
-      await piSushi.pokeRouter();
+      await sushiRouter.poke(false);
       await sushiRouter.setVotingAndStaking(constants.ZERO_ADDRESS, scammyBar.address, { from: piGov });
       await sushiRouter.setReserveConfig(ether('0.2'), 0, { from: piGov });
-      await piSushi.pokeRouter();
+      await sushiRouter.poke(false);
       await sushi.transfer(scammyBar.address, ether(1000));
-      await expectRevert(sushiRouter.claimRewards({ from: alice }), 'NOTHING_RELEASED');
+      await expectRevert(sushiRouter.poke(true, { from: alice }), 'NOTHING_RELEASED');
     });
 
     it('should revert distribute rewards() if there is no yCrv on the balance', async () => {
-      await expectRevert(sushiRouter.distributeRewards({ from: bob }), 'NO_PENDING_REWARD');
+      await expectRevert(sushiRouter.poke(true, { from: bob }), 'NO_PENDING_REWARD');
     });
 
     it('should revert distributing rewards when missing reward pools config', async () => {
+      const poke = await MockPoke.new();
       const router = await SushiPowerIndexRouter.new(
         piSushi.address,
         buildBasicRouterConfig(
           poolRestrictions.address,
+          poke.address,
           xSushi.address,
           xSushi.address,
           ether('0.2'),
@@ -511,8 +522,8 @@ describe('SushiRouter Tests', () => {
       await sushiRouter.migrateToNewRouter(piSushi.address, router.address, { from: piGov });
       await sushi.transfer(xSushi.address, ether(2000));
       await time.increase(1);
-      await router.claimRewards({ from: bob });
-      await expectRevert(router.distributeRewards({ from: bob }), 'MISSING_REWARD_POOLS');
+      await router.poke(true, { from: bob });
+      await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
     });
   });
 });

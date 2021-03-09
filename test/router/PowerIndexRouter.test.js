@@ -6,6 +6,7 @@ const MockERC20 = artifacts.require('MockERC20');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexBasicRouter = artifacts.require('PowerIndexBasicRouter');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
+const MockPoke = artifacts.require('MockPoke');
 
 MockERC20.numberFormat = 'String';
 PowerIndexBasicRouter.numberFormat = 'String';
@@ -27,8 +28,10 @@ describe('PowerIndex BasicRouter Test', () => {
   before(async function () {
     [deployer, bob, alice, stub, piGov] = await web3.eth.getAccounts();
     poolRestrictions = await PoolRestrictions.new();
+    const poke = await MockPoke.new();
     defaultBasicConfig = buildBasicRouterConfig(
       poolRestrictions.address,
+      poke.address,
       constants.ZERO_ADDRESS,
       constants.ZERO_ADDRESS,
       ether(0),

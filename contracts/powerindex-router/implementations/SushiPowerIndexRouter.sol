@@ -44,7 +44,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
   /**
    * @notice Withdraws the extra staked SUSHI as a reward and transfers it to the router
    */
-  function claimRewards() external {
+  function _claimRewards() internal override {
     uint256 rewardsPending = getPendingRewards();
     require(rewardsPending > 0, "NOTING_TO_CLAIM");
 
@@ -65,7 +65,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
   /**
    * @notice Wraps the router's SUSHIs into piTokens and transfers it to the pools proportionally their SUSHI balances
    */
-  function distributeRewards() external onlyEOA {
+  function _distributeRewards() internal override {
     uint256 pendingReward = SUSHI.balanceOf(address(this));
     require(pendingReward > 0, "NO_PENDING_REWARD");
 
@@ -186,14 +186,9 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     _redeem(_xSushi);
   }
 
-  /*** PI TOKEN CALLBACK ***/
+  /*** POKE FUNCTION ***/
 
-  /**
-   * @notice The piToken contract callback hook. Is forced to be called on deposit/withdraw actions. Can be called
-   *         anytime using the permissionless `pokeRouter()` method.
-   * @param _withdrawAmount The amount of SUSHI being withdrawn. 0 in case of a deposit or a permissonless poke.
-   */
-  function piTokenCallback(uint256 _withdrawAmount) external payable override onlyPiToken {
+  function _rebalancePoke() internal override {
     // Ignore the tokens without a voting assigned
     if (staking == address(0)) {
       emit IgnoreDueMissingStaking();
@@ -204,7 +199,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
       return;
     }
 
-    (ReserveStatus reserveStatus, uint256 sushiDiff, ) = _getReserveStatus(_getUnderlyingStaked(), _withdrawAmount);
+    (ReserveStatus reserveStatus, uint256 sushiDiff, ) = _getReserveStatus(_getUnderlyingStaked(), 0);
 
     if (reserveStatus == ReserveStatus.SHORTAGE) {
       _redeem(getXSushiForSushi(sushiDiff));

@@ -7,6 +7,7 @@ const SushiPowerIndexRouter = artifacts.require('SushiPowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const SushiBar = artifacts.require('SushiBar');
+const MockPoke = artifacts.require('MockPoke');
 
 MockERC20.numberFormat = 'String';
 SushiPowerIndexRouter.numberFormat = 'String';
@@ -33,10 +34,12 @@ describe('SushiRouter Stories', () => {
 
     poolRestrictions = await PoolRestrictions.new();
     piSushi = await WrappedPiErc20.new(sushi.address, stub, 'Wrapped SUSHI', 'piSUSHI');
+    const poke = await MockPoke.new();
     sushiRouter = await SushiPowerIndexRouter.new(
       piSushi.address,
       buildBasicRouterConfig(
         poolRestrictions.address,
+        poke.address,
         constants.ZERO_ADDRESS,
         xSushi.address,
         ether('0.2'),
@@ -222,7 +225,7 @@ describe('SushiRouter Stories', () => {
 
     /////////////////////////////////////////////
     // Step #9. Router Claims Rewards 64.28... SUSHI
-    await sushiRouter.claimRewards({ from: charlie });
+    await sushiRouter.poke(true, { from: charlie });
 
     // assertions
     assert.equal(await piSushi.totalSupply(), ether(335));

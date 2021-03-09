@@ -3,6 +3,7 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
+import "@powerpool/poweroracle/contracts/interfaces/IPowerPoke.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "../interfaces/WrappedPiErc20Interface.sol";
 import "../interfaces/IPoolRestrictions.sol";
@@ -27,10 +28,11 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
 
   struct BasicConfig {
     address poolRestrictions;
+    address powerPoke;
     address voting;
     address staking;
     uint256 reserveRatio;
-    uint256 rebalancingInterval;
+    uint256 claimRewardsInterval;
     address pvp;
     uint256 pvpFee;
     address[] rewardPools;
@@ -40,15 +42,19 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   address public immutable pvp;
 
   IPoolRestrictions public poolRestrictions;
+  IPowerPoke public powerPoke;
   address public voting;
   address public staking;
   uint256 public reserveRatio;
-  uint256 public rebalancingInterval;
+  uint256 public claimRewardsInterval;
+  uint256 public lastClaimRewardsAt;
   uint256 public lastRebalancedAt;
   // 1 ether == 100%
   uint256 public pvpFee;
 
   address[] internal rewardPools;
+
+  uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
 
   modifier onlyPiToken() {
     require(msg.sender == address(piToken), "ONLY_PI_TOKEN_ALLOWED");
@@ -60,6 +66,20 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     _;
   }
 
+  modifier onlyReporter(uint256 _reporterId, bytes calldata _rewardOpts) {
+    uint256 gasStart = gasleft();
+    powerPoke.authorizeReporter(_reporterId, msg.sender);
+    _;
+    _reward(_reporterId, gasStart, COMPENSATION_PLAN_1_ID, _rewardOpts);
+  }
+
+  modifier onlyNonReporter(uint256 _reporterId, bytes calldata _rewardOpts) {
+    uint256 gasStart = gasleft();
+    powerPoke.authorizeNonReporter(_reporterId, msg.sender);
+    _;
+    _reward(_reporterId, gasStart, COMPENSATION_PLAN_1_ID, _rewardOpts);
+  }
+
   constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexNaiveRouter() Ownable() {
     require(_piToken != address(0), "INVALID_PI_TOKEN");
     require(_basicConfig.reserveRatio <= HUNDRED_PCT, "RR_GT_HUNDRED_PCT");
@@ -69,10 +89,11 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
 
     piToken = WrappedPiErc20Interface(_piToken);
     poolRestrictions = IPoolRestrictions(_basicConfig.poolRestrictions);
+    powerPoke = IPowerPoke(_basicConfig.powerPoke);
     voting = _basicConfig.voting;
     staking = _basicConfig.staking;
     reserveRatio = _basicConfig.reserveRatio;
-    rebalancingInterval = _basicConfig.rebalancingInterval;
+    claimRewardsInterval = _basicConfig.claimRewardsInterval;
     pvp = _basicConfig.pvp;
     pvpFee = _basicConfig.pvpFee;
     rewardPools = _basicConfig.rewardPools;
@@ -95,7 +116,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) public virtual override onlyOwner {
     require(_reserveRatio <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
     reserveRatio = _reserveRatio;
-    rebalancingInterval = _rebalancingInterval;
+    claimRewardsInterval = _rebalancingInterval;
     emit SetReserveConfig(_reserveRatio, _rebalancingInterval);
   }
 
@@ -116,10 +137,63 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     piToken.setEthFee(_ethFee);
   }
 
+  function withdrawEthFee(address payable _receiver) external onlyOwner {
+    piToken.withdrawEthFee(_receiver);
+  }
+
   function migrateToNewRouter(address _piToken, address payable _newRouter) public override onlyOwner {
     super.migrateToNewRouter(_piToken, _newRouter);
 
     _newRouter.transfer(address(this).balance);
+  }
+
+  function pokeFromReporter(
+    uint256 _reporterId,
+    bool _claimAndDistributeRewards,
+    bytes calldata _rewardOpts
+  ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
+    (uint256 minInterval,) = _getMinMaxReportInterval();
+    require(lastRebalancedAt + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
+    _rebalancePoke();
+    _postPoke(_claimAndDistributeRewards);
+  }
+
+  function pokeFromSlasher(
+    uint256 _reporterId,
+    bool _claimAndDistributeRewards,
+    bytes calldata _rewardOpts
+  ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
+    (, uint256 maxInterval) = _getMinMaxReportInterval();
+    require(lastRebalancedAt + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
+    _rebalancePoke();
+    _postPoke(_claimAndDistributeRewards);
+  }
+
+  function poke(bool _claimAndDistributeRewards) external onlyEOA {
+    _rebalancePoke();
+    _postPoke(_claimAndDistributeRewards);
+  }
+
+  function _postPoke(bool _claimAndDistributeRewards) internal {
+    lastRebalancedAt = block.timestamp;
+
+    if (_claimAndDistributeRewards && lastClaimRewardsAt + claimRewardsInterval < block.timestamp) {
+      _claimRewards();
+      _distributeRewards();
+      lastClaimRewardsAt = block.timestamp;
+    }
+  }
+
+  function _rebalancePoke() internal virtual {
+    // need to redefine in implementation
+  }
+
+  function _claimRewards() internal virtual {
+    // need to redefine in implementation
+  }
+
+  function _distributeRewards() internal virtual {
+    // need to redefine in implementation
   }
 
   function _callVoting(bytes4 _sig, bytes memory _data) internal {
@@ -137,9 +211,9 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   function _rebalanceHook() internal returns (bool) {
     uint256 blockTimestamp_ = block.timestamp;
     uint256 lastRebalancedAt_ = lastRebalancedAt;
-    uint256 rebalancingInterval_ = rebalancingInterval;
+    uint256 rebalancingInterval_ = claimRewardsInterval;
 
-    if (blockTimestamp_ < lastRebalancedAt_.add(rebalancingInterval)) {
+    if (blockTimestamp_ < lastRebalancedAt_.add(claimRewardsInterval)) {
       emit IgnoreRebalancing(blockTimestamp_, lastRebalancedAt_, rebalancingInterval_);
       return false;
     }
@@ -354,5 +428,18 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
       _reserveRatioPct.mul(_stakedBalance.add(_leftOnPiToken).sub(_withdrawAmount)).div(HUNDRED_PCT).add(
         _withdrawAmount
       );
+  }
+
+  function _reward(
+    uint256 _reporterId,
+    uint256 _gasStart,
+    uint256 _compensationPlan,
+    bytes calldata _rewardOpts
+  ) internal {
+    powerPoke.reward(_reporterId, _gasStart.sub(gasleft()), _compensationPlan, _rewardOpts);
+  }
+
+  function _getMinMaxReportInterval() internal view returns (uint256 min, uint256 max) {
+    return powerPoke.getMinMaxReportIntervals(address(this));
   }
 }

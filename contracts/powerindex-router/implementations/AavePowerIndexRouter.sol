@@ -39,7 +39,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     AAVE = IERC20(_aaveConfig.AAVE);
     if (_basicConfig.staking != address(0)) {
       require(
-        _basicConfig.rebalancingInterval < IStakedAave(_basicConfig.staking).UNSTAKE_WINDOW(),
+        _basicConfig.claimRewardsInterval < IStakedAave(_basicConfig.staking).UNSTAKE_WINDOW(),
         "REBALANCING_GT_UNSTAKE"
       );
     }
@@ -64,9 +64,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     _callVoting(IAaveGovernanceV2(0).submitVote.selector, abi.encode(_proposalId, _support));
   }
 
-  /*** PERMISSIONLESS REWARD CLAIMING AND DISTRIBUTION ***/
-
-  function claimRewards() external {
+  function _claimRewards() internal override {
     uint256 rewardsPending = IStakedAave(staking).getTotalRewardsBalance(address(piToken));
     require(rewardsPending > 0, "NOTHING_TO_CLAIM");
 
@@ -75,7 +73,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     emit ClaimRewards(msg.sender, rewardsPending);
   }
 
-  function distributeRewards() external onlyEOA {
+  function _distributeRewards() internal override {
     uint256 pendingReward = AAVE.balanceOf(address(this));
     require(pendingReward > 0, "NO_PENDING_REWARD");
 
@@ -107,9 +105,9 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     _triggerCoolDown();
   }
 
-  /*** PI TOKEN CALLBACK ***/
+  /*** POKE FUNCTION ***/
 
-  function piTokenCallback(uint256 _withdrawAmount) external payable override onlyPiToken {
+  function _rebalancePoke() internal override {
     address piToken_ = msg.sender;
 
     // Ignore the tokens without a voting assigned
@@ -123,7 +121,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     }
 
     (ReserveStatus reserveStatus, uint256 diff, ) =
-      _getReserveStatus(IERC20(staking).balanceOf(piToken_), _withdrawAmount);
+      _getReserveStatus(IERC20(staking).balanceOf(piToken_), 0);
 
     if (reserveStatus == ReserveStatus.SHORTAGE) {
       (CoolDownStatus coolDownStatus, uint256 coolDownFinishesAt, uint256 unstakeFinishesAt) = getCoolDownStatus();

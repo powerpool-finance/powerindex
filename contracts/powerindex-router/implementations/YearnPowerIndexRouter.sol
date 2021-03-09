@@ -67,9 +67,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     usdcYfiSwapPath = _yearnConfig.usdcYfiSwapPath;
   }
 
-  /*** PERMISSIONLESS METHODS ***/
-
-  function claimRewards() external {
+  function _claimRewards() internal override {
     // Step #1. Claim yCrv reward from YFI governance pool
     _callVoting(YearnGovernanceInterface(0).getReward.selector, "");
 
@@ -101,7 +99,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     emit Exit(msg.sender, yfiBalanceAfter - yfiBalanceBefore, yCrvReward);
   }
 
-  function distributeRewards() external onlyEOA {
+  function _distributeRewards() internal override {
     uint256 poolsLen = rewardPools.length;
     require(poolsLen > 0, "MISSING_REWARD_POOLS");
     require(usdcYfiSwapPath.length > 0, "MISSING_REWARD_SWAP_PATH");
@@ -207,9 +205,9 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     _redeem(_amount);
   }
 
-  /*** PI TOKEN CALLBACK ***/
+  /*** POKE FUNCTION ***/
 
-  function piTokenCallback(uint256 _withdrawAmount) external payable override onlyPiToken {
+  function _rebalancePoke() internal override {
     address piToken_ = msg.sender;
 
     // Ignore the tokens without a staking assigned
@@ -223,7 +221,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     }
 
     YearnGovernanceInterface _voting = YearnGovernanceInterface(voting);
-    (ReserveStatus status, uint256 diff, ) = _getReserveStatus(_voting.balanceOf(piToken_), _withdrawAmount);
+    (ReserveStatus status, uint256 diff, ) = _getReserveStatus(_voting.balanceOf(piToken_), 0);
 
     if (status == ReserveStatus.SHORTAGE) {
       uint256 voteLockUntilBlock = _voting.voteLock(piToken_);

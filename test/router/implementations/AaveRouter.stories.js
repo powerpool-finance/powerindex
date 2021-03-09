@@ -5,6 +5,7 @@ const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
+const MockPoke = artifacts.require('MockPoke');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const { web3 } = MockERC20;
 
@@ -51,11 +52,13 @@ describe('AaveRouter Stories', () => {
       constants.ZERO_ADDRESS,
     );
     poolRestrictions = await PoolRestrictions.new();
+    const poke = await MockPoke.new();
     piAave = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'piAAVE');
     aaveRouter = await AavePowerIndexRouter.new(
       piAave.address,
       buildBasicRouterConfig(
         poolRestrictions.address,
+        poke.address,
         stub,
         stakedAave.address,
         ether('0.2'),
