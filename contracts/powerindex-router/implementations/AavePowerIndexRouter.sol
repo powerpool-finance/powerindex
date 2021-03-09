@@ -37,14 +37,18 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     AaveConfig memory _aaveConfig
   ) public PowerIndexBasicRouter(_piToken, _basicConfig) {
     AAVE = IERC20(_aaveConfig.AAVE);
-    require(
-      _basicConfig.rebalancingInterval < IStakedAave(_basicConfig.staking).UNSTAKE_WINDOW(),
-      "REBALANCING_GT_UNSTAKE"
-    );
+    if (_basicConfig.staking != address(0)) {
+      require(
+        _basicConfig.rebalancingInterval < IStakedAave(_basicConfig.staking).UNSTAKE_WINDOW(),
+        "REBALANCING_GT_UNSTAKE"
+      );
+    }
   }
 
   function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) public override onlyOwner {
-    require(_rebalancingInterval < IStakedAave(staking).UNSTAKE_WINDOW(), "REBALANCING_GT_UNSTAKE");
+    if (staking != address(0)) {
+      require(_rebalancingInterval < IStakedAave(staking).UNSTAKE_WINDOW(), "REBALANCING_GT_UNSTAKE");
+    }
     PowerIndexBasicRouter.setReserveConfig(_reserveRatio, _rebalancingInterval);
   }
 
@@ -71,7 +75,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     emit ClaimRewards(msg.sender, rewardsPending);
   }
 
-  function distributeRewards() external {
+  function distributeRewards() external onlyEOA {
     uint256 pendingReward = AAVE.balanceOf(address(this));
     require(pendingReward > 0, "NO_PENDING_REWARD");
 
@@ -187,7 +191,6 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   function _redeem(uint256 _amount) internal {
     require(_amount > 0, "CANT_REDEEM_0");
 
-    _callStaking(IERC20(0).approve.selector, abi.encode(staking, _amount));
     _callStaking(IStakedAave(0).redeem.selector, abi.encode(address(piToken), _amount));
 
     emit Redeem(msg.sender, _amount);

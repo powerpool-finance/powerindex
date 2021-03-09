@@ -65,7 +65,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
   /**
    * @notice Wraps the router's SUSHIs into piTokens and transfers it to the pools proportionally their SUSHI balances
    */
-  function distributeRewards() external {
+  function distributeRewards() external onlyEOA {
     uint256 pendingReward = SUSHI.balanceOf(address(this));
     require(pendingReward > 0, "NO_PENDING_REWARD");
 
@@ -236,7 +236,6 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
   function _redeem(uint256 _xSushi) internal {
     require(_xSushi > 0, "CANT_REDEEM_0");
 
-    _callStaking(IERC20(0).approve.selector, abi.encode(staking, _xSushi));
     _callStaking(ISushiBar(0).leave.selector, abi.encode(_xSushi));
 
     emit Redeem(msg.sender, _xSushi);

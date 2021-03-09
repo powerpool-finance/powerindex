@@ -55,6 +55,11 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     _;
   }
 
+  modifier onlyEOA() {
+    require(tx.origin == msg.sender, "ONLY_EOA");
+    _;
+  }
+
   constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexNaiveRouter() Ownable() {
     require(_piToken != address(0), "INVALID_PI_TOKEN");
     require(_basicConfig.reserveRatio <= HUNDRED_PCT, "RR_GT_HUNDRED_PCT");

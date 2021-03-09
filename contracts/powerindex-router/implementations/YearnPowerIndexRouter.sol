@@ -101,7 +101,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     emit Exit(msg.sender, yfiBalanceAfter - yfiBalanceBefore, yCrvReward);
   }
 
-  function distributeRewards() external {
+  function distributeRewards() external onlyEOA {
     uint256 poolsLen = rewardPools.length;
     require(poolsLen > 0, "MISSING_REWARD_POOLS");
     require(usdcYfiSwapPath.length > 0, "MISSING_REWARD_SWAP_PATH");
@@ -168,6 +168,9 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   }
 
   function setUsdcYfiSwapPath(address[] calldata _usdcYfiSwapPath) external onlyOwner {
+    require(_usdcYfiSwapPath[0] == address(USDC), "0_NOT_USDC");
+    require(_usdcYfiSwapPath[_usdcYfiSwapPath.length - 1] == address(YFI), "LAST_NOT_YFI");
+
     usdcYfiSwapPath = _usdcYfiSwapPath;
     emit SetUsdcYfiSwapPath(_usdcYfiSwapPath);
   }
