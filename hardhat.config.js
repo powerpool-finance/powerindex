@@ -15,6 +15,7 @@ require('./tasks/deployYearnRouter');
 require('./tasks/deployAaveRouter');
 require('./tasks/deployProxyFactory');
 require('./tasks/deployMainnetAssy');
+require('./tasks/deployMainnetYla');
 require('./tasks/rebindMCapWeights');
 require('./tasks/deployMainnetWeightsStrategy');
 require('./tasks/testVestedLpMiningProxy');
