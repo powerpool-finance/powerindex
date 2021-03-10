@@ -99,7 +99,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
    * @param _xSushi The input amount of xSUSHI tokens
    * @return The corresponding amount of SUSHI tokens
    */
-  function getSushiForXSushi(uint256 _xSushi) external view returns (uint256) {
+  function getSushiForXSushi(uint256 _xSushi) public view returns (uint256) {
     return _xSushi.mul(SUSHI.balanceOf(staking)) / IERC20(staking).totalSupply();
   }
 
@@ -118,11 +118,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
       return 0;
     }
 
-    uint256 sushiAtBar = SUSHI.balanceOf(staking);
-    uint256 xSushiTotal = IERC20(staking).totalSupply();
-
-    // return xSushiAtPiToken * sushiAtBar / xSushiTotal;
-    return xSushiAtPiToken.mul(sushiAtBar) / xSushiTotal;
+    return getSushiForXSushi(xSushiAtPiToken);
   }
 
   /**
