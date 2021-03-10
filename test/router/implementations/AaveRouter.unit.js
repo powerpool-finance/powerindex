@@ -143,6 +143,7 @@ describe('AaveRouter Tests', () => {
           constants.ZERO_ADDRESS,
           stakedAave.address,
           ether('0.2'),
+          ether('0.02'),
           '0',
           pvp,
           ether('0.2'),
@@ -173,6 +174,7 @@ describe('AaveRouter Tests', () => {
           constants.ZERO_ADDRESS,
           stakedAave.address,
           ether('0.2'),
+          ether('0.02'),
           '172801',
           pvp,
           ether('0.2'),
@@ -180,10 +182,6 @@ describe('AaveRouter Tests', () => {
         ),
         buildAaveRouterConfig(aave.address),
       ), 'REBALANCING_GT_UNSTAKE');
-    });
-
-    it('should deny non-piToken calling piTokenCallback', async () => {
-      await expectRevert(aaveRouter.piTokenCallback(0), 'ONLY_PI_TOKEN_ALLOWED');
     });
 
     it('should allow depositing Aave and staking it in a StakedAave contract', async () => {});
@@ -644,6 +642,7 @@ describe('AaveRouter Tests', () => {
             constants.ZERO_ADDRESS,
             stakedAave.address,
             ether('0.2'),
+            ether('0.02'),
             '0',
             pvp,
             ether('0.2'),
@@ -671,6 +670,7 @@ describe('AaveRouter Tests', () => {
             constants.ZERO_ADDRESS,
             stakedAave.address,
             ether('0.2'),
+            ether('0.02'),
             '0',
             pvp,
             0,

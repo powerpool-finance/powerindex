@@ -188,18 +188,8 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
 
   /*** POKE FUNCTION ***/
 
-  function _rebalancePoke() internal override {
-    // Ignore the tokens without a voting assigned
-    if (staking == address(0)) {
-      emit IgnoreDueMissingStaking();
-      return;
-    }
-
-    if (!_rebalanceHook()) {
-      return;
-    }
-
-    (ReserveStatus reserveStatus, uint256 sushiDiff, ) = _getReserveStatus(_getUnderlyingStaked(), 0);
+  function _rebalancePoke(ReserveStatus reserveStatus, uint256 sushiDiff) internal override {
+    require(staking != address(0), "STACKING_IS_NULL");
 
     if (reserveStatus == ReserveStatus.SHORTAGE) {
       _redeem(getXSushiForSushi(sushiDiff));

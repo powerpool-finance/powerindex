@@ -207,24 +207,13 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
 
   /*** POKE FUNCTION ***/
 
-  function _rebalancePoke() internal override {
-    address piToken_ = msg.sender;
-
-    // Ignore the tokens without a staking assigned
-    if (staking == address(0)) {
-      emit IgnoreDueMissingStaking();
-      return;
-    }
-
-    if (!_rebalanceHook()) {
-      return;
-    }
+  function _rebalancePoke(ReserveStatus status, uint256 diff) internal override {
+    require(staking != address(0), "STACKING_IS_NULL");
 
     YearnGovernanceInterface _voting = YearnGovernanceInterface(voting);
-    (ReserveStatus status, uint256 diff, ) = _getReserveStatus(_voting.balanceOf(piToken_), 0);
 
     if (status == ReserveStatus.SHORTAGE) {
-      uint256 voteLockUntilBlock = _voting.voteLock(piToken_);
+      uint256 voteLockUntilBlock = _voting.voteLock(address(piToken));
       if (voteLockUntilBlock < block.number) {
         _redeem(diff);
       } else {
@@ -242,6 +231,10 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   }
 
   /*** INTERNALS ***/
+
+  function _getUnderlyingStaked() internal view override returns (uint256) {
+    return YearnGovernanceInterface(voting).balanceOf(address(piToken));
+  }
 
   function _stake(uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");

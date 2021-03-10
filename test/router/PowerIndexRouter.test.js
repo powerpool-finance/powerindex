@@ -35,6 +35,7 @@ describe('PowerIndex BasicRouter Test', () => {
       constants.ZERO_ADDRESS,
       constants.ZERO_ADDRESS,
       ether(0),
+      ether(0),
       0,
       stub,
       ether(0),

@@ -4,6 +4,7 @@ const template = artifacts.require('Migrations');
 const { promisify } = require('util');
 const { assert } = require('chai');
 const { web3 } = template;
+const { toBN } = web3.utils;
 const BigNumber = require('bignumber.js')
 const fs = require('fs')
 
@@ -327,6 +328,28 @@ function callContract(contract, method, args = []) {
   return contract.contract.methods[method].apply(contract.contract, args).call();
 }
 
+function isBnGreater(bn1, bn2) {
+  return toBN(bn1.toString(10)).gt(toBN(bn2.toString(10)));
+}
+function subBN(bn1, bn2) {
+  return toBN(bn1.toString(10)).sub(toBN(bn2.toString(10))).toString(10);
+}
+function addBN(bn1, bn2) {
+  return toBN(bn1.toString(10)).add(toBN(bn2.toString(10))).toString(10);
+}
+function mulBN(bn1, bn2) {
+  return toBN(bn1.toString(10)).mul(toBN(bn2.toString(10))).toString(10);
+}
+function divBN(bn1, bn2) {
+  return toBN(bn1.toString(10)).div(toBN(bn2.toString(10))).toString(10);
+}
+function mulScalarBN(bn1, bn2) {
+  return divBN(mulBN(bn1, bn2), toBN(ether(1))).toString(10);
+}
+function divScalarBN(bn1, bn2) {
+  return divBN(mulBN(bn1, toBN(ether(1))), bn2).toString(10);
+}
+
 module.exports = {
   deployProxied,
   createOrGetProxyAdmin,
@@ -349,5 +372,12 @@ module.exports = {
   evmSetNextBlockTimestamp: buildEndpoint('evm_setNextBlockTimestamp'),
   impersonateAccount,
   callContract,
-  forkReplacePoolTokenWithNewPiToken
+  forkReplacePoolTokenWithNewPiToken,
+  isBnGreater,
+  subBN,
+  addBN,
+  mulBN,
+  divBN,
+  mulScalarBN,
+  divScalarBN
 }

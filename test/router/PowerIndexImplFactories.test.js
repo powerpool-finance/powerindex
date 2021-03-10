@@ -83,6 +83,7 @@ describe('PowerIndex Implementation Factories Test', () => {
       voting,
       stakedAave.address,
       ether('0.3'),
+      ether('0.03'),
       4,
       pvp,
       ether('0.15'),

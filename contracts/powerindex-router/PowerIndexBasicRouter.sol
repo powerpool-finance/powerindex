@@ -32,6 +32,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     address voting;
     address staking;
     uint256 reserveRatio;
+    uint256 reserveShareToForceRebalance;
     uint256 claimRewardsInterval;
     address pvp;
     uint256 pvpFee;
@@ -49,6 +50,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   uint256 public claimRewardsInterval;
   uint256 public lastClaimRewardsAt;
   uint256 public lastRebalancedAt;
+  uint256 public reserveShareToForceRebalance;
   // 1 ether == 100%
   uint256 public pvpFee;
 
@@ -93,6 +95,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     voting = _basicConfig.voting;
     staking = _basicConfig.staking;
     reserveRatio = _basicConfig.reserveRatio;
+    reserveShareToForceRebalance = _basicConfig.reserveShareToForceRebalance;
     claimRewardsInterval = _basicConfig.claimRewardsInterval;
     pvp = _basicConfig.pvp;
     pvpFee = _basicConfig.pvpFee;
@@ -153,8 +156,9 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     bytes calldata _rewardOpts
   ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
     (uint256 minInterval,) = _getMinMaxReportInterval();
-    require(lastRebalancedAt + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
-    _rebalancePoke();
+    (ReserveStatus status, uint256 diff, bool forceRebalance) = _getReserveStatus(_getUnderlyingStaked(), 0);
+    require(forceRebalance || lastRebalancedAt + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
+    _rebalancePoke(status, diff);
     _postPoke(_claimAndDistributeRewards);
   }
 
@@ -164,13 +168,15 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     bytes calldata _rewardOpts
   ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
     (, uint256 maxInterval) = _getMinMaxReportInterval();
-    require(lastRebalancedAt + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
-    _rebalancePoke();
+    (ReserveStatus status, uint256 diff, bool forceRebalance) = _getReserveStatus(_getUnderlyingStaked(), 0);
+    require(forceRebalance || lastRebalancedAt + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
+    _rebalancePoke(status, diff);
     _postPoke(_claimAndDistributeRewards);
   }
 
   function poke(bool _claimAndDistributeRewards) external onlyEOA {
-    _rebalancePoke();
+    (ReserveStatus status, uint256 diff, ) = _getReserveStatus(_getUnderlyingStaked(), 0);
+    _rebalancePoke(status, diff);
     _postPoke(_claimAndDistributeRewards);
   }
 
@@ -184,7 +190,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     }
   }
 
-  function _rebalancePoke() internal virtual {
+  function _rebalancePoke(ReserveStatus reserveStatus, uint256 sushiDiff) internal virtual {
     // need to redefine in implementation
   }
 
@@ -206,20 +212,6 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
 
   function _checkVotingSenderAllowed() internal view {
     require(poolRestrictions.isVotingSenderAllowed(voting, msg.sender), "SENDER_NOT_ALLOWED");
-  }
-
-  function _rebalanceHook() internal returns (bool) {
-    uint256 blockTimestamp_ = block.timestamp;
-    uint256 lastRebalancedAt_ = lastRebalancedAt;
-    uint256 rebalancingInterval_ = claimRewardsInterval;
-
-    if (blockTimestamp_ < lastRebalancedAt_.add(claimRewardsInterval)) {
-      emit IgnoreRebalancing(blockTimestamp_, lastRebalancedAt_, rebalancingInterval_);
-      return false;
-    }
-
-    lastRebalancedAt = blockTimestamp_;
-    return true;
   }
 
   function _distributeRewardToPvp(uint256 _totalReward, IERC20 _underlying)
@@ -283,10 +275,17 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     returns (
       ReserveStatus status,
       uint256 diff,
-      uint256 adjustedReserveAmount
+      bool forceRebalance
     )
   {
-    return getReserveStatusPure(reserveRatio, piToken.getUnderlyingBalance(), _stakedBalance, _withdrawAmount);
+    uint256 expectedReserveAmount;
+    (status, diff, expectedReserveAmount) =
+      getReserveStatusPure(reserveRatio, piToken.getUnderlyingBalance(), _stakedBalance, _withdrawAmount);
+
+    if (status == ReserveStatus.SHORTAGE) {
+      uint256 share = expectedReserveAmount.mul(expectedReserveAmount.sub(diff)).div(1 ether);
+      forceRebalance = reserveShareToForceRebalance >= share;
+    }
   }
 
   // NOTICE: could/should be changed depending on implementation

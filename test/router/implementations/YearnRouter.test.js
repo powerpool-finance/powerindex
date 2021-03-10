@@ -75,6 +75,7 @@ describe('YearnRouter Tests', () => {
         yearnGovernance.address,
         yearnGovernance.address,
         ether('0.2'),
+        ether('0.02'),
         '0',
         pvp,
         ether('0.15'),
@@ -104,10 +105,6 @@ describe('YearnRouter Tests', () => {
     // Hardcoded into the bytecode for the test sake
     assert.equal(await yearnGovernance.period(), 10);
     assert.equal(await yearnGovernance.lock(), 10);
-  });
-
-  it('should deny non-piToken calling piTokenCallback', async () => {
-    await expectRevert(yfiRouter.piTokenCallback(0), 'ONLY_PI_TOKEN_ALLOWED');
   });
 
   describe('voting', async () => {
@@ -643,6 +640,7 @@ describe('YearnRouter Tests', () => {
           yearnGovernance.address,
           yearnGovernance.address,
           ether('0.2'),
+          ether('0.02'),
           '0',
           pvp,
           ether('0.2'),
@@ -674,6 +672,7 @@ describe('YearnRouter Tests', () => {
           yearnGovernance.address,
           yearnGovernance.address,
           ether('0.2'),
+          ether('0.02'),
           '0',
           pvp,
           ether('0.2'),

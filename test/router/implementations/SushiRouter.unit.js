@@ -1,5 +1,5 @@
 const { time, constants, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
-const { ether, getResTimestamp } = require('../../helpers');
+const { ether, getResTimestamp, addBN } = require('../../helpers');
 const { buildBasicRouterConfig, buildSushiRouterConfig } = require('../../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
@@ -37,7 +37,6 @@ describe.only('SushiRouter Tests', () => {
     poolRestrictions = await PoolRestrictions.new();
     piSushi = await WrappedPiErc20.new(sushi.address, stub, 'Wrapped SUSHI', 'piSUSHI');
     const poke = await MockPoke.new();
-    console.log('poke.address', poke.address);
     sushiRouter = await SushiPowerIndexRouter.new(
       piSushi.address,
       buildBasicRouterConfig(
@@ -46,6 +45,7 @@ describe.only('SushiRouter Tests', () => {
         constants.ZERO_ADDRESS,
         xSushi.address,
         ether('0.2'),
+        ether('0.02'),
         '0',
         pvp,
         ether('0.15'),
@@ -65,10 +65,6 @@ describe.only('SushiRouter Tests', () => {
     await sushiRouter.transferOwnership(piGov);
 
     assert.equal(await sushiRouter.owner(), piGov);
-  });
-
-  it('should deny non-piToken calling piTokenCallback', async () => {
-    await expectRevert(sushiRouter.piTokenCallback(0), 'ONLY_PI_TOKEN_ALLOWED');
   });
 
   describe('owner methods', async () => {
@@ -427,7 +423,7 @@ describe.only('SushiRouter Tests', () => {
       await piSushi.transfer(poolB.address, 20, { from: alice });
     });
 
-    it('should allow withdrawing rewards from the governance', async () => {
+    it.only('should allow withdrawing rewards from the governance', async () => {
       await sushi.transfer(xSushi.address, ether(2000));
 
       await time.increase(time.duration.days(8));
@@ -445,11 +441,6 @@ describe.only('SushiRouter Tests', () => {
         releasedSushiReward: '319999999999999999999'
       })
 
-      assert.equal(await sushi.balanceOf(piSushi.address), ether(2000));
-      assert.equal(await sushi.balanceOf(sushiRouter.address), '319999999999999999999');
-
-      res = await sushiRouter.poke(true, { from: bob });
-
       expectEvent(res, 'DistributeRewards', {
         sender: bob,
         sushiReward: '319999999999999999999',
@@ -458,6 +449,10 @@ describe.only('SushiRouter Tests', () => {
         poolRewardsPi: ether(272),
         pools: [poolA.address, poolB.address, poolC.address],
       });
+
+      assert.equal(await sushi.balanceOf(piSushi.address), addBN(ether(2000), ether(272)));
+      assert.equal(await sushi.balanceOf(sushiRouter.address), '0');
+
       assert.isTrue(parseInt(res.logs[3].args.poolRewardsUnderlying) > 1);
       assert.isTrue(parseInt(res.logs[3].args.poolRewardsPi.length) > 1);
 
@@ -510,6 +505,7 @@ describe.only('SushiRouter Tests', () => {
           xSushi.address,
           xSushi.address,
           ether('0.2'),
+          ether('0.02'),
           '0',
           pvp,
           ether('0.2'),

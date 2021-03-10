@@ -107,21 +107,8 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   /*** POKE FUNCTION ***/
 
-  function _rebalancePoke() internal override {
-    address piToken_ = msg.sender;
-
-    // Ignore the tokens without a voting assigned
-    if (staking == address(0)) {
-      emit IgnoreDueMissingStaking();
-      return;
-    }
-
-    if (!_rebalanceHook()) {
-      return;
-    }
-
-    (ReserveStatus reserveStatus, uint256 diff, ) =
-      _getReserveStatus(IERC20(staking).balanceOf(piToken_), 0);
+  function _rebalancePoke(ReserveStatus reserveStatus, uint256 diff) internal override {
+    require(staking != address(0), "STACKING_IS_NULL");
 
     if (reserveStatus == ReserveStatus.SHORTAGE) {
       (CoolDownStatus coolDownStatus, uint256 coolDownFinishesAt, uint256 unstakeFinishesAt) = getCoolDownStatus();
@@ -171,6 +158,11 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   }
 
   /*** INTERNALS ***/
+
+  function _getUnderlyingStaked() internal view override returns (uint256) {
+    return IERC20(staking).balanceOf(address(piToken));
+  }
+
 
   function _triggerCoolDown() internal {
     _callStaking(IStakedAave(0).cooldown.selector, "");

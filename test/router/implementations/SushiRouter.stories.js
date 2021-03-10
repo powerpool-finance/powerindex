@@ -43,6 +43,7 @@ describe('SushiRouter Stories', () => {
         constants.ZERO_ADDRESS,
         xSushi.address,
         ether('0.2'),
+        ether('0.02'),
         '0',
         pvp,
         ether('0.15'),
@@ -67,8 +68,6 @@ describe('SushiRouter Stories', () => {
 
     ///////////////////////////////////////////
     // Step #1. Charlie stakes at Bar 150 SUSHI
-    await expectRevert(sushiRouter.piTokenCallback(0), 'ONLY_PI_TOKEN_ALLOWED');
-
     await sushi.approve(xSushi.address, ether(150), { from: charlie });
     await xSushi.enter(ether(150), { from: charlie });
 

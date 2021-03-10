@@ -1,10 +1,11 @@
-function buildBasicRouterConfig(poolRestrictions, powerPoke, voting, staking, reserveRatio, claimRewardsInterval, pvp, pvpFee, rewardPools, refundMaxGasPrice, refundPct) {
+function buildBasicRouterConfig(poolRestrictions, powerPoke, voting, staking, reserveRatio, reserveShareToForceRebalance, claimRewardsInterval, pvp, pvpFee, rewardPools, refundMaxGasPrice, refundPct) {
   return {
     poolRestrictions,
     powerPoke,
     voting,
     staking,
     reserveRatio,
+    reserveShareToForceRebalance,
     claimRewardsInterval,
     pvp,
     pvpFee,

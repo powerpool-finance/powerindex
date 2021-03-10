@@ -39,6 +39,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
       constants.ZERO_ADDRESS,
       constants.ZERO_ADDRESS,
       ether('0.2'),
+      ether('0.02'),
       '0',
       stub,
       ether(0),
