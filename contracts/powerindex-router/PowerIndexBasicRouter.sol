@@ -283,7 +283,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
       getReserveStatusPure(reserveRatio, piToken.getUnderlyingBalance(), _stakedBalance, _withdrawAmount);
 
     if (status == ReserveStatus.SHORTAGE) {
-      uint256 share = expectedReserveAmount.mul(expectedReserveAmount.sub(diff)).div(1 ether);
+      uint256 share = expectedReserveAmount.sub(diff).mul(expectedReserveAmount).div(1 ether);
       forceRebalance = reserveShareToForceRebalance >= share;
     }
   }
