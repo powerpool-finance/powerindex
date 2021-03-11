@@ -46,7 +46,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
    */
   function _claimRewards() internal override {
     uint256 rewardsPending = getPendingRewards();
-    require(rewardsPending > 0, "NOTING_TO_CLAIM");
+    require(rewardsPending > 0, "NOTHING_TO_CLAIM");
 
     uint256 sushiBefore = SUSHI.balanceOf(address(piToken));
     uint256 xSushiToBurn = getXSushiForSushi(rewardsPending);

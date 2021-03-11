@@ -32,7 +32,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     address voting;
     address staking;
     uint256 reserveRatio;
-    uint256 reserveShareToForceRebalance;
+    uint256 reserveRatioToForceRebalance;
     uint256 claimRewardsInterval;
     address pvp;
     uint256 pvpFee;
@@ -50,7 +50,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   uint256 public claimRewardsInterval;
   uint256 public lastClaimRewardsAt;
   uint256 public lastRebalancedAt;
-  uint256 public reserveShareToForceRebalance;
+  uint256 public reserveRatioToForceRebalance;
   // 1 ether == 100%
   uint256 public pvpFee;
 
@@ -95,7 +95,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     voting = _basicConfig.voting;
     staking = _basicConfig.staking;
     reserveRatio = _basicConfig.reserveRatio;
-    reserveShareToForceRebalance = _basicConfig.reserveShareToForceRebalance;
+    reserveRatioToForceRebalance = _basicConfig.reserveRatioToForceRebalance;
     claimRewardsInterval = _basicConfig.claimRewardsInterval;
     pvp = _basicConfig.pvp;
     pvpFee = _basicConfig.pvpFee;
@@ -116,11 +116,11 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     emit SetVotingAndStaking(_voting, _staking);
   }
 
-  function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) public virtual override onlyOwner {
+  function setReserveConfig(uint256 _reserveRatio, uint256 _claimRewardsInterval) public virtual override onlyOwner {
     require(_reserveRatio <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
     reserveRatio = _reserveRatio;
-    claimRewardsInterval = _rebalancingInterval;
-    emit SetReserveConfig(_reserveRatio, _rebalancingInterval);
+    claimRewardsInterval = _claimRewardsInterval;
+    emit SetReserveConfig(_reserveRatio, _claimRewardsInterval);
   }
 
   function setRewardPools(address[] calldata _rewardPools) external onlyOwner {
@@ -283,8 +283,8 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
       getReserveStatusPure(reserveRatio, piToken.getUnderlyingBalance(), _stakedBalance, _withdrawAmount);
 
     if (status == ReserveStatus.SHORTAGE) {
-      uint256 share = expectedReserveAmount.sub(diff).mul(expectedReserveAmount).div(1 ether);
-      forceRebalance = reserveShareToForceRebalance >= share;
+      uint256 currentRatio = expectedReserveAmount.sub(diff).mul(HUNDRED_PCT).div(expectedReserveAmount);
+      forceRebalance = reserveRatioToForceRebalance >= currentRatio;
     }
   }
 

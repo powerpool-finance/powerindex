@@ -8,6 +8,7 @@ const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const SushiBar = artifacts.require('SushiBar');
 const MockPoke = artifacts.require('MockPoke');
+const MockPool = artifacts.require('MockPool');
 
 MockERC20.numberFormat = 'String';
 SushiPowerIndexRouter.numberFormat = 'String';
@@ -16,14 +17,14 @@ SushiBar.numberFormat = 'String';
 
 const { web3 } = MockERC20;
 
-describe('SushiRouter Stories', () => {
+describe.only('SushiRouter Stories', () => {
   let alice, bob, charlie, piGov, stub, pvp;
 
   before(async function () {
     [, alice, bob, charlie, piGov, stub, pvp] = await web3.eth.getAccounts();
   });
 
-  let sushi, xSushi, poolRestrictions, piSushi, sushiRouter;
+  let sushi, xSushi, poolRestrictions, piSushi, sushiRouter, pool;
 
   beforeEach(async function () {
     // 0x6b3595068778dd592e39a122f4f5a5cf09c90fe2
@@ -35,6 +36,7 @@ describe('SushiRouter Stories', () => {
     poolRestrictions = await PoolRestrictions.new();
     piSushi = await WrappedPiErc20.new(sushi.address, stub, 'Wrapped SUSHI', 'piSUSHI');
     const poke = await MockPoke.new();
+    pool = await MockPool.new();
     sushiRouter = await SushiPowerIndexRouter.new(
       piSushi.address,
       buildBasicRouterConfig(
@@ -47,7 +49,7 @@ describe('SushiRouter Stories', () => {
         '0',
         pvp,
         ether('0.15'),
-        [alice, bob]
+        [pool.address]
       ),
       buildSushiRouterConfig(
         sushi.address
@@ -95,6 +97,8 @@ describe('SushiRouter Stories', () => {
     await sushi.approve(piSushi.address, ether(125), { from: alice });
     await piSushi.deposit(ether(125), { from: alice });
 
+    await sushiRouter.poke(false);
+
     // assertions
     assert.equal(await piSushi.totalSupply(), ether(125));
     assert.equal(await piSushi.balanceOf(alice), ether(125));
@@ -114,6 +118,8 @@ describe('SushiRouter Stories', () => {
     // Step #4. Bob router deposit 250 SUSHI
     await sushi.approve(piSushi.address, ether(250), { from: bob });
     await piSushi.deposit(ether(250), { from: bob });
+
+    await sushiRouter.poke(false);
 
     // assertions
     assert.equal(await piSushi.totalSupply(), ether(375));
@@ -156,6 +162,8 @@ describe('SushiRouter Stories', () => {
 
     ///////////////////////////////////////
     // Step #6. Reward assignment 150 SUSHI
+    assert.equal(await sushiRouter.getSushiForXSushi(await xSushi.balanceOf(piSushi.address)), '300000000000000000000');
+
     await sushi.transfer(xSushi.address, ether(150));
 
     // assertions
@@ -181,6 +189,8 @@ describe('SushiRouter Stories', () => {
     await sushi.approve(piSushi.address, ether(60), { from: alice });
     await piSushi.deposit(ether(60), { from: alice });
 
+    await sushiRouter.poke(false);
+
     // assertions
     assert.equal(await piSushi.totalSupply(), ether(435));
     assert.equal(await piSushi.balanceOf(alice), ether(185));
@@ -201,46 +211,61 @@ describe('SushiRouter Stories', () => {
 
     ///////////////////////////////////////////
     // Step #8. Bob router withdrawal 100 SUSHI
+    await sushiRouter.setReserveConfig(ether('0.4'), '0', {from: piGov})
+    await sushiRouter.poke(false);
+
+    assert.equal(await sushi.balanceOf(piSushi.address), '173999999999999999999');
+    assert.equal(await sushi.balanceOf(xSushi.address), '811000000000000000001');
+    assert.equal(await xSushi.balanceOf(piSushi.address), '200911764705882352941');
+
     await piSushi.approve(piSushi.address, ether(100), { from: bob });
     await piSushi.withdraw(ether(100), { from: bob });
+
+    await sushiRouter.setReserveConfig(ether('0.2'), '0', {from: piGov})
+    await sushiRouter.poke(false);
 
     // assertions
     assert.equal(await piSushi.totalSupply(), ether(335));
     assert.equal(await piSushi.balanceOf(alice), ether(185));
     assert.equal(await piSushi.balanceOf(bob), ether(150));
 
-    assert.equal(await sushi.balanceOf(piSushi.address), '66999999999999999999');
-    assert.equal(await sushi.balanceOf(xSushi.address), '818000000000000000001');
+    assert.equal(await sushi.balanceOf(piSushi.address), '67000000000000000000');
+    assert.equal(await sushi.balanceOf(xSushi.address), '818000000000000000000');
 
-    assert.equal(await xSushi.totalSupply(), '505235294117647058823');
-    assert.equal(await xSushi.balanceOf(piSushi.address), '205235294117647058823');
+    assert.equal(await xSushi.totalSupply(), '505235294117647058822');
+    assert.equal(await xSushi.balanceOf(piSushi.address), '205235294117647058822');
     assert.equal(await xSushi.balanceOf(alice), ether(150));
     assert.equal(await xSushi.balanceOf(charlie), ether(150));
 
-    assert.equal(await sushiRouter.getUnderlyingStaked(), '268000000000000000001');
-    assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '332285714285714285714');
-    assert.equal(await sushiRouter.getPendingRewards(), '64285714285714285713');
+    assert.equal(await sushiRouter.getUnderlyingStaked(), '268000000000000000000');
+    assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '332285714285714285712');
+    assert.equal(await sushiRouter.getPendingRewards(), '64285714285714285712');
     assert.equal(await sushiRouter.getSushiForXSushi(ether(1)), '1619047619047619047');
 
     /////////////////////////////////////////////
     // Step #9. Router Claims Rewards 64.28... SUSHI
+    assert.equal(await sushiRouter.getSushiForXSushi(await xSushi.balanceOf(piSushi.address)), '332285714285714285712');
+
+    await piSushi.transfer(pool.address, ether(1), {from: alice})
     await sushiRouter.poke(true, { from: charlie });
+
+    assert.equal(await sushiRouter.getSushiForXSushi(await xSushi.balanceOf(piSushi.address)), '268000000000000000001');
 
     // assertions
     assert.equal(await piSushi.totalSupply(), ether(335));
-    assert.equal(await piSushi.balanceOf(alice), ether(185));
+    assert.equal(await piSushi.balanceOf(alice), ether(184));
     assert.equal(await piSushi.balanceOf(bob), ether(150));
 
-    assert.equal(await sushi.balanceOf(piSushi.address), '66999999999999999999');
-    assert.equal(await sushi.balanceOf(xSushi.address), '753714285714285714290');
+    assert.equal(await sushi.balanceOf(piSushi.address), '67000000000000000000');
+    assert.equal(await sushi.balanceOf(xSushi.address), '753714285714285714289');
 
-    assert.equal(await xSushi.totalSupply(), '465529411764705882354');
-    assert.equal(await xSushi.balanceOf(piSushi.address), '165529411764705882354');
+    assert.equal(await xSushi.totalSupply(), '465529411764705882353');
+    assert.equal(await xSushi.balanceOf(piSushi.address), '165529411764705882353');
     assert.equal(await xSushi.balanceOf(alice), ether(150));
     assert.equal(await xSushi.balanceOf(charlie), ether(150));
 
-    assert.equal(await sushiRouter.getUnderlyingStaked(), '268000000000000000001');
-    assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '268000000000000000002');
+    assert.equal(await sushiRouter.getUnderlyingStaked(), '268000000000000000000');
+    assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '268000000000000000001');
     assert.equal(await sushiRouter.getPendingRewards(), '1');
     assert.equal(await sushiRouter.getSushiForXSushi(ether(1)), '1619047619047619047');
 
@@ -250,42 +275,49 @@ describe('SushiRouter Stories', () => {
 
     // assertions
     assert.equal(await piSushi.totalSupply(), ether(335));
-    assert.equal(await piSushi.balanceOf(alice), ether(185));
+    assert.equal(await piSushi.balanceOf(alice), ether(184));
     assert.equal(await piSushi.balanceOf(bob), ether(150));
 
-    assert.equal(await sushi.balanceOf(piSushi.address), '66999999999999999999');
-    assert.equal(await sushi.balanceOf(xSushi.address), '510857142857142857147');
+    assert.equal(await sushi.balanceOf(piSushi.address), '67000000000000000000');
+    assert.equal(await sushi.balanceOf(xSushi.address), '510857142857142857146');
 
-    assert.equal(await xSushi.totalSupply(), '315529411764705882354');
-    assert.equal(await xSushi.balanceOf(piSushi.address), '165529411764705882354');
+    assert.equal(await xSushi.totalSupply(), '315529411764705882353');
+    assert.equal(await xSushi.balanceOf(piSushi.address), '165529411764705882353');
     assert.equal(await xSushi.balanceOf(alice), ether(150));
     assert.equal(await xSushi.balanceOf(charlie), ether(0));
 
-    assert.equal(await sushiRouter.getUnderlyingStaked(), '268000000000000000001');
-    assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '268000000000000000002');
+    assert.equal(await sushiRouter.getUnderlyingStaked(), '268000000000000000000');
+    assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '268000000000000000001');
     assert.equal(await sushiRouter.getPendingRewards(), '1');
     assert.equal(await sushiRouter.getSushiForXSushi(ether(1)), '1619047619047619047');
 
     //////////////////////////////////////////////
     // Step #11. Alice router withdrawal 185 SUSHI
-    await piSushi.approve(piSushi.address, ether(185), { from: alice });
+    await pool.transfer(piSushi.address, alice, ether(1));
+
+    await sushiRouter.setReserveConfig(ether('0.8'), '0', {from: piGov})
+    await sushiRouter.poke(false);
+
     await piSushi.withdraw(ether(185), { from: alice });
+
+    await sushiRouter.setReserveConfig(ether('0.2'), '0', {from: piGov})
+    await sushiRouter.poke(false);
 
     // assertions
     assert.equal(await piSushi.totalSupply(), ether(150));
     assert.equal(await piSushi.balanceOf(alice), ether(0));
     assert.equal(await piSushi.balanceOf(bob), ether(150));
 
-    assert.equal(await sushi.balanceOf(piSushi.address), '29999999999999999999');
-    assert.equal(await sushi.balanceOf(xSushi.address), '362857142857142857147');
+    assert.equal(await sushi.balanceOf(piSushi.address), '30000000000000000000');
+    assert.equal(await sushi.balanceOf(xSushi.address), '362857142857142857146');
 
-    assert.equal(await xSushi.totalSupply(), '224117647058823529413');
-    assert.equal(await xSushi.balanceOf(piSushi.address), '74117647058823529413');
+    assert.equal(await xSushi.totalSupply(), '224117647058823529412');
+    assert.equal(await xSushi.balanceOf(piSushi.address), '74117647058823529412');
     assert.equal(await xSushi.balanceOf(alice), ether(150));
     assert.equal(await xSushi.balanceOf(charlie), ether(0));
 
-    assert.equal(await sushiRouter.getUnderlyingStaked(), '120000000000000000001');
-    assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '120000000000000000002');
+    assert.equal(await sushiRouter.getUnderlyingStaked(), '120000000000000000000');
+    assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '120000000000000000001');
     assert.equal(await sushiRouter.getPendingRewards(), '1');
     assert.equal(await sushiRouter.getSushiForXSushi(ether(1)), '1619047619047619047');
 
@@ -298,40 +330,43 @@ describe('SushiRouter Stories', () => {
     assert.equal(await piSushi.balanceOf(alice), ether(0));
     assert.equal(await piSushi.balanceOf(bob), ether(150));
 
-    assert.equal(await sushi.balanceOf(piSushi.address), '29999999999999999999');
-    assert.equal(await sushi.balanceOf(xSushi.address), '120000000000000000003');
+    assert.equal(await sushi.balanceOf(piSushi.address), '30000000000000000000');
+    assert.equal(await sushi.balanceOf(xSushi.address), '120000000000000000002');
 
-    assert.equal(await xSushi.totalSupply(), '74117647058823529413');
-    assert.equal(await xSushi.balanceOf(piSushi.address), '74117647058823529413');
+    assert.equal(await xSushi.totalSupply(), '74117647058823529412');
+    assert.equal(await xSushi.balanceOf(piSushi.address), '74117647058823529412');
     assert.equal(await xSushi.balanceOf(alice), ether(0));
     assert.equal(await xSushi.balanceOf(charlie), ether(0));
 
-    assert.equal(await sushiRouter.getUnderlyingStaked(), '120000000000000000001');
-    assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '120000000000000000003');
+    assert.equal(await sushiRouter.getUnderlyingStaked(), '120000000000000000000');
+    assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '120000000000000000002');
     assert.equal(await sushiRouter.getPendingRewards(), '2');
     assert.equal(await sushiRouter.getSushiForXSushi(ether(1)), '1619047619047619047');
 
     //////////////////////////////////////////////////////////////////////////////////
     // Step #13. Bob router withdrawal 150 SUSHI - 5 wei
-    await piSushi.approve(piSushi.address, '149999999999999999995', { from: bob });
+    await sushiRouter.setReserveConfig(ether('1'), '0', {from: piGov})
+    await sushiRouter.poke(false);
+
     await piSushi.withdraw('149999999999999999995', { from: bob });
+
+    console.log(await sushiRouter.getSushiForXSushi(ether(1)));
 
     // assertions
     assert.equal(await piSushi.totalSupply(), '5');
     assert.equal(await piSushi.balanceOf(alice), ether(0));
     assert.equal(await piSushi.balanceOf(bob), '5');
 
-    assert.equal(await sushi.balanceOf(piSushi.address), 0);
-    assert.equal(await sushi.balanceOf(xSushi.address), '7');
+    assert.equal(await sushi.balanceOf(piSushi.address), '3');
+    assert.equal(await sushi.balanceOf(xSushi.address), '4');
 
-    assert.equal(await xSushi.totalSupply(), '4');
-    assert.equal(await xSushi.balanceOf(piSushi.address), '4');
+    assert.equal(await xSushi.totalSupply(), '2');
+    assert.equal(await xSushi.balanceOf(piSushi.address), '2');
     assert.equal(await xSushi.balanceOf(alice), ether(0));
     assert.equal(await xSushi.balanceOf(charlie), ether(0));
 
-    assert.equal(await sushiRouter.getUnderlyingStaked(), '5');
-    assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '7');
+    assert.equal(await sushiRouter.getUnderlyingStaked(), '2');
+    assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '4');
     assert.equal(await sushiRouter.getPendingRewards(), '2');
-    assert.equal(await sushiRouter.getSushiForXSushi(ether(1)), '1750000000000000000');
   });
 });

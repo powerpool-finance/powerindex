@@ -25,7 +25,7 @@ describe.only('SushiRouter Tests', () => {
     [, bob, alice, piGov, stub, pvp, pool1, pool2] = await web3.eth.getAccounts();
   });
 
-  let sushi, xSushi, poolRestrictions, piSushi, sushiRouter;
+  let sushi, xSushi, poolRestrictions, piSushi, sushiRouter, poke;
 
   beforeEach(async function () {
     // 0x6b3595068778dd592e39a122f4f5a5cf09c90fe2
@@ -36,7 +36,7 @@ describe.only('SushiRouter Tests', () => {
 
     poolRestrictions = await PoolRestrictions.new();
     piSushi = await WrappedPiErc20.new(sushi.address, stub, 'Wrapped SUSHI', 'piSUSHI');
-    const poke = await MockPoke.new();
+    poke = await MockPoke.new();
     sushiRouter = await SushiPowerIndexRouter.new(
       piSushi.address,
       buildBasicRouterConfig(
@@ -77,6 +77,8 @@ describe.only('SushiRouter Tests', () => {
         await sushi.transfer(alice, ether('10000'));
         await sushi.approve(piSushi.address, ether('10000'), { from: alice });
         await piSushi.deposit(ether('10000'), { from: alice });
+
+        await sushiRouter.poke(false);
 
         assert.equal(await sushi.balanceOf(piSushi.address), ether(2000));
         assert.equal(await sushi.balanceOf(xSushi.address), ether(50000));
@@ -202,6 +204,8 @@ describe.only('SushiRouter Tests', () => {
         await sushi.approve(piSushi.address, ether(1000), { from: alice });
         await piSushi.deposit(ether(1000), { from: alice });
 
+        await sushiRouter.poke(false, { from: bob });
+
         assert.equal(await piSushi.balanceOf(alice), ether(11000));
         assert.equal(await sushi.balanceOf(xSushi.address), ether(50800));
         assert.equal(await xSushi.balanceOf(piSushi.address), ether(8800));
@@ -212,6 +216,8 @@ describe.only('SushiRouter Tests', () => {
         assert.equal(await piSushi.balanceOf(alice), ether(10000));
 
         await piSushi.withdraw(ether(1000), { from: alice });
+
+        await sushiRouter.poke(false, { from: bob });
 
         assert.equal(await piSushi.balanceOf(alice), ether(9000));
         assert.equal(await sushi.balanceOf(xSushi.address), ether(49200));
@@ -245,6 +251,8 @@ describe.only('SushiRouter Tests', () => {
         await sushi.approve(piSushi.address, ether(1000), { from: alice });
         await piSushi.deposit(ether(1000), { from: alice });
 
+        await sushiRouter.poke(false, { from: bob });
+
         assert.equal(await piSushi.balanceOf(alice), ether(11000));
         assert.equal(await sushi.balanceOf(xSushi.address), ether(80800));
         assert.equal(await xSushi.balanceOf(piSushi.address), ether(8500));
@@ -258,6 +266,8 @@ describe.only('SushiRouter Tests', () => {
       it('should decrease reserve on withdrawal', async () => {
         await piSushi.withdraw(ether(1000), { from: alice });
 
+        await sushiRouter.poke(false, { from: bob });
+
         assert.equal(await piSushi.balanceOf(alice), ether(9000));
         assert.equal(await sushi.balanceOf(xSushi.address), ether(79200));
         assert.equal(await xSushi.balanceOf(piSushi.address), ether(7500));
@@ -269,7 +279,7 @@ describe.only('SushiRouter Tests', () => {
       });
     });
 
-    it('should ignore rebalancing if the staking address is 0', async () => {
+    it('should revert rebalancing if the staking address is 0', async () => {
       await sushiRouter.redeem(ether(8000), { from: piGov });
       await sushiRouter.setVotingAndStaking(xSushi.address, constants.ZERO_ADDRESS, { from: piGov });
 
@@ -278,8 +288,9 @@ describe.only('SushiRouter Tests', () => {
       assert.equal(await piSushi.balanceOf(alice), ether(10000));
       assert.equal(await piSushi.totalSupply(), ether(10000));
 
-      const res = await piSushi.withdraw(ether(1000), { from: alice });
-      await expectEvent.inTransaction(res.tx, sushiRouter, 'IgnoreDueMissingStaking');
+      await piSushi.withdraw(ether(1000), { from: alice });
+
+      await expectRevert(sushiRouter.poke(false, { from: bob }), "STACKING_IS_NULL");
 
       assert.equal(await sushi.balanceOf(xSushi.address), ether(42000));
       assert.equal(await xSushi.balanceOf(piSushi.address), ether(0));
@@ -295,8 +306,8 @@ describe.only('SushiRouter Tests', () => {
         await time.increase(time.duration.minutes(61));
 
         await sushi.approve(piSushi.address, ether(1000), { from: alice });
-        const res = await piSushi.deposit(ether(1000), { from: alice });
-        await expectEvent.notEmitted.inTransaction(res.tx, sushiRouter, 'IgnoreRebalancing');
+        await piSushi.deposit(ether(1000), { from: alice });
+        await sushiRouter.poke(false, { from: bob });
 
         assert.equal(await sushi.balanceOf(xSushi.address), ether(50800));
         assert.equal(await xSushi.balanceOf(piSushi.address), ether(8800));
@@ -306,45 +317,28 @@ describe.only('SushiRouter Tests', () => {
       it('should DO rebalance on withdrawal if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(61));
 
-        const res = await piSushi.withdraw(ether(1000), { from: alice });
-        await expectEvent.notEmitted.inTransaction(res.tx, sushiRouter, 'IgnoreRebalancing');
+        await piSushi.withdraw(ether(1000), { from: alice });
+        await sushiRouter.poke(false, { from: bob });
 
         assert.equal(await sushi.balanceOf(xSushi.address), ether(49200));
         assert.equal(await xSushi.balanceOf(piSushi.address), ether(7200));
         assert.equal(await sushi.balanceOf(piSushi.address), ether(1800));
       });
 
-      it('should NOT rebalance on deposit if the rebalancing interval has passed', async () => {
+      it('should NOT rebalance if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(59));
 
         await sushi.approve(piSushi.address, ether(1000), { from: alice });
-        const res = await piSushi.deposit(ether(1000), { from: alice });
-        const now = await getResTimestamp(res);
-        await expectEvent.inTransaction(res.tx, sushiRouter, 'IgnoreRebalancing', {
-          blockTimestamp: now,
-          lastRebalancedAt: firstDepositAt,
-          rebalancingInterval: time.duration.hours(1),
-        });
+        await piSushi.deposit(ether(1000), { from: alice });
 
-        assert.equal(await sushi.balanceOf(xSushi.address), ether(50000));
-        assert.equal(await xSushi.balanceOf(piSushi.address), ether(8000));
-        assert.equal(await sushi.balanceOf(piSushi.address), ether(3000));
-      });
+        await poke.setMinMaxReportIntervals(60, 120);
+        await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
 
-      it('should NOT rebalance on withdrawal if the rebalancing interval has passed', async () => {
-        await time.increase(time.duration.minutes(59));
+        await expectRevert(sushiRouter.pokeFromReporter('0', false, '0x', { from: bob }), "MIN_INTERVAL_NOT_REACHED");
 
-        const res = await piSushi.withdraw(ether(1000), { from: alice });
-        const now = await getResTimestamp(res);
-        await expectEvent.inTransaction(res.tx, sushiRouter, 'IgnoreRebalancing', {
-          blockTimestamp: now,
-          lastRebalancedAt: firstDepositAt,
-          rebalancingInterval: time.duration.hours(1),
-        });
+        await time.increase(60);
 
-        assert.equal(await sushi.balanceOf(xSushi.address), ether(50000));
-        assert.equal(await xSushi.balanceOf(piSushi.address), ether(8000));
-        assert.equal(await sushi.balanceOf(piSushi.address), ether(1000));
+        await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
       });
     });
 
@@ -423,7 +417,7 @@ describe.only('SushiRouter Tests', () => {
       await piSushi.transfer(poolB.address, 20, { from: alice });
     });
 
-    it.only('should allow withdrawing rewards from the governance', async () => {
+    it('should allow withdrawing rewards from the governance', async () => {
       await sushi.transfer(xSushi.address, ether(2000));
 
       await time.increase(time.duration.days(8));
@@ -476,8 +470,8 @@ describe.only('SushiRouter Tests', () => {
       assert.equal(await sushi.balanceOf(sushiRouter.address), '0');
     });
 
-    it('should revert poke(true, ) if there is no reward available', async () => {
-      await expectRevert(sushiRouter.poke(true, { from: alice }), 'NOTING_TO_CLAIM');
+    it('should revert poke if there is no reward available', async () => {
+      await expectRevert(sushiRouter.poke(true, { from: alice }), 'NOTHING_TO_CLAIM');
     });
 
     it('should revert poke(true, ) if there is nothing released', async () => {
@@ -491,12 +485,8 @@ describe.only('SushiRouter Tests', () => {
       await expectRevert(sushiRouter.poke(true, { from: alice }), 'NOTHING_RELEASED');
     });
 
-    it('should revert distribute rewards() if there is no yCrv on the balance', async () => {
-      await expectRevert(sushiRouter.poke(true, { from: bob }), 'NO_PENDING_REWARD');
-    });
-
     it('should revert distributing rewards when missing reward pools config', async () => {
-      const poke = await MockPoke.new();
+      poke = await MockPoke.new();
       const router = await SushiPowerIndexRouter.new(
         piSushi.address,
         buildBasicRouterConfig(
@@ -518,7 +508,6 @@ describe.only('SushiRouter Tests', () => {
       await sushiRouter.migrateToNewRouter(piSushi.address, router.address, { from: piGov });
       await sushi.transfer(xSushi.address, ether(2000));
       await time.increase(1);
-      await router.poke(true, { from: bob });
       await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
     });
   });
