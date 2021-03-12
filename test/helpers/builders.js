@@ -1,4 +1,4 @@
-function buildBasicRouterConfig(poolRestrictions, powerPoke, voting, staking, reserveRatio, reserveRatioToForceRebalance, claimRewardsInterval, pvp, pvpFee, rewardPools, refundMaxGasPrice, refundPct) {
+function buildBasicRouterConfig(poolRestrictions, powerPoke, voting, staking, reserveRatio, reserveRatioToForceRebalance, claimRewardsInterval, pvp, pvpFee, rewardPools) {
   return {
     poolRestrictions,
     powerPoke,
@@ -43,10 +43,12 @@ function buildSushiRouterConfig(SUSHI) {
 
 const BasicConfig = {
   poolRestrictions: 'address',
+  powerPoke: 'address',
   voting: 'address',
   staking: 'address',
   reserveRatio: 'uint256',
-  rebalancingInterval: 'uint256',
+  reserveRatioToForceRebalance: 'uint256',
+  claimRewardsInterval: 'uint256',
   pvp: 'address',
   pvpFee: 'uint256',
   rewardPools: 'address[]',

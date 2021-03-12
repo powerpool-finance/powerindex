@@ -17,7 +17,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   uint256 public constant HUNDRED_PCT = 1 ether;
 
   event SetVotingAndStaking(address indexed voting, address indexed staking);
-  event SetReserveConfig(uint256 ratio, uint256 rebalancingInterval);
+  event SetReserveConfig(uint256 ratio, uint256 claimRewardsInterval);
   event SetRebalancingInterval(uint256 rebalancingInterval);
   event IgnoreRebalancing(uint256 blockTimestamp, uint256 lastRebalancedAt, uint256 rebalancingInterval);
   event RewardPool(address indexed pool, uint256 amount);
@@ -155,9 +155,10 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     bool _claimAndDistributeRewards,
     bytes calldata _rewardOpts
   ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
-    (uint256 minInterval,) = _getMinMaxReportInterval();
+    (uint256 minInterval, ) = _getMinMaxReportInterval();
     (ReserveStatus status, uint256 diff, bool forceRebalance) = _getReserveStatus(_getUnderlyingStaked(), 0);
     require(forceRebalance || lastRebalancedAt + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
+    require(status != ReserveStatus.EQUILIBRIUM, "RESERVE_STATUS_EQUILIBRIUM");
     _rebalancePoke(status, diff);
     _postPoke(_claimAndDistributeRewards);
   }
@@ -170,6 +171,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     (, uint256 maxInterval) = _getMinMaxReportInterval();
     (ReserveStatus status, uint256 diff, bool forceRebalance) = _getReserveStatus(_getUnderlyingStaked(), 0);
     require(forceRebalance || lastRebalancedAt + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
+    require(status != ReserveStatus.EQUILIBRIUM, "RESERVE_STATUS_EQUILIBRIUM");
     _rebalancePoke(status, diff);
     _postPoke(_claimAndDistributeRewards);
   }
@@ -279,8 +281,12 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     )
   {
     uint256 expectedReserveAmount;
-    (status, diff, expectedReserveAmount) =
-      getReserveStatusPure(reserveRatio, piToken.getUnderlyingBalance(), _stakedBalance, _withdrawAmount);
+    (status, diff, expectedReserveAmount) = getReserveStatusPure(
+      reserveRatio,
+      piToken.getUnderlyingBalance(),
+      _stakedBalance,
+      _withdrawAmount
+    );
 
     if (status == ReserveStatus.SHORTAGE) {
       uint256 currentRatio = expectedReserveAmount.sub(diff).mul(HUNDRED_PCT).div(expectedReserveAmount);

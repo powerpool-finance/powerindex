@@ -1,5 +1,5 @@
 const { time, constants, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
-const { ether, getResTimestamp, addBN } = require('../../helpers');
+const { ether, addBN } = require('../../helpers');
 const { buildBasicRouterConfig, buildSushiRouterConfig } = require('../../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
@@ -18,7 +18,7 @@ SushiBar.numberFormat = 'String';
 
 const { web3 } = MockERC20;
 
-describe.only('SushiRouter Tests', () => {
+describe('SushiRouter Tests', () => {
   let bob, alice, piGov, stub, pvp, pool1, pool2;
 
   before(async function () {
@@ -183,16 +183,13 @@ describe.only('SushiRouter Tests', () => {
   });
 
   describe('reserve management', () => {
-    let firstDepositAt;
 
     beforeEach(async () => {
       await sushi.transfer(alice, ether(100000));
       await sushi.approve(piSushi.address, ether(10000), { from: alice });
-      const res = await piSushi.deposit(ether(10000), { from: alice });
+      await piSushi.deposit(ether(10000), { from: alice });
 
       await sushiRouter.poke(false);
-
-      firstDepositAt = await getResTimestamp(res);
 
       assert.equal(await sushi.balanceOf(xSushi.address), ether(50000));
       assert.equal(await sushi.balanceOf(piSushi.address), ether(2000));
@@ -290,7 +287,7 @@ describe.only('SushiRouter Tests', () => {
 
       await piSushi.withdraw(ether(1000), { from: alice });
 
-      await expectRevert(sushiRouter.poke(false, { from: bob }), "STACKING_IS_NULL");
+      await expectRevert(sushiRouter.poke(false, { from: bob }), 'STACKING_IS_NULL');
 
       assert.equal(await sushi.balanceOf(xSushi.address), ether(42000));
       assert.equal(await xSushi.balanceOf(piSushi.address), ether(0));
@@ -334,11 +331,11 @@ describe.only('SushiRouter Tests', () => {
         await poke.setMinMaxReportIntervals(60, 120);
         await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
 
-        await expectRevert(sushiRouter.pokeFromReporter('0', false, '0x', { from: bob }), "MIN_INTERVAL_NOT_REACHED");
+        await expectRevert(sushiRouter.pokeFromReporter('0', false, '0x', { from: bob }), 'MIN_INTERVAL_NOT_REACHED');
 
         await time.increase(60);
 
-        await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
+        await expectRevert(sushiRouter.pokeFromReporter('0', false, '0x', { from: bob }), 'RESERVE_STATUS_EQUILIBRIUM');
       });
     });
 
@@ -474,7 +471,7 @@ describe.only('SushiRouter Tests', () => {
       await expectRevert(sushiRouter.poke(true, { from: alice }), 'NOTHING_TO_CLAIM');
     });
 
-    it('should revert poke(true, ) if there is nothing released', async () => {
+    it('should revert poke if there is nothing released', async () => {
       const scammyBar = await MockSushiBar.new(sushi.address);
       await sushiRouter.setReserveConfig(ether(1), 0, { from: piGov });
       await sushiRouter.poke(false);

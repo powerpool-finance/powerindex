@@ -131,10 +131,10 @@ describe('PowerIndex BasicRouter Test', () => {
         const res = await router.setReserveConfig(ether('0.2'), 3600, { from: piGov });
         expectEvent(res, 'SetReserveConfig', {
           ratio: ether('0.2'),
-          rebalancingInterval: '3600'
+          claimRewardsInterval: '3600'
         });
         assert.equal(await router.reserveRatio(), ether('0.2'))
-        assert.equal(await router.rebalancingInterval(), 3600)
+        assert.equal(await router.claimRewardsInterval(), 3600)
       });
 
       it('should deny setting a reserve ratio greater or equal 100%', async () => {

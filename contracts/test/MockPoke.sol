@@ -5,9 +5,14 @@ pragma solidity 0.6.12;
 contract MockPoke {
   uint256 minInterval;
   uint256 maxInterval;
+
   constructor() public {}
 
   function authorizeReporter(uint256 _reporterId, address _acc) public view returns (bool) {
+    return true;
+  }
+
+  function authorizeNonReporter(uint256 _reporterId, address _acc) public view returns (bool) {
     return true;
   }
 

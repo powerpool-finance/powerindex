@@ -11,7 +11,6 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   event TriggerCooldown();
   event Stake(address indexed sender, uint256 amount);
   event Redeem(address indexed sender, uint256 amount);
-  event IgnoreRedeemDueCoolDown(uint256 coolDownFinishesAt, uint256 unstakeFinishesAt);
   event IgnoreDueMissingStaking();
   event ClaimRewards(address indexed sender, uint256 aaveReward);
   event DistributeRewards(
@@ -43,13 +42,6 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
         "REBALANCING_GT_UNSTAKE"
       );
     }
-  }
-
-  function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) public override onlyOwner {
-    if (staking != address(0)) {
-      require(_rebalancingInterval < IStakedAave(staking).UNSTAKE_WINDOW(), "REBALANCING_GT_UNSTAKE");
-    }
-    PowerIndexBasicRouter.setReserveConfig(_reserveRatio, _rebalancingInterval);
   }
 
   /*** THE PROXIED METHOD EXECUTORS FOR VOTING ***/
@@ -112,14 +104,11 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
     if (reserveStatus == ReserveStatus.SHORTAGE) {
       (CoolDownStatus coolDownStatus, uint256 coolDownFinishesAt, uint256 unstakeFinishesAt) = getCoolDownStatus();
+      require(coolDownStatus != CoolDownStatus.COOLDOWN, "COOLDOWN");
       if (coolDownStatus == CoolDownStatus.NONE) {
         _triggerCoolDown();
       } else if (coolDownStatus == CoolDownStatus.UNSTAKE_WINDOW) {
         _redeem(diff);
-      }
-      /* if (coolDownStatus == CoolDownStatus.COOLDOWN) */
-      else {
-        emit IgnoreRedeemDueCoolDown(coolDownFinishesAt, unstakeFinishesAt);
       }
     } else if (reserveStatus == ReserveStatus.EXCESS) {
       _stake(diff);
@@ -162,7 +151,6 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   function _getUnderlyingStaked() internal view override returns (uint256) {
     return IERC20(staking).balanceOf(address(piToken));
   }
-
 
   function _triggerCoolDown() internal {
     _callStaking(IStakedAave(0).cooldown.selector, "");

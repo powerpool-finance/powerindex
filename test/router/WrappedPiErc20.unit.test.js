@@ -534,7 +534,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
     describe('callVoting', async () => {
       let signature, args;
       beforeEach(async () => {
-        const data = await router.contract.methods.piTokenCallback(ether(15)).encodeABI();
+        const data = await router.contract.methods.piTokenCallback(bob, ether(15)).encodeABI();
         ({ signature, args } = signatureAndArgs(data));
       });
 

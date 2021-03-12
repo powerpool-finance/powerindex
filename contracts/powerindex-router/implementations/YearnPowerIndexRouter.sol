@@ -26,7 +26,6 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     address[] uniswapSwapPath,
     address[] pools
   );
-  event IgnoreDueMissingStaking();
   event ClaimRewards(address indexed sender, uint256 yCrvAmount);
   event Exit(address indexed sender, uint256 redeemAmount, uint256 yCrvAmount);
 
@@ -97,6 +96,12 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     }
 
     emit Exit(msg.sender, yfiBalanceAfter - yfiBalanceBefore, yCrvReward);
+  }
+
+  function distributeRewards() external {
+    _checkVotingSenderAllowed();
+
+    _distributeRewards();
   }
 
   function _distributeRewards() internal override {
@@ -214,11 +219,8 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
 
     if (status == ReserveStatus.SHORTAGE) {
       uint256 voteLockUntilBlock = _voting.voteLock(address(piToken));
-      if (voteLockUntilBlock < block.number) {
-        _redeem(diff);
-      } else {
-        emit IgnoreRedeemDueVoteLock(voteLockUntilBlock);
-      }
+      require(voteLockUntilBlock < block.number, "VOTE_LOCK");
+      _redeem(diff);
     } else if (status == ReserveStatus.EXCESS) {
       _stake(diff);
     }

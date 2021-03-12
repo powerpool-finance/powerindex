@@ -107,10 +107,12 @@ describe.skip('PowerIndexPoolController', () => {
     defaultFactoryArgs = web3.eth.abi.encodeParameter({
       BasicConfig: {
         poolRestrictions: 'address',
+        powerPoke: 'address',
         voting: 'address',
         staking: 'address',
         reserveRatio: 'uint256',
-        rebalancingInterval: 'uint256',
+        reserveRatioToForceRebalance: 'uint256',
+        claimRewardsInterval: 'uint256',
         pvp: 'address',
         pvpFee: 'uint256',
         rewardPools: 'address[]',

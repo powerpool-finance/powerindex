@@ -58,6 +58,8 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
 
     emit Deposit(_msgSender(), _depositAmount, mintAmount);
 
+    PowerIndexNaiveRouterInterface(router).piTokenCallback{ value: msg.value }(msg.sender, 0);
+
     return mintAmount;
   }
 
@@ -68,6 +70,8 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
   function withdraw(uint256 _withdrawAmount) external payable override nonReentrant returns (uint256) {
     require(msg.value >= ethFee, "FEE");
     require(_withdrawAmount > 0, "ZERO_WITHDRAWAL");
+
+    PowerIndexNaiveRouterInterface(router).piTokenCallback{ value: msg.value }(msg.sender, _withdrawAmount);
 
     uint256 burnAmount = getPiEquivalentForUnderlying(_withdrawAmount);
     require(burnAmount > 0, "ZERO_PI_FOR_BURN");

@@ -93,10 +93,12 @@ describe('PowerIndex Implementation Factories Test', () => {
       {
         BasicConfig: {
           poolRestrictions: 'address',
+          powerPoke: 'address',
           voting: 'address',
           staking: 'address',
           reserveRatio: 'uint256',
-          rebalancingInterval: 'uint256',
+          reserveRatioToForceRebalance: 'uint256',
+          claimRewardsInterval: 'uint256',
           pvp: 'address',
           pvpFee: 'uint256',
           rewardPools: 'address[]',
@@ -119,7 +121,7 @@ describe('PowerIndex Implementation Factories Test', () => {
 
     assert.equal(await router.owner(), deployer);
     assert.equal(await router.reserveRatio(), ether('0.3'));
-    assert.equal(await router.rebalancingInterval(), 4);
+    assert.equal(await router.claimRewardsInterval(), 4);
     assert.equal(await router.staking(), stakedAave.address);
     assert.equal(await router.poolRestrictions(), poolRestrictions);
     assert.equal(await router.pvp(), pvp);
@@ -143,10 +145,12 @@ describe('PowerIndex Implementation Factories Test', () => {
         {
           BasicConfig: {
             poolRestrictions: 'address',
+            powerPoke: 'address',
             voting: 'address',
             staking: 'address',
             reserveRatio: 'uint256',
-            rebalancingInterval: 'uint256',
+            reserveRatioToForceRebalance: 'uint256',
+            claimRewardsInterval: 'uint256',
             pvp: 'address',
             pvpFee: 'uint256',
             rewardPools: 'address[]',
@@ -176,7 +180,7 @@ describe('PowerIndex Implementation Factories Test', () => {
 
     assert.equal(await router.owner(), deployer);
     assert.equal(await router.reserveRatio(), ether('0.3'));
-    assert.equal(await router.rebalancingInterval(), 4);
+    assert.equal(await router.claimRewardsInterval(), 4);
     assert.equal(await router.staking(), stakedAave.address);
     assert.equal(await router.poolRestrictions(), poolRestrictions);
     assert.equal(await router.pvp(), pvp);
@@ -204,7 +208,7 @@ describe('PowerIndex Implementation Factories Test', () => {
 
     assert.equal(await router.owner(), deployer);
     assert.equal(await router.reserveRatio(), ether('0.3'));
-    assert.equal(await router.rebalancingInterval(), 4);
+    assert.equal(await router.claimRewardsInterval(), 4);
     assert.equal(await router.staking(), stakedAave.address);
     assert.equal(await router.poolRestrictions(), poolRestrictions);
     assert.equal(await router.pvp(), pvp);
