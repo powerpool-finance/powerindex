@@ -156,7 +156,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     bytes calldata _rewardOpts
   ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
     (uint256 minInterval, ) = _getMinMaxReportInterval();
-    (ReserveStatus status, uint256 diff, bool forceRebalance) = _getReserveStatus(_getUnderlyingStaked(), 0);
+    (ReserveStatus status, uint256 diff, bool forceRebalance) = getReserveStatus(_getUnderlyingStaked(), 0);
     require(forceRebalance || lastRebalancedAt + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
     require(status != ReserveStatus.EQUILIBRIUM, "RESERVE_STATUS_EQUILIBRIUM");
     _rebalancePoke(status, diff);
@@ -169,7 +169,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     bytes calldata _rewardOpts
   ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
     (, uint256 maxInterval) = _getMinMaxReportInterval();
-    (ReserveStatus status, uint256 diff, bool forceRebalance) = _getReserveStatus(_getUnderlyingStaked(), 0);
+    (ReserveStatus status, uint256 diff, bool forceRebalance) = getReserveStatus(_getUnderlyingStaked(), 0);
     require(forceRebalance || lastRebalancedAt + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
     require(status != ReserveStatus.EQUILIBRIUM, "RESERVE_STATUS_EQUILIBRIUM");
     _rebalancePoke(status, diff);
@@ -177,7 +177,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   }
 
   function poke(bool _claimAndDistributeRewards) external onlyEOA {
-    (ReserveStatus status, uint256 diff, ) = _getReserveStatus(_getUnderlyingStaked(), 0);
+    (ReserveStatus status, uint256 diff, ) = getReserveStatus(_getUnderlyingStaked(), 0);
     _rebalancePoke(status, diff);
     _postPoke(_claimAndDistributeRewards);
   }
@@ -266,13 +266,25 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   }
 
   /*
-   * * In case of deposit, the deposited amount is already accounted on the pi token contract right away, no further
-   *   adjustment required.
-   * * In case of withdrawal, the withdrawAmount is deducted from the sum of pi token and staked balances
-   *
+   * @dev Getting status and diff of actual staked balance and target reserve balance.
    */
-  function _getReserveStatus(uint256 _stakedBalance, uint256 _withdrawAmount)
-    internal
+  function getReserveStatusForStakedBalance()
+    public
+    view
+    returns (
+      ReserveStatus status,
+      uint256 diff,
+      bool forceRebalance
+    )
+  {
+    return getReserveStatus(_getUnderlyingStaked(), 0);
+  }
+
+  /*
+   * @dev Getting status and diff of provided staked balance and target reserve balance.
+   */
+  function getReserveStatus(uint256 _stakedBalance, uint256 _withdrawAmount)
+    public
     view
     returns (
       ReserveStatus status,

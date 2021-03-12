@@ -297,6 +297,8 @@ describe('SushiRouter Tests', () => {
     describe('when interval enabled', () => {
       beforeEach(async () => {
         await sushiRouter.setReserveConfig(ether('0.2'), time.duration.hours(1), { from: piGov });
+        await poke.setMinMaxReportIntervals(time.duration.hours(1), time.duration.hours(2));
+        await sushiRouter.poke(false, { from: bob });
       });
 
       it('should DO rebalance on deposit if the rebalancing interval has passed', async () => {
@@ -304,7 +306,7 @@ describe('SushiRouter Tests', () => {
 
         await sushi.approve(piSushi.address, ether(1000), { from: alice });
         await piSushi.deposit(ether(1000), { from: alice });
-        await sushiRouter.poke(false, { from: bob });
+        await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
 
         assert.equal(await sushi.balanceOf(xSushi.address), ether(50800));
         assert.equal(await xSushi.balanceOf(piSushi.address), ether(8800));
@@ -315,27 +317,38 @@ describe('SushiRouter Tests', () => {
         await time.increase(time.duration.minutes(61));
 
         await piSushi.withdraw(ether(1000), { from: alice });
-        await sushiRouter.poke(false, { from: bob });
+        await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
 
         assert.equal(await sushi.balanceOf(xSushi.address), ether(49200));
         assert.equal(await xSushi.balanceOf(piSushi.address), ether(7200));
         assert.equal(await sushi.balanceOf(piSushi.address), ether(1800));
       });
 
-      it('should NOT rebalance if the rebalancing interval has passed', async () => {
+      it('should NOT rebalance if the rebalancing interval hasn\'t passed', async () => {
         await time.increase(time.duration.minutes(59));
 
         await sushi.approve(piSushi.address, ether(1000), { from: alice });
         await piSushi.deposit(ether(1000), { from: alice });
 
-        await poke.setMinMaxReportIntervals(60, 120);
-        await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
-
+        assert.equal(await sushiRouter.getReserveStatusForStakedBalance().then(s => s.forceRebalance), false);
         await expectRevert(sushiRouter.pokeFromReporter('0', false, '0x', { from: bob }), 'MIN_INTERVAL_NOT_REACHED');
 
         await time.increase(60);
 
-        await expectRevert(sushiRouter.pokeFromReporter('0', false, '0x', { from: bob }), 'RESERVE_STATUS_EQUILIBRIUM');
+        await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
+      });
+
+      it('should rebalance if the rebalancing interval not passed but reserveRatioToForceRebalance has reached', async () => {
+        await time.increase(time.duration.minutes(59));
+
+        assert.equal(await sushiRouter.getReserveStatusForStakedBalance().then(s => s.forceRebalance), false);
+        await piSushi.withdraw(ether(2000), { from: alice });
+        assert.equal(await sushiRouter.getReserveStatusForStakedBalance().then(s => s.forceRebalance), true);
+        await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
+
+        assert.equal(await sushi.balanceOf(xSushi.address), ether(48400));
+        assert.equal(await xSushi.balanceOf(piSushi.address), ether(6400));
+        assert.equal(await sushi.balanceOf(piSushi.address), ether(1600));
       });
     });
 
