@@ -39,6 +39,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   uint256 public lastRoundCreatedAt;
   uint256 public roundPeriod;
 
+  address public feeReceiver;
   mapping(address => uint256) public feeByToken;
   mapping(address => uint256) public pendingFeeByToken;
 
@@ -74,8 +75,9 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     powerPoke = IPowerPoke(_powerPoke);
   }
 
-  function initialize() external initializer {
+  function initialize(address _feeReceiver) external initializer {
     __Ownable_init();
+    feeReceiver = _feeReceiver;
   }
 
   function depositEth(address _pool) external payable {
@@ -183,6 +185,23 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     require(len == _fees.length, "LENGTHS_NOT_EQUAL");
     for (uint256 i = 0; i < len; i++) {
       feeByToken[_tokens[i]] = _fees[i];
+    }
+  }
+
+  function setFeeReceiver(address _feeReceiver) external onlyOwner {
+    feeReceiver = _feeReceiver;
+  }
+
+  function claimFee(address[] memory _tokens) external onlyOwner {
+    uint256 len = _tokens.length;
+    for (uint256 i = 0; i < len; i++) {
+      address token = _tokens[i];
+      if (token == ETH) {
+        payable(feeReceiver).transfer(pendingFeeByToken[token]);
+      } else {
+        IERC20(token).transfer(feeReceiver, pendingFeeByToken[token]);
+      }
+      pendingFeeByToken[token] = 0;
     }
   }
 
