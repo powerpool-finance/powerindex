@@ -91,7 +91,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
 
   beforeEach(async () => {
     this.weth = await WETH.new();
-    this.weth.deposit({ value: ether('50000000') });
+    await this.weth.deposit({ value: ether('50000000') });
 
     const proxyFactory = await ProxyFactory.new();
     const impl = await PowerIndexPool.new();
