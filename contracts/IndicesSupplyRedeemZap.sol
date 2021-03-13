@@ -21,7 +21,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
   address public constant ETH = 0x0000000000000000000000000000000000000001;
 
-  IERC20 public immutable usdt;
   IERC20 public immutable usdc;
   IPowerPoke public immutable powerPoke;
 
@@ -69,8 +68,12 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     _reward(_reporterId, gasStart, COMPENSATION_PLAN_1_ID, _rewardOpts);
   }
 
-  constructor(address _usdt, address _usdc, address _powerPoke) public {
-    usdt = IERC20(_usdt);
+  modifier onlyEOA() {
+    require(tx.origin == msg.sender, "ONLY_EOA");
+    _;
+  }
+
+  constructor(address _usdc, address _powerPoke) public {
     usdc = IERC20(_usdc);
     powerPoke = IPowerPoke(_powerPoke);
   }
@@ -80,21 +83,16 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     feeReceiver = _feeReceiver;
   }
 
-  function depositEth(address _pool) external payable {
+  function depositEth(address _pool) external payable onlyEOA {
     require(poolType[_pool] != PoolType.NULL, "UNKNOWN_POOL");
 
     _deposit(_pool, ETH, _pool, msg.value);
   }
 
-  function depositErc20(address _pool, address _inputToken, uint256 _amount) external {
-    PoolType pType = poolType[_pool];
-    require(pType != PoolType.NULL, "UNKNOWN_POOL");
+  function depositErc20(address _pool, address _inputToken, uint256 _amount) external onlyEOA {
+    require(poolType[_pool] != PoolType.NULL, "UNKNOWN_POOL");
 
-    if (pType == PoolType.PIPT) {
-      require(_inputToken == address(usdt), "NOT_SUPPORTED_TOKEN");
-    } else if(pType == PoolType.VAULT) {
-      require(_inputToken == address(usdc), "NOT_SUPPORTED_TOKEN");
-    }
+    require(_inputToken == address(usdc), "NOT_SUPPORTED_TOKEN");
 
     _deposit(_pool, _inputToken, _pool, _amount);
   }
@@ -103,20 +101,37 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     PoolType pType = poolType[_pool];
     require(pType != PoolType.NULL, "UNKNOWN_POOL");
 
-    if (pType == PoolType.PIPT) {
-      require(_outputToken == address(usdt) || _outputToken == ETH, "NOT_SUPPORTED_TOKEN");
-    } else if(pType == PoolType.VAULT) {
-      require(_outputToken == address(usdc), "NOT_SUPPORTED_TOKEN");
-    }
+    require(_outputToken == address(usdc) || _outputToken == ETH, "NOT_SUPPORTED_TOKEN");
 
     _deposit(_pool, _pool, _outputToken, _amount);
+  }
+
+  function withdrawEth(address _pool, uint256 _amount) external onlyEOA {
+    require(poolType[_pool] != PoolType.NULL, "UNKNOWN_POOL");
+
+    _withdraw(_pool, ETH, _pool, _amount);
+  }
+
+  function withdrawErc20(address _pool, address _inputToken, uint256 _amount) external onlyEOA {
+    require(poolType[_pool] != PoolType.NULL, "UNKNOWN_POOL");
+
+    _withdraw(_pool, _inputToken, _pool, _amount);
+  }
+
+  function withdrawPoolToken(address _pool, address _outputToken, uint256 _amount) external onlyEOA {
+    PoolType pType = poolType[_pool];
+    require(pType != PoolType.NULL, "UNKNOWN_POOL");
+
+    require(_outputToken == address(usdc) || _outputToken == ETH, "NOT_SUPPORTED_TOKEN");
+
+    _withdraw(_pool, _pool, _outputToken, _amount);
   }
 
   function supplyAndRedeemPokeFromReporter(
     uint256 _reporterId,
     bytes32[] memory _roundKeys,
     bytes calldata _rewardOpts
-  ) external onlyReporter(_reporterId, _rewardOpts) {
+  ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
     _supplyAndRedeemPoke(_roundKeys);
   }
 
@@ -124,11 +139,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     uint256 _reporterId,
     bytes32[] memory _roundKeys,
     bytes calldata _rewardOpts
-  ) external onlyNonReporter(_reporterId, _rewardOpts) {
+  ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
     _supplyAndRedeemPoke(_roundKeys);
   }
 
-  function supplyAndRedeemPoke(bytes32[] memory _roundKeys) external {
+  function supplyAndRedeemPoke(bytes32[] memory _roundKeys) external onlyEOA {
     _supplyAndRedeemPoke(_roundKeys);
   }
 
@@ -137,7 +152,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     bytes32 _roundKey,
     address[] memory _claimForList,
     bytes calldata _rewardOpts
-  ) external onlyReporter(_reporterId, _rewardOpts) {
+  ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
     _claimPoke(_roundKey, _claimForList);
   }
 
@@ -146,11 +161,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     bytes32 _roundKey,
     address[] memory _claimForList,
     bytes calldata _rewardOpts
-  ) external onlyNonReporter(_reporterId, _rewardOpts) {
+  ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
     _claimPoke(_roundKey, _claimForList);
   }
 
-  function claimPoke(bytes32 _roundKey, address[] memory _claimForList) external {
+  function claimPoke(bytes32 _roundKey, address[] memory _claimForList) external onlyEOA {
     _claimPoke(_roundKey, _claimForList);
   }
 
@@ -168,7 +183,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     require(len == _piptSwaps.length, "LENGTHS_NOT_EQUAL");
     for (uint256 i = 0; i < len; i++) {
       poolPiptSwap[_pools[i]] = _piptSwaps[i];
-      usdt.approve(_piptSwaps[i], uint256(-1));
+      usdc.approve(_piptSwaps[i], uint256(-1));
       IERC20(_pools[i]).approve(_piptSwaps[i], uint256(-1));
     }
   }
@@ -205,18 +220,18 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
   }
 
-  function getCurrentRoundKey(address pool, address inputToken) public view returns(bytes32) {
-    return getRoundKey(roundCounter, pool, inputToken);
+  function getCurrentRoundKey(address pool, address inputToken, address outputToken) public view returns(bytes32) {
+    return getRoundKey(roundCounter, pool, inputToken, outputToken);
   }
 
-  function getRoundKey(uint256 id, address pool, address inputToken) public view returns(bytes32) {
-    return keccak256(abi.encodePacked(id, pool, inputToken));
+  function getRoundKey(uint256 id, address pool, address inputToken, address outputToken) public view returns(bytes32) {
+    return keccak256(abi.encodePacked(id, pool, inputToken, outputToken));
   }
 
   function _deposit(address _pool, address _inputToken, address _outputToken, uint256 _amount) internal {
     _updateRoundByPeriod();
 
-    bytes32 roundKey = getCurrentRoundKey(_pool, _inputToken);
+    bytes32 roundKey = getCurrentRoundKey(_pool, _inputToken, _outputToken);
     _initRoundData(roundKey, _pool, _inputToken, _outputToken);
 
     if (_inputToken != ETH) {
@@ -226,6 +241,19 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     Round storage round = rounds[roundKey];
     round.inputAmount[msg.sender] = round.inputAmount[msg.sender].add(_amount);
     round.totalInputAmount = round.totalInputAmount.add(_amount);
+  }
+
+  function _withdraw(address _pool, address _inputToken, address _outputToken, uint256 _amount) internal {
+    Round storage round = rounds[getCurrentRoundKey(_pool, _inputToken, _outputToken)];
+
+    round.inputAmount[msg.sender] = round.inputAmount[msg.sender].sub(_amount);
+    round.totalInputAmount = round.totalInputAmount.sub(_amount);
+
+    if (_inputToken == ETH) {
+      msg.sender.transfer(_amount);
+    } else {
+      IERC20(_inputToken).transfer(msg.sender, _amount);
+    }
   }
 
   function _supplyAndRedeemPoke(bytes32[] memory _roundKeys) internal {
