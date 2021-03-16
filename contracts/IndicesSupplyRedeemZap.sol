@@ -242,6 +242,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     require(len == _depositors.length && len == _depositorIndexes.length, "LENGTHS_NOT_EQUAL");
     for (uint256 i = 0; i < len; i++) {
       vaultConfig[_tokens[i]] = VaultConfig(_depositorAmountLength[i], _depositorIndexes[i], _depositors[i], _lpTokens[i], _vaultRegistries[i]);
+
+      usdc.approve(_depositors[i], uint256(-1));
+      console.log("approve", _lpTokens[i]);
+      console.log("_tokens[i]", _tokens[i]);
+      IERC20(_lpTokens[i]).approve(_tokens[i], uint256(-1));
     }
   }
 
@@ -410,7 +415,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
         uint256[2] memory amounts;
         amounts[vc.depositorIndex] = tokensInPipt[i];
-        IERC20(round.inputToken).approve(vc.depositor, amounts[vc.depositorIndex]);
         console.log("IERC20(round.inputToken).balanceOf(address(this))", IERC20(round.inputToken).balanceOf(address(this)));
 
         console.log("vc.depositor", vc.depositor);
@@ -422,7 +426,10 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         console.log("liquidity", liquidity);
         console.log("token", IVault(tokens[i]).token());
         console.log("lpToken", vc.lpToken);
-        IERC20(vc.lpToken).approve(tokens[i], liquidity);
+        console.log("allowance", IERC20(vc.lpToken).allowance(address(this), tokens[i]));
+//        IERC20(vc.lpToken).transfer(tokens[i], liquidity);
+        console.log("liquidity", IVault(vc.lpToken).balanceOf(address(this)));
+//        IERC20(vc.lpToken).transferFrom(address(this), tokens[i], liquidity);
         IVault(tokens[i]).deposit(liquidity);
         tokensInPipt[i] = IVault(tokens[i]).balanceOf(address(this));
       }
