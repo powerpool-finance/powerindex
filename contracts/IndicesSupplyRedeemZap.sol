@@ -11,6 +11,9 @@ import "./interfaces/PowerIndexPoolInterface.sol";
 import "./interfaces/TokenInterface.sol";
 import "./Erc20PiptSwap.sol";
 import "hardhat/console.sol";
+import "./interfaces/IVaultDepositor.sol";
+import "./interfaces/IVault.sol";
+import "./interfaces/IVaultRegistry.sol";
 
 contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   using SafeMath for uint256;
@@ -36,6 +39,15 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   mapping(address => PoolType) public poolType;
   mapping(address => address) public poolPiptSwap;
   mapping(address => address[]) public poolTokens;
+
+  struct VaultConfig {
+    uint256 depositorLength;
+    uint256 depositorIndex;
+    address depositor;
+    address lpToken;
+    address vaultRegistry;
+  }
+  mapping(address => VaultConfig) public vaultConfig;
 
   uint256 public roundCounter;
   uint256 public lastRoundCreatedAt;
@@ -94,7 +106,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   }
 
   function depositEth(address _pool) external payable onlyEOA {
-    require(poolType[_pool] != PoolType.NULL, "UNKNOWN_POOL");
+    require(poolType[_pool] == PoolType.PIPT, "NOT_SUPPORTED_POOL");
 
     _deposit(_pool, ETH, _pool, msg.value);
   }
@@ -218,6 +230,21 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
   }
 
+  function setVaultConfigs(
+    address[] memory _tokens,
+    address[] memory _depositors,
+    uint256[] memory _depositorAmountLength,
+    uint256[] memory _depositorIndexes,
+    address[] memory _lpTokens,
+    address[] memory _vaultRegistries
+  ) external onlyOwner {
+    uint256 len = _tokens.length;
+    require(len == _depositors.length && len == _depositorIndexes.length, "LENGTHS_NOT_EQUAL");
+    for (uint256 i = 0; i < len; i++) {
+      vaultConfig[_tokens[i]] = VaultConfig(_depositorAmountLength[i], _depositorIndexes[i], _depositors[i], _lpTokens[i], _vaultRegistries[i]);
+    }
+  }
+
   function updatePools(address[] memory _pools) external onlyOwner {
     uint256 len = _pools.length;
     for (uint256 i = 0; i < len; i++) {
@@ -265,6 +292,14 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address outputToken
   ) public view returns (bytes32) {
     return keccak256(abi.encodePacked(id, pool, inputToken, outputToken));
+  }
+
+  function getRoundUserInput(bytes32 roundKey, address user) public view returns (uint256) {
+    return rounds[roundKey].inputAmount[user];
+  }
+
+  function getRoundUserOutput(bytes32 roundKey, address user) public view returns (uint256) {
+    return rounds[roundKey].outputAmount[user];
   }
 
   function _deposit(
@@ -325,19 +360,75 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
   }
 
-  function _supplyPool(Round storage round, uint256 inputAmountWithFee) internal {
+  function _supplyPool(Round storage round, uint256 totalInputAmount) internal {
     PoolType pType = poolType[round.pool];
     if (pType == PoolType.PIPT) {
       Erc20PiptSwap piptSwap = Erc20PiptSwap(payable(poolPiptSwap[round.pool]));
       if (round.inputToken == ETH) {
-        (round.totalOutputAmount, ) = piptSwap.swapEthToPipt{ value: inputAmountWithFee }(piptSwap.defaultSlippage());
+        (round.totalOutputAmount, ) = piptSwap.swapEthToPipt{ value: totalInputAmount }(piptSwap.defaultSlippage());
       } else {
         round.totalOutputAmount = piptSwap.swapErc20ToPipt(
           round.inputToken,
-          inputAmountWithFee,
+          totalInputAmount,
           piptSwap.defaultSlippage()
         );
       }
+    } else if (pType == PoolType.VAULT) {
+      address[] memory tokens = poolTokens[round.pool];
+      uint256 len = tokens.length;
+      uint256[] memory tokensBalances = new uint256[](len);
+      uint256[] memory tokensInPipt = new uint256[](len);
+      PowerIndexPoolInterface pipt = PowerIndexPoolInterface(round.pool);
+
+      uint256 poolAmountOut;
+      {
+        uint256 piptTotalSupply = pipt.totalSupply();
+        uint256 ratio = totalInputAmount.mul(1 ether).div(piptTotalSupply).add(100);
+        for (uint256 i = 0; i < len; i++) {
+          tokensBalances[i] = pipt.getBalance(tokens[i]);
+          console.log("usdcSharesInPipt[i]", ratio.mul(tokensBalances[i]).div(1 ether));
+          tokensInPipt[i] = calcTokenOutByUsdc(tokens[i], ratio.mul(tokensBalances[i]).div(1 ether));
+        }
+
+        poolAmountOut = tokensInPipt[0].mul(piptTotalSupply).div(tokensBalances[0]);
+        ratio = poolAmountOut.mul(1 ether).div(piptTotalSupply).add(100);
+        uint256 sum1 = 0;
+        uint256 sum2 = 0;
+        for (uint256 i = 0; i < len; i++) {
+          sum1 += tokensInPipt[i];
+          console.log("tokensInPipt[i]", tokensInPipt[i]);
+          tokensInPipt[i] = ratio.mul(tokensBalances[i]).div(1 ether);
+          console.log("inPipt         ", tokensInPipt[i]);
+          sum2 += tokensInPipt[i];
+        }
+        console.log("sum1", sum1);
+        console.log("sum2", sum2);
+      }
+
+      for (uint256 i = 0; i < len; i++) {
+        VaultConfig storage vc = vaultConfig[tokens[i]];
+
+        uint256[2] memory amounts;
+        amounts[vc.depositorIndex] = tokensInPipt[i];
+        IERC20(round.inputToken).approve(vc.depositor, amounts[vc.depositorIndex]);
+        console.log("IERC20(round.inputToken).balanceOf(address(this))", IERC20(round.inputToken).balanceOf(address(this)));
+
+        console.log("vc.depositor", vc.depositor);
+        console.log("vc.depositorLength", vc.depositorLength);
+        console.log("vc.depositorIndex", vc.depositorIndex);
+        console.log("amounts[vc.depositorIndex]", amounts[vc.depositorIndex]);
+        IVaultDepositor(vc.depositor).add_liquidity(amounts, 1);
+        uint256 liquidity = IVault(vc.lpToken).balanceOf(address(this));
+        console.log("liquidity", liquidity);
+        console.log("token", IVault(tokens[i]).token());
+        console.log("lpToken", vc.lpToken);
+        IERC20(vc.lpToken).approve(tokens[i], liquidity);
+        IVault(tokens[i]).deposit(liquidity);
+        tokensInPipt[i] = IVault(tokens[i]).balanceOf(address(this));
+      }
+
+      pipt.joinPool(poolAmountOut, tokensInPipt);
+      round.totalOutputAmount = poolAmountOut;
     }
   }
 
@@ -349,6 +440,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         round.totalOutputAmount = piptSwap.swapPiptToEth(inputAmountWithFee);
       } else {
         round.totalOutputAmount = piptSwap.swapPiptToErc20(round.inputToken, inputAmountWithFee);
+        console.log("round.totalOutputAmount", round.totalOutputAmount);
+        console.log("pool.balanceOf(address(this))", IERC20(round.pool).balanceOf(address(this)));
       }
     }
   }
@@ -367,6 +460,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
       uint256 inputShare = round.inputAmount[_claimFor].mul(1 ether).div(round.totalInputAmount);
       uint256 outputAmount = round.totalOutputAmount.mul(inputShare).div(1 ether);
+      console.log("outputAmount", outputAmount);
+      console.log("pool.balanceOf(address(this))", IERC20(round.pool).balanceOf(address(this)));
       round.outputAmount[_claimFor] = outputAmount;
       IERC20(round.pool).transfer(_claimFor, outputAmount - 1);
     }
@@ -431,5 +526,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function _getMinMaxReportInterval() internal view returns (uint256 min, uint256 max) {
     return powerPoke.getMinMaxReportIntervals(address(this));
+  }
+
+  function calcTokenOutByUsdc(address _token, uint256 _amountIn) public view returns (uint256 amountOut) {
+    VaultConfig storage vc = vaultConfig[_token];
+    amountOut = IVaultRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
+    return _amountIn.mul(1 ether).div(IVault(_token).getPricePerFullShare().mul(amountOut).div(1 ether));
   }
 }
