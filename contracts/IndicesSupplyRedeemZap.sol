@@ -407,23 +407,15 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     uint256 minPoolAmount;
     uint256 piptTotalSupply = PowerIndexPoolInterface(round.pool).totalSupply();
     uint256 restInput = 0;
-    {
-      uint256 sum;
-      uint256 ratio = totalInputAmount.mul(1 ether).div(piptTotalSupply).add(100);
-      for (uint256 i = 0; i < len; i++) {
-        vc[i].token = poolTokens[round.pool][i];
-        vc[i].tokenBalance = PowerIndexPoolInterface(round.pool).getBalance(vc[i].token);
-        //          console.log("usdcSharesInPipt[i]", ratio.mul(tokensBalances[i]).div(1 ether));
-        vc[i].input = ratio.mul(vc[i].tokenBalance).div(1 ether);
-        sum = sum.add(vc[i].input);
-        console.log("vc[i].input", vc[i].input);
-        vc[i].out = calcVaultOutByUsdc(vc[i].token, vc[i].input);
-        vc[i].poolAmountOut = vc[i].out.mul(piptTotalSupply).div(vc[i].tokenBalance);
-        if (minPoolAmount == 0 || vc[i].poolAmountOut < minPoolAmount) {
-          minPoolAmount = vc[i].poolAmountOut;
-        }
+    for (uint256 i = 0; i < len; i++) {
+      vc[i].token = poolTokens[round.pool][i];
+      vc[i].tokenBalance = PowerIndexPoolInterface(round.pool).getBalance(vc[i].token);
+      vc[i].input = totalInputAmount / len;
+      vc[i].out = calcVaultOutByUsdc(vc[i].token, vc[i].input);
+      vc[i].poolAmountOut = vc[i].out.mul(piptTotalSupply).div(vc[i].tokenBalance);
+      if (minPoolAmount == 0 || vc[i].poolAmountOut < minPoolAmount) {
+        minPoolAmount = vc[i].poolAmountOut;
       }
-      restInput = totalInputAmount.sub(sum);
     }
 
     for (uint256 i = 0; i < len; i++) {
@@ -437,25 +429,19 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
 
     uint256 totalCorrectInput = totalInputAmount.sub(restInput).sub(100);
-    console.log("totalInputAmount", totalInputAmount);
-    console.log("restInput", restInput);
 
     for (uint256 i = 0; i < len; i++) {
       uint256 share = vc[i].correctInput.mul(1 ether).div(totalCorrectInput);
       vc[i].correctInput = vc[i].correctInput.add(restInput.mul(share).div(1 ether)).sub(100);
-      console.log("vc[i].correctInput", restInput.mul(share).div(1 ether));
 
       IVault(vc[i].token).deposit(_addYearnLpTokenLiquidity(round, vaultConfig[vc[i].token], vc[i].correctInput));
       tokensInPipt[i] = IVault(vc[i].token).balanceOf(address(this));
 
       uint256 poolOutByToken = tokensInPipt[i].sub(1e6).mul(piptTotalSupply).div(vc[i].tokenBalance);
-//      console.log("poolOutByToken", poolOutByToken);
       if (poolOutByToken < poolAmountOut || poolAmountOut == 0) {
         poolAmountOut = poolOutByToken;
       }
     }
-
-    console.log("poolAmountOut", poolAmountOut);
   }
 
   function _addYearnLpTokenLiquidity(Round storage round, VaultConfig storage vc, uint256 _amount) internal returns (uint256) {
