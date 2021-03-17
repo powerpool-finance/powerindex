@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { deployProxied, mwei } = require('./helpers');
+const { deployProxied, mwei, addBN, subBN, mulScalarBN, divScalarBN, mulBN, divBN, assertEqualWithAccuracy } = require('./helpers');
 
 const { time, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
@@ -17,7 +17,9 @@ const ProxyFactory = artifacts.require('ProxyFactory');
 const IndicesSupplyRedeemZap = artifacts.require('IndicesSupplyRedeemZap');
 const MockPoke = artifacts.require('MockPoke');
 const MockVault = artifacts.require('MockVault');
-const MockVaultDepositor = artifacts.require('MockVaultDepositor');
+const MockVaultDepositor2 = artifacts.require('MockVaultDepositor2');
+const MockVaultDepositor3 = artifacts.require('MockVaultDepositor3');
+const MockVaultDepositor4 = artifacts.require('MockVaultDepositor4');
 const MockVaultRegistry = artifacts.require('MockVaultRegistry');
 
 WETH.numberFormat = 'String';
@@ -190,6 +192,12 @@ describe.only('IndicesSupplyRedeemZap', () => {
     });
 
     it('swapEthToPipt should work properly', async () => {
+      const aliceEthToSwap = ether(10);
+      const bobEthToSwap = ether(20);
+
+      const danUsdcToSwap = mwei(10000);
+      const carolUsdcToSwap = mwei(5000);
+
       const erc20PiptSwap = await Erc20PiptSwap.new(this.weth.address, cvp.address, pool.address, zeroAddress, feeManager, {
         from: minter,
       });
@@ -215,7 +223,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
 
       assert.notEqual(firstRoundEthKey, firstRoundUsdcKey);
 
-      let res = await this.indiciesZap.depositEth(pool.address, { value: ether('1'), from: alice });
+      let res = await this.indiciesZap.depositEth(pool.address, { value: aliceEthToSwap, from: alice });
       await expectEvent.inTransaction(res.tx, IndicesSupplyRedeemZap, 'NewRound', {
         id: '1',
       });
@@ -232,29 +240,34 @@ describe.only('IndicesSupplyRedeemZap', () => {
       assert.equal(round.pool, pool.address);
       assert.equal(round.inputToken, ETH);
       assert.equal(round.outputToken, pool.address);
-      assert.equal(round.totalInputAmount, ether('1'));
+      assert.equal(round.totalInputAmount, aliceEthToSwap);
       assert.equal(round.totalOutputAmount, '0');
 
-      assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, alice), ether('1'));
+      assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, alice), aliceEthToSwap);
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, bob), '0');
 
-      res = await this.indiciesZap.depositEth(pool.address, { value: ether('2'), from: bob });
+      await expectRevert(this.indiciesZap.depositErc20(pool.address, await this.indiciesZap.ETH(), ether(10), { from: alice }), 'NOT_SUPPORTED_TOKEN');
+      await expectRevert(this.indiciesZap.depositErc20(pool.address, alice, ether(10), { from: alice }), 'NOT_SUPPORTED_TOKEN');
+
+      res = await this.indiciesZap.depositEth(pool.address, { value: bobEthToSwap, from: bob });
       await expectEvent.notEmitted.inTransaction(res.tx, IndicesSupplyRedeemZap, 'NewRound');
       await expectEvent.notEmitted.inTransaction(res.tx, IndicesSupplyRedeemZap, 'InitRoundKey');
 
-      assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, alice), ether('1'));
-      assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, bob), ether('2'));
+      assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, alice), aliceEthToSwap);
+      assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, bob), bobEthToSwap);
+
+      const totalEthToSwap = addBN(aliceEthToSwap, bobEthToSwap);
 
       round = await this.indiciesZap.rounds(firstRoundEthKey);
-      assert.equal(round.totalInputAmount, ether('3'));
+      assert.equal(round.totalInputAmount, totalEthToSwap);
       assert.equal(round.totalOutputAmount, '0');
 
-      await usdc.transfer(dan, mwei('1000'), {from: minter});
-      await usdc.approve(this.indiciesZap.address, mwei('1000'), {from: dan});
-      await usdc.transfer(carol, mwei('2000'), {from: minter});
-      await usdc.approve(this.indiciesZap.address, mwei('2000'), {from: carol});
+      await usdc.transfer(dan, danUsdcToSwap, {from: minter});
+      await usdc.approve(this.indiciesZap.address, danUsdcToSwap, {from: dan});
+      await usdc.transfer(carol, mulBN(carolUsdcToSwap, '3'), {from: minter});
+      await usdc.approve(this.indiciesZap.address, mulBN(carolUsdcToSwap, '3'), {from: carol});
 
-      res = await this.indiciesZap.depositErc20(pool.address, usdc.address, mwei('1000'), { from: dan });
+      res = await this.indiciesZap.depositErc20(pool.address, usdc.address, danUsdcToSwap, { from: dan });
       await expectEvent.notEmitted.inTransaction(res.tx, IndicesSupplyRedeemZap, 'NewRound');
       await expectEvent.inTransaction(res.tx, IndicesSupplyRedeemZap, 'InitRoundKey', {
         id: '1',
@@ -269,24 +282,35 @@ describe.only('IndicesSupplyRedeemZap', () => {
       assert.equal(round.pool, pool.address);
       assert.equal(round.inputToken, usdc.address);
       assert.equal(round.outputToken, pool.address);
-      assert.equal(round.totalInputAmount, mwei('1000'));
+      assert.equal(round.totalInputAmount, danUsdcToSwap);
 
-      res = await this.indiciesZap.depositErc20(pool.address, usdc.address, mwei('2000'), { from: carol });
+      res = await this.indiciesZap.depositErc20(pool.address, usdc.address, mulBN(carolUsdcToSwap, '3'), { from: carol });
       await expectEvent.notEmitted.inTransaction(res.tx, IndicesSupplyRedeemZap, 'NewRound');
       await expectEvent.notEmitted.inTransaction(res.tx, IndicesSupplyRedeemZap, 'InitRoundKey');
 
       round = await this.indiciesZap.rounds(firstRoundUsdcKey);
-      assert.equal(round.totalInputAmount, mwei('3000'));
+      assert.equal(round.totalInputAmount, addBN(mulBN(carolUsdcToSwap, '3'), danUsdcToSwap));
 
-      await expectRevert(this.indiciesZap.withdrawErc20(pool.address, usdc.address, mwei('2500'), { from: carol }), ' subtraction overflow');
-      await expectRevert(this.indiciesZap.withdrawErc20(pool.address, usdc.address, mwei('1500'), { from: alice }), ' subtraction overflow');
+      await expectRevert(this.indiciesZap.withdrawErc20(pool.address, usdc.address, mulBN(carolUsdcToSwap, '4'), { from: carol }), ' subtraction overflow');
+      await expectRevert(this.indiciesZap.withdrawErc20(pool.address, usdc.address, carolUsdcToSwap, { from: alice }), ' subtraction overflow');
 
-      res = await this.indiciesZap.withdrawErc20(pool.address, usdc.address, mwei('1500'), { from: carol });
+      assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, carol), '0');
+      assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundUsdcKey, carol), mulBN(carolUsdcToSwap, '3'));
+
+      res = await this.indiciesZap.withdrawErc20(pool.address, usdc.address, subBN(mulBN(carolUsdcToSwap, '3'), carolUsdcToSwap), { from: carol });
       await expectEvent.notEmitted.inTransaction(res.tx, IndicesSupplyRedeemZap, 'NewRound');
       await expectEvent.notEmitted.inTransaction(res.tx, IndicesSupplyRedeemZap, 'InitRoundKey');
 
+      await expectRevert(this.indiciesZap.withdrawErc20(pool.address, usdc.address, mulBN(carolUsdcToSwap, '3'), { from: carol }), ' subtraction overflow');
+
+      assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, carol), '0');
+      assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundUsdcKey, dan), danUsdcToSwap);
+      assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundUsdcKey, carol), carolUsdcToSwap);
+
+      const totalUsdcToSwap = addBN(danUsdcToSwap, carolUsdcToSwap);
+
       round = await this.indiciesZap.rounds(firstRoundUsdcKey);
-      assert.equal(round.totalInputAmount, mwei('1500'));
+      assert.equal(round.totalInputAmount, totalUsdcToSwap);
 
       await time.increase(roundPeriod);
 
@@ -297,36 +321,58 @@ describe.only('IndicesSupplyRedeemZap', () => {
       assert.equal(await pool.balanceOf(alice), '0');
       assert.equal(await pool.balanceOf(bob), '0');
 
+      const { ethAfterFee: ethInAfterFee } = await erc20PiptSwap.calcEthFee(totalEthToSwap);
+      const {poolOut: poolOutForEth} = await erc20PiptSwap.calcSwapEthToPiptInputs(
+        ethInAfterFee,
+        balancerTokens.map(t => t.address),
+        await erc20PiptSwap.defaultSlippage(),
+      );
+
       round = await this.indiciesZap.rounds(firstRoundEthKey);
-      assert.equal(round.totalOutputAmount, ether('0.03094770810646647'));
+      assertEqualWithAccuracy(round.totalOutputAmount, poolOutForEth, ether('0.05'));
       round = await this.indiciesZap.rounds(firstRoundUsdcKey);
       assert.equal(round.totalOutputAmount, '0');
 
       await this.indiciesZap.claimPoke(firstRoundEthKey, [alice, bob]);
-      assert.equal(await pool.balanceOf(alice), ether('0.010315902702155488'));
-      assert.equal(await pool.balanceOf(bob), ether('0.020631805404310978'));
+      assertEqualWithAccuracy(await pool.balanceOf(alice), divBN(mulBN(poolOutForEth, aliceEthToSwap), totalEthToSwap), ether('0.05'));
+      assertEqualWithAccuracy(await pool.balanceOf(bob), divBN(mulBN(poolOutForEth, bobEthToSwap), totalEthToSwap), ether('0.05'));
 
-      assert.equal(await this.indiciesZap.getRoundUserOutput(firstRoundEthKey, alice), ether('0.010315902702155489'));
-      assert.equal(await this.indiciesZap.getRoundUserOutput(firstRoundEthKey, bob), ether('0.020631805404310979'));
+      assertEqualWithAccuracy(await this.indiciesZap.getRoundUserOutput(firstRoundEthKey, alice), await pool.balanceOf(alice), ether('0.0000001'));
+      assertEqualWithAccuracy(await this.indiciesZap.getRoundUserOutput(firstRoundEthKey, bob), await pool.balanceOf(bob), ether('0.0000001'));
 
       round = await this.indiciesZap.rounds(firstRoundEthKey);
-      assert.equal(round.totalOutputAmount, ether('0.03094770810646647'));
+      assertEqualWithAccuracy(round.totalOutputAmount, poolOutForEth, ether('0.05'));
       round = await this.indiciesZap.rounds(firstRoundUsdcKey);
       assert.equal(round.totalOutputAmount, '0');
 
       await expectRevert(this.indiciesZap.claimPoke(firstRoundEthKey, [dan, carol]), 'INPUT_NULL');
       await expectRevert(this.indiciesZap.claimPoke(firstRoundUsdcKey, [dan, carol]), 'TOTAL_OUTPUT_NULL');
 
+      const { erc20AfterFee: usdcInAfterFee } = await erc20PiptSwap.calcErc20Fee(usdc.address, totalUsdcToSwap);
+      const {poolOut: poolOutForUsdc} = await erc20PiptSwap.calcSwapErc20ToPiptInputs(
+        usdc.address,
+        usdcInAfterFee,
+        balancerTokens.map(t => t.address),
+        await erc20PiptSwap.defaultSlippage(),
+        true
+      );
+
       await this.indiciesZap.supplyAndRedeemPoke([firstRoundUsdcKey]);
 
+      round = await this.indiciesZap.rounds(firstRoundUsdcKey);
+      assertEqualWithAccuracy(round.totalOutputAmount, poolOutForUsdc, ether('0.05'));
+
       await this.indiciesZap.claimPoke(firstRoundUsdcKey, [dan, carol]);
-      assert.equal(await pool.balanceOf(dan), ether('0.007645055183580519'));
-      assert.equal(await pool.balanceOf(carol), ether('0.003822527591790259'));
+      assertEqualWithAccuracy(await pool.balanceOf(dan), divBN(mulBN(poolOutForUsdc, danUsdcToSwap), totalUsdcToSwap), ether('0.05'));
+      assertEqualWithAccuracy(await pool.balanceOf(carol), divBN(mulBN(poolOutForUsdc, carolUsdcToSwap), totalUsdcToSwap), ether('0.05'));
+
+      assertEqualWithAccuracy(await this.indiciesZap.getRoundUserOutput(firstRoundUsdcKey, dan), await pool.balanceOf(dan), ether('0.0000001'));
+      assertEqualWithAccuracy(await this.indiciesZap.getRoundUserOutput(firstRoundUsdcKey, carol), await pool.balanceOf(carol), ether('0.0000001'));
     });
   });
 
-  describe.only('Swaps with Uniswap mainnet values', () => {
-    let cvp, usdc, tokens, balancerTokens, vaults, bPoolBalances, pool;
+  describe.skip('Swaps with Uniswap mainnet values', () => {
+    let usdc, tokens, balancerTokens, vaults, bPoolBalances, pool;
 
     beforeEach(async () => {
       tokens = [];
@@ -342,7 +388,15 @@ describe.only('IndicesSupplyRedeemZap', () => {
         const v = vaultsData[i];
         const lpToken = await MockERC20.new("", "", '18', v.totalSupply);
         const vault = await MockVault.new(lpToken.address, v.usdtValue, v.totalSupply);
-        const depositor = await MockVaultDepositor.new(lpToken.address, usdc.address, v.config.usdcIndex, szabo(v.usdcToLpRate));
+        let depositor;
+        if (v.config.amountsLength === 2) {
+          depositor = await MockVaultDepositor2.new(lpToken.address, usdc.address, v.config.usdcIndex, szabo(v.usdcToLpRate));
+        } else if (v.config.amountsLength === 3) {
+          depositor = await MockVaultDepositor3.new(lpToken.address, usdc.address, v.config.usdcIndex, szabo(v.usdcToLpRate));
+        } else if (v.config.amountsLength === 4) {
+          depositor = await MockVaultDepositor4.new(lpToken.address, usdc.address, v.config.usdcIndex, szabo(v.usdcToLpRate));
+        }
+        await lpToken.transfer(depositor.address, v.totalSupply);
         await vaultRegistry.set_virtual_price(lpToken.address, szabo(v.usdcToLpRate));
 
         vaults.push({
@@ -370,6 +424,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
       await this.indiciesZap.setVaultConfigs(
         vaults.map(v => v.vault.address),
         vaults.map(v => v.depositor.address),
+        vaults.map(v => v.config.amountsLength),
         vaults.map(v => v.config.usdcIndex),
         vaults.map(v => v.lpToken.address),
         vaults.map(v => vaultRegistry.address),
