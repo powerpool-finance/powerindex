@@ -88,6 +88,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   mapping(address => uint256) public feeByToken;
   mapping(address => uint256) public pendingFeeByToken;
 
+  mapping(address => uint256) public oddTokens;
+
   struct Round {
     uint256 id;
     address inputToken;
@@ -141,8 +143,10 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   }
 
   receive() external payable {
-    oddEth = oddEth.add(msg.value);
+    oddTokens[ETH] = oddTokens[ETH].add(msg.value);
   }
+
+  /* ==========  Client Functions  ========== */
 
   function depositEth(address _pool) external payable onlyEOA {
     require(poolType[_pool] == PoolType.PIPT, "NOT_SUPPORTED_POOL");
@@ -167,7 +171,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address _pool,
     address _outputToken,
     uint256 _amount
-  ) external {
+  ) external onlyEOA {
     PoolType pType = poolType[_pool];
     require(pType != PoolType.NULL, "UNKNOWN_POOL");
 
@@ -214,6 +218,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     _withdraw(_pool, _pool, _outputToken, _amount);
   }
 
+  /* ==========  Poker Functions  ========== */
+
   function supplyAndRedeemPokeFromReporter(
     uint256 _reporterId,
     bytes32[] memory _roundKeys,
@@ -255,6 +261,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   function claimPoke(bytes32 _roundKey, address[] memory _claimForList) external onlyEOA {
     _claimPoke(_roundKey, _claimForList);
   }
+
+  /* ==========  Owner Functions  ========== */
 
   function setRoundPeriod(uint256 _roundPeriod) external onlyOwner {
     roundPeriod = _roundPeriod;
@@ -341,6 +349,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
   }
 
+  /* ==========  View Functions  ========== */
+
   function getCurrentRoundKey(
     address pool,
     address inputToken,
@@ -365,6 +375,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   function getRoundUserOutput(bytes32 roundKey, address user) public view returns (uint256) {
     return rounds[roundKey].outputAmount[user];
   }
+
+  /* ==========  Internal Functions  ========== */
 
   function _deposit(
     address _pool,
