@@ -73,6 +73,16 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   }
   mapping(bytes32 => Round) public rounds;
 
+  struct VaultCalc {
+    address token;
+    uint256 tokenBalance;
+    uint256 input;
+    uint256 correctInput;
+    uint256 out;
+    uint256 correctOut;
+    uint256 poolAmountOut;
+  }
+
   modifier onlyReporter(uint256 _reporterId, bytes calldata _rewardOpts) {
     uint256 gasStart = gasleft();
     powerPoke.authorizeReporter(_reporterId, msg.sender);
@@ -381,55 +391,66 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         );
       }
     } else if (pType == PoolType.VAULT) {
-      address[] memory tokens = poolTokens[round.pool];
-      uint256 len = tokens.length;
-      uint256[] memory tokensBalances = new uint256[](len);
-      uint256[] memory tokensInPipt = new uint256[](len);
-      PowerIndexPoolInterface pipt = PowerIndexPoolInterface(round.pool);
+      (uint256 poolAmountOut, uint256[] memory tokensInPipt) = _depositVaultAndGetTokensInPipt(round, totalInputAmount);
 
-      uint256 poolAmountOut;
-      {
-        uint256 piptTotalSupply = pipt.totalSupply();
-        uint256 ratio = totalInputAmount.mul(1 ether).div(piptTotalSupply).add(100);
-        for (uint256 i = 0; i < len; i++) {
-          tokensBalances[i] = pipt.getBalance(tokens[i]);
-          console.log("usdcSharesInPipt[i]", ratio.mul(tokensBalances[i]).div(1 ether));
-          tokensInPipt[i] = calcTokenOutByUsdc(tokens[i], ratio.mul(tokensBalances[i]).div(1 ether));
-        }
-
-        poolAmountOut = tokensInPipt[0].mul(piptTotalSupply).div(tokensBalances[0]);
-        ratio = poolAmountOut.mul(1 ether).div(piptTotalSupply).add(100);
-        uint256 sum1 = 0;
-        uint256 sum2 = 0;
-        for (uint256 i = 0; i < len; i++) {
-          sum1 += tokensInPipt[i];
-          console.log("tokensInPipt[i]", tokensInPipt[i]);
-          tokensInPipt[i] = ratio.mul(tokensBalances[i]).div(1 ether);
-          console.log("inPipt         ", tokensInPipt[i]);
-          sum2 += tokensInPipt[i];
-        }
-        console.log("sum1", sum1);
-        console.log("sum2", sum2);
-      }
-
-      for (uint256 i = 0; i < len; i++) {
-        VaultConfig storage vc = vaultConfig[tokens[i]];
-
-        uint256 liquidity = _addYearnLpTokenLiquidity(round, vc, tokensInPipt[i]);
-        console.log("liquidity", liquidity);
-        console.log("token", IVault(tokens[i]).token());
-        console.log("lpToken", vc.lpToken);
-        console.log("allowance", IERC20(vc.lpToken).allowance(address(this), tokens[i]));
-//        IERC20(vc.lpToken).transfer(tokens[i], liquidity);
-        console.log("liquidity", IVault(vc.lpToken).balanceOf(address(this)));
-//        IERC20(vc.lpToken).transferFrom(address(this), tokens[i], liquidity);
-        IVault(tokens[i]).deposit(liquidity);
-        tokensInPipt[i] = IVault(tokens[i]).balanceOf(address(this));
-      }
-
-      pipt.joinPool(poolAmountOut, tokensInPipt);
-      round.totalOutputAmount = poolAmountOut;
+      PowerIndexPoolInterface(round.pool).joinPool(poolAmountOut, tokensInPipt);
+      (, uint256 communityFee, , ) = PowerIndexPoolInterface(round.pool).getCommunityFee();
+      round.totalOutputAmount = poolAmountOut.sub(poolAmountOut.mul(communityFee).div(1 ether)) - 1;
     }
+  }
+
+  function _depositVaultAndGetTokensInPipt(Round storage round, uint256 totalInputAmount) internal returns (uint256 poolAmountOut, uint256[] memory tokensInPipt) {
+    uint256 len = poolTokens[round.pool].length;
+    VaultCalc[] memory vc = new VaultCalc[](len);
+    tokensInPipt = new uint256[](len);
+
+    uint256 minPoolAmount;
+    uint256 piptTotalSupply = PowerIndexPoolInterface(round.pool).totalSupply();
+    {
+      uint256 ratio = totalInputAmount.mul(1 ether).div(piptTotalSupply).add(100);
+      for (uint256 i = 0; i < len; i++) {
+        vc[i].token = poolTokens[round.pool][i];
+        vc[i].tokenBalance = PowerIndexPoolInterface(round.pool).getBalance(vc[i].token);
+        //          console.log("usdcSharesInPipt[i]", ratio.mul(tokensBalances[i]).div(1 ether));
+        vc[i].input = ratio.mul(vc[i].tokenBalance).div(1 ether);
+        //          console.log("tokensInPipt[i]", tokensInPipt[i]);
+        vc[i].out = calcVaultOutByUsdc(vc[i].token, vc[i].input);
+        vc[i].poolAmountOut = vc[i].out.mul(piptTotalSupply).div(vc[i].tokenBalance);
+        if (minPoolAmount == 0 || vc[i].poolAmountOut < minPoolAmount) {
+          minPoolAmount = vc[i].poolAmountOut;
+        }
+      }
+    }
+
+    uint256 restInput = 0;
+    for (uint256 i = 0; i < len; i++) {
+      if (vc[i].poolAmountOut > minPoolAmount) {
+        uint256 ratio = minPoolAmount.mul(1 ether).div(vc[i].poolAmountOut);
+        vc[i].correctInput = ratio.mul(vc[i].input).div(1 ether);
+        restInput = restInput.add(vc[i].input.sub(vc[i].correctInput));
+      } else {
+        vc[i].correctInput = vc[i].input;
+      }
+    }
+
+    uint256 totalCorrectInput = totalInputAmount.sub(restInput).sub(100);
+    console.log("totalInputAmount", totalInputAmount);
+
+    for (uint256 i = 0; i < len; i++) {
+      uint256 share = vc[i].correctInput.mul(1 ether).div(totalCorrectInput);
+      vc[i].correctInput = vc[i].correctInput.add(restInput.mul(share).div(1 ether));
+
+      IVault(vc[i].token).deposit(_addYearnLpTokenLiquidity(round, vaultConfig[vc[i].token], vc[i].correctInput));
+      tokensInPipt[i] = IVault(vc[i].token).balanceOf(address(this));
+
+      uint256 poolOutByToken = tokensInPipt[i].sub(1e6).mul(piptTotalSupply).div(vc[i].tokenBalance);
+      console.log("poolOutByToken", poolOutByToken);
+      if (poolOutByToken < poolAmountOut || poolAmountOut == 0) {
+        poolAmountOut = poolOutByToken;
+      }
+    }
+
+    console.log("poolAmountOut", poolAmountOut);
   }
 
   function _addYearnLpTokenLiquidity(Round storage round, VaultConfig storage vc, uint256 _amount) internal returns (uint256) {
@@ -555,9 +576,10 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     return powerPoke.getMinMaxReportIntervals(address(this));
   }
 
-  function calcTokenOutByUsdc(address _token, uint256 _amountIn) public view returns (uint256 amountOut) {
+  function calcVaultOutByUsdc(address _token, uint256 _usdcIn) public view returns (uint256 amountOut) {
     VaultConfig storage vc = vaultConfig[_token];
-    amountOut = IVaultRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
-    return _amountIn.mul(1 ether).div(IVault(_token).getPricePerFullShare().mul(amountOut).div(1 ether));
+    uint256 lpByUsdcPrice = IVaultRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
+    uint256 vaultByLpPrice = IVault(_token).getPricePerFullShare();
+    return _usdcIn.mul(1e30).div(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether));
   }
 }

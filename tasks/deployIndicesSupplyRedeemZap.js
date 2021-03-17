@@ -3,7 +3,7 @@ require('@nomiclabs/hardhat-truffle5');
 const fs = require('fs');
 
 task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').setAction(async (__, {ethers, network}) => {
-  const {impersonateAccount, gwei, fromEther, ethUsed, deployProxied, callContract, increaseTime} = require('../test/helpers');
+  const {impersonateAccount, forkContractUpgrade, gwei, fromEther, mwei, fromMwei, ethUsed, deployProxied, callContract, increaseTime} = require('../test/helpers');
   const IndicesSupplyRedeemZap = artifacts.require('IndicesSupplyRedeemZap');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
   const PowerPoke = await artifacts.require('PowerPoke');
@@ -55,26 +55,41 @@ task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').set
   }
   const ERC20 = await artifacts.require('ERC20');
   const holder = '0xf977814e90da44bfa03b6295a0616a897441acec';
+  const pool = await PowerIndexPool.at(poolAddress);
 
   await impersonateAccount(ethers, admin);
   await impersonateAccount(ethers, holder);
+  await forkContractUpgrade(ethers, admin, proxyAdminAddr, poolAddress, await PowerIndexPool.new().then(r => r.address));
 
   const usdc = await ERC20.at(usdcAddress);
 
-  await usdc.approve(zap.address, gwei(1000), {from: holder});
-  await zap.depositErc20(poolAddress, usdc.address, gwei(1000), {from: holder});
+  await pool.transfer(deployer, await callContract(pool, 'balanceOf', [holder]), {from: holder});
+
+  await usdc.approve(zap.address, mwei(100000), {from: holder});
+  await zap.depositErc20(poolAddress, usdc.address, mwei(100000), {from: holder});
 
   const roundKey = await callContract(zap, 'getCurrentRoundKey', [poolAddress, usdc.address, poolAddress]);
 
   await increaseTime(roundPeriod + 1);
 
-  await usdc.approve(zap.address, gwei(1000), {from: holder});
+  await usdc.approve(zap.address, mwei(100000), {from: holder});
+
+  console.log('usdc balance before supply', fromMwei(await callContract(usdc, 'balanceOf', [zap.address])));
 
   await zap.supplyAndRedeemPoke([roundKey]);
+
+  console.log('usdc balance after supply', fromMwei(await callContract(usdc, 'balanceOf', [zap.address])));
+
   await zap.claimPoke(roundKey, [holder]);
 
-  const pool = await PowerIndexPool.at(poolAddress);
-  console.log('balanceOf', await callContract(pool, 'balanceOf', [holder]));
+  console.log('result pool balance', fromEther(await callContract(pool, 'balanceOf', [holder])));
+
+  console.log('pool dust:');
+  const tokens = await pool.getCurrentTokens();
+  for (let i = 0; i < tokens.length; i++) {
+    const token = await ERC20.at(tokens[i]);
+    console.log(i + ' dust balanceOf', fromEther(await callContract(token, 'balanceOf', [zap.address])));
+  }
 
   function ether(amount) {
     return toWei(amount.toString(), 'ether');
