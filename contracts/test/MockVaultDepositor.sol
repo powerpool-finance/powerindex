@@ -3,9 +3,9 @@
 pragma solidity 0.6.12;
 
 import "./MockERC20.sol";
-import "../interfaces/IVaultDepositor.sol";
+import "../interfaces/IVaultDepositor2.sol";
 
-contract MockVaultDepositor is IVaultDepositor {
+contract MockVaultDepositor is IVaultDepositor2 {
   using SafeMath for uint256;
 
   MockERC20 public token;
@@ -27,7 +27,7 @@ contract MockVaultDepositor is IVaultDepositor {
     token.mint(msg.sender, out);
   }
 
-  function calc_token_amount(uint256[] memory _amounts, bool _deposit) external override view returns (uint256) {
+  function calc_token_amount(uint256[2] memory _amounts, bool _deposit) external override view returns (uint256) {
     require(_amounts[index] != 0, "NULL_ADD_LIQUIDITY_AMOUNT");
     return _amounts[index].mul(rate).div(1 ether);
   }

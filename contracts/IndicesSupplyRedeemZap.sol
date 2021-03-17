@@ -11,7 +11,9 @@ import "./interfaces/PowerIndexPoolInterface.sol";
 import "./interfaces/TokenInterface.sol";
 import "./Erc20PiptSwap.sol";
 import "hardhat/console.sol";
-import "./interfaces/IVaultDepositor.sol";
+import "./interfaces/IVaultDepositor2.sol";
+import "./interfaces/IVaultDepositor3.sol";
+import "./interfaces/IVaultDepositor4.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/IVaultRegistry.sol";
 
@@ -413,16 +415,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       for (uint256 i = 0; i < len; i++) {
         VaultConfig storage vc = vaultConfig[tokens[i]];
 
-        uint256[2] memory amounts;
-        amounts[vc.depositorIndex] = tokensInPipt[i];
-        console.log("IERC20(round.inputToken).balanceOf(address(this))", IERC20(round.inputToken).balanceOf(address(this)));
-
-        console.log("vc.depositor", vc.depositor);
-        console.log("vc.depositorLength", vc.depositorLength);
-        console.log("vc.depositorIndex", vc.depositorIndex);
-        console.log("amounts[vc.depositorIndex]", amounts[vc.depositorIndex]);
-        IVaultDepositor(vc.depositor).add_liquidity(amounts, 1);
-        uint256 liquidity = IVault(vc.lpToken).balanceOf(address(this));
+        uint256 liquidity = _addYearnLpTokenLiquidity(round, vc, tokensInPipt[i]);
         console.log("liquidity", liquidity);
         console.log("token", IVault(tokens[i]).token());
         console.log("lpToken", vc.lpToken);
@@ -437,6 +430,27 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       pipt.joinPool(poolAmountOut, tokensInPipt);
       round.totalOutputAmount = poolAmountOut;
     }
+  }
+
+  function _addYearnLpTokenLiquidity(Round storage round, VaultConfig storage vc, uint256 _amount) internal returns (uint256) {
+    if (vc.depositorLength == 2) {
+      uint256[2] memory amounts;
+      amounts[vc.depositorIndex] = _amount;
+      IVaultDepositor2(vc.depositor).add_liquidity(amounts, 1);
+    }
+
+    if (vc.depositorLength == 3) {
+      uint256[3] memory amounts;
+      amounts[vc.depositorIndex] = _amount;
+      IVaultDepositor3(vc.depositor).add_liquidity(amounts, 1);
+    }
+
+    if (vc.depositorLength == 4) {
+      uint256[4] memory amounts;
+      amounts[vc.depositorIndex] = _amount;
+      IVaultDepositor4(vc.depositor).add_liquidity(amounts, 1);
+    }
+    return IERC20(vc.lpToken).balanceOf(address(this));
   }
 
   function _redeemPool(Round storage round, uint256 inputAmountWithFee) internal {
@@ -520,6 +534,12 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function _updatePool(address _pool) internal {
     poolTokens[_pool] = PowerIndexPoolInterface(_pool).getCurrentTokens();
+    if (poolType[_pool] == PoolType.VAULT) {
+      uint256 len = poolTokens[_pool].length;
+      for (uint256 i = 0; i < len; i++) {
+        IERC20(poolTokens[_pool][i]).approve(_pool, uint256(-1));
+      }
+    }
   }
 
   function _reward(
