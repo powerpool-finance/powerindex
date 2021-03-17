@@ -19,12 +19,16 @@ import "./interfaces/IVaultRegistry.sol";
 contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   using SafeMath for uint256;
 
-  event InitRoundKey(
+  event InitRound(
     bytes32 indexed key,
     address indexed pool,
     uint256 endTime,
     address inputToken,
     address outputToken
+  );
+  event FinishRound(
+    bytes32 indexed key,
+    address indexed pool
   );
   event SetFee(uint256 fee);
   event SetRoundPeriod(uint256 roundPeriod);
@@ -659,6 +663,9 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     roundKey = lastRoundByPartialKey[partialKey];
 
     if (roundKey == bytes32(0) || isRoundReadyToExecute(roundKey)) {
+      if (roundKey != bytes32(0)) {
+        emit FinishRound(roundKey, _pool);
+      }
       roundKey = getCurrentRoundKey(_pool, _inputToken, _outputToken);
       rounds[roundKey].blockNumber = block.number;
       rounds[roundKey].pool = _pool;
@@ -666,7 +673,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       rounds[roundKey].outputToken = _outputToken;
       rounds[roundKey].endTime = block.timestamp.add(roundPeriod);
       lastRoundByPartialKey[partialKey] = roundKey;
-      emit InitRoundKey(roundKey, _pool, rounds[roundKey].endTime, _inputToken, _outputToken);
+      emit InitRound(roundKey, _pool, rounds[roundKey].endTime, _inputToken, _outputToken);
     }
 
     return roundKey;
