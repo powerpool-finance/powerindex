@@ -12,14 +12,21 @@ contract MockVaultDepositor {
   uint256 public index;
   uint256 public rate;
 
-  constructor(address _token, address _usdc, uint256 _index, uint256 _rate) public {
+  constructor(
+    address _token,
+    address _usdc,
+    uint256 _index,
+    uint256 _rate
+  ) public {
     token = MockERC20(_token);
     usdc = MockERC20(_usdc);
     index = _index;
     rate = _rate;
   }
 
-  function _remove_liquidity_one_coin(uint256 _token_amount, int128 _i, uint256 _min_amount) internal {
-
-  }
+  function _remove_liquidity_one_coin(
+    uint256 _token_amount,
+    int128 _i,
+    uint256 _min_amount
+  ) internal {}
 }

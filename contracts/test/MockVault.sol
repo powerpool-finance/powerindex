@@ -8,7 +8,11 @@ contract MockVault is MockERC20 {
   uint256 public balance;
   IERC20 public token;
 
-  constructor(address _token, uint256 _balance, uint256 _supply) public MockERC20("", "", 18, _supply) {
+  constructor(
+    address _token,
+    uint256 _balance,
+    uint256 _supply
+  ) public MockERC20("", "", 18, _supply) {
     token = IERC20(_token);
     balance = _balance;
   }

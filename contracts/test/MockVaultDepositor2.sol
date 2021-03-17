@@ -9,8 +9,12 @@ import "./MockVaultDepositor.sol";
 contract MockVaultDepositor2 is MockVaultDepositor, IVaultDepositor2 {
   using SafeMath for uint256;
 
-  constructor(address _token, address _usdc, uint256 _index, uint256 _rate) public MockVaultDepositor(_token, _usdc, _index, _rate) {
-  }
+  constructor(
+    address _token,
+    address _usdc,
+    uint256 _index,
+    uint256 _rate
+  ) public MockVaultDepositor(_token, _usdc, _index, _rate) {}
 
   function add_liquidity(uint256[2] memory _amounts, uint256 _min_mint_amount) external override {
     require(_amounts[index] != 0, "NULL_ADD_LIQUIDITY_AMOUNT");
@@ -19,12 +23,16 @@ contract MockVaultDepositor2 is MockVaultDepositor, IVaultDepositor2 {
     token.mint(msg.sender, out);
   }
 
-  function calc_token_amount(uint256[2] memory _amounts, bool _deposit) external override view returns (uint256) {
+  function calc_token_amount(uint256[2] memory _amounts, bool _deposit) external view override returns (uint256) {
     require(_amounts[index] != 0, "NULL_ADD_LIQUIDITY_AMOUNT");
     return _amounts[index].mul(1 ether).div(rate);
   }
 
-  function remove_liquidity_one_coin(uint256 _token_amount, int128 _i, uint256 _min_amount) external override {
+  function remove_liquidity_one_coin(
+    uint256 _token_amount,
+    int128 _i,
+    uint256 _min_amount
+  ) external override {
     _remove_liquidity_one_coin(_token_amount, _i, _min_amount);
   }
 }

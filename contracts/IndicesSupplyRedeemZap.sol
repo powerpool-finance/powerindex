@@ -301,7 +301,13 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     uint256 len = _tokens.length;
     require(len == _depositors.length && len == _depositorIndexes.length, "LENGTHS_NOT_EQUAL");
     for (uint256 i = 0; i < len; i++) {
-      vaultConfig[_tokens[i]] = VaultConfig(_depositorAmountLength[i], _depositorIndexes[i], _depositors[i], _lpTokens[i], _vaultRegistries[i]);
+      vaultConfig[_tokens[i]] = VaultConfig(
+        _depositorAmountLength[i],
+        _depositorIndexes[i],
+        _depositors[i],
+        _lpTokens[i],
+        _vaultRegistries[i]
+      );
 
       usdc.approve(_depositors[i], uint256(-1));
       IERC20(_lpTokens[i]).approve(_tokens[i], uint256(-1));
@@ -464,7 +470,10 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
   }
 
-  function _depositVaultAndGetTokensInPipt(Round storage round, uint256 totalInputAmount) internal returns (uint256 poolAmountOut, uint256[] memory tokensInPipt) {
+  function _depositVaultAndGetTokensInPipt(Round storage round, uint256 totalInputAmount)
+    internal
+    returns (uint256 poolAmountOut, uint256[] memory tokensInPipt)
+  {
     uint256 len = poolTokens[round.pool].length;
     VaultCalc[] memory vc = new VaultCalc[](len);
     tokensInPipt = new uint256[](len);
@@ -509,7 +518,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
   }
 
-  function _addYearnLpTokenLiquidity(Round storage round, VaultConfig storage vc, uint256 _amount) internal returns (uint256) {
+  function _addYearnLpTokenLiquidity(
+    Round storage round,
+    VaultConfig storage vc,
+    uint256 _amount
+  ) internal returns (uint256) {
     if (vc.depositorLength == 2) {
       uint256[2] memory amounts;
       amounts[vc.depositorIndex] = _amount;
@@ -555,8 +568,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     for (uint256 i = 0; i < len; i++) {
       VaultConfig storage vc = vaultConfig[tokens[i]];
       IVault(tokens[i]).withdraw(IERC20(tokens[i]).balanceOf(address(this)));
-      IVaultDepositor2(vc.depositor)
-        .remove_liquidity_one_coin(IERC20(vc.lpToken).balanceOf(address(this)), int128(vc.depositorIndex), 1);
+      IVaultDepositor2(vc.depositor).remove_liquidity_one_coin(
+        IERC20(vc.lpToken).balanceOf(address(this)),
+        int128(vc.depositorIndex),
+        1
+      );
     }
     totalOutputAmount = IERC20(round.outputToken).balanceOf(address(this)).sub(outputTokenBalanceBefore);
   }

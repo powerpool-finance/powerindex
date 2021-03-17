@@ -3,7 +3,6 @@
 pragma solidity 0.6.12;
 
 contract MockVaultRegistry {
-
   mapping(address => uint256) private virtual_prices;
 
   constructor() public {}
