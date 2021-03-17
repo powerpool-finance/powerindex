@@ -19,11 +19,10 @@ import "./interfaces/IVaultRegistry.sol";
 contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   using SafeMath for uint256;
 
-  event NewRound(uint256 indexed id, uint256 createdAt);
   event InitRoundKey(
-    uint256 indexed id,
     bytes32 indexed key,
     address indexed pool,
+    uint256 endTime,
     address inputToken,
     address outputToken
   );
@@ -31,6 +30,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   event SetRoundPeriod(uint256 roundPeriod);
   event SetPool(address indexed pool, PoolType pType);
   event SetPiptSwap(address indexed pool, address piptSwap);
+  event SetTokenCap(address indexed token, uint256 cap);
   event SetVaultConfig(
     address indexed token,
     address depositor,
@@ -67,6 +67,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   mapping(address => PoolType) public poolType;
   mapping(address => address) public poolPiptSwap;
+  mapping(address => uint256) public tokenCap;
   mapping(address => address[]) public poolTokens;
 
   struct VaultConfig {
@@ -78,8 +79,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   }
   mapping(address => VaultConfig) public vaultConfig;
 
-  uint256 public roundCounter;
-  uint256 public lastRoundCreatedAt;
   uint256 public roundPeriod;
 
   uint256 public oddEth;
@@ -91,7 +90,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   mapping(address => uint256) public oddTokens;
 
   struct Round {
-    uint256 id;
+    uint256 blockNumber;
     address inputToken;
     address outputToken;
     address pool;
@@ -99,8 +98,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     uint256 totalInputAmount;
     mapping(address => uint256) outputAmount;
     uint256 totalOutputAmount;
+    uint256 endTime;
   }
   mapping(bytes32 => Round) public rounds;
+
+  mapping(bytes32 => bytes32) public lastRoundByPartialKey;
 
   struct VaultCalc {
     address token;
@@ -290,6 +292,15 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
   }
 
+  function setTokensCap(address[] memory _tokens, uint256[] memory _caps) external onlyOwner {
+    uint256 len = _tokens.length;
+    require(len == _caps.length, "LENGTHS_NOT_EQUAL");
+    for (uint256 i = 0; i < len; i++) {
+      tokenCap[_tokens[i]] = _caps[i];
+      emit SetTokenCap(_tokens[i], _caps[i]);
+    }
+  }
+
   function setVaultConfigs(
     address[] memory _tokens,
     address[] memory _depositors,
@@ -362,16 +373,24 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address inputToken,
     address outputToken
   ) public view returns (bytes32) {
-    return getRoundKey(roundCounter, pool, inputToken, outputToken);
+    return getRoundKey(block.number, pool, inputToken, outputToken);
   }
 
   function getRoundKey(
-    uint256 id,
+    uint256 blockNumber,
     address pool,
     address inputToken,
     address outputToken
   ) public view returns (bytes32) {
-    return keccak256(abi.encodePacked(id, pool, inputToken, outputToken));
+    return keccak256(abi.encodePacked(blockNumber, pool, inputToken, outputToken));
+  }
+
+  function getRoundPartialKey(
+    address pool,
+    address inputToken,
+    address outputToken
+  ) public view returns (bytes32) {
+    return keccak256(abi.encodePacked(pool, inputToken, outputToken));
   }
 
   function getRoundUserInput(bytes32 roundKey, address user) public view returns (uint256) {
@@ -380,6 +399,14 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function getRoundUserOutput(bytes32 roundKey, address user) public view returns (uint256) {
     return rounds[roundKey].outputAmount[user];
+  }
+
+  function isRoundReadyToExecute(bytes32 roundKey) public view returns (bool) {
+    Round storage round = rounds[roundKey];
+    if (tokenCap[round.inputToken] == 0) {
+      return round.endTime <= block.timestamp;
+    }
+    return round.totalInputAmount >= tokenCap[round.inputToken] || round.endTime <= block.timestamp;
   }
 
   /* ==========  Internal Functions  ========== */
@@ -407,7 +434,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address _outputToken,
     uint256 _amount
   ) internal {
-    Round storage round = rounds[getCurrentRoundKey(_pool, _inputToken, _outputToken)];
+    Round storage round = rounds[_updateRound(_pool, _inputToken, _outputToken)];
 
     round.inputAmount[msg.sender] = round.inputAmount[msg.sender].sub(_amount);
     round.totalInputAmount = round.totalInputAmount.sub(_amount);
@@ -420,14 +447,13 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   }
 
   function _supplyAndRedeemPoke(bytes32[] memory _roundKeys) internal {
-    _incrementRound();
-
     uint256 len = _roundKeys.length;
     require(len > 0, "NULL_LENGTH");
 
     for (uint256 i = 0; i < len; i++) {
       Round storage round = rounds[_roundKeys[i]];
-      _checkRoundBeforeExecute(round);
+      _updateRound(round.pool, round.inputToken, round.outputToken);
+      _checkRoundBeforeExecute(_roundKeys[i], round);
 
       uint256 inputAmountWithFee = _takeAmountFee(round.inputToken, round.totalInputAmount);
       require(round.inputToken == round.pool || round.outputToken == round.pool, "UNKNOWN_ROUND_ACTION");
@@ -616,18 +642,12 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
   }
 
-  function _checkRoundBeforeExecute(Round storage round) internal {
-    require(round.id != roundCounter, "CURRENT_ROUND");
+  function _checkRoundBeforeExecute(bytes32 _roundKey, Round storage round) internal {
+    bytes32 partialKey = getRoundPartialKey(round.pool, round.inputToken, round.outputToken);
+
+    require(lastRoundByPartialKey[partialKey] != _roundKey, "CURRENT_ROUND");
     require(round.totalInputAmount != 0, "TOTAL_INPUT_NULL");
     require(round.totalOutputAmount == 0, "TOTAL_OUTPUT_NOT_NULL");
-  }
-
-  function _incrementRound() internal {
-    if (lastRoundCreatedAt.add(roundPeriod) <= block.timestamp) {
-      roundCounter = roundCounter.add(1);
-      lastRoundCreatedAt = block.timestamp;
-      emit NewRound(roundCounter, lastRoundCreatedAt);
-    }
   }
 
   function _updateRound(
@@ -635,16 +655,18 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address _inputToken,
     address _outputToken
   ) internal returns (bytes32 roundKey) {
-    _incrementRound();
+    bytes32 partialKey = getRoundPartialKey(_pool, _inputToken, _outputToken);
+    roundKey = lastRoundByPartialKey[partialKey];
 
-    roundKey = getCurrentRoundKey(_pool, _inputToken, _outputToken);
-
-    if (rounds[roundKey].pool == address(0)) {
-      rounds[roundKey].id = roundCounter;
+    if (roundKey == bytes32(0) || isRoundReadyToExecute(roundKey)) {
+      roundKey = getCurrentRoundKey(_pool, _inputToken, _outputToken);
+      rounds[roundKey].blockNumber = block.number;
       rounds[roundKey].pool = _pool;
       rounds[roundKey].inputToken = _inputToken;
       rounds[roundKey].outputToken = _outputToken;
-      emit InitRoundKey(roundCounter, roundKey, _pool, _inputToken, _outputToken);
+      rounds[roundKey].endTime = block.timestamp.add(roundPeriod);
+      lastRoundByPartialKey[partialKey] = roundKey;
+      emit InitRoundKey(roundKey, _pool, rounds[roundKey].endTime, _inputToken, _outputToken);
     }
 
     return roundKey;
