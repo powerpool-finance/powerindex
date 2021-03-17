@@ -10,7 +10,6 @@ import "@powerpool/poweroracle/contracts/interfaces/IPowerPoke.sol";
 import "./interfaces/PowerIndexPoolInterface.sol";
 import "./interfaces/TokenInterface.sol";
 import "./Erc20PiptSwap.sol";
-import "hardhat/console.sol";
 import "./interfaces/IVaultDepositor2.sol";
 import "./interfaces/IVaultDepositor3.sol";
 import "./interfaces/IVaultDepositor4.sol";
@@ -143,7 +142,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     PoolType pType = poolType[_pool];
     require(pType != PoolType.NULL, "UNKNOWN_POOL");
 
-    require(_outputToken == address(usdc) || _outputToken == ETH, "NOT_SUPPORTED_TOKEN");
+    if (pType == PoolType.PIPT) {
+      require(_outputToken == address(usdc) || _outputToken == ETH, "NOT_SUPPORTED_TOKEN");
+    } else {
+      require(_outputToken == address(usdc), "NOT_SUPPORTED_TOKEN");
+    }
 
     _deposit(_pool, _pool, _outputToken, _amount);
   }
@@ -256,9 +259,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       vaultConfig[_tokens[i]] = VaultConfig(_depositorAmountLength[i], _depositorIndexes[i], _depositors[i], _lpTokens[i], _vaultRegistries[i]);
 
       usdc.approve(_depositors[i], uint256(-1));
-      console.log("approve", _lpTokens[i]);
-      console.log("_tokens[i]", _tokens[i]);
       IERC20(_lpTokens[i]).approve(_tokens[i], uint256(-1));
+      IERC20(_lpTokens[i]).approve(_depositors[i], uint256(-1));
     }
   }
 
@@ -367,8 +369,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       uint256 inputAmountWithFee = _takeAmountFee(round.inputToken, round.totalInputAmount);
       require(round.inputToken == round.pool || round.outputToken == round.pool, "UNKNOWN_ROUND_ACTION");
 
-      console.log("round.totalInputAmount", round.totalInputAmount);
-      console.log("inputAmountWithFee", inputAmountWithFee);
       if (round.inputToken == round.pool) {
         _redeemPool(round, inputAmountWithFee);
       } else {
@@ -465,18 +465,35 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     return IERC20(vc.lpToken).balanceOf(address(this));
   }
 
-  function _redeemPool(Round storage round, uint256 inputAmountWithFee) internal {
+  function _redeemPool(Round storage round, uint256 totalInputAmount) internal {
     PoolType pType = poolType[round.pool];
     if (pType == PoolType.PIPT) {
       Erc20PiptSwap piptSwap = Erc20PiptSwap(payable(poolPiptSwap[round.pool]));
       if (round.inputToken == ETH) {
-        round.totalOutputAmount = piptSwap.swapPiptToEth(inputAmountWithFee);
+        round.totalOutputAmount = piptSwap.swapPiptToEth(totalInputAmount);
       } else {
-        round.totalOutputAmount = piptSwap.swapPiptToErc20(round.inputToken, inputAmountWithFee);
-        console.log("round.totalOutputAmount", round.totalOutputAmount);
-        console.log("pool.balanceOf(address(this))", IERC20(round.pool).balanceOf(address(this)));
+        round.totalOutputAmount = piptSwap.swapPiptToErc20(round.inputToken, totalInputAmount);
       }
+    } else if (pType == PoolType.VAULT) {
+      round.totalOutputAmount = _redeemVault(round, totalInputAmount);
     }
+  }
+
+  function _redeemVault(Round storage round, uint256 totalInputAmount) internal returns (uint256 totalOutputAmount) {
+    address[] memory tokens = poolTokens[round.pool];
+    uint256 len = tokens.length;
+
+    uint256[] memory amounts = new uint256[](len);
+    PowerIndexPoolInterface(round.pool).exitPool(totalInputAmount, amounts);
+
+    uint256 outputTokenBalanceBefore = IERC20(round.outputToken).balanceOf(address(this));
+    for (uint256 i = 0; i < len; i++) {
+      VaultConfig storage vc = vaultConfig[tokens[i]];
+      IVault(tokens[i]).withdraw(IERC20(tokens[i]).balanceOf(address(this)));
+      IVaultDepositor2(vc.depositor)
+        .remove_liquidity_one_coin(IERC20(vc.lpToken).balanceOf(address(this)), int128(vc.depositorIndex), 1);
+    }
+    totalOutputAmount = IERC20(round.outputToken).balanceOf(address(this)).sub(outputTokenBalanceBefore);
   }
 
   function _claimPoke(bytes32 _roundKey, address[] memory _claimForList) internal {
@@ -493,10 +510,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
       uint256 inputShare = round.inputAmount[_claimFor].mul(1 ether).div(round.totalInputAmount);
       uint256 outputAmount = round.totalOutputAmount.mul(inputShare).div(1 ether);
-      console.log("outputAmount", outputAmount);
-      console.log("pool.balanceOf(address(this))", IERC20(round.pool).balanceOf(address(this)));
       round.outputAmount[_claimFor] = outputAmount;
-      IERC20(round.pool).transfer(_claimFor, outputAmount - 1);
+      IERC20(round.outputToken).transfer(_claimFor, outputAmount - 1);
     }
   }
 

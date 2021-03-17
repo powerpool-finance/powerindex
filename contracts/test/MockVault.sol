@@ -15,7 +15,12 @@ contract MockVault is MockERC20 {
 
   function deposit(uint256 _amount) public {
     token.transferFrom(msg.sender, address(this), _amount);
-    mint(msg.sender, _amount.div(getPricePerFullShare()).mul(_amount));
+    mint(msg.sender, _amount.mul(1 ether).div(getPricePerFullShare()));
+  }
+
+  function withdraw(uint256 _amount) public {
+    burn(_amount);
+    token.transfer(msg.sender, _amount.mul(getPricePerFullShare()).div(1 ether));
   }
 
   function setBalance(uint256 _balance) public {

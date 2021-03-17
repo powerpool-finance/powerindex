@@ -3,7 +3,7 @@ require('@nomiclabs/hardhat-truffle5');
 const fs = require('fs');
 
 task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').setAction(async (__, {ethers, network}) => {
-  const {impersonateAccount, forkContractUpgrade, gwei, fromEther, mwei, fromMwei, ethUsed, deployProxied, callContract, increaseTime} = require('../test/helpers');
+  const {impersonateAccount, forkContractUpgrade, gwei, ether, fromEther, mwei, fromMwei, ethUsed, deployProxied, callContract, increaseTime} = require('../test/helpers');
   const IndicesSupplyRedeemZap = artifacts.require('IndicesSupplyRedeemZap');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
   const PowerPoke = await artifacts.require('PowerPoke');
@@ -68,7 +68,7 @@ task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').set
   await usdc.approve(zap.address, mwei(100000), {from: holder});
   await zap.depositErc20(poolAddress, usdc.address, mwei(100000), {from: holder});
 
-  const roundKey = await callContract(zap, 'getCurrentRoundKey', [poolAddress, usdc.address, poolAddress]);
+  let roundKey = await callContract(zap, 'getCurrentRoundKey', [poolAddress, usdc.address, poolAddress]);
 
   await increaseTime(roundPeriod + 1);
 
@@ -82,7 +82,8 @@ task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').set
 
   await zap.claimPoke(roundKey, [holder]);
 
-  console.log('result pool balance', fromEther(await callContract(pool, 'balanceOf', [holder])));
+  const resultPoolBalance = await callContract(pool, 'balanceOf', [holder]);
+  console.log('result pool balance', fromEther(resultPoolBalance));
 
   console.log('pool dust:');
   const tokens = await pool.getCurrentTokens();
@@ -91,7 +92,23 @@ task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').set
     console.log(i + ' dust balanceOf', fromEther(await callContract(token, 'balanceOf', [zap.address])));
   }
 
-  function ether(amount) {
-    return toWei(amount.toString(), 'ether');
-  }
+  await pool.approve(zap.address, resultPoolBalance, {from: holder});
+  await zap.depositPoolToken(poolAddress, usdc.address, resultPoolBalance, {from: holder});
+
+  const usdcBalanceBefore = fromMwei(await callContract(usdc, 'balanceOf', [holder]));
+
+  roundKey = await callContract(zap, 'getCurrentRoundKey', [poolAddress, poolAddress, usdc.address]);
+
+  await increaseTime(roundPeriod + 1);
+  await usdc.approve(zap.address, mwei(100000), {from: holder});
+
+  console.log('pool balance before redeem', fromEther(await callContract(pool, 'balanceOf', [zap.address])));
+
+  await zap.supplyAndRedeemPoke([roundKey]);
+
+  console.log('pool balance after redeem', fromEther(await callContract(pool, 'balanceOf', [zap.address])));
+
+  await zap.claimPoke(roundKey, [holder]);
+
+  console.log('result usdc balance', fromMwei(await callContract(usdc, 'balanceOf', [holder])) - usdcBalanceBefore);
 });
