@@ -28,6 +28,34 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address outputToken
   );
   event SetFee(uint256 fee);
+  event SetRoundPeriod(uint256 roundPeriod);
+  event SetPool(address indexed pool, PoolType pType);
+  event SetPiptSwap(address indexed pool, address piptSwap);
+  event SetVaultConfig(
+    address indexed token,
+    address depositor,
+    uint256 depositorAmountLength,
+    uint256 depositorIndex,
+    address lpToken,
+    address indexed vaultRegistry
+  );
+  event SupplyAndRedeemPoke(
+    bytes32 indexed roundKey,
+    address indexed pool,
+    address inputToken,
+    address outputToken,
+    uint256 totalInputAmount,
+    uint256 totalOutputAmount
+  );
+  event ClaimPoke(
+    bytes32 indexed roundKey,
+    address indexed pool,
+    address indexed claimFor,
+    address inputToken,
+    address outputToken,
+    uint256 inputAmount,
+    uint256 outputAmount
+  );
 
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
   address public constant ETH = 0x0000000000000000000000000000000000000001;
@@ -130,6 +158,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     require(poolType[_pool] != PoolType.NULL, "UNKNOWN_POOL");
 
     require(_inputToken == address(usdc), "NOT_SUPPORTED_TOKEN");
+    require(_inputToken != ETH, "ETH_CANT_BE_INPUT_TOKEN");
 
     _deposit(_pool, _inputToken, _pool, _amount);
   }
@@ -159,12 +188,13 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function withdrawErc20(
     address _pool,
-    address _inputToken,
+    address _outputToken,
     uint256 _amount
   ) external onlyEOA {
     require(poolType[_pool] != PoolType.NULL, "UNKNOWN_POOL");
+    require(_outputToken != ETH, "ETH_CANT_BE_OUTPUT_TOKEN");
 
-    _withdraw(_pool, _inputToken, _pool, _amount);
+    _withdraw(_pool, _outputToken, _pool, _amount);
   }
 
   function withdrawPoolToken(
@@ -175,7 +205,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     PoolType pType = poolType[_pool];
     require(pType != PoolType.NULL, "UNKNOWN_POOL");
 
-    require(_outputToken == address(usdc) || _outputToken == ETH, "NOT_SUPPORTED_TOKEN");
+    if (pType == PoolType.PIPT) {
+      require(_outputToken == address(usdc) || _outputToken == ETH, "NOT_SUPPORTED_TOKEN");
+    } else {
+      require(_outputToken == address(usdc), "NOT_SUPPORTED_TOKEN");
+    }
 
     _withdraw(_pool, _pool, _outputToken, _amount);
   }
@@ -224,6 +258,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function setRoundPeriod(uint256 _roundPeriod) external onlyOwner {
     roundPeriod = _roundPeriod;
+    emit SetRoundPeriod(roundPeriod);
   }
 
   function setPools(address[] memory _pools, PoolType[] memory _types) external onlyOwner {
@@ -232,6 +267,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     for (uint256 i = 0; i < len; i++) {
       poolType[_pools[i]] = _types[i];
       _updatePool(_pools[i]);
+      emit SetPool(_pools[i], _types[i]);
     }
   }
 
@@ -242,6 +278,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       poolPiptSwap[_pools[i]] = _piptSwaps[i];
       usdc.approve(_piptSwaps[i], uint256(-1));
       IERC20(_pools[i]).approve(_piptSwaps[i], uint256(-1));
+      emit SetPiptSwap(_pools[i], _piptSwaps[i]);
     }
   }
 
@@ -261,6 +298,14 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       usdc.approve(_depositors[i], uint256(-1));
       IERC20(_lpTokens[i]).approve(_tokens[i], uint256(-1));
       IERC20(_lpTokens[i]).approve(_depositors[i], uint256(-1));
+      emit SetVaultConfig(
+        _tokens[i],
+        _depositors[i],
+        _depositorAmountLength[i],
+        _depositorIndexes[i],
+        _lpTokens[i],
+        _vaultRegistries[i]
+      );
     }
   }
 
@@ -374,6 +419,14 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       } else {
         _supplyPool(round, inputAmountWithFee);
       }
+      emit SupplyAndRedeemPoke(
+        _roundKeys[i],
+        round.pool,
+        round.inputToken,
+        round.outputToken,
+        round.totalInputAmount,
+        round.totalOutputAmount
+      );
     }
   }
 
@@ -512,6 +565,16 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       uint256 outputAmount = round.totalOutputAmount.mul(inputShare).div(1 ether);
       round.outputAmount[_claimFor] = outputAmount;
       IERC20(round.outputToken).transfer(_claimFor, outputAmount - 1);
+
+      emit ClaimPoke(
+        _roundKey,
+        round.pool,
+        _claimFor,
+        round.inputToken,
+        round.outputToken,
+        round.inputAmount[_claimFor],
+        outputAmount
+      );
     }
   }
 
