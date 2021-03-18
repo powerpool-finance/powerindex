@@ -60,7 +60,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   event SupplyAndRedeemPoke(
     bytes32 indexed roundKey,
     address indexed pool,
-    address inputToken,
+    address indexed inputToken,
     address outputToken,
     uint256 totalInputAmount,
     uint256 totalOutputAmount
