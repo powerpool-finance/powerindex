@@ -297,7 +297,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function setPools(address[] memory _pools, PoolType[] memory _types) external onlyOwner {
     uint256 len = _pools.length;
-    require(len == _types.length, "LENGTHS_NOT_EQUAL");
+    require(len == _types.length, "LENGTH_ERR");
     for (uint256 i = 0; i < len; i++) {
       poolType[_pools[i]] = _types[i];
       _updatePool(_pools[i]);
@@ -307,7 +307,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function setPoolsPiptSwap(address[] memory _pools, address[] memory _piptSwaps) external onlyOwner {
     uint256 len = _pools.length;
-    require(len == _piptSwaps.length, "LENGTHS_NOT_EQUAL");
+    require(len == _piptSwaps.length, "LENGTH_ERR");
     for (uint256 i = 0; i < len; i++) {
       poolPiptSwap[_pools[i]] = _piptSwaps[i];
       usdc.approve(_piptSwaps[i], uint256(-1));
@@ -318,7 +318,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function setTokensCap(address[] memory _tokens, uint256[] memory _caps) external onlyOwner {
     uint256 len = _tokens.length;
-    require(len == _caps.length, "LENGTHS_NOT_EQUAL");
+    require(len == _caps.length, "LENGTH_ERR");
     for (uint256 i = 0; i < len; i++) {
       tokenCap[_tokens[i]] = _caps[i];
       emit SetTokenCap(_tokens[i], _caps[i]);
@@ -340,7 +340,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         len == _depositorIndexes.length &&
         len == _lpTokens.length &&
         len == _vaultRegistries.length,
-      "LENGTHS_NOT_EQUAL"
+      "LENGTH_ERR"
     );
     for (uint256 i = 0; i < len; i++) {
       vaultConfig[_tokens[i]] = VaultConfig(
@@ -374,7 +374,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function setFee(address[] memory _tokens, uint256[] memory _fees) external onlyOwner {
     uint256 len = _tokens.length;
-    require(len == _fees.length, "LENGTHS_NOT_EQUAL");
+    require(len == _fees.length, "LENGTH_ERR");
     for (uint256 i = 0; i < len; i++) {
       feeByToken[_tokens[i]] = _fees[i];
       emit SetFee(_tokens[i], _fees[i]);
@@ -586,9 +586,9 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       _updateRound(round.pool, round.inputToken, round.outputToken);
       _checkRoundBeforeExecute(_roundKeys[i], round);
 
-      require(round.endTime + minInterval <= block.timestamp, "MIN_INTERVAL_NOT_REACHED");
+      require(round.endTime + minInterval <= block.timestamp, "MIN_INTERVAL");
       if (_bySlasher) {
-        require(round.endTime + maxInterval <= block.timestamp, "MAX_INTERVAL_NOT_REACHED");
+        require(round.endTime + maxInterval <= block.timestamp, "MAX_INTERVAL");
       }
 
       uint256 inputAmountWithFee = _takeAmountFee(round.pool, round.inputToken, round.totalInputAmount);
@@ -723,9 +723,9 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     require(len > 0, "NULL_LENGTH");
 
     Round storage round = rounds[_roundKey];
-    require(round.endTime + minInterval <= block.timestamp, "MIN_INTERVAL_NOT_REACHED");
+    require(round.endTime + minInterval <= block.timestamp, "MIN_INTERVAL");
     if (_bySlasher) {
-      require(round.endTime + maxInterval <= block.timestamp, "MAX_INTERVAL_NOT_REACHED");
+      require(round.endTime + maxInterval <= block.timestamp, "MAX_INTERVAL");
     }
     require(round.totalOutputAmount != 0, "TOTAL_OUTPUT_NULL");
 
