@@ -6,14 +6,43 @@ contract MockPoke {
   uint256 minInterval;
   uint256 maxInterval;
 
-  constructor() public {}
+  mapping(uint256 => mapping(address => bool)) authorizedReporters;
+  mapping(uint256 => mapping(address => bool)) authorizedSlashers;
 
-  function authorizeReporter(uint256 _reporterId, address _acc) public view returns (bool) {
-    return true;
+  bool simpleImpl;
+
+  constructor(bool _simpleImpl) public {
+    simpleImpl = _simpleImpl;
   }
 
-  function authorizeNonReporter(uint256 _reporterId, address _acc) public view returns (bool) {
-    return true;
+  function setReporter(
+    uint256 _reporterId,
+    address _acc,
+    bool _authorized
+  ) public {
+    authorizedReporters[_reporterId][_acc] = _authorized;
+  }
+
+  function setSlasher(
+    uint256 _reporterId,
+    address _acc,
+    bool _authorized
+  ) public {
+    authorizedSlashers[_reporterId][_acc] = _authorized;
+  }
+
+  function authorizeReporter(uint256 _reporterId, address _acc) public view {
+    if (simpleImpl) {
+      return;
+    }
+    require(authorizedReporters[_reporterId][_acc], "NOT_HDH");
+  }
+
+  function authorizeNonReporter(uint256 _reporterId, address _acc) public view {
+    if (simpleImpl) {
+      return;
+    }
+    require(authorizedSlashers[_reporterId][_acc], "INVALID_POKER_KEY");
   }
 
   function setMinMaxReportIntervals(uint256 _minInterval, uint256 _maxInterval) public {

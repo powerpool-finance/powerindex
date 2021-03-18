@@ -258,7 +258,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     bytes32[] memory _roundKeys,
     bytes calldata _rewardOpts
   ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
-    _supplyAndRedeemPoke(_roundKeys);
+    _supplyAndRedeemPoke(_roundKeys, false);
   }
 
   function supplyAndRedeemPokeFromSlasher(
@@ -266,11 +266,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     bytes32[] memory _roundKeys,
     bytes calldata _rewardOpts
   ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
-    _supplyAndRedeemPoke(_roundKeys);
-  }
-
-  function supplyAndRedeemPoke(bytes32[] memory _roundKeys) external onlyEOA {
-    _supplyAndRedeemPoke(_roundKeys);
+    _supplyAndRedeemPoke(_roundKeys, true);
   }
 
   function claimPokeFromReporter(
@@ -279,7 +275,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address[] memory _claimForList,
     bytes calldata _rewardOpts
   ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
-    _claimPoke(_roundKey, _claimForList);
+    _claimPoke(_roundKey, _claimForList, false);
   }
 
   function claimPokeFromSlasher(
@@ -288,11 +284,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address[] memory _claimForList,
     bytes calldata _rewardOpts
   ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
-    _claimPoke(_roundKey, _claimForList);
-  }
-
-  function claimPoke(bytes32 _roundKey, address[] memory _claimForList) external onlyEOA {
-    _claimPoke(_roundKey, _claimForList);
+    _claimPoke(_roundKey, _claimForList, true);
   }
 
   /* ==========  Owner Functions  ========== */
@@ -504,14 +496,22 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     emit Withdraw(roundKey, _pool, msg.sender, _inputToken, _amount);
   }
 
-  function _supplyAndRedeemPoke(bytes32[] memory _roundKeys) internal {
+  function _supplyAndRedeemPoke(bytes32[] memory _roundKeys, bool _bySlasher) internal {
+    (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
+
     uint256 len = _roundKeys.length;
     require(len > 0, "NULL_LENGTH");
 
     for (uint256 i = 0; i < len; i++) {
       Round storage round = rounds[_roundKeys[i]];
+
       _updateRound(round.pool, round.inputToken, round.outputToken);
       _checkRoundBeforeExecute(_roundKeys[i], round);
+
+      require(round.endTime + minInterval <= block.timestamp, "MIN_INTERVAL_NOT_REACHED");
+      if (_bySlasher) {
+        require(round.endTime + maxInterval <= block.timestamp, "MAX_INTERVAL_NOT_REACHED");
+      }
 
       uint256 inputAmountWithFee = _takeAmountFee(round.pool, round.inputToken, round.totalInputAmount);
       require(round.inputToken == round.pool || round.outputToken == round.pool, "UNKNOWN_ROUND_ACTION");
@@ -661,11 +661,21 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     totalOutputAmount = IERC20(round.outputToken).balanceOf(address(this)).sub(outputTokenBalanceBefore);
   }
 
-  function _claimPoke(bytes32 _roundKey, address[] memory _claimForList) internal {
+  function _claimPoke(
+    bytes32 _roundKey,
+    address[] memory _claimForList,
+    bool _bySlasher
+  ) internal {
+    (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
+
     uint256 len = _claimForList.length;
     require(len > 0, "NULL_LENGTH");
 
     Round storage round = rounds[_roundKey];
+    require(round.endTime + minInterval <= block.timestamp, "MIN_INTERVAL_NOT_REACHED");
+    if (_bySlasher) {
+      require(round.endTime + maxInterval <= block.timestamp, "MAX_INTERVAL_NOT_REACHED");
+    }
     require(round.totalOutputAmount != 0, "TOTAL_OUTPUT_NULL");
 
     for (uint256 i = 0; i < len; i++) {
