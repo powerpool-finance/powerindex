@@ -33,12 +33,14 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address indexed pool,
     address indexed inputToken,
     uint256 totalInputAmount,
-    uint256 inputCap
+    uint256 inputCap,
+    uint256 initEndTime,
+    uint256 finishEndTime
   );
 
   event SetFee(address indexed token, uint256 fee);
   event SetFeeReceiver(address indexed feeReceiver);
-  event TakeFee(address indexed token, uint256 amount);
+  event TakeFee(address indexed pool, address indexed token, uint256 amount);
   event ClaimFee(address indexed token, uint256 amount);
 
   event SetRoundPeriod(uint256 roundPeriod);
@@ -54,8 +56,20 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address indexed vaultRegistry
   );
 
-  event Deposit(bytes32 indexed roundKey, address indexed pool, address indexed inputToken, uint256 inputAmount);
-  event Withdraw(bytes32 indexed roundKey, address indexed pool, address indexed inputToken, uint256 inputAmount);
+  event Deposit(
+    bytes32 indexed roundKey,
+    address indexed pool,
+    address indexed user,
+    address inputToken,
+    uint256 inputAmount
+  );
+  event Withdraw(
+    bytes32 indexed roundKey,
+    address indexed pool,
+    address indexed user,
+    address inputToken,
+    uint256 inputAmount
+  );
 
   event SupplyAndRedeemPoke(
     bytes32 indexed roundKey,
@@ -465,7 +479,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     round.inputAmount[msg.sender] = round.inputAmount[msg.sender].add(_amount);
     round.totalInputAmount = round.totalInputAmount.add(_amount);
 
-    emit Deposit(roundKey, _pool, _inputToken, _amount);
+    emit Deposit(roundKey, _pool, msg.sender, _inputToken, _amount);
   }
 
   function _withdraw(
@@ -487,7 +501,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       IERC20(_inputToken).safeTransfer(msg.sender, _amount);
     }
 
-    emit Withdraw(roundKey, _pool, _inputToken, _amount);
+    emit Withdraw(roundKey, _pool, msg.sender, _inputToken, _amount);
   }
 
   function _supplyAndRedeemPoke(bytes32[] memory _roundKeys) internal {
@@ -499,7 +513,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       _updateRound(round.pool, round.inputToken, round.outputToken);
       _checkRoundBeforeExecute(_roundKeys[i], round);
 
-      uint256 inputAmountWithFee = _takeAmountFee(round.inputToken, round.totalInputAmount);
+      uint256 inputAmountWithFee = _takeAmountFee(round.pool, round.inputToken, round.totalInputAmount);
       require(round.inputToken == round.pool || round.outputToken == round.pool, "UNKNOWN_ROUND_ACTION");
 
       if (round.inputToken == round.pool) {
@@ -676,14 +690,18 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
   }
 
-  function _takeAmountFee(address _inputToken, uint256 _amount) internal returns (uint256 amountWithFee) {
+  function _takeAmountFee(
+    address _pool,
+    address _inputToken,
+    uint256 _amount
+  ) internal returns (uint256 amountWithFee) {
     if (feeByToken[_inputToken] == 0) {
       return _amount;
     }
     amountWithFee = _amount.sub(_amount.mul(feeByToken[_inputToken]).div(1 ether));
     if (amountWithFee != _amount) {
       pendingFeeByToken[_inputToken] = pendingFeeByToken[_inputToken].add(_amount.sub(amountWithFee));
-      emit TakeFee(_inputToken, _amount.sub(amountWithFee));
+      emit TakeFee(_pool, _inputToken, _amount.sub(amountWithFee));
     }
   }
 
@@ -705,7 +723,16 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
     if (roundKey == bytes32(0) || isRoundReadyToExecute(roundKey)) {
       if (roundKey != bytes32(0)) {
-        emit FinishRound(roundKey, _pool, _inputToken, rounds[roundKey].totalInputAmount, tokenCap[_inputToken]);
+        emit FinishRound(
+          roundKey,
+          _pool,
+          _inputToken,
+          rounds[roundKey].totalInputAmount,
+          tokenCap[_inputToken],
+          rounds[roundKey].endTime,
+          block.timestamp
+        );
+        rounds[roundKey].endTime = block.timestamp;
       }
       roundKey = getCurrentBlockRoundKey(_pool, _inputToken, _outputToken);
       rounds[roundKey].blockNumber = block.number;
