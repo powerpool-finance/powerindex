@@ -45,7 +45,7 @@ async function getTimestamp(shift = 0) {
   return currentTimestamp + shift;
 }
 
-describe('IndicesSupplyRedeemZap', () => {
+describe.only('IndicesSupplyRedeemZap', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   let ETH;
   const swapFee = ether('0.0001');
@@ -227,11 +227,11 @@ describe('IndicesSupplyRedeemZap', () => {
       await this.indiciesZap.setTokensCap([usdc.address], [usdcTokenCap], {from: minter});
       await this.indiciesZap.setFee([usdc.address], [usdcFee], {from: minter});
 
-      await expectRevert(this.indiciesZap.depositEth(pool.address, { value: '0', from: alice }), 'NULL_AMOUNT');
+      await expectRevert(this.indiciesZap.depositEth(pool.address, { value: '0', from: alice }), 'NA');
       let res = await this.indiciesZap.depositEth(pool.address, { value: aliceEthToSwap, from: alice });
 
-      await expectRevert(this.indiciesZap.withdrawEth(pool.address, '0', { from: alice }), 'NULL_AMOUNT');
-      await expectRevert(this.indiciesZap.withdrawEth(alice, '0', { from: alice }), 'NOT_SUPPORTED_POOL');
+      await expectRevert(this.indiciesZap.withdrawEth(pool.address, '0', { from: alice }), 'NA');
+      await expectRevert(this.indiciesZap.withdrawEth(alice, '0', { from: alice }), 'NS_POOL');
 
       const firstRoundEthKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, ETH, pool.address);
       let endTime = await web3.eth.getBlock(res.receipt.blockNumber).then(b => (b.timestamp + roundPeriod).toString());
@@ -245,7 +245,7 @@ describe('IndicesSupplyRedeemZap', () => {
       });
 
       let round = await this.indiciesZap.rounds(firstRoundEthKey);
-      assert.equal(round.blockNumber, res.receipt.blockNumber);
+      assert.equal(round.startBlock, res.receipt.blockNumber);
       assert.equal(round.endTime, endTime);
       assert.equal(round.pool, pool.address);
       assert.equal(round.inputToken, ETH);
@@ -256,9 +256,11 @@ describe('IndicesSupplyRedeemZap', () => {
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, alice), aliceEthToSwap);
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, bob), '0');
 
-      await expectRevert(this.indiciesZap.depositErc20(pool.address, usdc.address, '0', { from: alice }), 'NULL_AMOUNT');
-      await expectRevert(this.indiciesZap.depositErc20(pool.address, await this.indiciesZap.ETH(), ether(10), { from: alice }), 'NOT_SUPPORTED_TOKEN');
-      await expectRevert(this.indiciesZap.depositErc20(pool.address, alice, ether(10), { from: alice }), 'NOT_SUPPORTED_TOKEN');
+      await expectRevert(this.indiciesZap.depositErc20(pool.address, usdc.address, '0', { from: alice }), 'NA');
+      await expectRevert(this.indiciesZap.depositErc20(pool.address, await this.indiciesZap.ETH(), ether(10), { from: alice }), 'NS_TOKEN');
+      await expectRevert(this.indiciesZap.depositErc20(pool.address, alice, ether(10), { from: alice }), 'NS_TOKEN');
+
+      await expectRevert(this.indiciesZap.depositEth(pool.address, { value: '1', from: bob }), 'MIN_INPUT');
 
       res = await this.indiciesZap.depositEth(pool.address, { value: bobEthToSwap, from: bob });
       await expectEvent.notEmitted.inTransaction(res.tx, IndicesSupplyRedeemZap, 'FinishRound');
@@ -293,13 +295,13 @@ describe('IndicesSupplyRedeemZap', () => {
 
       round = await this.indiciesZap.rounds(firstRoundUsdcKey);
       assert.equal(round.endTime, endTime);
-      assert.equal(round.blockNumber, res.receipt.blockNumber);
+      assert.equal(round.startBlock, res.receipt.blockNumber);
       assert.equal(round.pool, pool.address);
       assert.equal(round.inputToken, usdc.address);
       assert.equal(round.outputToken, pool.address);
       assert.equal(round.totalInputAmount, mulBN(danUsdcToSwap, '2'));
 
-      await expectRevert(this.indiciesZap.withdrawErc20(pool.address, usdc.address, '0', { from: carol }), 'NULL_AMOUNT');
+      await expectRevert(this.indiciesZap.withdrawErc20(pool.address, usdc.address, '0', { from: carol }), 'NA');
       await expectRevert(this.indiciesZap.withdrawErc20(pool.address, usdc.address, mulBN(danUsdcToSwap, '3'), { from: dan }), 'subtraction overflow');
       await expectRevert(this.indiciesZap.withdrawErc20(pool.address, usdc.address, danUsdcToSwap, { from: alice }), 'subtraction overflow');
 
@@ -382,11 +384,11 @@ describe('IndicesSupplyRedeemZap', () => {
 
       await time.increase(roundPeriod);
 
-      await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [], '0x', {from: reporter}), 'NULL_LENGTH');
-      await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [alice, bob], '0x', {from: reporter}), 'TOTAL_OUTPUT_NULL');
-      await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan, carol], '0x', {from: reporter}), 'TOTAL_OUTPUT_NULL');
+      await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [], '0x', {from: reporter}), 'L');
+      await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [alice, bob], '0x', {from: reporter}), 'NULL_TO');
+      await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan, carol], '0x', {from: reporter}), 'NULL_TO');
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [], '0x', {from: reporter}), 'NULL_LENGTH');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [], '0x', {from: reporter}), 'L');
 
       assert.equal(await this.indiciesZap.isRoundReadyToExecute(firstRoundEthKey), true);
 
@@ -395,7 +397,7 @@ describe('IndicesSupplyRedeemZap', () => {
       await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('2', [firstRoundEthKey], '0x', {from: reporter}), 'NOT_HDH');
 
       res = await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], '0x', {from: reporter});
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], '0x', {from: reporter}), 'TOTAL_OUTPUT_NOT_NULL');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], '0x', {from: reporter}), 'TO_NOT_NULL');
       const secondRoundEthKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, ETH, pool.address);
       endTime = await web3.eth.getBlock(res.receipt.blockNumber).then(b => (b.timestamp + roundPeriod).toString());
       await expectEvent.inTransaction(res.tx, IndicesSupplyRedeemZap, 'InitRound', {
@@ -474,7 +476,7 @@ describe('IndicesSupplyRedeemZap', () => {
       assert.equal(round.totalOutputAmount, '0');
 
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [dan, carol], '0x', {from: reporter}), 'INPUT_NULL');
-      await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan, carol], '0x', {from: reporter}), 'TOTAL_OUTPUT_NULL');
+      await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan, carol], '0x', {from: reporter}), 'NULL_TO');
 
       const totalUscToSwapWithFee = mulScalarBN(totalUsdcToSwap, subBN(ether(1), usdcFee));
       const { erc20AfterFee: usdcInAfterFee } = await erc20PiptSwap.calcErc20Fee(usdc.address, totalUscToSwapWithFee);
@@ -562,6 +564,7 @@ describe('IndicesSupplyRedeemZap', () => {
 
       await expectRevert(this.indiciesZap.withdrawPoolToken(pool.address, usdc.address, mulBN(alicePoolBalance, 2), { from: alice }), 'subtraction overflow');
       await expectRevert(this.indiciesZap.withdrawPoolToken(pool.address, usdc.address, alicePoolBalance, { from: bob }), 'subtraction overflow');
+      await expectRevert(this.indiciesZap.withdrawPoolToken(pool.address, usdc.address, subBN(alicePoolBalance, '1'), { from: alice }), 'MIN_INPUT');
 
       res = await this.indiciesZap.withdrawPoolToken(pool.address, usdc.address, alicePoolBalance, { from: alice });
       await expectEvent.inTransaction(res.tx, IndicesSupplyRedeemZap, 'Withdraw', {
@@ -600,11 +603,11 @@ describe('IndicesSupplyRedeemZap', () => {
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundPoolUsdcKey, alice), alicePoolBalance);
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundPoolUsdcKey, bob), bobPoolBalance);
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundPoolUsdcKey], '0x', {from: reporter}), 'CURRENT_ROUND');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundPoolUsdcKey], '0x', {from: reporter}), 'CUR_ROUND');
 
       await time.increase(roundPeriod);
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundPoolUsdcKey], '0x', {from: slasher}), 'MAX_INTERVAL');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundPoolUsdcKey], '0x', {from: slasher}), 'MAX_I');
 
       res = await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundPoolUsdcKey], '0x', {from: reporter});
       const secondRoundPoolUsdcKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, pool.address, usdc.address);

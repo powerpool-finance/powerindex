@@ -122,7 +122,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   mapping(address => uint256) public pendingOddTokens;
 
   struct Round {
-    uint256 blockNumber;
+    uint256 startBlock;
     address inputToken;
     address outputToken;
     address pool;
@@ -182,7 +182,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   /* ==========  Client Functions  ========== */
 
   function depositEth(address _pool) external payable onlyEOA {
-    require(poolType[_pool] == PoolType.PIPT, "NOT_SUPPORTED_POOL");
+    require(poolType[_pool] == PoolType.PIPT, "NS_POOL");
 
     _deposit(_pool, ETH, _pool, msg.value);
   }
@@ -192,9 +192,9 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address _inputToken,
     uint256 _amount
   ) external onlyEOA {
-    require(poolType[_pool] != PoolType.NULL, "UNKNOWN_POOL");
+    require(poolType[_pool] != PoolType.NULL, "UP");
 
-    require(_inputToken == address(usdc), "NOT_SUPPORTED_TOKEN");
+    require(_inputToken == address(usdc), "NS_TOKEN");
 
     _deposit(_pool, _inputToken, _pool, _amount);
   }
@@ -205,19 +205,19 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     uint256 _poolAmount
   ) external onlyEOA {
     PoolType pType = poolType[_pool];
-    require(pType != PoolType.NULL, "UNKNOWN_POOL");
+    require(pType != PoolType.NULL, "UP");
 
     if (pType == PoolType.PIPT) {
-      require(_outputToken == address(usdc) || _outputToken == ETH, "NOT_SUPPORTED_TOKEN");
+      require(_outputToken == address(usdc) || _outputToken == ETH, "NS_TOKEN");
     } else {
-      require(_outputToken == address(usdc), "NOT_SUPPORTED_TOKEN");
+      require(_outputToken == address(usdc), "NS_TOKEN");
     }
 
     _deposit(_pool, _pool, _outputToken, _poolAmount);
   }
 
   function withdrawEth(address _pool, uint256 _amount) external onlyEOA {
-    require(poolType[_pool] == PoolType.PIPT, "NOT_SUPPORTED_POOL");
+    require(poolType[_pool] == PoolType.PIPT, "NS_POOL");
 
     _withdraw(_pool, ETH, _pool, _amount);
   }
@@ -227,8 +227,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address _outputToken,
     uint256 _amount
   ) external onlyEOA {
-    require(poolType[_pool] != PoolType.NULL, "UNKNOWN_POOL");
-    require(_outputToken != ETH, "ETH_CANT_BE_OUTPUT_TOKEN");
+    require(poolType[_pool] != PoolType.NULL, "UP");
+    require(_outputToken != ETH, "ETH_CANT_BE_OT");
 
     _withdraw(_pool, _outputToken, _pool, _amount);
   }
@@ -239,12 +239,12 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     uint256 _amount
   ) external onlyEOA {
     PoolType pType = poolType[_pool];
-    require(pType != PoolType.NULL, "UNKNOWN_POOL");
+    require(pType != PoolType.NULL, "UP");
 
     if (pType == PoolType.PIPT) {
-      require(_outputToken == address(usdc) || _outputToken == ETH, "NOT_SUPPORTED_TOKEN");
+      require(_outputToken == address(usdc) || _outputToken == ETH, "NS_TOKEN");
     } else {
-      require(_outputToken == address(usdc), "NOT_SUPPORTED_TOKEN");
+      require(_outputToken == address(usdc), "NS_TOKEN");
     }
 
     _withdraw(_pool, _pool, _outputToken, _amount);
@@ -295,7 +295,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function setPools(address[] memory _pools, PoolType[] memory _types) external onlyOwner {
     uint256 len = _pools.length;
-    require(len == _types.length, "LENGTH_ERR");
+    require(len == _types.length, "L");
     for (uint256 i = 0; i < len; i++) {
       poolType[_pools[i]] = _types[i];
       _updatePool(_pools[i]);
@@ -305,7 +305,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function setPoolsPiptSwap(address[] memory _pools, address[] memory _piptSwaps) external onlyOwner {
     uint256 len = _pools.length;
-    require(len == _piptSwaps.length, "LENGTH_ERR");
+    require(len == _piptSwaps.length, "L");
     for (uint256 i = 0; i < len; i++) {
       poolPiptSwap[_pools[i]] = _piptSwaps[i];
       usdc.approve(_piptSwaps[i], uint256(-1));
@@ -316,7 +316,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function setTokensCap(address[] memory _tokens, uint256[] memory _caps) external onlyOwner {
     uint256 len = _tokens.length;
-    require(len == _caps.length, "LENGTH_ERR");
+    require(len == _caps.length, "L");
     for (uint256 i = 0; i < len; i++) {
       tokenCap[_tokens[i]] = _caps[i];
       emit SetTokenCap(_tokens[i], _caps[i]);
@@ -338,7 +338,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         len == _depositorIndexes.length &&
         len == _lpTokens.length &&
         len == _vaultRegistries.length,
-      "LENGTH_ERR"
+      "L"
     );
     for (uint256 i = 0; i < len; i++) {
       vaultConfig[_tokens[i]] = VaultConfig(
@@ -372,7 +372,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function setFee(address[] memory _tokens, uint256[] memory _fees) external onlyOwner {
     uint256 len = _tokens.length;
-    require(len == _fees.length, "LENGTH_ERR");
+    require(len == _fees.length, "L");
     for (uint256 i = 0; i < len; i++) {
       feeByToken[_tokens[i]] = _fees[i];
       emit SetFee(_tokens[i], _fees[i]);
@@ -385,7 +385,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   }
 
   function claimFee(address[] memory _tokens) external onlyOwner {
-    require(feeReceiver != address(0), "FEE_RECEIVER_NOT_SET");
+    require(feeReceiver != address(0), "FR_NOT_SET");
 
     uint256 len = _tokens.length;
     for (uint256 i = 0; i < len; i++) {
@@ -535,7 +535,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address _outputToken,
     uint256 _amount
   ) internal {
-    require(_amount > 0, "NULL_AMOUNT");
+    require(_amount > 0, "NA");
     bytes32 roundKey = _updateRound(_pool, _inputToken, _outputToken);
 
     if (_inputToken != ETH) {
@@ -546,6 +546,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     round.inputAmount[msg.sender] = round.inputAmount[msg.sender].add(_amount);
     round.totalInputAmount = round.totalInputAmount.add(_amount);
 
+    require(round.inputAmount[msg.sender] == 0 || round.inputAmount[msg.sender] > 1e5, "MIN_INPUT");
+
     emit Deposit(roundKey, _pool, msg.sender, _inputToken, _amount);
   }
 
@@ -555,12 +557,14 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address _outputToken,
     uint256 _amount
   ) internal {
-    require(_amount > 0, "NULL_AMOUNT");
+    require(_amount > 0, "NA");
     bytes32 roundKey = _updateRound(_pool, _inputToken, _outputToken);
     Round storage round = rounds[roundKey];
 
     round.inputAmount[msg.sender] = round.inputAmount[msg.sender].sub(_amount);
     round.totalInputAmount = round.totalInputAmount.sub(_amount);
+
+    require(round.inputAmount[msg.sender] == 0 || round.inputAmount[msg.sender] > 1e5, "MIN_INPUT");
 
     if (_inputToken == ETH) {
       msg.sender.transfer(_amount);
@@ -575,7 +579,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
 
     uint256 len = _roundKeys.length;
-    require(len > 0, "NULL_LENGTH");
+    require(len > 0, "L");
 
     for (uint256 i = 0; i < len; i++) {
       Round storage round = rounds[_roundKeys[i]];
@@ -583,19 +587,22 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       _updateRound(round.pool, round.inputToken, round.outputToken);
       _checkRoundBeforeExecute(_roundKeys[i], round);
 
-      require(round.endTime + minInterval <= block.timestamp, "MIN_INTERVAL");
+      require(round.endTime + minInterval <= block.timestamp, "MIN_I");
       if (_bySlasher) {
-        require(round.endTime + maxInterval <= block.timestamp, "MAX_INTERVAL");
+        require(round.endTime + maxInterval <= block.timestamp, "MAX_I");
       }
 
       uint256 inputAmountWithFee = _takeAmountFee(round.pool, round.inputToken, round.totalInputAmount);
-      require(round.inputToken == round.pool || round.outputToken == round.pool, "UNKNOWN_ROUND_ACTION");
+      require(round.inputToken == round.pool || round.outputToken == round.pool, "UA");
 
       if (round.inputToken == round.pool) {
         _redeemPool(round, inputAmountWithFee);
       } else {
         _supplyPool(round, inputAmountWithFee);
       }
+
+      require(round.totalOutputAmount != 0, "NULL_TO");
+
       emit SupplyAndRedeemPoke(
         _roundKeys[i],
         round.pool,
@@ -717,14 +724,14 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
 
     uint256 len = _claimForList.length;
-    require(len > 0, "NULL_LENGTH");
+    require(len > 0, "L");
 
     Round storage round = rounds[_roundKey];
-    require(round.endTime + minInterval <= block.timestamp, "MIN_INTERVAL");
+    require(round.endTime + minInterval <= block.timestamp, "MIN_I");
     if (_bySlasher) {
-      require(round.endTime + maxInterval <= block.timestamp, "MAX_INTERVAL");
+      require(round.endTime + maxInterval <= block.timestamp, "MAX_I");
     }
-    require(round.totalOutputAmount != 0, "TOTAL_OUTPUT_NULL");
+    require(round.totalOutputAmount != 0, "NULL_TO");
 
     for (uint256 i = 0; i < len; i++) {
       address _claimFor = _claimForList[i];
@@ -767,9 +774,9 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   function _checkRoundBeforeExecute(bytes32 _roundKey, Round storage round) internal {
     bytes32 partialKey = getRoundPartialKey(round.pool, round.inputToken, round.outputToken);
 
-    require(lastRoundByPartialKey[partialKey] != _roundKey, "CURRENT_ROUND");
-    require(round.totalInputAmount != 0, "TOTAL_INPUT_NULL");
-    require(round.totalOutputAmount == 0, "TOTAL_OUTPUT_NOT_NULL");
+    require(lastRoundByPartialKey[partialKey] != _roundKey, "CUR_ROUND");
+    require(round.totalInputAmount != 0, "TI_NULL");
+    require(round.totalOutputAmount == 0, "TO_NOT_NULL");
   }
 
   function _updateRound(
@@ -794,7 +801,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         rounds[roundKey].endTime = block.timestamp;
       }
       roundKey = getCurrentBlockRoundKey(_pool, _inputToken, _outputToken);
-      rounds[roundKey].blockNumber = block.number;
+      rounds[roundKey].startBlock = block.number;
       rounds[roundKey].pool = _pool;
       rounds[roundKey].inputToken = _inputToken;
       rounds[roundKey].outputToken = _outputToken;
