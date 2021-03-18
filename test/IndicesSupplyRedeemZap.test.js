@@ -230,6 +230,9 @@ describe('IndicesSupplyRedeemZap', () => {
       await expectRevert(this.indiciesZap.depositEth(pool.address, { value: '0', from: alice }), 'NULL_AMOUNT');
       let res = await this.indiciesZap.depositEth(pool.address, { value: aliceEthToSwap, from: alice });
 
+      await expectRevert(this.indiciesZap.withdrawEth(pool.address, '0', { from: alice }), 'NULL_AMOUNT');
+      await expectRevert(this.indiciesZap.withdrawEth(alice, '0', { from: alice }), 'NOT_SUPPORTED_POOL');
+
       const firstRoundEthKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, ETH, pool.address);
       let endTime = await web3.eth.getBlock(res.receipt.blockNumber).then(b => (b.timestamp + roundPeriod).toString());
       await expectEvent.notEmitted.inTransaction(res.tx, IndicesSupplyRedeemZap, 'FinishRound');

@@ -218,7 +218,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   }
 
   function withdrawEth(address _pool, uint256 _amount) external onlyEOA {
-    require(poolType[_pool] != PoolType.NULL, "UNKNOWN_POOL");
+    require(poolType[_pool] == PoolType.PIPT, "NOT_SUPPORTED_POOL");
 
     _withdraw(_pool, ETH, _pool, _amount);
   }
