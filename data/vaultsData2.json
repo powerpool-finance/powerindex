@@ -1,0 +1,117 @@
+[
+ {
+   "name": "Compound",
+  "address": "0x629c759D1E83eFbF63d84eb3868B564d9521C129",
+  "curvePool": {
+   "virtualPrice": "1065225569025474530"
+  },
+  "yearnVault": {
+   "totalSupply": "25220770002191785354026958",
+   "crvValue": "27379487851655521865795542"
+  },
+  "balancerPool": {
+   "vaultTokenBalance": "351877534685530208568563",
+   "usdcEstimation": "374866760815",
+   "denormWeight": "2151451518000000000",
+   "normWeight": "86058060723442322"
+  },
+  "config": {
+   "lpToken": "0x845838df265dcd2c412a1dc9e959c7d08537f8a2",
+   "depositor": "0xeb21209ae4c2c9ff2a86aca31e123764a3b6bc06",
+   "amountsLength": 2,
+   "usdcIndex": 1
+  }
+ },
+ {
+   "name": "3CRV",
+  "address": "0x9cA85572E6A3EbF24dEDd195623F188735A5179f",
+  "curvePool": {
+   "virtualPrice": "1014774142679541667"
+  },
+  "yearnVault": {
+   "totalSupply": "74619274055649745653298073",
+   "crvValue": "80168549789357591599072779"
+  },
+  "balancerPool": {
+   "vaultTokenBalance": "1602634818799002025699215",
+   "usdcEstimation": "1625648945937",
+   "denormWeight": "9009543319000000000",
+   "normWeight": "360381732774415269"
+  },
+  "config": {
+   "lpToken": "0x6c3f90f043a72fa612cbac8115ee7e52bde6e490",
+   "depositor": "0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7",
+   "amountsLength": 3,
+   "usdcIndex": 1
+  }
+ },
+ {
+   "name": "GUSD",
+  "address": "0xcC7E70A958917cCe67B4B87a8C30E6297451aE98",
+  "curvePool": {
+   "virtualPrice": "1015066146667169236"
+  },
+  "yearnVault": {
+   "totalSupply": "36379636910177355957293395",
+   "crvValue": "40256665866870881029059771"
+  },
+  "balancerPool": {
+   "vaultTokenBalance": "750001646239684145098699",
+   "usdcEstimation": "760926840691",
+   "denormWeight": "4323650860000000000",
+   "normWeight": "172946034406917841"
+  },
+  "config": {
+   "lpToken": "0xd2967f45c4f384deea880f807be904762a3dea07",
+   "depositor": "0x64448b78561690b70e17cbe8029a3e5c1bb7136e",
+   "amountsLength": 4,
+   "usdcIndex": 2
+  }
+ },
+ {
+   "name": "Y",
+  "address": "0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c",
+  "curvePool": {
+   "virtualPrice": "1091655678173830885"
+  },
+  "yearnVault": {
+   "totalSupply": "41657837378850978367377285",
+   "crvValue": "48386837172214483212696166"
+  },
+  "balancerPool": {
+   "vaultTokenBalance": "1056932418311209236207428",
+   "usdcEstimation": "1153136992295",
+   "denormWeight": "6738427746000000000",
+   "normWeight": "269537109850781484"
+  },
+  "config": {
+   "lpToken": "0xdf5e0e81dff6faf3a7e52ba697820c5e32d806a8",
+   "depositor": "0xbbc81d23ea2c3ec7e56d39296f0cbb648873a5d3",
+   "amountsLength": 4,
+   "usdcIndex": 1
+  }
+ },
+ {
+   "name": "BUSD",
+  "address": "0x2994529C0652D127b7842094103715ec5299bBed",
+  "curvePool": {
+   "virtualPrice": "1096259150925712728"
+  },
+  "yearnVault": {
+   "totalSupply": "16389957259759308131042340",
+   "crvValue": "18490542567471488936445717"
+  },
+  "balancerPool": {
+   "vaultTokenBalance": "438106326817929161302093",
+   "usdcEstimation": "480157725269",
+   "denormWeight": "2776926556000000000",
+   "normWeight": "111077062244443082"
+  },
+  "config": {
+   "lpToken": "0x3b3ac5386837dc563660fb6a0937dfaa5924333b",
+   "depositor": "0xb6c057591e073249f2d9d88ba59a46cfc9b59edb",
+   "amountsLength": 4,
+   "usdcIndex": 1
+  }
+ }
+]

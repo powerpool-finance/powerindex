@@ -15,6 +15,7 @@ const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const ProxyFactory = artifacts.require('ProxyFactory');
 const MCapWeightStrategy = artifacts.require('MCapWeightStrategy');
 const VaultBalanceWeightStrategy = artifacts.require('VaultBalanceWeightStrategy');
+const MockInstantRebindStrategy = artifacts.require('MockInstantRebindStrategy');
 const MockOracle = artifacts.require('MockOracle');
 const PowerPoke = artifacts.require('PowerPoke');
 const MockFastGasOracle = artifacts.require('MockFastGasOracle');
@@ -25,8 +26,15 @@ const MockProxyCall = artifacts.require('MockProxyCall');
 const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRouterFactory');
+const MockCurveDepositor2 = artifacts.require('MockCurveDepositor2');
+const MockCurveDepositor3 = artifacts.require('MockCurveDepositor3');
+const MockCurveDepositor4 = artifacts.require('MockCurveDepositor4');
+const MockYVaultV1 = artifacts.require('MockYVaultV1');
+const MockYController = artifacts.require('MockYController');
+const MockCurvePoolRegistry = artifacts.require('MockCurvePoolRegistry');
 const ethers = require('ethers');
 const pIteration = require('p-iteration');
+const { deployProxied, gwei } = require('../helpers');
 
 WETH.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
@@ -35,11 +43,17 @@ UniswapV2Router02.numberFormat = 'String';
 MCapWeightStrategy.numberFormat = 'String';
 PowerIndexPool.numberFormat = 'String';
 PowerPoke.numberFormat = 'String';
+MockYVaultV1.numberFormat = 'String';
+MockYController.numberFormat = 'String';
+MockCurveDepositor2.numberFormat = 'String';
+MockCurveDepositor3.numberFormat = 'String';
+MockCurveDepositor4.numberFormat = 'String';
+MockCurvePoolRegistry.numberFormat = 'String';
+MockInstantRebindStrategy.numberFormat = 'String';
 
 const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
 
-const { deployProxied, gwei } = require('../helpers');
 const {buildBasicRouterConfig, buildBasicRouterArgs} = require('../helpers/builders');
 
 function ether(val) {
@@ -131,14 +145,14 @@ describe('WeightStrategy', () => {
       await poke.setMinimalDeposit(weightStrategy.address, slasherDeposit, { from: weightStrategyOwner });
     }
 
-    this.makePowerIndexPool = async (_tokens, _balances) => {
+    this.makePowerIndexPool = async (_tokens, _balances, _totalDenormalizedWeight = 50, _customWeights = []) => {
       const fromTimestamp = await getTimestamp(100);
       const targetTimestamp = await getTimestamp(100 + 60 * 60 * 24 * 5);
       for (let i = 0; i < _tokens.length; i++) {
         await _tokens[i].approve(this.bActions.address, '0x' + 'f'.repeat(64));
       }
 
-      const weightPart = 50 / _tokens.length;
+      const weightPart = _totalDenormalizedWeight / _tokens.length;
       const minWeightPerSecond = ether('0');
       const maxWeightPerSecond = ether('0.1');
 
@@ -159,7 +173,7 @@ describe('WeightStrategy', () => {
         _tokens.map((t, i) => ({
           token: t.address,
           balance: _balances[i],
-          targetDenorm: ether(weightPart),
+          targetDenorm: _customWeights && _customWeights.length > 0 ? _customWeights[i] : ether(weightPart),
           fromTimestamp: fromTimestamp.toString(),
           targetTimestamp: targetTimestamp.toString()
         })),
@@ -246,6 +260,108 @@ describe('WeightStrategy', () => {
 
       await oracle.setPrice(this.weth.address, ether(1000));
       await oracle.setPrice(this.cvpToken.address, ether(1.5));
+    });
+
+    describe('InstantRebindStrategy', () => {
+      let usdc;
+      const vaultsData = JSON.parse(fs.readFileSync('data/vaultsData2.json', { encoding: 'utf8' }));
+
+      beforeEach(async () => {
+        usdc = await MockERC20.new('USDC', 'USDC', 6, ether(1e16));
+
+        const curvePoolRegistry = await MockCurvePoolRegistry.new();
+        weightStrategy = await deployProxied(
+          MockInstantRebindStrategy,
+          [usdc.address],
+          [poke.address, curvePoolRegistry.address, oracle.address],
+          {proxyAdminOwner: minter}
+        );
+        const depositors = [
+          null,
+          null,
+          MockCurveDepositor2,
+          MockCurveDepositor3,
+          MockCurveDepositor4
+        ]
+        const denormWeights = [];
+
+        for (let i = 0; i < vaultsData.length; i++) {
+          const crvToken = await MockERC20.new(vaultsData[i].name, 'CRV', 18, ether(1e16));
+          const crvDeposit = await depositors[vaultsData[i].config.amountsLength].new(
+            crvToken.address,
+            usdc.address,
+            vaultsData[i].config.usdcIndex,
+            vaultsData[i].curvePool.virtualPrice,
+          );
+          const ycrvVault = await MockYVaultV1.new(crvToken.address, minter);
+          await curvePoolRegistry.set_virtual_price(crvToken.address, vaultsData[i].curvePool.virtualPrice);
+
+          const yController = await MockYController.new();
+          await crvToken.approve(ycrvVault.address, vaultsData[i].yearnVault.totalSupply);
+          await ycrvVault.setController(yController.address);
+          await ycrvVault.deposit(vaultsData[i].yearnVault.totalSupply);
+
+          await weightStrategy.setVaultConfig(
+            ycrvVault.address,
+            crvDeposit.address,
+            vaultsData[i].config.amountsLength,
+            vaultsData[i].config.usdcIndex,
+          );
+
+          await usdc.transfer(crvDeposit.address, ether(1e8));
+
+          tokens.push(ycrvVault);
+          bPoolBalances.push(vaultsData[i].balancerPool.vaultTokenBalance);
+          denormWeights.push(ether(5))
+        }
+
+        balancerTokens = tokens;
+
+        pool = await this.makePowerIndexPool(tokens, bPoolBalances, 25, denormWeights);
+        poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
+
+        await this.initWeightsStrategy(weightStrategy, pool, poolController, poke);
+
+        await time.increase(pokePeriod);
+      })
+
+      it('should correctly rebalance token balances', async () => {
+        // BEFORE
+        for (let t of balancerTokens) {
+          assert.equal(await pool.getDenormalizedWeight(t.address), ether('5'));
+          assert.equal(await pool.getNormalizedWeight(t.address), ether('0.2'));
+        }
+
+        assert.equal(await pool.getBalance(balancerTokens[0].address), ether('351877.534685530208568563')) // Compound
+        assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1602634.818799002025699215')) // 3CRV
+        assert.equal(await pool.getBalance(balancerTokens[2].address), ether('750001.646239684145098699')) // GUSD
+        assert.equal(await pool.getBalance(balancerTokens[3].address), ether('1056932.418311209236207428')) // Y
+        assert.equal(await pool.getBalance(balancerTokens[4].address), ether('438106.326817929161302093')) // BUSD
+
+        // ACTION
+        await weightStrategy.mockPoke();
+
+        await time.increase(pokePeriod * 2);
+
+        assert.equal(await pool.getNormalizedWeight(balancerTokens[0].address), ether('0.132370679337861024'))
+        assert.equal(await pool.getNormalizedWeight(balancerTokens[1].address), ether('0.373088863460271325'))
+        assert.equal(await pool.getNormalizedWeight(balancerTokens[2].address), ether('0.181946865339872727'))
+        assert.equal(await pool.getNormalizedWeight(balancerTokens[3].address), ether('0.224065128438652867'))
+        assert.equal(await pool.getNormalizedWeight(balancerTokens[4].address), ether('0.088528463423342056'))
+
+        assert.equal(await pool.getDenormalizedWeight(balancerTokens[0].address), ether('3.309266983446525607'))
+        assert.equal(await pool.getDenormalizedWeight(balancerTokens[1].address), ether('9.327221586506783136'))
+        assert.equal(await pool.getDenormalizedWeight(balancerTokens[2].address), ether('4.548671633496818185'))
+        assert.equal(await pool.getDenormalizedWeight(balancerTokens[3].address), ether('5.601628210966321663'))
+        assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.213211585583551406'))
+        assert.equal(await pool.getTotalDenormalizedWeight(), ether('24.999999999999999997'))
+
+        assert.equal(await pool.getBalance(balancerTokens[0].address), ether('546336.171211141988666428'))
+        assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1616414.109584114684162004'))
+        assert.equal(await pool.getBalance(balancerTokens[2].address), ether('788061.250224738394683042'))
+        assert.equal(await pool.getBalance(balancerTokens[3].address), ether('902398.434802742931942694'))
+        assert.equal(await pool.getBalance(balancerTokens[4].address), ether('355041.757045204632243442'))
+      })
     });
 
     describe('MCapWeightStrategy', () => {

@@ -214,4 +214,31 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
       revert("NEW_TOKEN_NOT_ALLOWED"); // If there is no tokens with target MIN_WEIGHT
     }
   }
+
+  function rebindByStrategyAdd(
+    address token,
+    uint256 balance,
+    uint256 denorm,
+    uint256 deposit
+  ) external onlyWeightsStrategy {
+    uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+
+    IERC20(token).transferFrom(msg.sender, address(this), deposit);
+    IERC20(token).approve(address(pool), deposit);
+    pool.rebind(token, balance, denorm);
+
+    uint256 balanceAfter = IERC20(token).balanceOf(address(this));
+    IERC20(token).transfer(msg.sender, balanceAfter - balanceBefore);
+  }
+
+  function rebindByStrategyRemove(
+    address token,
+    uint256 balance,
+    uint256 denorm
+  ) external onlyWeightsStrategy {
+    uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+    pool.rebind(token, balance, denorm);
+    uint256 balanceAfter = IERC20(token).balanceOf(address(this));
+    IERC20(token).transfer(msg.sender, balanceAfter - balanceBefore);
+  }
 }
