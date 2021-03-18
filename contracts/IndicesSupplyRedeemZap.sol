@@ -130,6 +130,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     uint256 totalInputAmount;
     mapping(address => uint256) outputAmount;
     uint256 totalOutputAmount;
+    uint256 totalOutputAmountClaimed;
     uint256 endTime;
   }
   mapping(bytes32 => Round) public rounds;
@@ -686,6 +687,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       uint256 inputShare = round.inputAmount[_claimFor].mul(1 ether).div(round.totalInputAmount);
       uint256 outputAmount = round.totalOutputAmount.mul(inputShare).div(1 ether);
       round.outputAmount[_claimFor] = outputAmount;
+      round.totalOutputAmountClaimed = round.totalOutputAmountClaimed.add(outputAmount).add(1);
       IERC20(round.outputToken).safeTransfer(_claimFor, outputAmount - 1);
 
       emit ClaimPoke(

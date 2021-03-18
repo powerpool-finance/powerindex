@@ -451,6 +451,9 @@ describe('IndicesSupplyRedeemZap', () => {
       assert.equal(await this.indiciesZap.getRoundUserOutput(firstRoundEthKey, alice), '0');
       assert.equal(await this.indiciesZap.getRoundUserOutput(firstRoundEthKey, bob), '0');
 
+      round = await this.indiciesZap.rounds(firstRoundEthKey);
+      assert.equal(round.totalOutputAmountClaimed, '0');
+
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [alice, bob], '0x', {from: dan}), 'NOT_HDH');
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [alice, bob], '0x', {from: slasher}), 'NOT_HDH');
       await expectRevert(this.indiciesZap.claimPokeFromReporter('2', firstRoundEthKey, [alice, bob], '0x', {from: reporter}), 'NOT_HDH');
@@ -466,6 +469,7 @@ describe('IndicesSupplyRedeemZap', () => {
 
       round = await this.indiciesZap.rounds(firstRoundEthKey);
       assertEqualWithAccuracy(round.totalOutputAmount, poolOutForEth, ether('0.05'));
+      assertEqualWithAccuracy(round.totalOutputAmount, round.totalOutputAmountClaimed, ether('0.0000001'));
       round = await this.indiciesZap.rounds(firstRoundUsdcKey);
       assert.equal(round.totalOutputAmount, '0');
 
