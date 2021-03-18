@@ -45,7 +45,7 @@ async function getTimestamp(shift = 0) {
   return currentTimestamp + shift;
 }
 
-describe.only('IndicesSupplyRedeemZap', () => {
+describe('IndicesSupplyRedeemZap', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   let ETH;
   const swapFee = ether('0.0001');
@@ -139,7 +139,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
     };
   });
 
-  describe('Swaps with Uniswap mainnet values', () => {
+  describe('Supply and Redeem of PIPT pool', () => {
     let cvp, usdc, tokens, balancerTokens, pairs, bPoolBalances, pool;
 
     const tokenBySymbol = {};
@@ -191,7 +191,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
       await time.increase(12 * 60 * 60);
     });
 
-    it('swapEthToPipt should work properly', async () => {
+    it('should deposit, withdraw, supply, redeem and claim correctly', async () => {
       const aliceEthToSwap = ether(10);
       const bobEthToSwap = ether(20);
 
@@ -527,7 +527,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
     });
   });
 
-  describe.skip('Swaps with Uniswap mainnet values', () => {
+  describe.skip('Supply and Redeem of VAULT pool', () => {
     let usdc, tokens, vaults, bPoolBalances, pool;
 
     beforeEach(async () => {
@@ -587,7 +587,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
       await time.increase(12 * 60 * 60);
     });
 
-    it('swapEthToPipt should work properly', async () => {
+    it('should deposit, withdraw, supply, redeem and claim correctly', async () => {
       const erc20PiptSwap = await Erc20PiptSwap.new(this.weth.address, usdc.address, pool.address, zeroAddress, feeManager, {
         from: minter,
       });
