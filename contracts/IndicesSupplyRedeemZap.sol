@@ -453,6 +453,13 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     return rounds[roundKey].outputAmount[user];
   }
 
+  function calcVaultOutByUsdc(address _token, uint256 _usdcIn) public view returns (uint256 amountOut) {
+    VaultConfig storage vc = vaultConfig[_token];
+    uint256 lpByUsdcPrice = IVaultRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
+    uint256 vaultByLpPrice = IVault(_token).getPricePerFullShare();
+    return _usdcIn.mul(1e30).div(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether));
+  }
+
   /* ==========  Internal Functions  ========== */
 
   function _deposit(
@@ -779,13 +786,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   }
 
   function _getMinMaxReportInterval() internal view returns (uint256 min, uint256 max) {
-    return powerPoke.getMinMaxReportIntervals(address(this));
-  }
-
-  function calcVaultOutByUsdc(address _token, uint256 _usdcIn) public view returns (uint256 amountOut) {
-    VaultConfig storage vc = vaultConfig[_token];
-    uint256 lpByUsdcPrice = IVaultRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
-    uint256 vaultByLpPrice = IVault(_token).getPricePerFullShare();
-    return _usdcIn.mul(1e30).div(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether));
+    (min, max) = powerPoke.getMinMaxReportIntervals(address(this));
+    min = min == 1 ? 0 : min;
   }
 }
