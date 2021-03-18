@@ -105,7 +105,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   mapping(address => uint256) public feeByToken;
   mapping(address => uint256) public pendingFeeByToken;
 
-  mapping(address => uint256) public oddTokens;
+  mapping(address => uint256) public pendingOddTokens;
 
   struct Round {
     uint256 blockNumber;
@@ -163,7 +163,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   }
 
   receive() external payable {
-    oddTokens[ETH] = oddTokens[ETH].add(msg.value);
+    pendingOddTokens[ETH] = pendingOddTokens[ETH].add(msg.value);
   }
 
   /* ==========  Client Functions  ========== */
@@ -680,7 +680,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     if (feeByToken[_inputToken] == 0) {
       return _amount;
     }
-    amountWithFee = _amount.mul(feeByToken[_inputToken]).div(1 ether);
+    amountWithFee = _amount.sub(_amount.mul(feeByToken[_inputToken]).div(1 ether));
     if (amountWithFee != _amount) {
       pendingFeeByToken[_inputToken] = pendingFeeByToken[_inputToken].add(_amount.sub(amountWithFee));
       emit TakeFee(_inputToken, _amount.sub(amountWithFee));

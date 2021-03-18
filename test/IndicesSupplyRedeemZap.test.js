@@ -199,6 +199,8 @@ describe.only('IndicesSupplyRedeemZap', () => {
       const carolUsdcToSwap = mwei(10000);
       const usdcTokenCap = mwei(11000);
 
+      const usdcFee = ether('0.1');
+
       const erc20PiptSwap = await Erc20PiptSwap.new(this.weth.address, cvp.address, pool.address, zeroAddress, feeManager, {
         from: minter,
       });
@@ -219,7 +221,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
       await this.indiciesZap.setPools([pool.address], ['1'], {from: minter});
       await this.indiciesZap.setPoolsPiptSwap([pool.address], [erc20PiptSwap.address], {from: minter});
       await this.indiciesZap.setTokensCap([usdc.address], [usdcTokenCap], {from: minter});
-      await this.indiciesZap.setTokensCap([usdc.address], [usdcTokenCap], {from: minter});
+      await this.indiciesZap.setFee([usdc.address], [usdcFee], {from: minter});
 
       await expectRevert(this.indiciesZap.depositEth(pool.address, { value: '0', from: alice }), "NULL_AMOUNT");
       let res = await this.indiciesZap.depositEth(pool.address, { value: aliceEthToSwap, from: alice });
@@ -392,7 +394,8 @@ describe.only('IndicesSupplyRedeemZap', () => {
       await expectRevert(this.indiciesZap.claimPoke(firstRoundEthKey, [dan, carol]), 'INPUT_NULL');
       await expectRevert(this.indiciesZap.claimPoke(firstRoundUsdcKey, [dan, carol]), 'TOTAL_OUTPUT_NULL');
 
-      const { erc20AfterFee: usdcInAfterFee } = await erc20PiptSwap.calcErc20Fee(usdc.address, totalUsdcToSwap);
+      const totalUscToSwapWithFee = mulScalarBN(totalUsdcToSwap, subBN(ether(1), usdcFee));
+      const { erc20AfterFee: usdcInAfterFee } = await erc20PiptSwap.calcErc20Fee(usdc.address, totalUscToSwapWithFee);
       const {poolOut: poolOutForUsdc} = await erc20PiptSwap.calcSwapErc20ToPiptInputs(
         usdc.address,
         usdcInAfterFee,
@@ -417,6 +420,10 @@ describe.only('IndicesSupplyRedeemZap', () => {
         inputToken: usdc.address,
         totalInputAmount: totalUsdcToSwap,
         inputCap: usdcTokenCap
+      });
+      await expectEvent.inTransaction(res.tx, IndicesSupplyRedeemZap, 'TakeFee', {
+        token: usdc.address,
+        amount: subBN(totalUsdcToSwap, totalUscToSwapWithFee)
       });
 
       round = await this.indiciesZap.rounds(firstRoundUsdcKey);
