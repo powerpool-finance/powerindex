@@ -113,8 +113,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   uint256 public roundPeriod;
 
-  uint256 public oddEth;
-
   address public feeReceiver;
   mapping(address => uint256) public feeByToken;
   mapping(address => uint256) public pendingFeeByToken;
