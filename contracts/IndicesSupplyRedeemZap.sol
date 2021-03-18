@@ -10,12 +10,12 @@ import "@powerpool/poweroracle/contracts/interfaces/IPowerPoke.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./interfaces/PowerIndexPoolInterface.sol";
 import "./interfaces/TokenInterface.sol";
-import "./Erc20PiptSwap.sol";
 import "./interfaces/IVaultDepositor2.sol";
 import "./interfaces/IVaultDepositor3.sol";
 import "./interfaces/IVaultDepositor4.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/IVaultRegistry.sol";
+import "./interfaces/IErc20PiptSwap.sol";
 
 contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   using SafeMath for uint256;
@@ -617,7 +617,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   function _supplyPool(Round storage round, uint256 totalInputAmount) internal {
     PoolType pType = poolType[round.pool];
     if (pType == PoolType.PIPT) {
-      Erc20PiptSwap piptSwap = Erc20PiptSwap(payable(poolPiptSwap[round.pool]));
+      IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolPiptSwap[round.pool]));
       if (round.inputToken == ETH) {
         (round.totalOutputAmount, ) = piptSwap.swapEthToPipt{ value: totalInputAmount }(piptSwap.defaultSlippage());
       } else {
@@ -685,7 +685,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   function _redeemPool(Round storage round, uint256 totalInputAmount) internal {
     PoolType pType = poolType[round.pool];
     if (pType == PoolType.PIPT) {
-      Erc20PiptSwap piptSwap = Erc20PiptSwap(payable(poolPiptSwap[round.pool]));
+      IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolPiptSwap[round.pool]));
       if (round.inputToken == ETH) {
         round.totalOutputAmount = piptSwap.swapPiptToEth(totalInputAmount);
       } else {
