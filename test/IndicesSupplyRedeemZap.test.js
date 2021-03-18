@@ -45,7 +45,7 @@ async function getTimestamp(shift = 0) {
   return currentTimestamp + shift;
 }
 
-describe.only('IndicesSupplyRedeemZap', () => {
+describe('IndicesSupplyRedeemZap', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   let ETH;
   const swapFee = ether('0.0001');
