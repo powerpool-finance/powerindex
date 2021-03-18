@@ -142,8 +142,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     uint256 tokenBalance;
     uint256 input;
     uint256 correctInput;
-    uint256 out;
-    uint256 correctOut;
     uint256 poolAmountOut;
   }
 
@@ -510,8 +508,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       vc[i].token = poolTokens[_pool][i];
       vc[i].tokenBalance = PowerIndexPoolInterface(_pool).getBalance(vc[i].token);
       vc[i].input = totalInputAmount / len;
-      vc[i].out = calcVaultOutByUsdc(vc[i].token, vc[i].input);
-      vc[i].poolAmountOut = vc[i].out.mul(piptTotalSupply).div(vc[i].tokenBalance);
+      vc[i].poolAmountOut = calcVaultOutByUsdc(vc[i].token, vc[i].input).mul(piptTotalSupply).div(vc[i].tokenBalance);
       if (minPoolAmount == 0 || vc[i].poolAmountOut < minPoolAmount) {
         minPoolAmount = vc[i].poolAmountOut;
       }

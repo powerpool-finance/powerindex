@@ -604,7 +604,7 @@ describe('IndicesSupplyRedeemZap', () => {
 
       await time.increase(roundPeriod);
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundPoolUsdcKey], '0x', {from: slasher}), 'MAX_INTERVAL_NOT_REACHED');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundPoolUsdcKey], '0x', {from: slasher}), 'MAX_INTERVAL');
 
       res = await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundPoolUsdcKey], '0x', {from: reporter});
       const secondRoundPoolUsdcKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, pool.address, usdc.address);
