@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { deployProxied, mwei, addBN, subBN, mulScalarBN, divScalarBN, mulBN, divBN, assertEqualWithAccuracy } = require('./helpers');
+const { deployProxied, mwei, addBN, subBN, mulScalarBN, mulBN, divBN, assertEqualWithAccuracy } = require('./helpers');
 
 const { time, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
@@ -223,7 +223,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
       await this.indiciesZap.setTokensCap([usdc.address], [usdcTokenCap], {from: minter});
       await this.indiciesZap.setFee([usdc.address], [usdcFee], {from: minter});
 
-      await expectRevert(this.indiciesZap.depositEth(pool.address, { value: '0', from: alice }), "NULL_AMOUNT");
+      await expectRevert(this.indiciesZap.depositEth(pool.address, { value: '0', from: alice }), 'NULL_AMOUNT');
       let res = await this.indiciesZap.depositEth(pool.address, { value: aliceEthToSwap, from: alice });
 
       const firstRoundEthKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, ETH, pool.address);
@@ -249,7 +249,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, alice), aliceEthToSwap);
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundEthKey, bob), '0');
 
-      await expectRevert(this.indiciesZap.depositErc20(pool.address, usdc.address, '0', { from: alice }), "NULL_AMOUNT");
+      await expectRevert(this.indiciesZap.depositErc20(pool.address, usdc.address, '0', { from: alice }), 'NULL_AMOUNT');
       await expectRevert(this.indiciesZap.depositErc20(pool.address, await this.indiciesZap.ETH(), ether(10), { from: alice }), 'NOT_SUPPORTED_TOKEN');
       await expectRevert(this.indiciesZap.depositErc20(pool.address, alice, ether(10), { from: alice }), 'NOT_SUPPORTED_TOKEN');
 
@@ -488,7 +488,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundPoolUsdcKey, alice), alicePoolBalance);
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundPoolUsdcKey, bob), bobPoolBalance);
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPoke([firstRoundPoolUsdcKey]), "CURRENT_ROUND");
+      await expectRevert(this.indiciesZap.supplyAndRedeemPoke([firstRoundPoolUsdcKey]), 'CURRENT_ROUND');
 
       await time.increase(roundPeriod);
 
@@ -520,7 +520,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
       round = await this.indiciesZap.rounds(firstRoundPoolUsdcKey);
       assertEqualWithAccuracy(round.totalOutputAmount, totalErc20Out, ether('0.05'));
 
-      await expectRevert(this.indiciesZap.claimPoke(firstRoundUsdcKey, [alice, bob, dan]), "INPUT_NULL");
+      await expectRevert(this.indiciesZap.claimPoke(firstRoundUsdcKey, [alice, bob, dan]), 'INPUT_NULL');
       await this.indiciesZap.claimPoke(firstRoundPoolUsdcKey, [alice, bob]);
       assertEqualWithAccuracy(await usdc.balanceOf(alice), divBN(mulBN(totalErc20Out, alicePoolBalance), totalPoolUsdcRoundInput), ether('0.05'));
       assertEqualWithAccuracy(await usdc.balanceOf(bob), divBN(mulBN(totalErc20Out, bobPoolBalance), totalPoolUsdcRoundInput), ether('0.05'));
@@ -528,11 +528,10 @@ describe.only('IndicesSupplyRedeemZap', () => {
   });
 
   describe.skip('Swaps with Uniswap mainnet values', () => {
-    let usdc, tokens, balancerTokens, vaults, bPoolBalances, pool;
+    let usdc, tokens, vaults, bPoolBalances, pool;
 
     beforeEach(async () => {
       tokens = [];
-      balancerTokens = [];
       vaults = [];
       bPoolBalances = [];
       const vaultsData = JSON.parse(fs.readFileSync('data/vaultsData.json', { encoding: 'utf8' }));
@@ -542,7 +541,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
       const vaultRegistry = await MockVaultRegistry.new();
       for (let i = 0; i < vaultsData.length; i++) {
         const v = vaultsData[i];
-        const lpToken = await MockERC20.new("", "", '18', v.totalSupply);
+        const lpToken = await MockERC20.new('', '', '18', v.totalSupply);
         const vault = await MockVault.new(lpToken.address, v.usdtValue, v.totalSupply);
         let depositor;
         if (v.config.amountsLength === 2) {
@@ -564,7 +563,6 @@ describe.only('IndicesSupplyRedeemZap', () => {
         tokens.push(vault);
         bPoolBalances.push(poolsData[i].balancerBalance);
       }
-      balancerTokens = tokens;
 
       pool = await this.makePowerIndexPool(tokens, bPoolBalances);
 
@@ -583,7 +581,7 @@ describe.only('IndicesSupplyRedeemZap', () => {
         vaults.map(v => v.config.amountsLength),
         vaults.map(v => v.config.usdcIndex),
         vaults.map(v => v.lpToken.address),
-        vaults.map(v => vaultRegistry.address),
+        vaults.map(() => vaultRegistry.address),
       );
 
       await time.increase(12 * 60 * 60);

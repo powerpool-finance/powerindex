@@ -5,7 +5,6 @@ const fs = require('fs');
 task('fetch-vaults-data', 'Fetch vaults data').setAction(async () => {
   const BPool = artifacts.require('BPool');
   const MockVault = artifacts.require('MockVault');
-  const MockVaultDepositor = artifacts.require('MockVaultDepositor');
   const MockVaultRegistry = artifacts.require('MockVaultRegistry');
 
   const vaultRegistry = await MockVaultRegistry.at('0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c');

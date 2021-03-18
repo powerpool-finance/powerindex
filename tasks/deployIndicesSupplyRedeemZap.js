@@ -3,20 +3,16 @@ require('@nomiclabs/hardhat-truffle5');
 const fs = require('fs');
 
 task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').setAction(async (__, {ethers, network}) => {
-  const {impersonateAccount, forkContractUpgrade, gwei, ether, fromEther, mwei, fromMwei, ethUsed, deployProxied, callContract, increaseTime} = require('../test/helpers');
+  const {impersonateAccount, forkContractUpgrade, fromEther, mwei, fromMwei, deployProxied, callContract, increaseTime} = require('../test/helpers');
   const IndicesSupplyRedeemZap = artifacts.require('IndicesSupplyRedeemZap');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
-  const PowerPoke = await artifacts.require('PowerPoke');
 
   const { web3 } = IndicesSupplyRedeemZap;
-  const { toWei } = web3.utils;
 
   const [deployer] = await web3.eth.getAccounts();
   console.log('deployer', deployer);
-  // const sendOptions = { from: deployer };
 
   const roundPeriod = 3600;
-  const zeroAddress = '0x0000000000000000000000000000000000000000';
   const admin = '0xb258302c3f209491d604165549079680708581cc';
   const usdcAddress = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
   const proxyAdminAddr = '0x7696f9208f9e195ba31e6f4B2D07B6462C8C42bb';
@@ -47,7 +43,7 @@ task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').set
     vd.map(v => v.config.amountsLength),
     vd.map(v => v.config.usdcIndex),
     vd.map(v => v.config.lpToken),
-    vd.map(v => curveRegistry),
+    vd.map(() => curveRegistry),
   );
 
   if (network.name !== 'mainnetfork') {

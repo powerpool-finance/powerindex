@@ -14,7 +14,6 @@ import "./interfaces/IPoolRestrictions.sol";
 import "./interfaces/IUniswapV2Pair.sol";
 import "./interfaces/IUniswapV2Factory.sol";
 import "./lib/UniswapV2Library.sol";
-import "hardhat/console.sol";
 
 contract EthPiptSwap is Ownable {
   using SafeMath for uint256;
@@ -390,7 +389,6 @@ contract EthPiptSwap is Ownable {
     address[] memory tokens,
     uint256 wrapperFee
   ) internal returns (uint256 poolAmountOutAfterFee, uint256 oddEth) {
-    console.log("_wethAmount", _wethAmount);
     require(_wethAmount > 0, "ETH_REQUIRED");
 
     {
@@ -437,7 +435,6 @@ contract EthPiptSwap is Ownable {
     uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(100);
     for (uint256 i = 0; i < len; i++) {
       tokensInPipt[i] = ratio.mul(getPiptTokenBalance(_tokens[i])).div(1 ether);
-      console.log("tokensInPipt[i]", tokensInPipt[i]);
       totalEthSwap = totalEthSwap.add(_swapWethForTokenIn(_tokens[i], tokensInPipt[i]));
 
       address approveAddress = address(piptWrapper) == address(0) ? address(pipt) : address(piptWrapper);
@@ -506,8 +503,6 @@ contract EthPiptSwap is Ownable {
   function _swapWethForTokenIn(address _erc20, uint256 _erc20Out) internal returns (uint256 ethIn) {
     IUniswapV2Pair tokenPair = _uniswapPairFor(_erc20);
     bool isInverse;
-    console.log("tokenPair", address(tokenPair));
-    console.log("_erc20Out", _erc20Out);
     (ethIn, isInverse) = getAmountInForUniswap(tokenPair, _erc20Out, true);
     weth.safeTransfer(address(tokenPair), ethIn);
     tokenPair.swap(isInverse ? uint256(0) : _erc20Out, isInverse ? _erc20Out : uint256(0), address(this), new bytes(0));
