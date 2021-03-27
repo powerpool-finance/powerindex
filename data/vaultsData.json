@@ -1,32 +1,67 @@
 [
  {
   "address": "0x629c759D1E83eFbF63d84eb3868B564d9521C129",
-  "totalSupply": "17426101895408222223447383",
-  "usdtValue": "18784431775472379582627921",
-  "balancerBalance": "34423289952553289281884"
+  "totalSupply": "24481201686547875562733510",
+  "usdtValue": "26488762195659944942487610",
+  "balancerBalance": "43988765421808904886938",
+  "usdcToLpRate": "1063688645005002554",
+  "config": {
+   "lpToken": "0x845838df265dcd2c412a1dc9e959c7d08537f8a2",
+   "depositor": "0xeb21209ae4c2c9ff2a86aca31e123764a3b6bc06",
+   "amountsLength": 2,
+   "usdcIndex": 1
+  }
  },
  {
   "address": "0x9cA85572E6A3EbF24dEDd195623F188735A5179f",
-  "totalSupply": "75378162215072598832033876",
-  "usdtValue": "80393328917778433112428639",
-  "balancerBalance": "152358083770092489146247"
+  "totalSupply": "70729436714596613309230063",
+  "usdtValue": "75748750946624192097346502",
+  "balancerBalance": "202874476839333312464567",
+  "usdcToLpRate": "1014610322937254195",
+  "config": {
+   "lpToken": "0x6c3f90f043a72fa612cbac8115ee7e52bde6e490",
+   "depositor": "0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7",
+   "amountsLength": 3,
+   "usdcIndex": 1
+  }
  },
  {
   "address": "0xcC7E70A958917cCe67B4B87a8C30E6297451aE98",
-  "totalSupply": "29630674200382283367536278",
-  "usdtValue": "32387009876630555278999498",
-  "balancerBalance": "71527902036360709930585"
+  "totalSupply": "41123936432723651420289281",
+  "usdtValue": "45239725598809415661242272",
+  "balancerBalance": "88473438713176605462035",
+  "usdcToLpRate": "1014945421959319233",
+  "config": {
+   "lpToken": "0xd2967f45c4f384deea880f807be904762a3dea07",
+   "depositor": "0x64448b78561690b70e17cbe8029a3e5c1bb7136e",
+   "amountsLength": 4,
+   "usdcIndex": 2
+  }
  },
  {
   "address": "0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c",
-  "totalSupply": "44735864867970520560559068",
-  "usdtValue": "51744611790231991374545940",
-  "balancerBalance": "102910390117365933414606"
+  "totalSupply": "42516125453065117799756672",
+  "usdtValue": "49306825022143500608226508",
+  "balancerBalance": "123028452041117842024104",
+  "usdcToLpRate": "1089176121018181034",
+  "config": {
+   "lpToken": "0xdf5e0e81dff6faf3a7e52ba697820c5e32d806a8",
+   "depositor": "0xbbc81d23ea2c3ec7e56d39296f0cbb648873a5d3",
+   "amountsLength": 4,
+   "usdcIndex": 1
+  }
  },
  {
   "address": "0x2994529C0652D127b7842094103715ec5299bBed",
-  "totalSupply": "14130407190972745855069060",
-  "usdtValue": "15872741480560284425367532",
-  "balancerBalance": "41572793633385630125195"
+  "totalSupply": "13438587251137748980959093",
+  "usdtValue": "15130318137716150642919555",
+  "balancerBalance": "54978153943113162584313",
+  "usdcToLpRate": "1093722616709957867",
+  "config": {
+   "lpToken": "0x3b3ac5386837dc563660fb6a0937dfaa5924333b",
+   "depositor": "0xb6c057591e073249f2d9d88ba59a46cfc9b59edb",
+   "amountsLength": 4,
+   "usdcIndex": 1
+  }
  }
 ]

@@ -54,7 +54,7 @@ contract Erc20PiptSwap is EthPiptSwap {
     (, uint256 ethSwapAmount) = calcEthFee(ethAmount, wrapperFee);
     (, , poolAmountOut) = calcSwapEthToPiptInputs(ethSwapAmount, tokens, _slippage);
 
-    _swapWethToPiptByPoolOut(ethAmount, poolAmountOut, tokens, wrapperFee);
+    (poolAmountOut, ) = _swapWethToPiptByPoolOut(ethAmount, poolAmountOut, tokens, wrapperFee);
 
     emit Erc20ToPiptSwap(msg.sender, _swapToken, _swapAmount, ethAmount, poolAmountOut);
   }

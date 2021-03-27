@@ -4,6 +4,7 @@ const template = artifacts.require('Migrations');
 const { promisify } = require('util');
 const { assert } = require('chai');
 const { web3 } = template;
+const { toBN } = web3.utils;
 const BigNumber = require('bignumber.js')
 const fs = require('fs')
 
@@ -173,15 +174,23 @@ function ether(value) {
 }
 
 function fromEther(value) {
-  return web3.utils.fromWei(value, 'ether');
+  return parseFloat(web3.utils.fromWei(value, 'ether'));
 }
 
 function gwei(value) {
   return web3.utils.toWei(value.toString(), 'gwei').toString();
 }
 
+function fromGwei(value) {
+  return web3.utils.fromWei(value.toString(), 'gwei').toString();
+}
+
 function mwei(value) {
   return web3.utils.toWei(value.toString(), 'mwei').toString(10);
+}
+
+function fromMwei(value) {
+  return web3.utils.fromWei(value.toString(), 'mwei').toString();
 }
 
 async function getResTimestamp(res) {
@@ -323,9 +332,52 @@ async function forkReplacePoolTokenWithNewPiToken(
 }
 
 function callContract(contract, method, args = []) {
-  console.log(method, args);
+  // console.log(method, args);
   return contract.contract.methods[method].apply(contract.contract, args).call();
 }
+
+function mulScalarBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .mul(toBN(bn2.toString(10)))
+    .div(toBN(ether('1').toString(10)))
+    .toString(10);
+}
+function divScalarBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .mul(toBN(ether('1').toString(10)))
+    .div(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function mulBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .mul(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function divBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .div(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function subBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .sub(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function addBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .add(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei) {
+  bn1 = toBN(bn1.toString(10));
+  bn2 = toBN(bn2.toString(10));
+  const bn1GreaterThenBn2 = bn1.gt(bn2);
+  let diff = bn1GreaterThenBn2 ? bn1.sub(bn2) : bn2.sub(bn1);
+  let diffPercent = divScalarBN(diff, bn1);
+  const lowerThenAccurancy = toBN(diffPercent).lte(toBN(accuracyPercentWei));
+  assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));
+}
+
 
 module.exports = {
   deployProxied,
@@ -339,7 +391,9 @@ module.exports = {
   fromEther,
   ethUsed,
   gwei,
+  fromGwei,
   mwei,
+  fromMwei,
   expectExactRevert,
   getResTimestamp,
   forkContractUpgrade,
@@ -349,5 +403,12 @@ module.exports = {
   evmSetNextBlockTimestamp: buildEndpoint('evm_setNextBlockTimestamp'),
   impersonateAccount,
   callContract,
-  forkReplacePoolTokenWithNewPiToken
+  forkReplacePoolTokenWithNewPiToken,
+  mulScalarBN,
+  divScalarBN,
+  mulBN,
+  divBN,
+  subBN,
+  addBN,
+  assertEqualWithAccuracy
 }
