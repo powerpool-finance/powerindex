@@ -4,7 +4,6 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./interfaces/BPoolInterface.sol";
@@ -14,8 +13,9 @@ import "./interfaces/IPoolRestrictions.sol";
 import "./interfaces/IUniswapV2Pair.sol";
 import "./interfaces/IUniswapV2Factory.sol";
 import "./lib/UniswapV2Library.sol";
+import "./traits/ProgressiveFee.sol";
 
-contract EthPiptSwap is Ownable {
+contract EthPiptSwap is ProgressiveFee {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
   using SafeERC20 for TokenInterface;
@@ -25,11 +25,6 @@ contract EthPiptSwap is Ownable {
   TokenInterface public cvp;
   BPoolInterface public pipt;
   PowerIndexWrapperInterface public piptWrapper;
-
-  uint256[] public feeLevels;
-  uint256[] public feeAmounts;
-  address public feePayout;
-  address public feeManager;
 
   mapping(address => address) public uniswapEthPairByTokenAddress;
   mapping(address => address) public uniswapEthPairToken0;
@@ -46,13 +41,6 @@ contract EthPiptSwap is Ownable {
   event SetTokenSetting(address indexed token, bool indexed reApprove, address indexed uniswapPair);
   event SetDefaultSlippage(uint256 newDefaultSlippage);
   event SetPiptWrapper(address _piptWrapper);
-  event SetFees(
-    address indexed sender,
-    uint256[] newFeeLevels,
-    uint256[] newFeeAmounts,
-    address indexed feePayout,
-    address indexed feeManager
-  );
 
   event EthToPiptSwap(
     address indexed user,
@@ -77,7 +65,8 @@ contract EthPiptSwap is Ownable {
     address _pipt,
     address _piptWrapper,
     address _feeManager
-  ) public Ownable() {
+  ) public {
+    __Ownable_init();
     weth = TokenInterface(_weth);
     cvp = TokenInterface(_cvp);
     pipt = BPoolInterface(_pipt);
@@ -144,20 +133,6 @@ contract EthPiptSwap is Ownable {
     cvp.safeTransfer(feePayout, cvpOut);
 
     emit PayoutCVP(feePayout, wethBalance, cvpOut);
-  }
-
-  function setFees(
-    uint256[] calldata _feeLevels,
-    uint256[] calldata _feeAmounts,
-    address _feePayout,
-    address _feeManager
-  ) external onlyFeeManagerOrOwner {
-    feeLevels = _feeLevels;
-    feeAmounts = _feeAmounts;
-    feePayout = _feePayout;
-    feeManager = _feeManager;
-
-    emit SetFees(msg.sender, _feeLevels, _feeAmounts, _feePayout, _feeManager);
   }
 
   function setTokensSettings(
@@ -291,27 +266,11 @@ contract EthPiptSwap is Ownable {
   }
 
   function calcEthFee(uint256 ethAmount, uint256 wrapperFee) public view returns (uint256 ethFee, uint256 ethAfterFee) {
-    uint256 len = feeLevels.length;
-    for (uint256 i = 0; i < len; i++) {
-      if (ethAmount >= feeLevels[i]) {
-        ethFee = ethAmount.mul(feeAmounts[i]).div(1 ether);
-        break;
-      }
-    }
-    ethFee = ethFee.add(wrapperFee);
-    ethAfterFee = ethAmount.sub(ethFee);
+    return calcFee(ethAmount, wrapperFee);
   }
 
   function calcEthFee(uint256 ethAmount) external view returns (uint256 ethFee, uint256 ethAfterFee) {
     (ethFee, ethAfterFee) = calcEthFee(ethAmount, getWrapFee(getPiptTokens()));
-  }
-
-  function getFeeLevels() external view returns (uint256[] memory) {
-    return feeLevels;
-  }
-
-  function getFeeAmounts() external view returns (uint256[] memory) {
-    return feeAmounts;
   }
 
   function getWrapFee(address[] memory tokens) public view returns (uint256 wrapperFee) {
