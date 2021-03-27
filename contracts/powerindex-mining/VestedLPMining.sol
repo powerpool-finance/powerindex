@@ -243,7 +243,7 @@ contract VestedLPMining is
     uint256 boostPoolId = 10;
     Pool memory _pool = pools[boostPoolId];
     require(boostBalanceByLp[address(_pool.lpToken)] == 0, "ALREADY_UPDATED");
-    boostBalanceByLp[address(_pool.lpToken)] = _pool.lpToken.balanceOf(address(this));
+    boostBalanceByLp[address(_pool.lpToken)] = cvp.balanceOf(address(this));
   }
 
   /// @inheritdoc IVestedLPMining
