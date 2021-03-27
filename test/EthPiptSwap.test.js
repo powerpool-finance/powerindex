@@ -91,7 +91,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
 
   beforeEach(async () => {
     this.weth = await WETH.new();
-    this.weth.deposit({ value: ether('50000000') });
+    await this.weth.deposit({ value: ether('50000000') });
 
     const proxyFactory = await ProxyFactory.new();
     const impl = await PowerIndexPool.new();
@@ -441,7 +441,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           const erc20Swap = res.receipt.logs.filter(l => l.event === 'Erc20ToPiptSwap')[0].args;
           assert.equal(erc20Swap.erc20InAmount, amountToSwap);
           assert.equal(erc20Swap.ethInAmount, addBN(ethFee, ethAfterFee));
-          assert.equal(erc20Swap.poolOutAmount, swapErc20ToPiptInputs.poolOut);
+          assertEqualWithAccuracy(erc20Swap.poolOutAmount, swapErc20ToPiptInputs.poolOut, ether('0.002'));
 
           assert.equal(poolOutAfterFee, await pool.balanceOf(bob));
 
@@ -680,7 +680,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           const erc20Swap = res.receipt.logs.filter(l => l.event === 'Erc20ToPiptSwap')[0].args;
           assert.equal(erc20Swap.erc20InAmount, amountToSwap);
           assert.equal(erc20Swap.ethInAmount, addBN(ethFee, ethAfterFee));
-          assert.equal(erc20Swap.poolOutAmount, swapErc20ToPiptInputs.poolOut);
+          assertEqualWithAccuracy(erc20Swap.poolOutAmount, swapErc20ToPiptInputs.poolOut, ether('0.002'));
 
           assert.equal(poolOutAfterFee, await pool.balanceOf(bob));
 

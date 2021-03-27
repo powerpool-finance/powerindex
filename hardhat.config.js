@@ -5,6 +5,7 @@ require('solidity-coverage');
 require('hardhat-contract-sizer');
 require('hardhat-gas-reporter');
 require('./tasks/fetchPoolsData');
+require('./tasks/fetchVaultsData');
 require('./tasks/deployVestedLpMining');
 require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
@@ -19,6 +20,7 @@ require('./tasks/deployMainnetYla');
 require('./tasks/rebindMCapWeights');
 require('./tasks/deployMainnetWeightsStrategy');
 require('./tasks/testVestedLpMiningProxy');
+require('./tasks/deployIndicesSupplyRedeemZap');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
