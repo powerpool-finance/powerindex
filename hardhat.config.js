@@ -19,6 +19,7 @@ require('./tasks/deployMainnetYla');
 require('./tasks/rebindMCapWeights');
 require('./tasks/deployMainnetWeightsStrategy');
 require('./tasks/testVestedLpMiningProxy');
+require('./tasks/testVestedLpMiningPool');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
