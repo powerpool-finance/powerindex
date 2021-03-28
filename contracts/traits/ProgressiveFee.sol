@@ -3,8 +3,11 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 
 contract ProgressiveFee is OwnableUpgradeSafe {
+  using SafeMath for uint256;
+
   uint256[] public feeLevels;
   uint256[] public feeAmounts;
   address public feePayout;
@@ -17,6 +20,11 @@ contract ProgressiveFee is OwnableUpgradeSafe {
     address indexed feePayout,
     address indexed feeManager
   );
+
+  modifier onlyFeeManagerOrOwner() {
+    require(msg.sender == feeManager || msg.sender == owner(), "NOT_FEE_MANAGER");
+    _;
+  }
 
   function setFees(
     uint256[] calldata _feeLevels,

@@ -16,6 +16,7 @@ import "./interfaces/IVaultDepositor4.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/IVaultRegistry.sol";
 import "./interfaces/IErc20PiptSwap.sol";
+import "./interfaces/IErc20VaultPoolSwap.sol";
 
 contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   using SafeMath for uint256;
@@ -47,14 +48,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   event SetPool(address indexed pool, PoolType pType);
   event SetPiptSwap(address indexed pool, address piptSwap);
   event SetTokenCap(address indexed token, uint256 cap);
-  event SetVaultConfig(
-    address indexed token,
-    address depositor,
-    uint256 depositorAmountLength,
-    uint256 depositorIndex,
-    address lpToken,
-    address indexed vaultRegistry
-  );
 
   event Deposit(
     bytes32 indexed roundKey,
@@ -97,19 +90,12 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   enum PoolType { NULL, PIPT, VAULT }
 
+  IErc20VaultPoolSwap public erc20VaultPoolSwap;
+
   mapping(address => PoolType) public poolType;
   mapping(address => address) public poolPiptSwap;
   mapping(address => uint256) public tokenCap;
   mapping(address => address[]) public poolTokens;
-
-  struct VaultConfig {
-    uint256 depositorLength;
-    uint256 depositorIndex;
-    address depositor;
-    address lpToken;
-    address vaultRegistry;
-  }
-  mapping(address => VaultConfig) public vaultConfig;
 
   uint256 public roundPeriod;
 
@@ -134,14 +120,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   mapping(bytes32 => Round) public rounds;
 
   mapping(bytes32 => bytes32) public lastRoundByPartialKey;
-
-  struct VaultCalc {
-    address token;
-    uint256 tokenBalance;
-    uint256 input;
-    uint256 correctInput;
-    uint256 poolAmountOut;
-  }
 
   modifier onlyReporter(uint256 _reporterId, bytes calldata _rewardOpts) {
     uint256 gasStart = gasleft();
@@ -321,46 +299,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
   }
 
-  function setVaultConfigs(
-    address[] memory _tokens,
-    address[] memory _depositors,
-    uint256[] memory _depositorAmountLength,
-    uint256[] memory _depositorIndexes,
-    address[] memory _lpTokens,
-    address[] memory _vaultRegistries
-  ) external onlyOwner {
-    uint256 len = _tokens.length;
-    require(
-      len == _depositors.length &&
-        len == _depositorAmountLength.length &&
-        len == _depositorIndexes.length &&
-        len == _lpTokens.length &&
-        len == _vaultRegistries.length,
-      "L"
-    );
-    for (uint256 i = 0; i < len; i++) {
-      vaultConfig[_tokens[i]] = VaultConfig(
-        _depositorAmountLength[i],
-        _depositorIndexes[i],
-        _depositors[i],
-        _lpTokens[i],
-        _vaultRegistries[i]
-      );
-
-      usdc.approve(_depositors[i], uint256(-1));
-      IERC20(_lpTokens[i]).approve(_tokens[i], uint256(-1));
-      IERC20(_lpTokens[i]).approve(_depositors[i], uint256(-1));
-      emit SetVaultConfig(
-        _tokens[i],
-        _depositors[i],
-        _depositorAmountLength[i],
-        _depositorIndexes[i],
-        _lpTokens[i],
-        _vaultRegistries[i]
-      );
-    }
-  }
-
   function updatePools(address[] memory _pools) external onlyOwner {
     uint256 len = _pools.length;
     for (uint256 i = 0; i < len; i++) {
@@ -447,82 +385,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function getRoundUserOutput(bytes32 roundKey, address user) external view returns (uint256) {
     return rounds[roundKey].outputAmount[user];
-  }
-
-  function calcVaultOutByUsdc(address _token, uint256 _usdcIn) public view returns (uint256 amountOut) {
-    VaultConfig storage vc = vaultConfig[_token];
-    uint256 lpByUsdcPrice = IVaultRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
-    uint256 vaultByLpPrice = IVault(_token).getPricePerFullShare();
-    return _usdcIn.mul(1e30).div(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether));
-  }
-
-  //TODO: optimize contract for adding external calculation getters
-  //  function calcVaultPoolOutByUsdc(address _pool, uint256 _usdcIn) external view returns (uint256 amountOut) {
-  //    uint256 len = poolTokens[_pool].length;
-  //    uint256 piptTotalSupply = PowerIndexPoolInterface(_pool).totalSupply();
-  //
-  //    (VaultCalc[] memory vc, uint256 restInput, uint256 totalCorrectInput) =
-  //      _getVaultCalsForSupply(_pool, piptTotalSupply, _usdcIn);
-  //
-  //    uint256[] memory tokensInPipt = new uint256[](len);
-  //    for (uint256 i = 0; i < len; i++) {
-  //      uint256 share = vc[i].correctInput.mul(1 ether).div(totalCorrectInput);
-  //      vc[i].correctInput = vc[i].correctInput.add(restInput.mul(share).div(1 ether)).sub(100);
-  //
-  //      tokensInPipt[i] = calcVaultOutByUsdc(vc[i].token, vc[i].correctInput);
-  //
-  //      uint256 poolOutByToken = tokensInPipt[i].sub(1e6).mul(piptTotalSupply).div(vc[i].tokenBalance);
-  //      if (poolOutByToken < amountOut || amountOut == 0) {
-  //        amountOut = poolOutByToken;
-  //      }
-  //    }
-  //  }
-
-  function calcUsdcOutByVault(address _token, uint256 _vaultIn) external view returns (uint256 amountOut) {
-    VaultConfig storage vc = vaultConfig[_token];
-    uint256 lpByUsdcPrice = IVaultRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
-    uint256 vaultByLpPrice = IVault(_token).getPricePerFullShare();
-    return _vaultIn.mul(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether)).div(1e6);
-  }
-
-  function getVaultCalcsForSupply(
-    address _pool,
-    uint256 piptTotalSupply,
-    uint256 totalInputAmount
-  )
-    public
-    view
-    returns (
-      VaultCalc[] memory vc,
-      uint256 restInput,
-      uint256 totalCorrectInput
-    )
-  {
-    uint256 len = poolTokens[_pool].length;
-    vc = new VaultCalc[](len);
-
-    uint256 minPoolAmount;
-    for (uint256 i = 0; i < len; i++) {
-      vc[i].token = poolTokens[_pool][i];
-      vc[i].tokenBalance = PowerIndexPoolInterface(_pool).getBalance(vc[i].token);
-      vc[i].input = totalInputAmount / len;
-      vc[i].poolAmountOut = calcVaultOutByUsdc(vc[i].token, vc[i].input).mul(piptTotalSupply).div(vc[i].tokenBalance);
-      if (minPoolAmount == 0 || vc[i].poolAmountOut < minPoolAmount) {
-        minPoolAmount = vc[i].poolAmountOut;
-      }
-    }
-
-    for (uint256 i = 0; i < len; i++) {
-      if (vc[i].poolAmountOut > minPoolAmount) {
-        uint256 ratio = minPoolAmount.mul(1 ether).div(vc[i].poolAmountOut);
-        vc[i].correctInput = ratio.mul(vc[i].input).div(1 ether);
-        restInput = restInput.add(vc[i].input.sub(vc[i].correctInput));
-      } else {
-        vc[i].correctInput = vc[i].input;
-      }
-    }
-
-    totalCorrectInput = totalInputAmount.sub(restInput).sub(100);
   }
 
   /* ==========  Internal Functions  ========== */
@@ -626,58 +488,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         );
       }
     } else if (pType == PoolType.VAULT) {
-      (uint256 poolAmountOut, uint256[] memory tokensInPipt) = _depositVaultAndGetTokensInPipt(round, totalInputAmount);
-
-      PowerIndexPoolInterface(round.pool).joinPool(poolAmountOut, tokensInPipt);
-      (, uint256 communityFee, , ) = PowerIndexPoolInterface(round.pool).getCommunityFee();
-      round.totalOutputAmount = poolAmountOut.sub(poolAmountOut.mul(communityFee).div(1 ether)) - 1;
+      round.totalOutputAmount = erc20VaultPoolSwap.swapErc20cToVaultPool(round.pool, address(usdc), totalInputAmount);
     }
-  }
-
-  function _depositVaultAndGetTokensInPipt(Round storage round, uint256 totalInputAmount)
-    internal
-    returns (uint256 poolAmountOut, uint256[] memory tokensInPipt)
-  {
-    uint256 len = poolTokens[round.pool].length;
-    uint256 piptTotalSupply = PowerIndexPoolInterface(round.pool).totalSupply();
-
-    (VaultCalc[] memory vc, uint256 restInput, uint256 totalCorrectInput) =
-      getVaultCalcsForSupply(round.pool, piptTotalSupply, totalInputAmount);
-
-    tokensInPipt = new uint256[](len);
-    for (uint256 i = 0; i < len; i++) {
-      uint256 share = vc[i].correctInput.mul(1 ether).div(totalCorrectInput);
-      vc[i].correctInput = vc[i].correctInput.add(restInput.mul(share).div(1 ether)).sub(100);
-
-      IVault(vc[i].token).deposit(_addYearnLpTokenLiquidity(vaultConfig[vc[i].token], vc[i].correctInput));
-      tokensInPipt[i] = IVault(vc[i].token).balanceOf(address(this));
-
-      uint256 poolOutByToken = tokensInPipt[i].sub(1e6).mul(piptTotalSupply).div(vc[i].tokenBalance);
-      if (poolOutByToken < poolAmountOut || poolAmountOut == 0) {
-        poolAmountOut = poolOutByToken;
-      }
-    }
-  }
-
-  function _addYearnLpTokenLiquidity(VaultConfig storage vc, uint256 _amount) internal returns (uint256) {
-    if (vc.depositorLength == 2) {
-      uint256[2] memory amounts;
-      amounts[vc.depositorIndex] = _amount;
-      IVaultDepositor2(vc.depositor).add_liquidity(amounts, 1);
-    }
-
-    if (vc.depositorLength == 3) {
-      uint256[3] memory amounts;
-      amounts[vc.depositorIndex] = _amount;
-      IVaultDepositor3(vc.depositor).add_liquidity(amounts, 1);
-    }
-
-    if (vc.depositorLength == 4) {
-      uint256[4] memory amounts;
-      amounts[vc.depositorIndex] = _amount;
-      IVaultDepositor4(vc.depositor).add_liquidity(amounts, 1);
-    }
-    return IERC20(vc.lpToken).balanceOf(address(this));
   }
 
   function _redeemPool(Round storage round, uint256 totalInputAmount) internal {
@@ -690,28 +502,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         round.totalOutputAmount = piptSwap.swapPiptToErc20(round.outputToken, totalInputAmount);
       }
     } else if (pType == PoolType.VAULT) {
-      round.totalOutputAmount = _redeemVault(round, totalInputAmount);
+      round.totalOutputAmount = erc20VaultPoolSwap.swapVaultPoolToErc20(round.pool, totalInputAmount, address(usdc));
     }
-  }
-
-  function _redeemVault(Round storage round, uint256 totalInputAmount) internal returns (uint256 totalOutputAmount) {
-    address[] memory tokens = poolTokens[round.pool];
-    uint256 len = tokens.length;
-
-    uint256[] memory amounts = new uint256[](len);
-    PowerIndexPoolInterface(round.pool).exitPool(totalInputAmount, amounts);
-
-    uint256 outputTokenBalanceBefore = IERC20(round.outputToken).balanceOf(address(this));
-    for (uint256 i = 0; i < len; i++) {
-      VaultConfig storage vc = vaultConfig[tokens[i]];
-      IVault(tokens[i]).withdraw(IERC20(tokens[i]).balanceOf(address(this)));
-      IVaultDepositor2(vc.depositor).remove_liquidity_one_coin(
-        IERC20(vc.lpToken).balanceOf(address(this)),
-        int128(vc.depositorIndex),
-        1
-      );
-    }
-    totalOutputAmount = IERC20(round.outputToken).balanceOf(address(this)).sub(outputTokenBalanceBefore);
   }
 
   function _claimPoke(

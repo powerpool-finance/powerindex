@@ -4,7 +4,6 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@powerpool/poweroracle/contracts/interfaces/IPowerPoke.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./interfaces/PowerIndexPoolInterface.sol";
@@ -15,19 +14,15 @@ import "./interfaces/IVaultDepositor4.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/IVaultRegistry.sol";
 import "./interfaces/IErc20PiptSwap.sol";
+import "./interfaces/IErc20VaultPoolSwap.sol";
 import "./traits/ProgressiveFee.sol";
 
-contract Erc20VaultPoolSwap is ProgressiveFee {
-  using SafeMath for uint256;
+contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   using SafeERC20 for IERC20;
 
   event TakeFee(address indexed pool, address indexed token, uint256 amount);
   event ClaimFee(address indexed token, uint256 amount);
 
-  event SetRoundPeriod(uint256 roundPeriod);
-  event SetPool(address indexed pool, PoolType pType);
-  event SetPiptSwap(address indexed pool, address piptSwap);
-  event SetTokenCap(address indexed token, uint256 cap);
   event SetVaultConfig(
     address indexed token,
     address depositor,
@@ -37,46 +32,20 @@ contract Erc20VaultPoolSwap is ProgressiveFee {
     address indexed vaultRegistry
   );
 
-  event Deposit(
-    bytes32 indexed roundKey,
-    address indexed pool,
+  event Erc20ToVaultPoolSwap(
     address indexed user,
-    address inputToken,
-    uint256 inputAmount
-  );
-  event Withdraw(
-    bytes32 indexed roundKey,
     address indexed pool,
+    uint256 usdcInAmount,
+    uint256 poolOutAmount
+  );
+  event VaultPoolToErc20Swap(
     address indexed user,
-    address inputToken,
-    uint256 inputAmount
-  );
-
-  event SupplyAndRedeemPoke(
-    bytes32 indexed roundKey,
     address indexed pool,
-    address indexed inputToken,
-    address outputToken,
-    uint256 totalInputAmount,
-    uint256 totalOutputAmount
+    uint256 poolInAmount,
+    uint256 usdcOutAmount
   );
-  event ClaimPoke(
-    bytes32 indexed roundKey,
-    address indexed pool,
-    address indexed claimFor,
-    address inputToken,
-    address outputToken,
-    uint256 inputAmount,
-    uint256 outputAmount
-  );
-
-  uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
-  address public constant ETH = 0x0000000000000000000000000000000000000001;
 
   IERC20 public immutable usdc;
-  IPowerPoke public immutable powerPoke;
-
-  enum PoolType { NULL, PIPT, VAULT }
 
   mapping(address => address[]) public poolTokens;
 
@@ -89,30 +58,6 @@ contract Erc20VaultPoolSwap is ProgressiveFee {
   }
   mapping(address => VaultConfig) public vaultConfig;
 
-  uint256 public roundPeriod;
-
-  address public feeReceiver;
-  mapping(address => uint256) public feeByToken;
-  mapping(address => uint256) public pendingFeeByToken;
-
-  mapping(address => uint256) public pendingOddTokens;
-
-  struct Round {
-    uint256 startBlock;
-    address inputToken;
-    address outputToken;
-    address pool;
-    mapping(address => uint256) inputAmount;
-    uint256 totalInputAmount;
-    mapping(address => uint256) outputAmount;
-    uint256 totalOutputAmount;
-    uint256 totalOutputAmountClaimed;
-    uint256 endTime;
-  }
-  mapping(bytes32 => Round) public rounds;
-
-  mapping(bytes32 => bytes32) public lastRoundByPartialKey;
-
   struct VaultCalc {
     address token;
     uint256 tokenBalance;
@@ -121,183 +66,9 @@ contract Erc20VaultPoolSwap is ProgressiveFee {
     uint256 poolAmountOut;
   }
 
-  modifier onlyReporter(uint256 _reporterId, bytes calldata _rewardOpts) {
-    uint256 gasStart = gasleft();
-    powerPoke.authorizeReporter(_reporterId, msg.sender);
-    _;
-    _reward(_reporterId, gasStart, COMPENSATION_PLAN_1_ID, _rewardOpts);
-  }
-
-  modifier onlyNonReporter(uint256 _reporterId, bytes calldata _rewardOpts) {
-    uint256 gasStart = gasleft();
-    powerPoke.authorizeNonReporter(_reporterId, msg.sender);
-    _;
-    _reward(_reporterId, gasStart, COMPENSATION_PLAN_1_ID, _rewardOpts);
-  }
-
-  modifier onlyEOA() {
-    require(tx.origin == msg.sender, "ONLY_EOA");
-    _;
-  }
-
-  constructor(address _usdc, address _powerPoke) public {
+  constructor(address _usdc) public {
     __Ownable_init();
     usdc = IERC20(_usdc);
-    powerPoke = IPowerPoke(_powerPoke);
-  }
-
-  function initialize(uint256 _roundPeriod, address _feeReceiver) external initializer {
-    __Ownable_init();
-    feeReceiver = _feeReceiver;
-    roundPeriod = _roundPeriod;
-  }
-
-  receive() external payable {
-    pendingOddTokens[ETH] = pendingOddTokens[ETH].add(msg.value);
-  }
-
-  /* ==========  Client Functions  ========== */
-
-  function depositEth(address _pool) external payable onlyEOA {
-    require(poolType[_pool] == PoolType.PIPT, "NS_POOL");
-
-    _deposit(_pool, ETH, _pool, msg.value);
-  }
-
-  function depositErc20(
-    address _pool,
-    address _inputToken,
-    uint256 _amount
-  ) external onlyEOA {
-    require(poolType[_pool] != PoolType.NULL, "UP");
-
-    require(_inputToken == address(usdc), "NS_TOKEN");
-
-    _deposit(_pool, _inputToken, _pool, _amount);
-  }
-
-  function depositPoolToken(
-    address _pool,
-    address _outputToken,
-    uint256 _poolAmount
-  ) external onlyEOA {
-    PoolType pType = poolType[_pool];
-    require(pType != PoolType.NULL, "UP");
-
-    if (pType == PoolType.PIPT) {
-      require(_outputToken == address(usdc) || _outputToken == ETH, "NS_TOKEN");
-    } else {
-      require(_outputToken == address(usdc), "NS_TOKEN");
-    }
-
-    _deposit(_pool, _pool, _outputToken, _poolAmount);
-  }
-
-  function withdrawEth(address _pool, uint256 _amount) external onlyEOA {
-    require(poolType[_pool] == PoolType.PIPT, "NS_POOL");
-
-    _withdraw(_pool, ETH, _pool, _amount);
-  }
-
-  function withdrawErc20(
-    address _pool,
-    address _outputToken,
-    uint256 _amount
-  ) external onlyEOA {
-    require(poolType[_pool] != PoolType.NULL, "UP");
-    require(_outputToken != ETH, "ETH_CANT_BE_OT");
-
-    _withdraw(_pool, _outputToken, _pool, _amount);
-  }
-
-  function withdrawPoolToken(
-    address _pool,
-    address _outputToken,
-    uint256 _amount
-  ) external onlyEOA {
-    PoolType pType = poolType[_pool];
-    require(pType != PoolType.NULL, "UP");
-
-    if (pType == PoolType.PIPT) {
-      require(_outputToken == address(usdc) || _outputToken == ETH, "NS_TOKEN");
-    } else {
-      require(_outputToken == address(usdc), "NS_TOKEN");
-    }
-
-    _withdraw(_pool, _pool, _outputToken, _amount);
-  }
-
-  /* ==========  Poker Functions  ========== */
-
-  function supplyAndRedeemPokeFromReporter(
-    uint256 _reporterId,
-    bytes32[] memory _roundKeys,
-    bytes calldata _rewardOpts
-  ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
-    _supplyAndRedeemPoke(_roundKeys, false);
-  }
-
-  function supplyAndRedeemPokeFromSlasher(
-    uint256 _reporterId,
-    bytes32[] memory _roundKeys,
-    bytes calldata _rewardOpts
-  ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
-    _supplyAndRedeemPoke(_roundKeys, true);
-  }
-
-  function claimPokeFromReporter(
-    uint256 _reporterId,
-    bytes32 _roundKey,
-    address[] memory _claimForList,
-    bytes calldata _rewardOpts
-  ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
-    _claimPoke(_roundKey, _claimForList, false);
-  }
-
-  function claimPokeFromSlasher(
-    uint256 _reporterId,
-    bytes32 _roundKey,
-    address[] memory _claimForList,
-    bytes calldata _rewardOpts
-  ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
-    _claimPoke(_roundKey, _claimForList, true);
-  }
-
-  /* ==========  Owner Functions  ========== */
-
-  function setRoundPeriod(uint256 _roundPeriod) external onlyOwner {
-    roundPeriod = _roundPeriod;
-    emit SetRoundPeriod(roundPeriod);
-  }
-
-  function setPools(address[] memory _pools, PoolType[] memory _types) external onlyOwner {
-    uint256 len = _pools.length;
-    require(len == _types.length, "L");
-    for (uint256 i = 0; i < len; i++) {
-      poolType[_pools[i]] = _types[i];
-      _updatePool(_pools[i]);
-      emit SetPool(_pools[i], _types[i]);
-    }
-  }
-
-  function setPoolsPiptSwap(address[] memory _pools, address[] memory _piptSwaps) external onlyOwner {
-    uint256 len = _pools.length;
-    require(len == _piptSwaps.length, "L");
-    for (uint256 i = 0; i < len; i++) {
-      poolPiptSwap[_pools[i]] = _piptSwaps[i];
-      usdc.approve(_piptSwaps[i], uint256(-1));
-      IERC20(_pools[i]).approve(_piptSwaps[i], uint256(-1));
-      emit SetPiptSwap(_pools[i], _piptSwaps[i]);
-    }
-  }
-
-  function setTokensCap(address[] memory _tokens, uint256[] memory _caps) external onlyOwner {
-    uint256 len = _tokens.length;
-    require(len == _caps.length, "L");
-    for (uint256 i = 0; i < len; i++) {
-      tokenCap[_tokens[i]] = _caps[i];
-      emit SetTokenCap(_tokens[i], _caps[i]);
-    }
   }
 
   function setVaultConfigs(
@@ -348,18 +119,44 @@ contract Erc20VaultPoolSwap is ProgressiveFee {
   }
 
   function claimFee(address[] memory _tokens) external onlyOwner {
-    require(feeReceiver != address(0), "FR_NOT_SET");
+    require(feePayout != address(0), "FR_NOT_SET");
 
     uint256 len = _tokens.length;
     for (uint256 i = 0; i < len; i++) {
-      address token = _tokens[i];
-      if (token == ETH) {
-        payable(feeReceiver).transfer(address(this).balance);
-      } else {
-        IERC20(token).safeTransfer(feeReceiver, IERC20(token).balanceOf(address(this)));
-      }
-      pendingFeeByToken[token] = 0;
+      IERC20(_tokens[i]).safeTransfer(feePayout, IERC20(_tokens[i]).balanceOf(address(this)));
     }
+  }
+
+  function swapErc20cToVaultPool(
+    address _pool,
+    address _swapToken,
+    uint256 _swapAmount
+  ) external override payable returns (uint256 poolAmountOut) {
+    require(_swapToken == address(usdc), "ONLY_USDC");
+    usdc.safeTransferFrom(msg.sender, address(this), _swapAmount);
+
+    (, uint256 _swapAmountWithFee) = calcFee(_swapAmount, 0);
+
+    (uint256 poolAmountOut, uint256[] memory tokensInPipt) = _depositVaultAndGetTokensInPipt(_pool, _swapAmountWithFee);
+
+    PowerIndexPoolInterface(_pool).joinPool(poolAmountOut, tokensInPipt);
+    (, uint256 communityFee, , ) = PowerIndexPoolInterface(_pool).getCommunityFee();
+    poolAmountOut = poolAmountOut.sub(poolAmountOut.mul(communityFee).div(1 ether)) - 1;
+
+    emit Erc20ToVaultPoolSwap(msg.sender, _pool, _swapAmount, poolAmountOut);
+  }
+
+  function swapVaultPoolToErc20(address _pool, uint256 _poolAmountIn, address _swapToken) external override payable returns (uint256 erc20Out) {
+    require(_swapToken == address(usdc), "ONLY_USDC");
+    IERC20(_pool).safeTransferFrom(msg.sender, address(this), _poolAmountIn);
+
+    (, uint256 _poolAmountInWithFee) = calcFee(_poolAmountIn, 0);
+
+    erc20Out = _redeemVault(_pool, _poolAmountInWithFee);
+
+    usdc.safeTransfer(msg.sender, erc20Out);
+
+    emit VaultPoolToErc20Swap(msg.sender, _pool, _poolAmountIn, erc20Out);
   }
 
   /* ==========  View Functions  ========== */
@@ -442,76 +239,15 @@ contract Erc20VaultPoolSwap is ProgressiveFee {
 
   /* ==========  Internal Functions  ========== */
 
-  function _supplyAndRedeemPoke(bytes32[] memory _roundKeys, bool _bySlasher) internal {
-    (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
-
-    uint256 len = _roundKeys.length;
-    require(len > 0, "L");
-
-    for (uint256 i = 0; i < len; i++) {
-      Round storage round = rounds[_roundKeys[i]];
-
-      _updateRound(round.pool, round.inputToken, round.outputToken);
-      _checkRoundBeforeExecute(_roundKeys[i], round);
-
-      require(round.endTime + minInterval <= block.timestamp, "MIN_I");
-      if (_bySlasher) {
-        require(round.endTime + maxInterval <= block.timestamp, "MAX_I");
-      }
-
-      uint256 inputAmountWithFee = _takeAmountFee(round.pool, round.inputToken, round.totalInputAmount);
-      require(round.inputToken == round.pool || round.outputToken == round.pool, "UA");
-
-      if (round.inputToken == round.pool) {
-        _redeemPool(round, inputAmountWithFee);
-      } else {
-        _supplyPool(round, inputAmountWithFee);
-      }
-
-      require(round.totalOutputAmount != 0, "NULL_TO");
-
-      emit SupplyAndRedeemPoke(
-        _roundKeys[i],
-        round.pool,
-        round.inputToken,
-        round.outputToken,
-        round.totalInputAmount,
-        round.totalOutputAmount
-      );
-    }
-  }
-
-  function _supplyPool(Round storage round, uint256 totalInputAmount) internal {
-    PoolType pType = poolType[round.pool];
-    if (pType == PoolType.PIPT) {
-      IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolPiptSwap[round.pool]));
-      if (round.inputToken == ETH) {
-        (round.totalOutputAmount, ) = piptSwap.swapEthToPipt{ value: totalInputAmount }(piptSwap.defaultSlippage());
-      } else {
-        round.totalOutputAmount = piptSwap.swapErc20ToPipt(
-          round.inputToken,
-          totalInputAmount,
-          piptSwap.defaultSlippage()
-        );
-      }
-    } else if (pType == PoolType.VAULT) {
-      (uint256 poolAmountOut, uint256[] memory tokensInPipt) = _depositVaultAndGetTokensInPipt(round, totalInputAmount);
-
-      PowerIndexPoolInterface(round.pool).joinPool(poolAmountOut, tokensInPipt);
-      (, uint256 communityFee, , ) = PowerIndexPoolInterface(round.pool).getCommunityFee();
-      round.totalOutputAmount = poolAmountOut.sub(poolAmountOut.mul(communityFee).div(1 ether)) - 1;
-    }
-  }
-
-  function _depositVaultAndGetTokensInPipt(Round storage round, uint256 totalInputAmount)
+  function _depositVaultAndGetTokensInPipt(address _pool, uint256 totalInputAmount)
     internal
     returns (uint256 poolAmountOut, uint256[] memory tokensInPipt)
   {
-    uint256 len = poolTokens[round.pool].length;
-    uint256 piptTotalSupply = PowerIndexPoolInterface(round.pool).totalSupply();
+    uint256 len = poolTokens[_pool].length;
+    uint256 piptTotalSupply = PowerIndexPoolInterface(_pool).totalSupply();
 
     (VaultCalc[] memory vc, uint256 restInput, uint256 totalCorrectInput) =
-      getVaultCalcsForSupply(round.pool, piptTotalSupply, totalInputAmount);
+      getVaultCalcsForSupply(_pool, piptTotalSupply, totalInputAmount);
 
     tokensInPipt = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
@@ -549,28 +285,14 @@ contract Erc20VaultPoolSwap is ProgressiveFee {
     return IERC20(vc.lpToken).balanceOf(address(this));
   }
 
-  function _redeemPool(Round storage round, uint256 totalInputAmount) internal {
-    PoolType pType = poolType[round.pool];
-    if (pType == PoolType.PIPT) {
-      IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolPiptSwap[round.pool]));
-      if (round.inputToken == ETH) {
-        round.totalOutputAmount = piptSwap.swapPiptToEth(totalInputAmount);
-      } else {
-        round.totalOutputAmount = piptSwap.swapPiptToErc20(round.outputToken, totalInputAmount);
-      }
-    } else if (pType == PoolType.VAULT) {
-      round.totalOutputAmount = _redeemVault(round, totalInputAmount);
-    }
-  }
-
-  function _redeemVault(Round storage round, uint256 totalInputAmount) internal returns (uint256 totalOutputAmount) {
-    address[] memory tokens = poolTokens[round.pool];
+  function _redeemVault(address _pool, uint256 totalInputAmount) internal returns (uint256 totalOutputAmount) {
+    address[] memory tokens = poolTokens[_pool];
     uint256 len = tokens.length;
 
     uint256[] memory amounts = new uint256[](len);
-    PowerIndexPoolInterface(round.pool).exitPool(totalInputAmount, amounts);
+    PowerIndexPoolInterface(_pool).exitPool(totalInputAmount, amounts);
 
-    uint256 outputTokenBalanceBefore = IERC20(round.outputToken).balanceOf(address(this));
+    uint256 outputTokenBalanceBefore = usdc.balanceOf(address(this));
     for (uint256 i = 0; i < len; i++) {
       VaultConfig storage vc = vaultConfig[tokens[i]];
       IVault(tokens[i]).withdraw(IERC20(tokens[i]).balanceOf(address(this)));
@@ -580,57 +302,14 @@ contract Erc20VaultPoolSwap is ProgressiveFee {
         1
       );
     }
-    totalOutputAmount = IERC20(round.outputToken).balanceOf(address(this)).sub(outputTokenBalanceBefore);
+    totalOutputAmount = usdc.balanceOf(address(this)).sub(outputTokenBalanceBefore);
   }
 
-  function _claimPoke(
-    bytes32 _roundKey,
-    address[] memory _claimForList,
-    bool _bySlasher
-  ) internal {
-    (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
-
-    uint256 len = _claimForList.length;
-    require(len > 0, "L");
-
-    Round storage round = rounds[_roundKey];
-    require(round.endTime + minInterval <= block.timestamp, "MIN_I");
-    if (_bySlasher) {
-      require(round.endTime + maxInterval <= block.timestamp, "MAX_I");
-    }
-    require(round.totalOutputAmount != 0, "NULL_TO");
-
+  function _updatePool(address _pool) internal {
+    poolTokens[_pool] = PowerIndexPoolInterface(_pool).getCurrentTokens();
+    uint256 len = poolTokens[_pool].length;
     for (uint256 i = 0; i < len; i++) {
-      address _claimFor = _claimForList[i];
-      require(round.inputAmount[_claimFor] != 0, "INPUT_NULL");
-      require(round.outputAmount[_claimFor] == 0, "OUTPUT_NOT_NULL");
-
-      uint256 inputShare = round.inputAmount[_claimFor].mul(1 ether).div(round.totalInputAmount);
-      uint256 outputAmount = round.totalOutputAmount.mul(inputShare).div(1 ether);
-      round.outputAmount[_claimFor] = outputAmount;
-      round.totalOutputAmountClaimed = round.totalOutputAmountClaimed.add(outputAmount).add(10);
-      IERC20(round.outputToken).safeTransfer(_claimFor, outputAmount - 1);
-
-      emit ClaimPoke(
-        _roundKey,
-        round.pool,
-        _claimFor,
-        round.inputToken,
-        round.outputToken,
-        round.inputAmount[_claimFor],
-        outputAmount
-      );
+      IERC20(poolTokens[_pool][i]).approve(_pool, uint256(-1));
     }
-  }
-
-  function _takeAmountFee(
-    address _pool,
-    address _inputToken,
-    uint256 _amount
-  ) internal returns (uint256 amountWithFee) {
-    if (feeByToken[_inputToken] == 0) {
-      return _amount;
-    }
-    amountWithFee = _amount.sub(_amount.mul(feeByToken[_inputToken]).div(1 ether));
   }
 }

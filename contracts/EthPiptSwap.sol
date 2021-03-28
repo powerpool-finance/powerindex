@@ -75,11 +75,6 @@ contract EthPiptSwap is ProgressiveFee {
     defaultSlippage = 0.02 ether;
   }
 
-  modifier onlyFeeManagerOrOwner() {
-    require(msg.sender == feeManager || msg.sender == owner(), "NOT_FEE_MANAGER");
-    _;
-  }
-
   receive() external payable {
     if (msg.sender != tx.origin) {
       return;
