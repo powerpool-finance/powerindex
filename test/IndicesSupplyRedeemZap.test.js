@@ -58,9 +58,9 @@ describe('IndicesSupplyRedeemZap', () => {
   const roundPeriod = 60 * 60;
   const slasherInterval = 15 * 60;
 
-  let minter, alice, bob, dan, carol, reporter, slasher, feeManager, feeReceiver, permanentVotingPower;
+  let minter, alice, bob, dan, carol, reporter, slasher, feeManager, permanentVotingPower;
   before(async function () {
-    [minter, alice, bob, dan, carol, reporter, slasher, feeManager, feeReceiver, permanentVotingPower] = await web3.eth.getAccounts();
+    [minter, alice, bob, dan, carol, reporter, slasher, feeManager, permanentVotingPower] = await web3.eth.getAccounts();
   });
 
   beforeEach(async () => {
