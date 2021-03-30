@@ -40,7 +40,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   );
 
   event SetFee(address indexed token, uint256 fee);
-  event SetFeeReceiver(address indexed feeReceiver);
   event TakeFee(address indexed pool, address indexed token, uint256 amount);
   event ClaimFee(address indexed token, uint256 amount);
 
@@ -90,10 +89,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   enum PoolType { NULL, PIPT, VAULT }
 
-  IErc20VaultPoolSwap public erc20VaultPoolSwap;
-
   mapping(address => PoolType) public poolType;
-  mapping(address => address) public poolPiptSwap;
+  mapping(address => address) public poolSwapContract;
   mapping(address => uint256) public tokenCap;
   mapping(address => address[]) public poolTokens;
 
@@ -145,9 +142,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     powerPoke = IPowerPoke(_powerPoke);
   }
 
-  function initialize(uint256 _roundPeriod, address _feeReceiver) external initializer {
+  function initialize(uint256 _roundPeriod) external initializer {
     __Ownable_init();
-    feeReceiver = _feeReceiver;
     roundPeriod = _roundPeriod;
   }
 
@@ -279,14 +275,14 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
   }
 
-  function setPoolsPiptSwap(address[] memory _pools, address[] memory _piptSwaps) external onlyOwner {
+  function setPoolsSwapContracts(address[] memory _pools, address[] memory _swapContracts) external onlyOwner {
     uint256 len = _pools.length;
-    require(len == _piptSwaps.length, "L");
+    require(len == _swapContracts.length, "L");
     for (uint256 i = 0; i < len; i++) {
-      poolPiptSwap[_pools[i]] = _piptSwaps[i];
-      usdc.approve(_piptSwaps[i], uint256(-1));
-      IERC20(_pools[i]).approve(_piptSwaps[i], uint256(-1));
-      emit SetPiptSwap(_pools[i], _piptSwaps[i]);
+      poolSwapContract[_pools[i]] = _swapContracts[i];
+      usdc.approve(_swapContracts[i], uint256(-1));
+      IERC20(_pools[i]).approve(_swapContracts[i], uint256(-1));
+      emit SetPiptSwap(_pools[i], _swapContracts[i]);
     }
   }
 
@@ -303,36 +299,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     uint256 len = _pools.length;
     for (uint256 i = 0; i < len; i++) {
       _updatePool(_pools[i]);
-    }
-  }
-
-  function setFee(address[] memory _tokens, uint256[] memory _fees) external onlyOwner {
-    uint256 len = _tokens.length;
-    require(len == _fees.length, "L");
-    for (uint256 i = 0; i < len; i++) {
-      feeByToken[_tokens[i]] = _fees[i];
-      emit SetFee(_tokens[i], _fees[i]);
-    }
-  }
-
-  function setFeeReceiver(address _feeReceiver) external onlyOwner {
-    feeReceiver = _feeReceiver;
-    emit SetFeeReceiver(feeReceiver);
-  }
-
-  function claimFee(address[] memory _tokens) external onlyOwner {
-    require(feeReceiver != address(0), "FR_NOT_SET");
-
-    uint256 len = _tokens.length;
-    for (uint256 i = 0; i < len; i++) {
-      address token = _tokens[i];
-      if (token == ETH) {
-        payable(feeReceiver).transfer(pendingFeeByToken[token]);
-      } else {
-        IERC20(token).safeTransfer(feeReceiver, pendingFeeByToken[token]);
-      }
-      emit ClaimFee(token, pendingFeeByToken[token]);
-      pendingFeeByToken[token] = 0;
     }
   }
 
@@ -452,13 +418,12 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         require(round.endTime + maxInterval <= block.timestamp, "MAX_I");
       }
 
-      uint256 inputAmountWithFee = _takeAmountFee(round.pool, round.inputToken, round.totalInputAmount);
       require(round.inputToken == round.pool || round.outputToken == round.pool, "UA");
 
       if (round.inputToken == round.pool) {
-        _redeemPool(round, inputAmountWithFee);
+        _redeemPool(round, round.totalInputAmount);
       } else {
-        _supplyPool(round, inputAmountWithFee);
+        _supplyPool(round, round.totalInputAmount);
       }
 
       require(round.totalOutputAmount != 0, "NULL_TO");
@@ -477,7 +442,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   function _supplyPool(Round storage round, uint256 totalInputAmount) internal {
     PoolType pType = poolType[round.pool];
     if (pType == PoolType.PIPT) {
-      IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolPiptSwap[round.pool]));
+      IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolSwapContract[round.pool]));
       if (round.inputToken == ETH) {
         (round.totalOutputAmount, ) = piptSwap.swapEthToPipt{ value: totalInputAmount }(piptSwap.defaultSlippage());
       } else {
@@ -488,21 +453,23 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         );
       }
     } else if (pType == PoolType.VAULT) {
-      round.totalOutputAmount = erc20VaultPoolSwap.swapErc20cToVaultPool(round.pool, address(usdc), totalInputAmount);
+      IErc20VaultPoolSwap vaultPoolSwap = IErc20VaultPoolSwap(poolSwapContract[round.pool]);
+      round.totalOutputAmount = vaultPoolSwap.swapErc20cToVaultPool(round.pool, address(usdc), totalInputAmount);
     }
   }
 
   function _redeemPool(Round storage round, uint256 totalInputAmount) internal {
     PoolType pType = poolType[round.pool];
     if (pType == PoolType.PIPT) {
-      IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolPiptSwap[round.pool]));
+      IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolSwapContract[round.pool]));
       if (round.inputToken == ETH) {
         round.totalOutputAmount = piptSwap.swapPiptToEth(totalInputAmount);
       } else {
         round.totalOutputAmount = piptSwap.swapPiptToErc20(round.outputToken, totalInputAmount);
       }
     } else if (pType == PoolType.VAULT) {
-      round.totalOutputAmount = erc20VaultPoolSwap.swapVaultPoolToErc20(round.pool, totalInputAmount, address(usdc));
+      IErc20VaultPoolSwap vaultPoolSwap = IErc20VaultPoolSwap(poolSwapContract[round.pool]);
+      round.totalOutputAmount = vaultPoolSwap.swapVaultPoolToErc20(round.pool, totalInputAmount, address(usdc));
     }
   }
 
@@ -543,21 +510,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         round.inputAmount[_claimFor],
         outputAmount
       );
-    }
-  }
-
-  function _takeAmountFee(
-    address _pool,
-    address _inputToken,
-    uint256 _amount
-  ) internal returns (uint256 amountWithFee) {
-    if (feeByToken[_inputToken] == 0) {
-      return _amount;
-    }
-    amountWithFee = _amount.sub(_amount.mul(feeByToken[_inputToken]).div(1 ether));
-    if (amountWithFee != _amount) {
-      pendingFeeByToken[_inputToken] = pendingFeeByToken[_inputToken].add(_amount.sub(amountWithFee));
-      emit TakeFee(_pool, _inputToken, _amount.sub(amountWithFee));
     }
   }
 

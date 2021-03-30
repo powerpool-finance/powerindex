@@ -32,18 +32,8 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     address indexed vaultRegistry
   );
 
-  event Erc20ToVaultPoolSwap(
-    address indexed user,
-    address indexed pool,
-    uint256 usdcInAmount,
-    uint256 poolOutAmount
-  );
-  event VaultPoolToErc20Swap(
-    address indexed user,
-    address indexed pool,
-    uint256 poolInAmount,
-    uint256 usdcOutAmount
-  );
+  event Erc20ToVaultPoolSwap(address indexed user, address indexed pool, uint256 usdcInAmount, uint256 poolOutAmount);
+  event VaultPoolToErc20Swap(address indexed user, address indexed pool, uint256 poolInAmount, uint256 usdcOutAmount);
 
   IERC20 public immutable usdc;
 
@@ -131,22 +121,29 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     address _pool,
     address _swapToken,
     uint256 _swapAmount
-  ) external override payable returns (uint256 poolAmountOut) {
+  ) external override returns (uint256 poolAmountOut) {
     require(_swapToken == address(usdc), "ONLY_USDC");
     usdc.safeTransferFrom(msg.sender, address(this), _swapAmount);
 
     (, uint256 _swapAmountWithFee) = calcFee(_swapAmount, 0);
 
-    (uint256 poolAmountOut, uint256[] memory tokensInPipt) = _depositVaultAndGetTokensInPipt(_pool, _swapAmountWithFee);
+    uint256[] memory tokensInPipt;
+    (poolAmountOut, tokensInPipt) = _depositVaultAndGetTokensInPipt(_pool, _swapAmountWithFee);
 
     PowerIndexPoolInterface(_pool).joinPool(poolAmountOut, tokensInPipt);
     (, uint256 communityFee, , ) = PowerIndexPoolInterface(_pool).getCommunityFee();
     poolAmountOut = poolAmountOut.sub(poolAmountOut.mul(communityFee).div(1 ether)) - 1;
 
+    IERC20(_pool).safeTransfer(msg.sender, poolAmountOut);
+
     emit Erc20ToVaultPoolSwap(msg.sender, _pool, _swapAmount, poolAmountOut);
   }
 
-  function swapVaultPoolToErc20(address _pool, uint256 _poolAmountIn, address _swapToken) external override payable returns (uint256 erc20Out) {
+  function swapVaultPoolToErc20(
+    address _pool,
+    uint256 _poolAmountIn,
+    address _swapToken
+  ) external override returns (uint256 erc20Out) {
     require(_swapToken == address(usdc), "ONLY_USDC");
     IERC20(_pool).safeTransferFrom(msg.sender, address(this), _poolAmountIn);
 

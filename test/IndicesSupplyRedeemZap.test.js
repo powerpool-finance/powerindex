@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { deployProxied, mwei, addBN, subBN, mulScalarBN, mulBN, divBN, assertEqualWithAccuracy } = require('./helpers');
+const { deployProxied, mwei, addBN, subBN, mulBN, divBN, assertEqualWithAccuracy } = require('./helpers');
 
 const { time, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
@@ -203,8 +203,6 @@ describe('IndicesSupplyRedeemZap', () => {
       const carolUsdcToSwap = mwei(10000);
       const usdcTokenCap = mwei(11000);
 
-      const usdcFee = ether('0.1');
-
       const erc20PiptSwap = await Erc20PiptSwap.new(this.weth.address, cvp.address, pool.address, zeroAddress, feeManager, {
         from: minter,
       });
@@ -223,9 +221,8 @@ describe('IndicesSupplyRedeemZap', () => {
       );
 
       await this.indiciesZap.setPools([pool.address], ['1'], {from: minter});
-      await this.indiciesZap.setPoolsPiptSwap([pool.address], [erc20PiptSwap.address], {from: minter});
+      await this.indiciesZap.setPoolsSwapContracts([pool.address], [erc20PiptSwap.address], {from: minter});
       await this.indiciesZap.setTokensCap([usdc.address], [usdcTokenCap], {from: minter});
-      await this.indiciesZap.setFee([usdc.address], [usdcFee], {from: minter});
 
       await expectRevert(this.indiciesZap.depositEth(pool.address, { value: '0', from: alice }), 'NA');
       let res = await this.indiciesZap.depositEth(pool.address, { value: aliceEthToSwap, from: alice });
@@ -478,8 +475,7 @@ describe('IndicesSupplyRedeemZap', () => {
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [dan, carol], '0x', {from: reporter}), 'INPUT_NULL');
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan, carol], '0x', {from: reporter}), 'NULL_TO');
 
-      const totalUscToSwapWithFee = mulScalarBN(totalUsdcToSwap, subBN(ether(1), usdcFee));
-      const { erc20AfterFee: usdcInAfterFee } = await erc20PiptSwap.calcErc20Fee(usdc.address, totalUscToSwapWithFee);
+      const { erc20AfterFee: usdcInAfterFee } = await erc20PiptSwap.calcErc20Fee(usdc.address, totalUsdcToSwap);
       const {poolOut: poolOutForUsdc} = await erc20PiptSwap.calcSwapErc20ToPiptInputs(
         usdc.address,
         usdcInAfterFee,
@@ -509,11 +505,6 @@ describe('IndicesSupplyRedeemZap', () => {
         inputToken: usdc.address,
         totalInputAmount: danUsdcToSwap,
         inputCap: usdcTokenCap
-      });
-      await expectEvent.inTransaction(res.tx, IndicesSupplyRedeemZap, 'TakeFee', {
-        pool: pool.address,
-        token: usdc.address,
-        amount: subBN(totalUsdcToSwap, totalUscToSwapWithFee)
       });
 
       round = await this.indiciesZap.rounds(firstRoundUsdcKey);
@@ -710,7 +701,7 @@ describe('IndicesSupplyRedeemZap', () => {
       });
 
       await this.indiciesZap.setPools([pool.address], ['2'], {from: minter});
-      await this.indiciesZap.setPoolsPiptSwap([pool.address], [erc20PiptSwap.address], {from: minter});
+      await this.indiciesZap.setPoolsSwapContracts([pool.address], [erc20PiptSwap.address], {from: minter});
 
 
       await expectRevert(this.indiciesZap.depositEth(pool.address, { value: ether('1'), from: alice }), 'NOT_SUPPORTED_POOL');

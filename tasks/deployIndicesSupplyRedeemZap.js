@@ -7,6 +7,7 @@ task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').set
   const IndicesSupplyRedeemZap = artifacts.require('IndicesSupplyRedeemZap');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
   const PowerPoke = await artifacts.require('PowerPoke');
+  const Erc20VaultPoolSwap = await artifacts.require('Erc20VaultPoolSwap');
 
   const { web3 } = IndicesSupplyRedeemZap;
 
@@ -35,10 +36,12 @@ task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').set
   console.log('zap.address', zap.address);
   console.log('zap.initialImplementation.address', zap.initialImplementation.address);
 
+  const erc20VaultPoolSwap = await Erc20VaultPoolSwap.new(usdcAddress);
   await zap.setPools([poolAddress], ['2']);
+  await zap.setPoolsSwapContracts([poolAddress], [erc20VaultPoolSwap.address]);
 
   const vd = JSON.parse(fs.readFileSync('data/vaultsData.json'));
-  await zap.setVaultConfigs(
+  await erc20VaultPoolSwap.setVaultConfigs(
     vd.map(v => v.address),
     vd.map(v => v.config.depositor),
     vd.map(v => v.config.amountsLength),
@@ -46,6 +49,7 @@ task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').set
     vd.map(v => v.config.lpToken),
     vd.map(() => curveRegistry),
   );
+  await erc20VaultPoolSwap.updatePools([poolAddress]);
 
   if (network.name !== 'mainnetfork') {
     return;
