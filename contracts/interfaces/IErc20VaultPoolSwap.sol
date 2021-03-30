@@ -7,11 +7,11 @@ interface IErc20VaultPoolSwap {
     address _pool,
     address _swapToken,
     uint256 _swapAmount
-  ) external payable returns (uint256 poolAmountOut);
+  ) external returns (uint256 poolAmountOut);
 
   function swapVaultPoolToErc20(
     address _pool,
     uint256 _poolAmountIn,
     address _swapToken
-  ) external payable returns (uint256 erc20Out);
+  ) external returns (uint256 erc20Out);
 }
