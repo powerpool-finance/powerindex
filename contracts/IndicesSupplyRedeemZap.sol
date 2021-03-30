@@ -94,6 +94,15 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   mapping(address => uint256) public tokenCap;
   mapping(address => address[]) public poolTokens;
 
+  struct VaultConfig {
+    uint256 depositorLength;
+    uint256 depositorIndex;
+    address depositor;
+    address lpToken;
+    address vaultRegistry;
+  }
+  mapping(address => VaultConfig) public vaultConfig;
+
   uint256 public roundPeriod;
 
   address public feeReceiver;
