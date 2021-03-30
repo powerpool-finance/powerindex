@@ -186,7 +186,7 @@ describe('IndicesSupplyRedeemZap', () => {
       this.indiciesZap = await deployProxied(
         IndicesSupplyRedeemZap,
         [usdc.address, this.poke.address],
-        [roundPeriod, feeReceiver],
+        [roundPeriod],
         {proxyAdminOwner: minter}
       );
 
@@ -677,7 +677,7 @@ describe('IndicesSupplyRedeemZap', () => {
       this.indiciesZap = await deployProxied(
         IndicesSupplyRedeemZap,
         [usdc.address, this.poke.address],
-        [roundPeriod, feeReceiver],
+        [roundPeriod],
         {proxyAdminOwner: minter}
       );
 
