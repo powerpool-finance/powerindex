@@ -92,8 +92,10 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   mapping(address => PoolType) public poolType;
   mapping(address => address) public poolSwapContract;
   mapping(address => uint256) public tokenCap;
+  // TODO: delete on proxy replace
   mapping(address => address[]) public poolTokens;
 
+  // TODO: delete on proxy replace
   struct VaultConfig {
     uint256 depositorLength;
     uint256 depositorIndex;
@@ -105,6 +107,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   uint256 public roundPeriod;
 
+  // TODO: delete on proxy replace
   address public feeReceiver;
   mapping(address => uint256) public feeByToken;
   mapping(address => uint256) public pendingFeeByToken;
