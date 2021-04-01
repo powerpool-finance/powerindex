@@ -93,12 +93,10 @@ contract InstantRebindStrategy is PoolManagement, WeightValueAbstract {
   function initialize(
     address _powerPoke,
     address _curvePoolRegistry,
-    address _oracle,
     StrategyConstraints memory _constraints
   ) external initializer {
     __Ownable_init();
     powerPoke = IPowerPoke(_powerPoke);
-    oracle = IPowerOracle(_oracle);
     curvePoolRegistry = ICurvePoolRegistry(_curvePoolRegistry);
     constraints = _constraints;
     totalWeight = 25 * BONE;
@@ -212,7 +210,10 @@ contract InstantRebindStrategy is PoolManagement, WeightValueAbstract {
         uint256 usdcIn;
 
         if (constraints.useVirtualPriceEstimation) {
-          // usdcIn = (ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IVault(cfg.token).token()) * crvAmount) / 1e18;
+          // usdcIn =
+          // (ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(
+          //    IVault(cfg.token).token()
+          // ) * crvAmount) / 1e18;
           usdcIn =
             (
               ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IVault(cfg.token).token()).mul(
@@ -253,7 +254,7 @@ contract InstantRebindStrategy is PoolManagement, WeightValueAbstract {
         uint256 vaultBalance = IVault(cfg.token).balanceOf(address(this));
         IERC20(cfg.token).approve(address(controller), vaultBalance);
 
-        // uint256 newBalance = IVault(cfg.token).balanceOf(address(this)) + BPoolInterface(_pool).getBalance(cfg.token);
+        // uint256 newBalance = IVault(cfg.token).balanceOf(address(this)) + BPoolInterface(_pool).getBalance(cfg.token)
         uint256 newBalance =
           IVault(cfg.token).balanceOf(address(this)).add(BPoolInterface(_pool).getBalance(cfg.token));
         controller.rebindByStrategyAdd(cfg.token, newBalance, cfg.newWeight, vaultBalance);

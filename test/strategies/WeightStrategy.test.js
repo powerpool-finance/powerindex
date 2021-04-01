@@ -278,7 +278,7 @@ describe('WeightStrategy', () => {
         weightStrategy = await deployProxied(
           MockInstantRebindStrategy,
           [usdc.address],
-          [poke.address, curvePoolRegistry.address, oracle.address, {
+          [poke.address, curvePoolRegistry.address, {
             minUSDCRemainder: mwei('5'),
             useVirtualPriceEstimation: false
           }],
