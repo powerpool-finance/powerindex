@@ -174,15 +174,23 @@ function ether(value) {
 }
 
 function fromEther(value) {
-  return web3.utils.fromWei(value, 'ether');
+  return parseFloat(web3.utils.fromWei(value, 'ether'));
 }
 
 function gwei(value) {
   return web3.utils.toWei(value.toString(), 'gwei').toString();
 }
 
+function fromGwei(value) {
+  return web3.utils.fromWei(value.toString(), 'gwei').toString();
+}
+
 function mwei(value) {
   return web3.utils.toWei(value.toString(), 'mwei').toString(10);
+}
+
+function fromMwei(value) {
+  return web3.utils.fromWei(value.toString(), 'mwei').toString();
 }
 
 async function getResTimestamp(res) {
@@ -273,14 +281,16 @@ async function forkReplacePoolTokenWithNewPiToken(
   tokenAddress,
   factoryAddress,
   routerArgs,
-  admin
+  admin,
+  type = 'aave'
 ) {
   const MockERC20 = await artifacts.require('MockERC20');
   const {web3} = MockERC20;
   const token = await MockERC20.at(tokenAddress);
   const PowerIndexPool = await artifacts.require('PowerIndexPool');
   const WrappedPiErc20 = await artifacts.require('WrappedPiErc20');
-  const AavePowerIndexRouter = await artifacts.require('AavePowerIndexRouter');
+  console.log(routerArgs.SUSHI ? 'SushiPowerIndexRouter' : 'AavePowerIndexRouter');
+  const PowerIndexRouter = await artifacts.require(type === 'aave' ? 'AavePowerIndexRouter' : 'SushiPowerIndexRouter');
   const pool = await PowerIndexPool.at(await callContract(controller, 'pool'))
   console.log('pool getBalance before', await callContract(pool, 'getBalance', [token.address]));
 
@@ -290,7 +300,7 @@ async function forkReplacePoolTokenWithNewPiToken(
     to: admin,
     value: ether(10)
   })
-  await pool.setController(controller.address, {from: admin});
+  // await pool.setController(controller.address, {from: admin});
 
   console.log('await callContract(pool, "getDenormalizedWeight", [token])', await callContract(pool, 'getDenormalizedWeight', [tokenAddress]));
   const res = await controller.replacePoolTokenWithNewPiToken(
@@ -304,11 +314,13 @@ async function forkReplacePoolTokenWithNewPiToken(
 
   const wrappedTokenAddress = res.logs.filter(l => l.event === 'CreatePiToken')[0].args.piToken;
   const wrappedToken = await WrappedPiErc20.at(wrappedTokenAddress);
-  const router = await AavePowerIndexRouter.at(await callContract(wrappedToken, 'router', []));
+  const router = await PowerIndexRouter.at(await callContract(wrappedToken, 'router', []));
 
   await increaseTime(60);
 
-  await controller.finishReplace();
+  if(controller.finishReplace) {
+    await controller.finishReplace();
+  }
 
   await wrappedToken.pokeRouter();
 
@@ -324,31 +336,56 @@ async function forkReplacePoolTokenWithNewPiToken(
 }
 
 function callContract(contract, method, args = []) {
-  console.log(method, args);
+  // console.log(method, args);
   return contract.contract.methods[method].apply(contract.contract, args).call();
 }
 
 function isBnGreater(bn1, bn2) {
   return toBN(bn1.toString(10)).gt(toBN(bn2.toString(10)));
 }
-function subBN(bn1, bn2) {
-  return toBN(bn1.toString(10)).sub(toBN(bn2.toString(10))).toString(10);
-}
-function addBN(bn1, bn2) {
-  return toBN(bn1.toString(10)).add(toBN(bn2.toString(10))).toString(10);
-}
-function mulBN(bn1, bn2) {
-  return toBN(bn1.toString(10)).mul(toBN(bn2.toString(10))).toString(10);
-}
-function divBN(bn1, bn2) {
-  return toBN(bn1.toString(10)).div(toBN(bn2.toString(10))).toString(10);
-}
+
 function mulScalarBN(bn1, bn2) {
-  return divBN(mulBN(bn1, bn2), toBN(ether(1))).toString(10);
+  return toBN(bn1.toString(10))
+    .mul(toBN(bn2.toString(10)))
+    .div(toBN(ether('1').toString(10)))
+    .toString(10);
 }
 function divScalarBN(bn1, bn2) {
-  return divBN(mulBN(bn1, toBN(ether(1))), bn2).toString(10);
+  return toBN(bn1.toString(10))
+    .mul(toBN(ether('1').toString(10)))
+    .div(toBN(bn2.toString(10)))
+    .toString(10);
 }
+function mulBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .mul(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function divBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .div(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function subBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .sub(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function addBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .add(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei) {
+  bn1 = toBN(bn1.toString(10));
+  bn2 = toBN(bn2.toString(10));
+  const bn1GreaterThenBn2 = bn1.gt(bn2);
+  let diff = bn1GreaterThenBn2 ? bn1.sub(bn2) : bn2.sub(bn1);
+  let diffPercent = divScalarBN(diff, bn1);
+  const lowerThenAccurancy = toBN(diffPercent).lte(toBN(accuracyPercentWei));
+  assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));
+}
+
 
 module.exports = {
   deployProxied,
@@ -362,7 +399,9 @@ module.exports = {
   fromEther,
   ethUsed,
   gwei,
+  fromGwei,
   mwei,
+  fromMwei,
   expectExactRevert,
   getResTimestamp,
   forkContractUpgrade,
@@ -374,10 +413,11 @@ module.exports = {
   callContract,
   forkReplacePoolTokenWithNewPiToken,
   isBnGreater,
-  subBN,
-  addBN,
+  mulScalarBN,
+  divScalarBN,
   mulBN,
   divBN,
-  mulScalarBN,
-  divScalarBN
+  subBN,
+  addBN,
+  assertEqualWithAccuracy
 }

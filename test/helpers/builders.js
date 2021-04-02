@@ -79,6 +79,22 @@ function buildAaveRouterArgs(web3, basicConfig, aaveConfig) {
   );
 }
 
+function buildSushiRouterArgs(web3, basicConfig, sushiConfig) {
+  return web3.eth.abi.encodeParameters(
+    [
+      {
+        BasicConfig,
+      },
+      {
+        SushiConfig: {
+          SUSHI: 'address',
+        },
+      },
+    ],
+    [basicConfig, sushiConfig],
+  );
+}
+
 function buildYearnRouterArgs(web3, basicConfig, yearnConfig) {
   return web3.eth.abi.encodeParameters(
     [
@@ -109,4 +125,5 @@ module.exports = {
   buildBasicRouterArgs,
   buildYearnRouterArgs,
   buildAaveRouterArgs,
+  buildSushiRouterArgs,
 };

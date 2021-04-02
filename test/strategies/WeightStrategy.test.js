@@ -675,7 +675,7 @@ describe.skip('WeightStrategy', () => {
       });
     });
 
-    describe('TvlWeightStrategy', () => {
+    describe('VaultBalanceWeightStrategy', () => {
       const vaultsData = JSON.parse(fs.readFileSync('data/vaultsData.json', { encoding: 'utf8' }));
 
       beforeEach(async () => {
@@ -687,7 +687,7 @@ describe.skip('WeightStrategy', () => {
         );
 
         for (let i = 0; i < vaultsData.length; i++) {
-          const token = await MockVault.new(vaultsData[i].usdtValue, vaultsData[i].totalSupply);
+          const token = await MockVault.new(zeroAddress, vaultsData[i].usdtValue, vaultsData[i].totalSupply);
           tokens.push(token);
           bPoolBalances.push(poolsData[i].balancerBalance);
         }
@@ -711,11 +711,11 @@ describe.skip('WeightStrategy', () => {
         ]);
 
         const newWeights = [
-          ether(2.35769548658117795),
-          ether(10.090429724266482),
-          ether(4.064999565741278325),
-          ether(6.49463551152093545),
-          ether(1.992239711890126275),
+          ether(3.1249368209516502),
+          ether(8.936244707311612325),
+          ether(5.337028708598225225),
+          ether(5.816833263019053675),
+          ether(1.784956500119458575),
         ];
 
         await expectRevert(
@@ -779,11 +779,11 @@ describe.skip('WeightStrategy', () => {
         assert.equal(res.logs.length, 1);
 
         await this.checkWeights(pool, balancerTokens, [
-          ether(2.46396171806664775),
-          ether(10.043072709867559325),
-          ether(4.0459214641909087),
-          ether(6.46415449576249015),
-          ether(1.982889612112394075),
+          ether(3.260804048723702875),
+          ether(8.88074119698401715),
+          ether(5.30388012798650765),
+          ether(5.7807045897718094),
+          ether(1.7738700365339629),
         ]);
 
         await time.increase(pokePeriod * 2);
@@ -792,11 +792,11 @@ describe.skip('WeightStrategy', () => {
         assert.equal(res.logs.length, 1);
 
         await this.checkWeights(pool, balancerTokens, [
-          ether(2.516721658191270325),
-          ether(10.0195605065152678),
-          ether(4.03644941007344805),
-          ether(6.449021028207718125),
-          ether(1.9782473970122957),
+          ether(3.3281067128895294),
+          ether(8.8532471928973966),
+          ether(5.2874597753741232),
+          ether(5.762808030003948125),
+          ether(1.76837828883500265),
         ]);
 
         await time.increase(pokePeriod * 2);
@@ -805,11 +805,11 @@ describe.skip('WeightStrategy', () => {
         assert.equal(res.logs.length, 1);
 
         await this.checkWeights(pool, balancerTokens, [
-          ether(2.543009097903414875),
-          ether(10.007845640526733525),
-          ether(4.031729995097336025),
-          ether(6.4414808354963146),
-          ether(1.975934430976201),
+          ether(3.36160201409560555),
+          ether(8.8395639314744402),
+          ether(5.27928766713028545),
+          ether(5.753901240541645775),
+          ether(1.765645146758023025),
         ]);
 
         newBalance = mulScalarBN(await tokens[0].balance(), ether(2));
@@ -820,11 +820,11 @@ describe.skip('WeightStrategy', () => {
         assert.equal(res.logs.length, 1);
 
         await this.checkWeights(pool, balancerTokens, [
-          ether(3.653646660369392025),
-          ether(9.512895567465401775),
-          ether(3.832335926951820375),
-          ether(6.12290963399402335),
-          ether(1.878212211219362475),
+          ether(4.754068670330155625),
+          ether(8.27072338984793445),
+          ether(4.93955678456042425),
+          ether(5.38362819047850905),
+          ether(1.652022964782976675),
         ]);
 
         newBalance = mulScalarBN(await tokens[4].balance(), ether(0.5));
@@ -836,11 +836,11 @@ describe.skip('WeightStrategy', () => {
         assert.equal(res.logs.length, 1);
 
         await this.checkWeights(pool, balancerTokens, [
-          ether(4.2465990360162163),
-          ether(9.45666641092973695),
-          ether(3.8096836214360519),
-          ether(6.08671812512883025),
-          ether(1.4003328064891646),
+          ether(5.47278461314705205),
+          ether(8.143236171495610425),
+          ether(4.863417089799270275),
+          ether(5.300643456218174925),
+          ether(1.21991866933989235),
         ]);
 
         for (let i = 0; i < tokens.length; i++) {
@@ -851,77 +851,77 @@ describe.skip('WeightStrategy', () => {
         await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
 
         await this.checkWeights(pool, balancerTokens, [
-          ether(3.332768632467685625),
-          ether(9.763274011171683225),
-          ether(3.933202618732977275),
-          ether(6.2840639927527501),
-          ether(1.6866907448749038),
+          ether(4.35336656980972305),
+          ether(8.521330554983255475),
+          ether(5.089227891240536475),
+          ether(5.546754888756738275),
+          ether(1.489320095209746725),
         ]);
 
         await time.increase(pokePeriod);
         await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
 
         await this.checkWeights(pool, balancerTokens, [
-          ether(2.853265843915821775),
-          ether(9.924156379208807325),
-          ether(3.998015196004445175),
-          ether(6.3876148195444647),
-          ether(1.836947761326461025),
+          ether(3.753749738931534875),
+          ether(8.723856999280871675),
+          ether(5.210183559182610175),
+          ether(5.678584599828488775),
+          ether(1.633625102776494475),
         ]);
 
         await time.increase(pokePeriod);
         await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
 
         await this.checkWeights(pool, balancerTokens, [
-          ether(2.6075391674977957),
-          ether(10.006602384812689675),
-          ether(4.031229140914135125),
-          ether(6.4406806225290797),
-          ether(1.9139486842462998),
+          ether(3.44312446242425105),
+          ether(8.828773721961666725),
+          ether(5.272843387701103775),
+          ether(5.74687761354120215),
+          ether(1.7083808143717763),
         ]);
 
         await time.increase(pokePeriod);
         await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
 
         await this.checkWeights(pool, balancerTokens, [
-          ether(2.483138392312630325),
-          ether(10.048341227162046675),
-          ether(4.048043922906684375),
-          ether(6.467545540589010375),
-          ether(1.952930917029628225),
+          ether(3.284993093246652275),
+          ether(8.8821841372172698),
+          ether(5.304741900879024775),
+          ether(5.7816438369634698),
+          ether(1.746437031693583375),
         ]);
 
         await time.increase(pokePeriod);
         await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
 
         await this.checkWeights(pool, balancerTokens, [
-          ether(2.42054802250523435),
-          ether(10.0693414948379541),
-          ether(4.0565040263230649),
-          ether(6.48106221806721445),
-          ether(1.9725442382665322),
+          ether(3.2052077600253503),
+          ether(8.90913241320336095),
+          ether(5.320836326143288225),
+          ether(5.799185168168137575),
+          ether(1.765638332459862925),
         ]);
 
         await time.increase(pokePeriod);
         await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
 
         await this.checkWeights(pool, balancerTokens, [
-          ether(2.389154628147854875),
-          ether(10.0798745798283289),
-          ether(4.06074735263143995),
-          ether(6.4878417655883513),
-          ether(1.982381673804024975),
+          ether(3.16513326788600255),
+          ether(8.922667964545587475),
+          ether(5.328920216912423275),
+          ether(5.807995809310982025),
+          ether(1.7752827413450047),
         ]);
 
         await time.increase(pokePeriod);
         await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
 
         await this.checkWeights(pool, balancerTokens, [
-          ether(2.37343328866777615),
-          ether(10.085149390287532375),
-          ether(4.062872346592248525),
-          ether(6.4912368609669453),
-          ether(1.987308113485497675),
+          ether(3.145050323535482675),
+          ether(8.929451175257636275),
+          ether(5.3329713806274293),
+          ether(5.8124111769505487),
+          ether(1.78011594362890305),
         ]);
       });
     });

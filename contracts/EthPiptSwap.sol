@@ -126,7 +126,7 @@ contract EthPiptSwap is Ownable {
     ethOutAmount = _swapPiptToWeth(_poolAmountIn);
 
     weth.withdraw(ethOutAmount);
-    msg.sender.transfer(ethOutAmount);
+    Address.sendValue(msg.sender, ethOutAmount);
   }
 
   function convertOddToCvpAndSendToPayout(address[] memory oddTokens) external {
@@ -421,7 +421,7 @@ contract EthPiptSwap is Ownable {
     oddEth = swapAmount.sub(totalEthSwap);
     if (oddEth > 0) {
       weth.withdraw(oddEth);
-      msg.sender.transfer(oddEth);
+      Address.sendValue(msg.sender, oddEth);
       emit OddEth(msg.sender, oddEth);
     }
   }
