@@ -66,7 +66,7 @@ describe('YearnRouter Tests', () => {
 
     poolRestrictions = await PoolRestrictions.new();
     piYfi = await WrappedPiErc20.new(yfi.address, stub, 'wrapped.yearn.finance', 'piYFI');
-    poke = await MockPoke.new();
+    poke = await MockPoke.new(true);
     yfiRouter = await YearnPowerIndexRouter.new(
       piYfi.address,
       buildBasicRouterConfig(
@@ -611,7 +611,7 @@ describe('YearnRouter Tests', () => {
     });
 
     it('should revert distributing rewards when missing reward pools config', async () => {
-      poke = await MockPoke.new();
+      poke = await MockPoke.new(true);
       const router = await YearnPowerIndexRouter.new(
         piYfi.address,
         buildBasicRouterConfig(
@@ -642,7 +642,7 @@ describe('YearnRouter Tests', () => {
     });
 
     it('should revert when missing reward swap path', async () => {
-      poke = await MockPoke.new();
+      poke = await MockPoke.new(true);
       const router = await YearnPowerIndexRouter.new(
         piYfi.address,
         buildBasicRouterConfig(

@@ -32,7 +32,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
   beforeEach(async function () {
     [owner, alice, bob, stub, mockStaking] = await web3.eth.getAccounts();
     myContract = await MyContract.new();
-    const poke = await MockPoke.new();
+    const poke = await MockPoke.new(true);
     defaultBasicConfig = buildBasicRouterConfig(
       stub,
       poke.address,

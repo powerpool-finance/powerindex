@@ -76,7 +76,7 @@ describe('PowerIndex Implementation Factories Test', () => {
       // governance
       constants.ZERO_ADDRESS,
     );
-    const poke = await MockPoke.new();
+    const poke = await MockPoke.new(true);
     defaultBasicConfig = buildBasicRouterConfig(
       poolRestrictions,
       poke.address,

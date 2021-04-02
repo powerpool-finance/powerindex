@@ -28,7 +28,7 @@ describe('PowerIndex BasicRouter Test', () => {
   before(async function () {
     [deployer, bob, alice, stub, piGov] = await web3.eth.getAccounts();
     poolRestrictions = await PoolRestrictions.new();
-    const poke = await MockPoke.new();
+    const poke = await MockPoke.new(true);
     defaultBasicConfig = buildBasicRouterConfig(
       poolRestrictions.address,
       poke.address,

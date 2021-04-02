@@ -35,7 +35,7 @@ describe('SushiRouter Stories', () => {
 
     poolRestrictions = await PoolRestrictions.new();
     piSushi = await WrappedPiErc20.new(sushi.address, stub, 'Wrapped SUSHI', 'piSUSHI');
-    const poke = await MockPoke.new();
+    const poke = await MockPoke.new(true);
     pool = await MockPool.new();
     sushiRouter = await SushiPowerIndexRouter.new(
       piSushi.address,

@@ -36,7 +36,7 @@ describe('SushiRouter Tests', () => {
 
     poolRestrictions = await PoolRestrictions.new();
     piSushi = await WrappedPiErc20.new(sushi.address, stub, 'Wrapped SUSHI', 'piSUSHI');
-    poke = await MockPoke.new();
+    poke = await MockPoke.new(true);
     sushiRouter = await SushiPowerIndexRouter.new(
       piSushi.address,
       buildBasicRouterConfig(
@@ -496,7 +496,7 @@ describe('SushiRouter Tests', () => {
     });
 
     it('should revert distributing rewards when missing reward pools config', async () => {
-      poke = await MockPoke.new();
+      poke = await MockPoke.new(true);
       const router = await SushiPowerIndexRouter.new(
         piSushi.address,
         buildBasicRouterConfig(

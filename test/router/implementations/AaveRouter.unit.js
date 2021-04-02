@@ -134,7 +134,7 @@ describe('AaveRouter Tests', () => {
 
       poolRestrictions = await PoolRestrictions.new();
       piAave = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'piAAVE');
-      poke = await MockPoke.new();
+      poke = await MockPoke.new(true);
       aaveRouter = await AavePowerIndexRouter.new(
         piAave.address,
         buildBasicRouterConfig(
@@ -165,7 +165,7 @@ describe('AaveRouter Tests', () => {
     });
 
     it('should deny initializing contract with rebalancingInterval LT UNSTAKE_WINDOW', async () => {
-      poke = await MockPoke.new();
+      poke = await MockPoke.new(true);
       await expectRevert(AavePowerIndexRouter.new(
         piAave.address,
         buildBasicRouterConfig(
@@ -608,7 +608,7 @@ describe('AaveRouter Tests', () => {
       });
 
       it('should revert distributing rewards when missing reward pools config', async () => {
-        poke = await MockPoke.new();
+        poke = await MockPoke.new(true);
         const router = await AavePowerIndexRouter.new(
           piAave.address,
           buildBasicRouterConfig(
@@ -635,7 +635,7 @@ describe('AaveRouter Tests', () => {
       it('should correctly distribute pvpFee', async () => {
         const poolA = await MockGulpingBPool.new();
         const poolB = await MockGulpingBPool.new();
-        poke = await MockPoke.new();
+        poke = await MockPoke.new(true);
         const router = await AavePowerIndexRouter.new(
           piAave.address,
           buildBasicRouterConfig(

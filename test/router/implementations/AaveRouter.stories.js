@@ -52,7 +52,7 @@ describe('AaveRouter Stories', () => {
       constants.ZERO_ADDRESS,
     );
     poolRestrictions = await PoolRestrictions.new();
-    const poke = await MockPoke.new();
+    const poke = await MockPoke.new(true);
     piAave = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'piAAVE');
     aaveRouter = await AavePowerIndexRouter.new(
       piAave.address,

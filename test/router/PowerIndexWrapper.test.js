@@ -88,7 +88,7 @@ describe('PowerIndexWrapper', () => {
   let minter, alice, communityWallet, poolRestrictions, stub;
   before(async function () {
     [minter, alice, communityWallet, poolRestrictions, stub] = await web3.eth.getAccounts();
-    const poke = await MockPoke.new();
+    const poke = await MockPoke.new(true);
     defaultFactoryArguments = buildBasicRouterArgs(web3, buildBasicRouterConfig(
       poolRestrictions,
       poke.address,
