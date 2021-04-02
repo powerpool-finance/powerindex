@@ -195,11 +195,11 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
   function calcUsdcOutByPool(address _pool, uint256 _ppolIn) external view returns (uint256 amountOut) {
     uint256 len = poolTokens[_pool].length;
-    uint ratio = _ppolIn.mul(1 ether).div(PowerIndexPoolInterface(_pool).totalSupply());
+    uint256 ratio = _ppolIn.mul(1 ether).div(PowerIndexPoolInterface(_pool).totalSupply());
 
-    for (uint i = 0; i < len; i++) {
+    for (uint256 i = 0; i < len; i++) {
       address t = poolTokens[_pool][i];
-      uint bal = PowerIndexPoolInterface(_pool).getBalance(t);
+      uint256 bal = PowerIndexPoolInterface(_pool).getBalance(t);
       amountOut = amountOut.add(calcUsdcOutByVault(t, ratio.mul(bal).div(1 ether)));
     }
   }

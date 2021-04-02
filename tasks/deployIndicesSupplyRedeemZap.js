@@ -3,10 +3,9 @@ require('@nomiclabs/hardhat-truffle5');
 const fs = require('fs');
 
 task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').setAction(async (__, {ethers, network}) => {
-  const {impersonateAccount, forkContractUpgrade, ether, fromEther, mwei, fromMwei, gwei, deployProxied, callContract, increaseTime} = require('../test/helpers');
+  const {impersonateAccount, forkContractUpgrade, fromEther, mwei, fromMwei, callContract, increaseTime} = require('../test/helpers');
   const IndicesSupplyRedeemZap = artifacts.require('IndicesSupplyRedeemZap');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
-  const PowerPoke = await artifacts.require('PowerPoke');
   const Erc20VaultPoolSwap = await artifacts.require('Erc20VaultPoolSwap');
 
   const { web3 } = IndicesSupplyRedeemZap;
