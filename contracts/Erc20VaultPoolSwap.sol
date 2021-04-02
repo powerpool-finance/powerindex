@@ -165,33 +165,43 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     return _usdcIn.mul(1e30).div(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether));
   }
 
-  //TODO: optimize contract for adding external calculation getters
-  //  function calcVaultPoolOutByUsdc(address _pool, uint256 _usdcIn) external view returns (uint256 amountOut) {
-  //    uint256 len = poolTokens[_pool].length;
-  //    uint256 piptTotalSupply = PowerIndexPoolInterface(_pool).totalSupply();
-  //
-  //    (VaultCalc[] memory vc, uint256 restInput, uint256 totalCorrectInput) =
-  //      _getVaultCalsForSupply(_pool, piptTotalSupply, _usdcIn);
-  //
-  //    uint256[] memory tokensInPipt = new uint256[](len);
-  //    for (uint256 i = 0; i < len; i++) {
-  //      uint256 share = vc[i].correctInput.mul(1 ether).div(totalCorrectInput);
-  //      vc[i].correctInput = vc[i].correctInput.add(restInput.mul(share).div(1 ether)).sub(100);
-  //
-  //      tokensInPipt[i] = calcVaultOutByUsdc(vc[i].token, vc[i].correctInput);
-  //
-  //      uint256 poolOutByToken = tokensInPipt[i].sub(1e6).mul(piptTotalSupply).div(vc[i].tokenBalance);
-  //      if (poolOutByToken < amountOut || amountOut == 0) {
-  //        amountOut = poolOutByToken;
-  //      }
-  //    }
-  //  }
+  function calcVaultPoolOutByUsdc(address _pool, uint256 _usdcIn) external view returns (uint256 amountOut) {
+    uint256 len = poolTokens[_pool].length;
+    uint256 piptTotalSupply = PowerIndexPoolInterface(_pool).totalSupply();
 
-  function calcUsdcOutByVault(address _token, uint256 _vaultIn) external view returns (uint256 amountOut) {
+    (VaultCalc[] memory vc, uint256 restInput, uint256 totalCorrectInput) =
+      getVaultCalcsForSupply(_pool, piptTotalSupply, _usdcIn);
+
+    uint256[] memory tokensInPipt = new uint256[](len);
+    for (uint256 i = 0; i < len; i++) {
+      uint256 share = vc[i].correctInput.mul(1 ether).div(totalCorrectInput);
+      vc[i].correctInput = vc[i].correctInput.add(restInput.mul(share).div(1 ether)).sub(100);
+
+      tokensInPipt[i] = calcVaultOutByUsdc(vc[i].token, vc[i].correctInput);
+
+      uint256 poolOutByToken = tokensInPipt[i].sub(1e12).mul(piptTotalSupply).div(vc[i].tokenBalance);
+      if (poolOutByToken < amountOut || amountOut == 0) {
+        amountOut = poolOutByToken;
+      }
+    }
+  }
+
+  function calcUsdcOutByVault(address _token, uint256 _vaultIn) public view returns (uint256 amountOut) {
     VaultConfig storage vc = vaultConfig[_token];
     uint256 lpByUsdcPrice = IVaultRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
     uint256 vaultByLpPrice = IVault(_token).getPricePerFullShare();
-    return _vaultIn.mul(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether)).div(1e6);
+    return _vaultIn.mul(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether)).div(1e30);
+  }
+
+  function calcUsdcOutByPool(address _pool, uint256 _ppolIn) external view returns (uint256 amountOut) {
+    uint256 len = poolTokens[_pool].length;
+    uint ratio = _ppolIn.mul(1 ether).div(PowerIndexPoolInterface(_pool).totalSupply());
+
+    for (uint i = 0; i < len; i++) {
+      address t = poolTokens[_pool][i];
+      uint bal = PowerIndexPoolInterface(_pool).getBalance(t);
+      amountOut = amountOut.add(calcUsdcOutByVault(t, ratio.mul(bal).div(1 ether)));
+    }
   }
 
   function getVaultCalcsForSupply(
@@ -254,7 +264,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
       IVault(vc[i].token).deposit(_addYearnLpTokenLiquidity(vaultConfig[vc[i].token], vc[i].correctInput));
       tokensInPipt[i] = IVault(vc[i].token).balanceOf(address(this));
 
-      uint256 poolOutByToken = tokensInPipt[i].sub(1e6).mul(piptTotalSupply).div(vc[i].tokenBalance);
+      uint256 poolOutByToken = tokensInPipt[i].sub(1e12).mul(piptTotalSupply).div(vc[i].tokenBalance);
       if (poolOutByToken < poolAmountOut || poolAmountOut == 0) {
         poolAmountOut = poolOutByToken;
       }
