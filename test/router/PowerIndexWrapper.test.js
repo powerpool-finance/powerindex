@@ -306,7 +306,7 @@ describe('PowerIndexWrapper', () => {
             mulScalarBN(price, ether('1.05')),
             { from: alice },
           ),
-          'function call failed to execute',
+          'revert',
         );
 
         await poolWrapper.swapExactAmountIn(
@@ -480,7 +480,7 @@ describe('PowerIndexWrapper', () => {
             mulScalarBN(price, ether('1.05')),
             { from: alice },
           ),
-          'function call failed to execute',
+          'revert',
         );
 
         await poolWrapper.swapExactAmountOut(
@@ -952,7 +952,7 @@ describe('PowerIndexWrapper', () => {
         //
         // await expectRevert(
         //   poolWrapper.joinPool(poolOutAmount, [token1InAmount, token2InAmount], { from: alice }),
-        //   'function call failed to execute',
+        //   'revert',
         // );
 
         const res = await poolWrapper.joinPool(
@@ -987,7 +987,7 @@ describe('PowerIndexWrapper', () => {
         );
         await expectRevert(
           poolWrapper.exitPool(poolOutAmountAfterFee, [token1OutAmount, token2OutAmount], { from: alice }),
-          'function call failed to execute',
+          'revert',
         );
 
         token1AliceBalanceBefore = await this.token1.balanceOf(alice);
@@ -1077,7 +1077,7 @@ describe('PowerIndexWrapper', () => {
         );
         await expectRevert(
           poolWrapper.exitPool(poolOutAmountAfterFee, [token2OutAmount, token1OutAmount], { from: alice }),
-          'function call failed to execute',
+          'revert',
         );
 
         token1AliceBalanceBefore = await this.token1.balanceOf(alice);

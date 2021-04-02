@@ -79,7 +79,7 @@ function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei = '100000000') {
   assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));
 }
 
-describe.skip('WeightStrategy', () => {
+describe('WeightStrategy', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const swapFee = ether('0.0001');
   const communitySwapFee = ether('0.001');
@@ -626,8 +626,10 @@ describe.skip('WeightStrategy', () => {
       it('pokeFromReporter and pokeFromSlasher should work properly with wrapped tokens', async () => {
         const defaultFactoryArguments = buildBasicRouterArgs(web3, buildBasicRouterConfig(
           this.poolRestrictions.address,
+          poke.address,
           constants.ZERO_ADDRESS,
           constants.ZERO_ADDRESS,
+          ether(0),
           ether(0),
           '0',
           permanentVotingPower,
