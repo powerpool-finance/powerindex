@@ -1,10 +1,11 @@
-const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
+const { constants, time, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 const { artifactFromBytecode, ether } = require('../../helpers');
 const { buildBasicRouterConfig, buildAaveRouterConfig } = require('../../helpers/builders');
 const assert = require('chai').assert;
 const MockERC20 = artifacts.require('MockERC20');
 const AavePowerIndexRouter = artifacts.require('AavePowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
+const MockPoke = artifacts.require('MockPoke');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const { web3 } = MockERC20;
 
@@ -51,14 +52,17 @@ describe('AaveRouter Stories', () => {
       constants.ZERO_ADDRESS,
     );
     poolRestrictions = await PoolRestrictions.new();
+    const poke = await MockPoke.new(true);
     piAave = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'piAAVE');
     aaveRouter = await AavePowerIndexRouter.new(
       piAave.address,
       buildBasicRouterConfig(
         poolRestrictions.address,
+        poke.address,
         stub,
         stakedAave.address,
         ether('0.2'),
+        ether('0.02'),
         '0',
         stub,
         ether('0.2'),
@@ -83,11 +87,11 @@ describe('AaveRouter Stories', () => {
       ///////////////////////
       // Step #1. Deposit 10K
       await aave.approve(piAave.address, ether(10000), { from: alice });
-      let res = await piAave.deposit(ether('10000'), { from: alice });
+      await piAave.deposit(ether('10000'), { from: alice });
+      let res = await aaveRouter.poke(false);
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
-      await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'IgnoreRedeemDueCoolDown');
       await expectEvent.inTransaction(res.tx, AavePowerIndexRouter, 'Stake', {
         amount: ether(8000),
       });
@@ -107,11 +111,11 @@ describe('AaveRouter Stories', () => {
 
       //////////////////////////
       // Step #2. Withdraw 0.5K
-      res = await piAave.withdraw(ether(500), { from: alice });
+      await piAave.withdraw(ether(500), { from: alice });
+      res = await aaveRouter.poke(false);
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem');
-      await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'IgnoreRedeemDueCoolDown');
       await expectEvent.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown', {});
       await expectEvent.inTransaction(res.tx, StakedAave, 'Cooldown', {
         user: piAave.address,
@@ -126,13 +130,8 @@ describe('AaveRouter Stories', () => {
 
       ///////////////////////////////////////////////////////
       // Step #3. Withdraw 0.5K - waiting for a COOLDOWN ends
-      res = await piAave.withdraw(ether(500), { from: alice });
-
-      await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
-      await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem');
-      await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
-      await expectEvent.notEmitted.inTransaction(res.tx, StakedAave, 'Cooldown');
-      await expectEvent.inTransaction(res.tx, AavePowerIndexRouter, 'IgnoreRedeemDueCoolDown', {});
+      await piAave.withdraw(ether(500), { from: alice });
+      await expectRevert(aaveRouter.poke(false), 'COOLDOWN');
 
       assert.equal(await aave.balanceOf(piAave.address), ether(1000));
       assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
@@ -146,11 +145,11 @@ describe('AaveRouter Stories', () => {
 
       //////////////////////////////////////////////////////////
       // Step #4. Withdraw 0.5K - while within an UNSTAKE_WINDOW
-      res = await piAave.withdraw(ether(500), { from: alice });
+      await piAave.withdraw(ether(500), { from: alice });
+      res = await aaveRouter.poke(false);
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
-      await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'IgnoreRedeemDueCoolDown');
       await expectEvent.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem', {
         amount: ether(1200),
       });
@@ -161,11 +160,11 @@ describe('AaveRouter Stories', () => {
 
       //////////////////////////////////////////////////////////
       // Step #5. Withdraw 0.5K - while within an UNSTAKE_WINDOW
-      res = await piAave.withdraw(ether(500), { from: alice });
+      await piAave.withdraw(ether(500), { from: alice });
+      res = await aaveRouter.poke(false);
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
-      await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'IgnoreRedeemDueCoolDown');
       await expectEvent.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem', {
         amount: ether(400),
       });
@@ -177,11 +176,11 @@ describe('AaveRouter Stories', () => {
       ///////////////////////////////////////////////////////
       // Step #6. Deposit 3K - while within an UNSTAKE_WINDOW
       await aave.approve(piAave.address, ether(3000), { from: bob });
-      res = await piAave.deposit(ether(3000), { from: bob });
+      await piAave.deposit(ether(3000), { from: bob });
+      res = await aaveRouter.poke(false);
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
-      await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'IgnoreRedeemDueCoolDown');
       await expectEvent.inTransaction(res.tx, AavePowerIndexRouter, 'Stake', {
         amount: ether(2400),
       });

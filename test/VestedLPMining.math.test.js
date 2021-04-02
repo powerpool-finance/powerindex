@@ -6,7 +6,7 @@ const CvpToken = artifacts.require('MockCvp');
 
 const { toBN } = web3.utils;
 
-describe('VestedLPMining (internal math)', () => {
+describe.skip('VestedLPMining (internal math)', () => {
   let deployer, doesNotMatter, lpToken;
   before(async function () {
     [, deployer, doesNotMatter, lpToken] = await web3.eth.getAccounts();

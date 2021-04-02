@@ -29,7 +29,7 @@ function scale(num) {
   return web3.utils.toWei(num.toString(), 'szabo');
 }
 
-describe('VestedLPMining', () => {
+describe.skip('VestedLPMining', () => {
   let alice, bob, dan, carol, minter;
   before(async function () {
     [, alice, bob, dan, carol, minter] = await web3.eth.getAccounts();

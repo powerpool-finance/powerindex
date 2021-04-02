@@ -340,6 +340,10 @@ function callContract(contract, method, args = []) {
   return contract.contract.methods[method].apply(contract.contract, args).call();
 }
 
+function isBnGreater(bn1, bn2) {
+  return toBN(bn1.toString(10)).gt(toBN(bn2.toString(10)));
+}
+
 function mulScalarBN(bn1, bn2) {
   return toBN(bn1.toString(10))
     .mul(toBN(bn2.toString(10)))
@@ -408,6 +412,7 @@ module.exports = {
   impersonateAccount,
   callContract,
   forkReplacePoolTokenWithNewPiToken,
+  isBnGreater,
   mulScalarBN,
   divScalarBN,
   mulBN,

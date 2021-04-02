@@ -7,6 +7,7 @@ const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const MockYearnGovernance = artifacts.require('MockYearnGovernance');
 const MockRouter = artifacts.require('MockRouter');
 const MyContract = artifacts.require('MyContract');
+const MockPoke = artifacts.require('MockPoke');
 
 MyContract.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
@@ -31,11 +32,14 @@ describe('WrappedPiErc20 Unit Tests', () => {
   beforeEach(async function () {
     [owner, alice, bob, stub, mockStaking] = await web3.eth.getAccounts();
     myContract = await MyContract.new();
+    const poke = await MockPoke.new(true);
     defaultBasicConfig = buildBasicRouterConfig(
       stub,
+      poke.address,
       constants.ZERO_ADDRESS,
       constants.ZERO_ADDRESS,
       ether('0.2'),
+      ether('0.02'),
       '0',
       stub,
       ether(0),
@@ -530,7 +534,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
     describe('callVoting', async () => {
       let signature, args;
       beforeEach(async () => {
-        const data = await router.contract.methods.piTokenCallback(ether(15)).encodeABI();
+        const data = await router.contract.methods.piTokenCallback(bob, ether(15)).encodeABI();
         ({ signature, args } = signatureAndArgs(data));
       });
 
