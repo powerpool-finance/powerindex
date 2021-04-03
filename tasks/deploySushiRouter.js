@@ -41,11 +41,13 @@ task('deploy-sushi-router', 'Deploy SUSHI Router')
 
     const powerPokeAddress = '0x04D7aA22ef7181eE3142F5063e026Af1BbBE5B96';
     const sushiHolder = '0xe93381fb4c4f14bda253907b18fad305d799241a';
+    const poolHolder = '0xa36c6df92a5bef87a5de6b71cb92fba3e16f0a43';
     const pokerReporter = '0xabdf215fce6c5b0c1b40b9f2068204a9e7c49627';
 
     await impersonateAccount(ethers, admin);
     await impersonateAccount(ethers, sushiHolder);
     await impersonateAccount(ethers, pokerReporter);
+    await impersonateAccount(ethers, poolHolder);
 
     const sushiToken = await IERC20.at(sushi);
 
@@ -122,10 +124,25 @@ task('deploy-sushi-router', 'Deploy SUSHI Router')
     await sushiToken.transfer(stakingAddr, ether(10000), {from: sushiHolder});
     await increaseTime(MIN_REPORT_INTERVAL);
 
-    await sushiToken.transfer(stakingAddr, ether(1), {from: sushiHolder});
+    const tokens = await callContract(poolWrapper, 'getCurrentTokens');
+    for(let i = 0; i < tokens.length; i++) {
+      const t = await IERC20.at(tokens[i]);
+      console.log(i, 'token balance before', fromEther(await callContract(t, 'balanceOf', [poolHolder])));
+    }
+    await pool.approve(poolWrapper.address, ether(10000), {from: poolHolder});
+    await poolWrapper.exitPool(ether(10000), [1,1,1,1], {from: poolHolder});
+    for(let i = 0; i < tokens.length; i++) {
+      const t = await IERC20.at(tokens[i]);
+      console.log(i, 'token balance after', tokens[i], fromEther(await callContract(t, 'balanceOf', [poolHolder])));
+    }
 
+    const newTokens = await callContract(pool, 'getCurrentTokens');
+    for(let i = 0; i < newTokens.length; i++) {
+      const t = await IERC20.at(newTokens[i]);
+      console.log(i, 'new token balance after', newTokens[i], fromEther(await callContract(t, 'balanceOf', [poolHolder])));
+    }
     console.log('balance of router before', fromEther(await callContract(token, 'balanceOf', [router.address])));
-    // await router.pokeFromReporter('1', true, powerPokeOpts, {from: pokerReporter});
+    await router.pokeFromReporter('1', true, powerPokeOpts, {from: pokerReporter});
     console.log('wrapped balance before', fromEther(await callContract(pool, 'getBalance', [wrappedToken.address])));
     console.log('balance of router after', fromEther(await callContract(token, 'balanceOf', [router.address])));
     console.log('balance of router after 2', fromEther(await callContract(token, 'balanceOf', [router.address])));
