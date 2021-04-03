@@ -11,7 +11,7 @@ import "../balancer-core/BNum.sol";
 import "./WeightValueAbstract.sol";
 import "./blocks/PoolManagement.sol";
 
-contract WeightValueStrategy is WeightValueAbstract, PoolManagement {
+contract WeightValueStrategy is PoolManagement, WeightValueAbstract {
   event SetWeightsChangeDuration(uint256 weightsChangeDuration);
 
   struct PokeVars {
@@ -68,6 +68,23 @@ contract WeightValueStrategy is WeightValueAbstract, PoolManagement {
     weightsChangeDuration = _weightsChangeDuration;
 
     emit SetWeightsChangeDuration(_weightsChangeDuration);
+  }
+
+  function addPool(
+    address _poolAddress,
+    address _controller,
+    address _wrapper
+  ) external onlyOwner {
+    _addPool(_poolAddress, _controller, _wrapper);
+  }
+
+  function setPool(
+    address _poolAddress,
+    address _controller,
+    address _wrapper,
+    bool _active
+  ) external onlyOwner {
+    _setPool(_poolAddress, _controller, _wrapper, _active);
   }
 
   function pokeFromReporter(

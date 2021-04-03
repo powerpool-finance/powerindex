@@ -20,11 +20,11 @@ contract PoolManagement is OwnableUpgradeSafe {
   address[] public pools;
   mapping(address => Pool) public poolsData;
 
-  function addPool(
+  function _addPool(
     address _poolAddress,
     address _controller,
     address _wrapper
-  ) external onlyOwner {
+  ) internal {
     require(address(poolsData[_poolAddress].controller) == address(0), "ALREADY_EXIST");
     require(_controller != address(0), "CONTROLLER_CANT_BE_NULL");
     pools.push(_poolAddress);
@@ -34,12 +34,12 @@ contract PoolManagement is OwnableUpgradeSafe {
     emit AddPool(_poolAddress, _controller);
   }
 
-  function setPool(
+  function _setPool(
     address _poolAddress,
     address _controller,
     address _wrapper,
     bool _active
-  ) external onlyOwner {
+  ) internal {
     require(_controller != address(0), "CONTROLLER_CANT_BE_NULL");
     poolsData[_poolAddress].controller = PowerIndexPoolController(_controller);
     poolsData[_poolAddress].wrapper = PowerIndexWrapperInterface(_wrapper);

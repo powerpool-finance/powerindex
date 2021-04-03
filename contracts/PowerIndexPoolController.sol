@@ -228,7 +228,7 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     pool.rebind(token, balance, denorm);
 
     uint256 balanceAfter = IERC20(token).balanceOf(address(this));
-    IERC20(token).transfer(msg.sender, balanceAfter - balanceBefore);
+    IERC20(token).transfer(msg.sender, balanceAfter.sub(balanceBefore));
   }
 
   function rebindByStrategyRemove(
@@ -239,6 +239,6 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     uint256 balanceBefore = IERC20(token).balanceOf(address(this));
     pool.rebind(token, balance, denorm);
     uint256 balanceAfter = IERC20(token).balanceOf(address(this));
-    IERC20(token).transfer(msg.sender, balanceAfter - balanceBefore);
+    IERC20(token).transfer(msg.sender, balanceAfter.sub(balanceBefore));
   }
 }

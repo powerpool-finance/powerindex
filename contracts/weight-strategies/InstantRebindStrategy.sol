@@ -21,6 +21,7 @@ contract InstantRebindStrategy is PoolManagement, WeightValueAbstract {
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
 
   event InstantRebind(address indexed pool, uint256 poolCurrentTokensCount, uint256 usdcPulled, uint256 usdcRemainder);
+  event UpdatePool(address indexed pool, address[] poolTokensBefore, address[] poolTokensAfter);
 
   event PullLiquidity(
     address indexed bpool,
@@ -39,6 +40,14 @@ contract InstantRebindStrategy is PoolManagement, WeightValueAbstract {
     uint256 crvAmount,
     uint256 usdcAmount
   );
+
+  event SetCurvePoolRegistry(address curvePoolRegistry);
+
+  event SetVaultConfig(address indexed vault, address indexed depositor, uint8 depositorTokenLength, int8 usdcIndex);
+
+  event SetPools(address[] pools);
+
+  event SetStrategyConstraints(uint256 minUSDCRemainder, bool useVirtualPriceEstimation);
 
   struct RebindConfig {
     address token;
@@ -61,10 +70,10 @@ contract InstantRebindStrategy is PoolManagement, WeightValueAbstract {
   IERC20 public immutable USDC;
 
   StrategyConstraints public constraints;
-
   IPowerPoke public powerPoke;
   ICurvePoolRegistry public curvePoolRegistry;
 
+  mapping(address => address[]) internal poolTokens;
   mapping(address => VaultConfig) public vaultConfig;
 
   modifier onlyEOA() {
@@ -117,9 +126,14 @@ contract InstantRebindStrategy is PoolManagement, WeightValueAbstract {
     return ICurveDepositor(vc.depositor).calc_withdraw_one_coin(_amount, int128(vc.usdcIndex));
   }
 
+  function getPoolTokens(address _pool) public view returns (address[] memory) {
+    return poolTokens[_pool];
+  }
+
   /*** OWNER'S SETTERS ***/
-  function setPoolRegistry(address _curvePoolRegistry) external onlyOwner {
+  function setCurvePoolRegistry(address _curvePoolRegistry) external onlyOwner {
     curvePoolRegistry = ICurvePoolRegistry(_curvePoolRegistry);
+    emit SetCurvePoolRegistry(_curvePoolRegistry);
   }
 
   function setVaultConfig(
@@ -129,14 +143,58 @@ contract InstantRebindStrategy is PoolManagement, WeightValueAbstract {
     int8 _usdcIndex
   ) external onlyOwner {
     vaultConfig[_vault] = VaultConfig(_depositor, _depositorTokenLength, _usdcIndex);
+    USDC.approve(_depositor, uint256(-1));
+    IERC20(IVault(_vault).token()).approve(_vault, uint256(-1));
+    emit SetVaultConfig(_vault, _depositor, _depositorTokenLength, _usdcIndex);
   }
 
-  function setPools(address[] memory _pools) external onlyOwner {
-    pools = _pools;
+  function addPool(
+    address _poolAddress,
+    address _controller,
+    address _wrapper
+  ) external onlyOwner {
+    _addPool(_poolAddress, _controller, _wrapper);
+    _updatePool(_poolAddress);
+  }
+
+  function setPool(
+    address _poolAddress,
+    address _controller,
+    address _wrapper,
+    bool _active
+  ) external onlyOwner {
+    _setPool(_poolAddress, _controller, _wrapper, _active);
+    _updatePool(_poolAddress);
+  }
+
+  function updatePool(address _pool) external onlyOwner {
+    require(poolsData[_pool].active, "INACTIVE_POOL");
+    _updatePool(_pool);
   }
 
   function setStrategyConstraints(StrategyConstraints memory _constraints) external onlyOwner {
     constraints = _constraints;
+    emit SetStrategyConstraints(_constraints.minUSDCRemainder, _constraints.useVirtualPriceEstimation);
+  }
+
+  function _updatePool(address _pool) internal {
+    // remove approval
+    address[] memory poolTokensBefore = poolTokens[_pool];
+    uint256 len = poolTokensBefore.length;
+    for (uint256 i = 0; i < len; i++) {
+      IERC20(poolTokensBefore[i]).approve(_pool, uint256(0));
+    }
+
+    address[] memory poolTokensAfter = PowerIndexPoolInterface(_pool).getCurrentTokens();
+    poolTokens[_pool] = poolTokensAfter;
+
+    // approve
+    len = poolTokensAfter.length;
+    for (uint256 i = 0; i < len; i++) {
+      IERC20(poolTokensAfter[i]).approve(_pool, uint256(-1));
+    }
+
+    emit UpdatePool(_pool, poolTokensBefore, poolTokensAfter);
   }
 
   /*** POKERS ***/
@@ -192,7 +250,6 @@ contract InstantRebindStrategy is PoolManagement, WeightValueAbstract {
         uint256 crvBalance = crvToken.balanceOf(address(this));
 
         // 3rd step. CurvePool.remove_liquidity_one_coin()
-        crvToken.approve(vc.depositor, crvBalance);
         uint256 usdcBefore = USDC.balanceOf(address(this));
         ICurveDepositor(vc.depositor).remove_liquidity_one_coin(crvBalance, vc.usdcIndex, 0);
         emit PullLiquidity(
