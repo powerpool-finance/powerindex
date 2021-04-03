@@ -72,6 +72,7 @@ contract InstantRebindStrategy is PoolManagement, WeightValueAbstract {
   StrategyConstraints public constraints;
   IPowerPoke public powerPoke;
   ICurvePoolRegistry public curvePoolRegistry;
+  uint256 public lastUpdate;
 
   mapping(address => address[]) internal poolTokens;
   mapping(address => VaultConfig) public vaultConfig;
@@ -215,6 +216,13 @@ contract InstantRebindStrategy is PoolManagement, WeightValueAbstract {
   }
 
   function _poke(bool _bySlasher) internal {
+    (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
+    require(lastUpdate + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
+    if (_bySlasher) {
+      require(lastUpdate + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
+    }
+    lastUpdate = block.timestamp;
+
     for (uint256 i = 0; i < pools.length; i++) {
       _handlePool(pools[i]);
     }
@@ -394,5 +402,11 @@ contract InstantRebindStrategy is PoolManagement, WeightValueAbstract {
     bytes calldata _rewardOpts
   ) internal {
     powerPoke.reward(_reporterId, bsub(_gasStart, gasleft()), _compensationPlan, _rewardOpts);
+  }
+
+  function _getMinMaxReportInterval() internal view returns (uint256 min, uint256 max) {
+    (uint256 minInterval, uint256 maxInterval) = powerPoke.getMinMaxReportIntervals(address(this));
+    require(minInterval > 0 && maxInterval > 0, "INTERVALS_ARE_0");
+    return (minInterval, maxInterval);
   }
 }

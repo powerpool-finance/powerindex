@@ -334,6 +334,44 @@ describe('WeightStrategy', () => {
         await time.increase(pokePeriod);
       })
 
+      describe('pokes', () => {
+        it('should allow poker', async () => {
+          const res = await weightStrategy.pokeFromReporter('1', compensationOpts, { from: reporter });
+          expectEvent(res, 'InstantRebind', {
+            pool: pool.address,
+            poolCurrentTokensCount: '5',
+            usdcPulled: mwei('259757.825579'),
+            usdcRemainder: '1',
+          });
+          await expectRevert(
+            weightStrategy.pokeFromReporter('1', compensationOpts, { from: reporter }),
+            'MIN_INTERVAL_NOT_REACHED'
+          );
+        });
+
+        it('should allow slasher', async () => {
+          const res = await weightStrategy.pokeFromSlasher('2', compensationOpts, { from: slasher });
+          expectEvent(res, 'InstantRebind', {
+            pool: pool.address,
+            poolCurrentTokensCount: '5',
+            usdcPulled: mwei('259757.825579'),
+            usdcRemainder: '1',
+          });
+
+          await expectRevert(
+            weightStrategy.pokeFromSlasher('2', compensationOpts, { from: slasher }),
+            'MIN_INTERVAL_NOT_REACHED'
+          );
+
+          await time.increase(pokePeriod + 10);
+
+          await expectRevert(
+            weightStrategy.pokeFromSlasher('2', compensationOpts, { from: slasher }),
+            'MAX_INTERVAL_NOT_REACHED'
+          );
+        });
+      });
+
       describe('rebalance', () => {
         it('should correctly rebalance token balances', async () => {
           // BEFORE
