@@ -127,11 +127,12 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
 
   /**
    * @notice Get the amount of current pending rewards available at SushiBar
-   * @return The amount of pending rewards
+   * @return amount of pending rewards
    */
-  function getPendingRewards() public view returns (uint256) {
+  function getPendingRewards() public view returns (uint256 amount) {
     // return sushiAtPiToken + sushiBackedByXSushi - piToken.totalSupply()
-    return SUSHI.balanceOf(address(piToken)).add(getUnderlyingBackedByXSushi()).sub(piToken.totalSupply().sub(100));
+    amount = SUSHI.balanceOf(address(piToken)).add(getUnderlyingBackedByXSushi()).add(1).sub(piToken.totalSupply());
+    return amount == 1 ? 0 : amount;
   }
 
   /*** EQUIVALENT METHODS OVERRIDES ***/
