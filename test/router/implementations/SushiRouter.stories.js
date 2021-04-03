@@ -181,7 +181,7 @@ describe('SushiRouter Stories', () => {
 
     assert.equal(await sushiRouter.getUnderlyingStaked(), ether(300));
     assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '364285714285714285714');
-    assert.equal(await sushiRouter.getPendingRewards(), '64285714285714285714');
+    assert.equal(await sushiRouter.getPendingRewards(), '64285714285714285715');
     assert.equal(await sushiRouter.getSushiForXSushi(ether(1)), '1619047619047619047');
 
     /////////////////////////////////////////
@@ -206,7 +206,7 @@ describe('SushiRouter Stories', () => {
 
     assert.equal(await sushiRouter.getUnderlyingStaked(), ether(348));
     assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '412285714285714285713');
-    assert.equal(await sushiRouter.getPendingRewards(), '64285714285714285713');
+    assert.equal(await sushiRouter.getPendingRewards(), '64285714285714285714');
     assert.equal(await sushiRouter.getSushiForXSushi(ether(1)), '1619047619047619047');
 
     ///////////////////////////////////////////
@@ -239,7 +239,7 @@ describe('SushiRouter Stories', () => {
 
     assert.equal(await sushiRouter.getUnderlyingStaked(), '268000000000000000000');
     assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '332285714285714285712');
-    assert.equal(await sushiRouter.getPendingRewards(), '64285714285714285712');
+    assert.equal(await sushiRouter.getPendingRewards(), '64285714285714285713');
     assert.equal(await sushiRouter.getSushiForXSushi(ether(1)), '1619047619047619047');
 
     /////////////////////////////////////////////
@@ -266,7 +266,7 @@ describe('SushiRouter Stories', () => {
 
     assert.equal(await sushiRouter.getUnderlyingStaked(), '268000000000000000000');
     assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '268000000000000000001');
-    assert.equal(await sushiRouter.getPendingRewards(), '1');
+    assert.equal(await sushiRouter.getPendingRewards(), '2');
     assert.equal(await sushiRouter.getSushiForXSushi(ether(1)), '1619047619047619047');
 
     /////////////////////////////////////////////
@@ -288,7 +288,7 @@ describe('SushiRouter Stories', () => {
 
     assert.equal(await sushiRouter.getUnderlyingStaked(), '268000000000000000000');
     assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '268000000000000000001');
-    assert.equal(await sushiRouter.getPendingRewards(), '1');
+    assert.equal(await sushiRouter.getPendingRewards(), '2');
     assert.equal(await sushiRouter.getSushiForXSushi(ether(1)), '1619047619047619047');
 
     //////////////////////////////////////////////
@@ -340,7 +340,7 @@ describe('SushiRouter Stories', () => {
 
     assert.equal(await sushiRouter.getUnderlyingStaked(), '163714285714285714284');
     assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '163714285714285714285');
-    assert.equal(await sushiRouter.getPendingRewards(), '1');
+    assert.equal(await sushiRouter.getPendingRewards(), '2');
     assert.equal(await sushiRouter.getSushiForXSushi(ether(1)), '1619047619047619047');
 
     //////////////////////////////////////////////////////////////////////////////////
@@ -369,6 +369,6 @@ describe('SushiRouter Stories', () => {
 
     assert.equal(await sushiRouter.getUnderlyingStaked(), '1');
     assert.equal(await sushiRouter.getUnderlyingBackedByXSushi(), '2');
-    assert.equal(await sushiRouter.getPendingRewards(), '1');
+    assert.equal(await sushiRouter.getPendingRewards(), '2');
   });
 });

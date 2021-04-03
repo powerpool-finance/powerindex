@@ -322,8 +322,6 @@ async function forkReplacePoolTokenWithNewPiToken(
     await controller.finishReplace();
   }
 
-  await wrappedToken.pokeRouter();
-
   console.log('await callContract(pool, "isBound", [token])', await callContract(pool, 'isBound', [tokenAddress]));
   console.log('await callContract(pool, "isBound", [wrappedTokenAddress])', await callContract(pool, 'isBound', [wrappedTokenAddress]));
   console.log('await callContract(pool, "getDenormalizedWeight", [wrappedTokenAddress])', await callContract(pool, 'getDenormalizedWeight', [wrappedTokenAddress]));
