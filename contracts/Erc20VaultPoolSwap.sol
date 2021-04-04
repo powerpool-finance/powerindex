@@ -16,6 +16,7 @@ import "./interfaces/IVaultRegistry.sol";
 import "./interfaces/IErc20PiptSwap.sol";
 import "./interfaces/IErc20VaultPoolSwap.sol";
 import "./traits/ProgressiveFee.sol";
+import "hardhat/console.sol";
 
 contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   using SafeERC20 for IERC20;
@@ -34,6 +35,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
   event Erc20ToVaultPoolSwap(address indexed user, address indexed pool, uint256 usdcInAmount, uint256 poolOutAmount);
   event VaultPoolToErc20Swap(address indexed user, address indexed pool, uint256 poolInAmount, uint256 usdcOutAmount);
+  event ClaimFee(address indexed token, address indexed payout, uint256 amount);
 
   IERC20 public immutable usdc;
 
@@ -113,11 +115,13 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
     uint256 len = _tokens.length;
     for (uint256 i = 0; i < len; i++) {
-      IERC20(_tokens[i]).safeTransfer(feePayout, IERC20(_tokens[i]).balanceOf(address(this)));
+      uint256 amount = IERC20(_tokens[i]).balanceOf(address(this));
+      IERC20(_tokens[i]).safeTransfer(feePayout, amount);
+      emit ClaimFee(_tokens[i], feePayout, amount);
     }
   }
 
-  function swapErc20cToVaultPool(
+  function swapErc20ToVaultPool(
     address _pool,
     address _swapToken,
     uint256 _swapAmount
@@ -135,6 +139,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     poolAmountOut = poolAmountOut.sub(poolAmountOut.mul(communityFee).div(1 ether)) - 1;
 
     IERC20(_pool).safeTransfer(msg.sender, poolAmountOut);
+    console.log("poolAmountOut", poolAmountOut);
 
     emit Erc20ToVaultPoolSwap(msg.sender, _pool, _swapAmount, poolAmountOut);
   }
@@ -263,8 +268,10 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
       IVault(vc[i].token).deposit(_addYearnLpTokenLiquidity(vaultConfig[vc[i].token], vc[i].correctInput));
       tokensInPipt[i] = IVault(vc[i].token).balanceOf(address(this));
+      console.log("tokensInPipt[i]", tokensInPipt[i]);
 
       uint256 poolOutByToken = tokensInPipt[i].sub(1e12).mul(piptTotalSupply).div(vc[i].tokenBalance);
+      console.log("poolOutByToken", poolOutByToken);
       if (poolOutByToken < poolAmountOut || poolAmountOut == 0) {
         poolAmountOut = poolOutByToken;
       }
@@ -272,6 +279,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   }
 
   function _addYearnLpTokenLiquidity(VaultConfig storage vc, uint256 _amount) internal returns (uint256) {
+    console.log("_addYearnLpTokenLiquidity", _amount);
     if (vc.depositorLength == 2) {
       uint256[2] memory amounts;
       amounts[vc.depositorIndex] = _amount;
@@ -289,6 +297,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
       amounts[vc.depositorIndex] = _amount;
       IVaultDepositor4(vc.depositor).add_liquidity(amounts, 1);
     }
+    console.log("IERC20(vc.lpToken).balanceOf(address(this))", IERC20(vc.lpToken).balanceOf(address(this)));
     return IERC20(vc.lpToken).balanceOf(address(this));
   }
 

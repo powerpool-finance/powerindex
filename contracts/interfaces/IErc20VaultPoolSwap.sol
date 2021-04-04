@@ -3,7 +3,7 @@
 pragma solidity 0.6.12;
 
 interface IErc20VaultPoolSwap {
-  function swapErc20cToVaultPool(
+  function swapErc20ToVaultPool(
     address _pool,
     address _swapToken,
     uint256 _swapAmount

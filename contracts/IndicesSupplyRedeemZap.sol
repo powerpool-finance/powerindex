@@ -354,6 +354,9 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     if (tokenCap[round.inputToken] == 0) {
       return round.endTime <= block.timestamp;
     }
+    if (round.totalInputAmount == 0) {
+      return false;
+    }
     return round.totalInputAmount >= tokenCap[round.inputToken] || round.endTime <= block.timestamp;
   }
 
@@ -466,7 +469,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       }
     } else if (pType == PoolType.VAULT) {
       IErc20VaultPoolSwap vaultPoolSwap = IErc20VaultPoolSwap(poolSwapContract[round.pool]);
-      round.totalOutputAmount = vaultPoolSwap.swapErc20cToVaultPool(round.pool, address(usdc), totalInputAmount);
+      round.totalOutputAmount = vaultPoolSwap.swapErc20ToVaultPool(round.pool, address(usdc), totalInputAmount);
     }
   }
 
