@@ -76,8 +76,9 @@ task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').set
     { PowerPokeRewardOpts: {to: 'address', compensateInETH: 'bool'} },
     {to: pokerReporter, compensateInETH: false},
   );
-  const vaultPoolOutByUsdc = await callContract(erc20VaultPoolSwap,'calcVaultPoolOutByUsdc', [poolAddress, usdcIn]);
-  await zap.supplyAndRedeemPokeFromReporter('1', [roundKey], powerPokeOpts, {from: pokerReporter});
+  const vaultPoolOutByUsdc = await callContract(erc20VaultPoolSwap,'calcVaultPoolOutByUsdc', [poolAddress, usdcIn, true]);
+  let res = await zap.supplyAndRedeemPokeFromReporter('1', [roundKey], powerPokeOpts, {from: pokerReporter});
+  console.log('gasUsed', res.receipt.gasUsed);
 
   console.log('usdc balance after supply', fromMwei(await callContract(usdc, 'balanceOf', [zap.address])));
 
@@ -106,8 +107,9 @@ task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').set
 
   console.log('pool balance before redeem', fromEther(await callContract(pool, 'balanceOf', [zap.address])));
 
-  const usdcOutByPool = await callContract(erc20VaultPoolSwap,'calcUsdcOutByPool', [poolAddress, resultPoolBalance]);
-  await zap.supplyAndRedeemPokeFromReporter('1', [roundKey], powerPokeOpts, {from: pokerReporter});
+  const usdcOutByPool = await callContract(erc20VaultPoolSwap,'calcUsdcOutByPool', [poolAddress, resultPoolBalance, true]);
+  res = await zap.supplyAndRedeemPokeFromReporter('1', [roundKey], powerPokeOpts, {from: pokerReporter});
+  console.log('gasUsed', res.receipt.gasUsed);
 
   console.log('pool balance after redeem', fromEther(await callContract(pool, 'balanceOf', [zap.address])));
 
