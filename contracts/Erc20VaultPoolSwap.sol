@@ -111,7 +111,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   }
 
   function claimFee(address[] memory _tokens) external onlyOwner {
-    require(feePayout != address(0), "FR_NOT_SET");
+    require(feePayout != address(0), "FP_NOT_SET");
 
     uint256 len = _tokens.length;
     for (uint256 i = 0; i < len; i++) {
@@ -154,7 +154,9 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
     (, uint256 _poolAmountInWithFee) = calcFee(_poolAmountIn, 0);
 
+    console.log("_poolAmountInWithFee", _poolAmountInWithFee);
     erc20Out = _redeemVault(_pool, _poolAmountInWithFee);
+    console.log("erc20Out", erc20Out);
 
     usdc.safeTransfer(msg.sender, erc20Out);
 
@@ -170,9 +172,14 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     return _usdcIn.mul(1e30).div(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether));
   }
 
-  function calcVaultPoolOutByUsdc(address _pool, uint256 _usdcIn) external view returns (uint256 amountOut) {
+  function calcVaultPoolOutByUsdc(
+    address _pool,
+    uint256 _usdcIn,
+    bool _withFee
+  ) external view returns (uint256 amountOut) {
     uint256 len = poolTokens[_pool].length;
-    uint256 piptTotalSupply = PowerIndexPoolInterface(_pool).totalSupply();
+    PowerIndexPoolInterface p = PowerIndexPoolInterface(_pool);
+    uint256 piptTotalSupply = p.totalSupply();
 
     (VaultCalc[] memory vc, uint256 restInput, uint256 totalCorrectInput) =
       getVaultCalcsForSupply(_pool, piptTotalSupply, _usdcIn);
@@ -189,6 +196,10 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
         amountOut = poolOutByToken;
       }
     }
+    if (_withFee) {
+      (, uint256 communityJoinFee, , ) = p.getCommunityFee();
+      (amountOut, ) = p.calcAmountWithCommunityFee(amountOut, communityJoinFee, address(this));
+    }
   }
 
   function calcUsdcOutByVault(address _token, uint256 _vaultIn) public view returns (uint256 amountOut) {
@@ -198,13 +209,24 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     return _vaultIn.mul(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether)).div(1e30);
   }
 
-  function calcUsdcOutByPool(address _pool, uint256 _ppolIn) external view returns (uint256 amountOut) {
+  function calcUsdcOutByPool(
+    address _pool,
+    uint256 _ppolIn,
+    bool _withFee
+  ) external view returns (uint256 amountOut) {
     uint256 len = poolTokens[_pool].length;
-    uint256 ratio = _ppolIn.mul(1 ether).div(PowerIndexPoolInterface(_pool).totalSupply());
+    PowerIndexPoolInterface p = PowerIndexPoolInterface(_pool);
+
+    if (_withFee) {
+      (, , uint256 communityExitFee, ) = p.getCommunityFee();
+      (_ppolIn, ) = p.calcAmountWithCommunityFee(_ppolIn, communityExitFee, address(this));
+    }
+
+    uint256 ratio = _ppolIn.mul(1 ether).div(p.totalSupply());
 
     for (uint256 i = 0; i < len; i++) {
       address t = poolTokens[_pool][i];
-      uint256 bal = PowerIndexPoolInterface(_pool).getBalance(t);
+      uint256 bal = p.getBalance(t);
       amountOut = amountOut.add(calcUsdcOutByVault(t, ratio.mul(bal).div(1 ether)));
     }
   }
@@ -251,15 +273,16 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
   /* ==========  Internal Functions  ========== */
 
-  function _depositVaultAndGetTokensInPipt(address _pool, uint256 totalInputAmount)
+  function _depositVaultAndGetTokensInPipt(address _pool, uint256 _totalInputAmount)
     internal
     returns (uint256 poolAmountOut, uint256[] memory tokensInPipt)
   {
+    require(_totalInputAmount != 0, "NULL_INPUT");
     uint256 len = poolTokens[_pool].length;
     uint256 piptTotalSupply = PowerIndexPoolInterface(_pool).totalSupply();
 
     (VaultCalc[] memory vc, uint256 restInput, uint256 totalCorrectInput) =
-      getVaultCalcsForSupply(_pool, piptTotalSupply, totalInputAmount);
+      getVaultCalcsForSupply(_pool, piptTotalSupply, _totalInputAmount);
 
     tokensInPipt = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
@@ -276,6 +299,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
         poolAmountOut = poolOutByToken;
       }
     }
+    require(poolAmountOut != 0, "NULL_OUTPUT");
   }
 
   function _addYearnLpTokenLiquidity(VaultConfig storage vc, uint256 _amount) internal returns (uint256) {
@@ -301,12 +325,13 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     return IERC20(vc.lpToken).balanceOf(address(this));
   }
 
-  function _redeemVault(address _pool, uint256 totalInputAmount) internal returns (uint256 totalOutputAmount) {
+  function _redeemVault(address _pool, uint256 _totalInputAmount) internal returns (uint256 totalOutputAmount) {
+    require(_totalInputAmount != 0, "NULL_INPUT");
     address[] memory tokens = poolTokens[_pool];
     uint256 len = tokens.length;
 
     uint256[] memory amounts = new uint256[](len);
-    PowerIndexPoolInterface(_pool).exitPool(totalInputAmount, amounts);
+    PowerIndexPoolInterface(_pool).exitPool(_totalInputAmount, amounts);
 
     uint256 outputTokenBalanceBefore = usdc.balanceOf(address(this));
     for (uint256 i = 0; i < len; i++) {
@@ -319,6 +344,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
       );
     }
     totalOutputAmount = usdc.balanceOf(address(this)).sub(outputTokenBalanceBefore);
+    require(totalOutputAmount != 0, "NULL_OUTPUT");
   }
 
   function _updatePool(address _pool) internal {
