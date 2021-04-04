@@ -44,7 +44,7 @@ async function getTimestamp(shift = 0) {
   return currentTimestamp + shift;
 }
 
-describe.only('Erc20VaultPoolSwap', () => {
+describe('Erc20VaultPoolSwap', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const swapFee = ether('0.0001');
   const communitySwapFee = ether('0.001');
@@ -55,9 +55,9 @@ describe.only('Erc20VaultPoolSwap', () => {
 
   const slasherInterval = 15 * 60;
 
-  let minter, dan, reporter, slasher, permanentVotingPower;
+  let minter, alice, dan, reporter, slasher, permanentVotingPower;
   before(async function () {
-    [minter, dan, reporter, slasher, permanentVotingPower] = await web3.eth.getAccounts();
+    [minter, alice, dan, reporter, slasher, permanentVotingPower] = await web3.eth.getAccounts();
   });
 
   beforeEach(async () => {
@@ -180,9 +180,29 @@ describe.only('Erc20VaultPoolSwap', () => {
       await usdc.approve(vaultPoolSwap.address, danUsdcSwap, {from: dan});
 
       const vaultPoolOut = await vaultPoolSwap.calcVaultPoolOutByUsdc(pool.address, danUsdcSwap, true);
+      await expectRevert(vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, '0', {from: dan}), 'NULL_INPUT');
+      await expectRevert(vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, danUsdcSwap, {from: alice}), 'ERC20');
       await vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, danUsdcSwap, {from: dan});
       const danPoolBalance = await pool.balanceOf(dan);
       assertEqualWithAccuracy(vaultPoolOut, danPoolBalance, ether('0.00000001'));
+
+      for (let i = 0; i < tokens.length; i++) {
+        assertEqualWithAccuracy(await tokens[i].balanceOf(vaultPoolSwap.address), ether([
+          '0.009495032126027295',
+          '0.000001000000000018',
+          '0.15767685969318884',
+          '1.2679124215749662',
+          '0.009121499191673045'
+        ][i]), ether('0.002'));
+      }
+
+      await pool.approve(vaultPoolSwap.address, danPoolBalance, {from: dan});
+      const usdcOut = await vaultPoolSwap.calcUsdcOutByPool(pool.address, danPoolBalance, true);
+      await expectRevert(vaultPoolSwap.swapVaultPoolToErc20(pool.address, '0', usdc.address, {from: dan}), 'NULL_INPUT');
+      await expectRevert(vaultPoolSwap.swapVaultPoolToErc20(pool.address, danPoolBalance, usdc.address, {from: alice}), 'ERR_BTOKEN_BAD_CALLER');
+      await vaultPoolSwap.swapVaultPoolToErc20(pool.address, danPoolBalance, usdc.address, {from: dan});
+      const danUsdcBalance = await usdc.balanceOf(dan);
+      assertEqualWithAccuracy(usdcOut, danUsdcBalance, ether('0.002'));
 
       for (let i = 0; i < tokens.length; i++) {
         assertEqualWithAccuracy(await tokens[i].balanceOf(vaultPoolSwap.address), ether([
@@ -209,12 +229,6 @@ describe.only('Erc20VaultPoolSwap', () => {
         ][i]), ether('0.002'));
         assert.equal(await tokens[i].balanceOf(vaultPoolSwap.address), '0')
       }
-
-      await pool.approve(vaultPoolSwap.address, danPoolBalance, {from: dan});
-      const usdcOut = await vaultPoolSwap.calcUsdcOutByPool(pool.address, danPoolBalance, true);
-      await vaultPoolSwap.swapVaultPoolToErc20(pool.address, danPoolBalance, usdc.address, {from: dan});
-      const danUsdcBalance = await usdc.balanceOf(dan);
-      assertEqualWithAccuracy(usdcOut, danUsdcBalance, ether('0.00002'));
     });
   });
 });

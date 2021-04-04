@@ -16,13 +16,11 @@ import "./interfaces/IVaultRegistry.sol";
 import "./interfaces/IErc20PiptSwap.sol";
 import "./interfaces/IErc20VaultPoolSwap.sol";
 import "./traits/ProgressiveFee.sol";
-import "hardhat/console.sol";
 
 contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   using SafeERC20 for IERC20;
 
   event TakeFee(address indexed pool, address indexed token, uint256 amount);
-  event ClaimFee(address indexed token, uint256 amount);
 
   event SetVaultConfig(
     address indexed token,
@@ -139,7 +137,6 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     poolAmountOut = poolAmountOut.sub(poolAmountOut.mul(communityFee).div(1 ether)) - 1;
 
     IERC20(_pool).safeTransfer(msg.sender, poolAmountOut);
-    console.log("poolAmountOut", poolAmountOut);
 
     emit Erc20ToVaultPoolSwap(msg.sender, _pool, _swapAmount, poolAmountOut);
   }
@@ -154,9 +151,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
     (, uint256 _poolAmountInWithFee) = calcFee(_poolAmountIn, 0);
 
-    console.log("_poolAmountInWithFee", _poolAmountInWithFee);
     erc20Out = _redeemVault(_pool, _poolAmountInWithFee);
-    console.log("erc20Out", erc20Out);
 
     usdc.safeTransfer(msg.sender, erc20Out);
 
@@ -289,12 +284,11 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
       uint256 share = vc[i].correctInput.mul(1 ether).div(totalCorrectInput);
       vc[i].correctInput = vc[i].correctInput.add(restInput.mul(share).div(1 ether)).sub(100);
 
+      uint256 balanceBefore = IVault(vc[i].token).balanceOf(address(this));
       IVault(vc[i].token).deposit(_addYearnLpTokenLiquidity(vaultConfig[vc[i].token], vc[i].correctInput));
-      tokensInPipt[i] = IVault(vc[i].token).balanceOf(address(this));
-      console.log("tokensInPipt[i]", tokensInPipt[i]);
+      tokensInPipt[i] = IVault(vc[i].token).balanceOf(address(this)).sub(balanceBefore);
 
       uint256 poolOutByToken = tokensInPipt[i].sub(1e12).mul(piptTotalSupply).div(vc[i].tokenBalance);
-      console.log("poolOutByToken", poolOutByToken);
       if (poolOutByToken < poolAmountOut || poolAmountOut == 0) {
         poolAmountOut = poolOutByToken;
       }
@@ -303,7 +297,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   }
 
   function _addYearnLpTokenLiquidity(VaultConfig storage vc, uint256 _amount) internal returns (uint256) {
-    console.log("_addYearnLpTokenLiquidity", _amount);
+    uint256 balanceBefore = IERC20(vc.lpToken).balanceOf(address(this));
     if (vc.depositorLength == 2) {
       uint256[2] memory amounts;
       amounts[vc.depositorIndex] = _amount;
@@ -321,8 +315,8 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
       amounts[vc.depositorIndex] = _amount;
       IVaultDepositor4(vc.depositor).add_liquidity(amounts, 1);
     }
-    console.log("IERC20(vc.lpToken).balanceOf(address(this))", IERC20(vc.lpToken).balanceOf(address(this)));
-    return IERC20(vc.lpToken).balanceOf(address(this));
+    uint256 balanceAfter = IERC20(vc.lpToken).balanceOf(address(this));
+    return balanceAfter.sub(balanceBefore);
   }
 
   function _redeemVault(address _pool, uint256 _totalInputAmount) internal returns (uint256 totalOutputAmount) {
@@ -331,14 +325,21 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     uint256 len = tokens.length;
 
     uint256[] memory amounts = new uint256[](len);
+    for (uint256 i = 0; i < len; i++) {
+      amounts[i] = IERC20(tokens[i]).balanceOf(address(this));
+    }
     PowerIndexPoolInterface(_pool).exitPool(_totalInputAmount, amounts);
+    for (uint256 i = 0; i < len; i++) {
+      amounts[i] = IERC20(tokens[i]).balanceOf(address(this)).sub(amounts[i]);
+    }
 
     uint256 outputTokenBalanceBefore = usdc.balanceOf(address(this));
     for (uint256 i = 0; i < len; i++) {
       VaultConfig storage vc = vaultConfig[tokens[i]];
-      IVault(tokens[i]).withdraw(IERC20(tokens[i]).balanceOf(address(this)));
+      uint256 lpTokenBalanceBefore = IERC20(vc.lpToken).balanceOf(address(this));
+      IVault(tokens[i]).withdraw(amounts[i]);
       IVaultDepositor2(vc.depositor).remove_liquidity_one_coin(
-        IERC20(vc.lpToken).balanceOf(address(this)),
+        IERC20(vc.lpToken).balanceOf(address(this)).sub(lpTokenBalanceBefore),
         int128(vc.depositorIndex),
         1
       );
