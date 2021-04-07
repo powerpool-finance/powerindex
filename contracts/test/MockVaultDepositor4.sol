@@ -5,6 +5,7 @@ pragma solidity 0.6.12;
 import "./MockERC20.sol";
 import "../interfaces/IVaultDepositor4.sol";
 import "./MockVaultDepositor.sol";
+import "hardhat/console.sol";
 
 contract MockVaultDepositor4 is MockVaultDepositor, IVaultDepositor4 {
   using SafeMath for uint256;
@@ -18,8 +19,10 @@ contract MockVaultDepositor4 is MockVaultDepositor, IVaultDepositor4 {
 
   function add_liquidity(uint256[4] memory _amounts, uint256 _min_mint_amount) external override {
     require(_amounts[index] != 0, "NULL_ADD_LIQUIDITY_AMOUNT");
-    uint256 out = _amounts[index].mul(1 ether).div(rate);
+    uint256 out = _amounts[index].mul(1e30).div(rate);
     usdc.transferFrom(msg.sender, address(this), _amounts[index]);
+    console.log("_amounts[index]", _amounts[index]);
+    console.log("mint", out);
     token.mint(msg.sender, out);
   }
 

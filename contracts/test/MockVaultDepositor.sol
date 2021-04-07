@@ -28,5 +28,9 @@ contract MockVaultDepositor {
     uint256 _token_amount,
     int128 _i,
     uint256 _min_amount
-  ) internal {}
+  ) internal {
+    require(_token_amount != 0, "NULL_REMOVE_LIQUIDITY_AMOUNT");
+    uint256 out = _token_amount.mul(rate).div(1e30);
+    usdc.transfer(msg.sender, out);
+  }
 }
