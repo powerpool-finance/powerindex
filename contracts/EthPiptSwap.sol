@@ -30,6 +30,7 @@ contract EthPiptSwap is ProgressiveFee {
   mapping(address => address) public uniswapEthPairToken0;
   mapping(address => bool) public reApproveTokens;
   uint256 public defaultSlippage;
+  uint256 public defaultDiffPercent;
 
   struct CalculationStruct {
     uint256 tokenAmount;
@@ -73,26 +74,42 @@ contract EthPiptSwap is ProgressiveFee {
     piptWrapper = PowerIndexWrapperInterface(_piptWrapper);
     feeManager = _feeManager;
     defaultSlippage = 0.02 ether;
+    defaultDiffPercent = 0.02 ether;
   }
 
   receive() external payable {
     if (msg.sender != tx.origin) {
       return;
     }
-    swapEthToPipt(defaultSlippage);
+    swapEthToPipt(defaultSlippage, defaultDiffPercent);
   }
 
-  function swapEthToPipt(uint256 _slippage) public payable returns (uint256 poolAmountOutAfterFee, uint256 oddEth) {
+  function swapEthToPipt(
+    uint256 _slippage,
+    uint256 _diffPercent
+  ) public payable returns (uint256 poolAmountOutAfterFee, uint256 oddEth) {
     address[] memory tokens = getPiptTokens();
 
     uint256 wrapperFee = getWrapFee(tokens);
     (, uint256 swapAmount) = calcEthFee(msg.value, wrapperFee);
 
-    (, , uint256 poolAmountOut) = calcSwapEthToPiptInputs(swapAmount, tokens, _slippage);
+    (, uint256[] memory ethInUniswap, uint256 poolAmountOut) = calcSwapEthToPiptInputs(swapAmount, tokens, _slippage);
+    require(_diffPercent >= getMaxDiffPercent(ethInUniswap), "MAX_DIFF_PERCENT");
 
     weth.deposit{ value: msg.value }();
 
     return _swapWethToPiptByPoolOut(msg.value, poolAmountOut, tokens, wrapperFee);
+  }
+
+  function getMaxDiffPercent(uint256[] memory _ethInUniswap) public view returns (uint256 maxDiffPercent) {
+    uint256 len = _ethInUniswap.length;
+    for (uint256 i = 1; i < len; i++) {
+      uint256 diffPercent = _ethInUniswap[i].mul(1 ether).div(_ethInUniswap[0]);
+      diffPercent = diffPercent > 1 ether ? diffPercent - 1 ether : 1 ether - diffPercent;
+      if (diffPercent > maxDiffPercent) {
+        maxDiffPercent = diffPercent;
+      }
+    }
   }
 
   function swapEthToPiptByPoolOut(uint256 _poolAmountOut)
