@@ -33,8 +33,10 @@ contract MockCurveDepositor is ICurveDepositor {
   function remove_liquidity_one_coin(
     uint256 _tokenAmount,
     int128 _i,
-    uint256 _mintAmount
+    uint256 _minAmount
   ) external override {
+    uint256 calculated = calc_withdraw_one_coin(_tokenAmount, _i);
+    require(calculated >= _minAmount, "REMOVE_MIN_AMOUNT");
     usdc.transfer(msg.sender, calc_withdraw_one_coin(_tokenAmount, _i));
   }
 }

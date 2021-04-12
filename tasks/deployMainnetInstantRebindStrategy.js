@@ -2,7 +2,7 @@ require('@nomiclabs/hardhat-truffle5');
 
 const configByTokenAddress = require('./config/ylaPool');
 
-task('deploy-mainnet-weights-strategy', 'Deploy Mainnet Instant Rebind Strategy').setAction(async (__, {ethers, network}) => {
+task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind Strategy').setAction(async (__, {ethers, network}) => {
   const {impersonateAccount, gwei, fromEther, ethUsed, deployProxied} = require('../test/helpers');
   const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
@@ -10,6 +10,7 @@ task('deploy-mainnet-weights-strategy', 'Deploy Mainnet Instant Rebind Strategy'
   const InstantRebindStrategy = artifacts.require('InstantRebindStrategy');
   const ICurvePoolRegistry = artifacts.require('ICurvePoolRegistry');
   const PowerPoke = await artifacts.require('PowerPoke');
+  const ERC20 = await artifacts.require('@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20');
   const { web3 } = PowerIndexPoolController;
   InstantRebindStrategy.numberFormat = 'String';
   ICurvePoolRegistry.numberFormat = 'String';
@@ -25,14 +26,15 @@ task('deploy-mainnet-weights-strategy', 'Deploy Mainnet Instant Rebind Strategy'
   const admin = '0xb258302c3f209491d604165549079680708581cc';
   const proxyAdminAddr = '0x7696f9208f9e195ba31e6f4B2D07B6462C8C42bb';
   const poolAddress = '0x9ba60ba98413a60db4c651d4afe5c937bbd8044b';
+  const poolControllerAddress = '0xb258302c3f209491d604165549079680708581cc';
   const powerPokeAddress = '0x04D7aA22ef7181eE3142F5063e026Af1BbBE5B96';
   const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
   const curePoolRegistryAddress = '0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c';
 
   const weightStrategy =  await deployProxied(
     InstantRebindStrategy,
-    [usdcAddress],
-    [powerPokeAddress, curePoolRegistryAddress, {
+    [poolAddress, usdcAddress],
+    [powerPokeAddress, curePoolRegistryAddress, poolControllerAddress, {
       minUSDCRemainder: '20',
       useVirtualPriceEstimation: false
     }],
@@ -47,7 +49,7 @@ task('deploy-mainnet-weights-strategy', 'Deploy Mainnet Instant Rebind Strategy'
 
   const controller = await PowerIndexPoolController.new(poolAddress, zeroAddress, zeroAddress, weightStrategy.address);
   console.log('controller.address', controller.address);
-  await weightStrategy.addPool(poolAddress, controller.address, zeroAddress);
+  await weightStrategy.setPoolController(controller.address);
 
   for (let vaultAddress of Object.keys(configByTokenAddress)) {
     const cfg = configByTokenAddress[vaultAddress];
@@ -61,7 +63,6 @@ task('deploy-mainnet-weights-strategy', 'Deploy Mainnet Instant Rebind Strategy'
 
   await weightStrategy.transferOwnership(admin);
 
-  //TODO: calculate maxWPS
   if (network.name !== 'mainnetfork') {
     return;
   }
@@ -98,17 +99,24 @@ task('deploy-mainnet-weights-strategy', 'Deploy Mainnet Instant Rebind Strategy'
   );
 
   const [beforePool, beforeVault] = await getTVL(pool);
+  console.log('>>> poking...');
   const res = await weightStrategy.pokeFromReporter('1', powerPokeOpts, {from: pokerReporter});
+  console.log('>>> poke done');
   console.log('logs', JSON.stringify(res.logs.filter(l => l.event === 'InstantRebind'), null, 2))
   console.log('filtered', filterPushPullLogs(res.logs));
   const [afterPool, afterVault] = await getTVL(pool);
 
-  console.log('pool diff  ', beforePool - afterPool);
-  console.log('vault diff ', beforeVault - afterVault);
-  console.log('beforePool ', beforePool);
-  console.log('afterPool  ', afterPool);
-  console.log('beforeVault', beforeVault);
-  console.log('afterVault ', afterVault);
+  console.log('pool diff  ', fromEther(beforePool - afterPool));
+  console.log('vault diff ', fromEther(beforeVault - afterVault));
+  console.log('beforePool ', fromEther(beforePool));
+  console.log('afterPool  ', fromEther(afterPool));
+  console.log('beforeVault', fromEther(beforeVault));
+  console.log('afterVault ', fromEther(afterVault));
+
+  for (let vaultAddress of Object.keys(configByTokenAddress)) {
+    const vault = await ERC20.at(vaultAddress);
+    console.log('withdrawal fee paid (in crv*)', await vault.symbol(), fromEther(await weightStrategy.fees(vaultAddress)));
+  }
 
   console.log('powerPoke rewards', fromEther(await powerPoke.rewards('1')));
   console.log('ETH used', await ethUsed(web3, res.receipt));
@@ -151,14 +159,21 @@ task('deploy-mainnet-weights-strategy', 'Deploy Mainnet Instant Rebind Strategy'
     return logs
       .filter(l => l.event === 'PushLiquidity' || l.event === 'PullLiquidity')
       .map(l => {
-        return {
-          bpool: l.args.bpool,
+        const e = {
+          action: l.event,
           vaultToken: l.args.vaultToken,
           crvToken: l.args.crvToken,
           vaultAmount: Number(BigInt(l.args.vaultAmount) / oneE9) / 1e9 ,
-          crvAmount: Number(BigInt(l.args.crvAmount) / oneE9) / 1e9,
           usdcAmount: Number(l.args.usdcAmount) / 1e6,
         }
+        if (l.event === 'PullLiquidity') {
+          e.vaultReserve = Number(BigInt(l.args.vaultReserve) / oneE9) / 1e9;
+          e.crvExpected = Number(BigInt(l.args.crvAmountExpected) / oneE9) / 1e9;
+          e.crvActual = Number(BigInt(l.args.crvAmountActual) / oneE9) / 1e9;
+        } else {
+          e.crvAmount = Number(BigInt(l.args.crvAmount) / oneE9) / 1e9;
+        }
+        return e;
       })
   }
 });

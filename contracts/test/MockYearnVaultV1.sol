@@ -31,7 +31,7 @@ interface Controller {
   function earn(address, uint) external;
 }
 
-contract MockYVaultV1 is ERC20 {
+contract MockYearnVaultV1 is ERC20 {
   using SafeERC20 for IERC20;
   using Address for address;
   using SafeMath for uint256;

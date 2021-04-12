@@ -29,8 +29,8 @@ const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRoute
 const MockCurveDepositor2 = artifacts.require('MockCurveDepositor2');
 const MockCurveDepositor3 = artifacts.require('MockCurveDepositor3');
 const MockCurveDepositor4 = artifacts.require('MockCurveDepositor4');
-const MockYVaultV1 = artifacts.require('MockYVaultV1');
-const MockYController = artifacts.require('MockYController');
+const MockYearnVaultV1 = artifacts.require('MockYearnVaultV1');
+const MockYearnVaultController = artifacts.require('MockYearnVaultController');
 const MockCurvePoolRegistry = artifacts.require('MockCurvePoolRegistry');
 const ethers = require('ethers');
 const pIteration = require('p-iteration');
@@ -43,8 +43,8 @@ UniswapV2Router02.numberFormat = 'String';
 MCapWeightStrategy.numberFormat = 'String';
 PowerIndexPool.numberFormat = 'String';
 PowerPoke.numberFormat = 'String';
-MockYVaultV1.numberFormat = 'String';
-MockYController.numberFormat = 'String';
+MockYearnVaultV1.numberFormat = 'String';
+MockYearnVaultController.numberFormat = 'String';
 MockCurveDepositor2.numberFormat = 'String';
 MockCurveDepositor3.numberFormat = 'String';
 MockCurveDepositor4.numberFormat = 'String';
@@ -112,9 +112,9 @@ describe('WeightStrategy', () => {
 
   const poolsData = JSON.parse(fs.readFileSync('data/poolsData.json', { encoding: 'utf8' }));
 
-  let minter, alice, bob, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, slasher, reservoir;
+  let minter, alice, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, slasher, reservoir;
   before(async function () {
-    [minter, alice, bob, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, slasher, reservoir] = await web3.eth.getAccounts();
+    [minter, alice, feeManager, permanentVotingPower, uniswapRouter, weightStrategyOwner, reporter, slasher, reservoir] = await web3.eth.getAccounts();
   });
 
   beforeEach(async () => {
@@ -140,13 +140,21 @@ describe('WeightStrategy', () => {
       await pool.setController(poolController.address);
       await weightStrategy.addPool(pool.address, poolController.address, zeroAddress);
       await poolController.setWeightsStrategy(weightStrategy.address);
+      await this.initStrategyPoker(weightStrategy, pool, poolController, poke);
+    }
 
-      await poke.addClient(weightStrategy.address, weightStrategyOwner, true, gwei(300), pokePeriod, pokePeriod * 2, { from: minter });
+    this.initInstantRebindStrategy = async (strategy, pool, poolController, poke) => {
+      await pool.setController(poolController.address);
+      await poolController.setWeightsStrategy(strategy.address);
+      await this.initStrategyPoker(strategy, pool, poolController, poke);
+    }
+
+    this.initStrategyPoker = async (strategy, pool, poolController, poke) => {
+      await poke.addClient(strategy.address, weightStrategyOwner, true, gwei(300), pokePeriod, pokePeriod * 2, { from: minter });
       await this.cvpToken.approve(poke.address, ether(30000), { from: minter })
-      await poke.addCredit(weightStrategy.address, ether(30000), { from: minter });
-      await poke.setBonusPlan(weightStrategy.address, 1,  true, 20, 17520000, 100 * 1000, { from: weightStrategyOwner });
-
-      await poke.setMinimalDeposit(weightStrategy.address, slasherDeposit, { from: weightStrategyOwner });
+      await poke.addCredit(strategy.address, ether(30000), { from: minter });
+      await poke.setBonusPlan(strategy.address, 1,  true, 20, 17520000, 100 * 1000, { from: weightStrategyOwner });
+      await poke.setMinimalDeposit(strategy.address, slasherDeposit, { from: weightStrategyOwner });
     }
 
     this.makePowerIndexPool = async (_tokens, _balances, _totalDenormalizedWeight = 50, _customWeights = []) => {
@@ -268,22 +276,17 @@ describe('WeightStrategy', () => {
 
     describe('InstantRebindStrategy', () => {
       let usdc;
-      let crvTokens = [];
+      let crvTokens;
+      let crvDepositors;
       const vaultsData = JSON.parse(fs.readFileSync('data/vaultsData2.json', { encoding: 'utf8' }));
 
       beforeEach(async () => {
+        crvTokens = [];
+        crvDepositors = [];
+        weightStrategy = null;
         usdc = await MockERC20.new('USDC', 'USDC', 6, mwei(1e16));
 
         const curvePoolRegistry = await MockCurvePoolRegistry.new();
-        weightStrategy = await deployProxied(
-          MockInstantRebindStrategy,
-          [usdc.address],
-          [poke.address, curvePoolRegistry.address, {
-            minUSDCRemainder: mwei('5'),
-            useVirtualPriceEstimation: false
-          }],
-          {proxyAdminOwner: minter}
-        );
         const depositors = [
           null,
           null,
@@ -296,30 +299,24 @@ describe('WeightStrategy', () => {
         for (let i = 0; i < vaultsData.length; i++) {
           const crvToken = await MockERC20.new(vaultsData[i].name, 'CRV', 18, ether(1e16));
           crvTokens.push(crvToken);
-          const crvDeposit = await depositors[vaultsData[i].config.amountsLength].new(
+          const crvDepositor = await depositors[vaultsData[i].config.amountsLength].new(
             crvToken.address,
             usdc.address,
             vaultsData[i].config.usdcIndex,
             BigInt(vaultsData[i].curvePool.virtualPrice) / 10n ** 12n,
           );
-          const ycrvVault = await MockYVaultV1.new(crvToken.address, minter);
+          const ycrvVault = await MockYearnVaultV1.new(crvToken.address, minter);
           await curvePoolRegistry.set_virtual_price(crvToken.address, vaultsData[i].curvePool.virtualPrice);
 
-          const yController = await MockYController.new();
+          const yController = await MockYearnVaultController.new();
           await crvToken.approve(ycrvVault.address, vaultsData[i].yearnVault.totalSupply);
           await ycrvVault.setController(yController.address);
           await ycrvVault.deposit(vaultsData[i].yearnVault.totalSupply);
 
-          await weightStrategy.setVaultConfig(
-            ycrvVault.address,
-            crvDeposit.address,
-            vaultsData[i].config.amountsLength,
-            vaultsData[i].config.usdcIndex,
-          );
-
-          await usdc.transfer(crvDeposit.address, mwei(1e12));
+          await usdc.transfer(crvDepositor.address, mwei(1e12));
 
           tokens.push(ycrvVault);
+          crvDepositors.push(crvDepositor);
           bPoolBalances.push(vaultsData[i].balancerPool.vaultTokenBalance);
           denormWeights.push(ether(5))
         }
@@ -329,7 +326,26 @@ describe('WeightStrategy', () => {
         pool = await this.makePowerIndexPool(tokens, bPoolBalances, 25, denormWeights);
         poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
 
-        await this.initWeightsStrategy(weightStrategy, pool, poolController, poke);
+        weightStrategy = await deployProxied(
+          MockInstantRebindStrategy,
+          [pool.address, usdc.address],
+          [poke.address, curvePoolRegistry.address, poolController.address, {
+            minUSDCRemainder: mwei('5'),
+            useVirtualPriceEstimation: false
+          }],
+          {proxyAdminOwner: minter}
+        );
+
+        for (let i = 0; i < vaultsData.length; i++) {
+          await weightStrategy.setVaultConfig(
+            tokens[i].address,
+            crvDepositors[i].address,
+            vaultsData[i].config.amountsLength,
+            vaultsData[i].config.usdcIndex,
+          );
+        }
+
+        await this.initInstantRebindStrategy(weightStrategy, pool, poolController, poke);
 
         await time.increase(pokePeriod);
       })
@@ -338,7 +354,6 @@ describe('WeightStrategy', () => {
         it('should allow poker', async () => {
           const res = await weightStrategy.pokeFromReporter('1', compensationOpts, { from: reporter });
           expectEvent(res, 'InstantRebind', {
-            pool: pool.address,
             poolCurrentTokensCount: '5',
             usdcPulled: mwei('259757.825579'),
             usdcRemainder: '1',
@@ -352,7 +367,6 @@ describe('WeightStrategy', () => {
         it('should allow slasher', async () => {
           const res = await weightStrategy.pokeFromSlasher('2', compensationOpts, { from: slasher });
           expectEvent(res, 'InstantRebind', {
-            pool: pool.address,
             poolCurrentTokensCount: '5',
             usdcPulled: mwei('259757.825579'),
             usdcRemainder: '1',
@@ -373,7 +387,7 @@ describe('WeightStrategy', () => {
       });
 
       describe('rebalance', () => {
-        it('should correctly rebalance token balances', async () => {
+        it('should correctly rebalance token balances with all underlying tokens on vault', async () => {
           // BEFORE
           for (let t of balancerTokens) {
             assert.equal(await pool.getDenormalizedWeight(t.address), ether('5'));
@@ -390,7 +404,6 @@ describe('WeightStrategy', () => {
           const res = await weightStrategy.mockPoke();
 
           expectEvent(res, 'InstantRebind', {
-            pool: pool.address,
             poolCurrentTokensCount: '5',
             usdcPulled: mwei('259757.825579'),
             usdcRemainder: '1',
@@ -398,25 +411,26 @@ describe('WeightStrategy', () => {
 
           const pull0 = res.logs[0].args;
           assert.equal(res.logs[0].event, 'PullLiquidity');
-          assert.equal(pull0.bpool, pool.address);
           assert.equal(pull0.vaultToken, balancerTokens[4].address);
           assert.equal(pull0.crvToken, crvTokens[4].address);
           assert.equal(pull0.vaultAmount, ether('83064.627634615728983635'));
-          assert.equal(pull0.crvAmount,   ether('83064.627634615728983635'));
+          assert.equal(pull0.crvAmountExpected,   ether('83064.627634615728983635'));
+          assert.equal(pull0.crvAmountActual,   ether('83064.627634615728983635'));
           assert.equal(pull0.usdcAmount, mwei('91060.345626'));
+          assert.equal(pull0.vaultReserve, ether('16389957.25975930813104234'));
 
           const pull1 = res.logs[1].args;
           assert.equal(res.logs[1].event, 'PullLiquidity');
-          assert.equal(pull1.bpool, pool.address);
           assert.equal(pull1.vaultToken, balancerTokens[3].address);
           assert.equal(pull1.crvToken, crvTokens[3].address);
           assert.equal(pull1.vaultAmount, ether('154533.694210646329428272'));
-          assert.equal(pull1.crvAmount,   ether('154533.694210646329428272'));
+          assert.equal(pull1.crvAmountExpected,   ether('154533.694210646329428272'));
+          assert.equal(pull1.crvAmountActual,   ether('154533.694210646329428272'));
           assert.equal(pull1.usdcAmount, mwei('168697.479953'));
+          assert.equal(pull1.vaultReserve, ether('41657837.378850978367377285'));
 
           const push0 = res.logs[2].args;
           assert.equal(res.logs[2].event, 'PushLiquidity');
-          assert.equal(push0.bpool, pool.address);
           assert.equal(push0.vaultToken, balancerTokens[0].address);
           assert.equal(push0.crvToken, crvTokens[0].address);
           assert.equal(push0.vaultAmount, ether('194458.764116501208664836'));
@@ -425,7 +439,6 @@ describe('WeightStrategy', () => {
 
           const push1 = res.logs[3].args;
           assert.equal(res.logs[3].event, 'PushLiquidity');
-          assert.equal(push1.bpool, pool.address);
           assert.equal(push1.vaultToken, balancerTokens[2].address);
           assert.equal(push1.crvToken, crvTokens[2].address);
           assert.equal(push1.vaultAmount, ether('38059.480924393093651053'));
@@ -434,7 +447,6 @@ describe('WeightStrategy', () => {
 
           const push2 = res.logs[4].args;
           assert.equal(res.logs[4].event, 'PushLiquidity');
-          assert.equal(push2.bpool, pool.address);
           assert.equal(push2.vaultToken, balancerTokens[1].address);
           assert.equal(push2.crvToken, crvTokens[1].address);
           assert.equal(push2.vaultAmount, ether('13779.032087932879636253'));
@@ -463,113 +475,183 @@ describe('WeightStrategy', () => {
           assert.equal(await pool.getBalance(balancerTokens[4].address), ether('355041.699183313432318458'))
         })
 
+        it('should correctly rebalance token balances with insufficient underlying tokens on vault', async () => {
+          for (let i in Object.keys(tokens)) {
+            const vault = tokens[i];
+            await vault.setMin(9990);
+
+            await vault.earn();
+
+            const vaultController = await MockYearnVaultController.at(await vault.controller());
+            await vaultController.setWithdrawRatio(5, 10);
+          }
+
+          let res = await weightStrategy.mockPoke();
+
+          expectEvent(res, 'InstantRebind', {
+            poolCurrentTokensCount: '5',
+            usdcPulled: mwei('161600.725098'),
+            usdcRemainder: '2',
+          });
+          expectEvent(res, 'VaultWithdrawFee', {
+            vaultToken: balancerTokens[4].address,
+            crvAmount: ether('33337.335187428210426296')
+          });
+          expectEvent(res, 'VaultWithdrawFee', {
+            vaultToken: balancerTokens[3].address,
+            crvAmount: ether('56437.928415897675530447')
+          });
+
+          const pull0 = res.logs[1].args;
+          assert.equal(res.logs[1].event, 'PullLiquidity');
+          assert.equal(pull0.vaultToken, balancerTokens[4].address);
+          assert.equal(pull0.crvToken, crvTokens[4].address);
+          assert.equal(pull0.vaultAmount, ether('83064.627634615728983635'));
+          assert.equal(pull0.crvAmountExpected,   ether('83064.627634615728983635'));
+          assert.equal(pull0.crvAmountActual,   ether('49727.292447187518557339'));
+          assert.equal(pull0.usdcAmount, mwei('54513.991890'));
+          assert.equal(pull0.vaultReserve, ether('16389.957259759308131043'));
+
+          const pull1 = res.logs[3].args;
+          assert.equal(res.logs[3].event, 'PullLiquidity');
+          assert.equal(pull1.vaultToken, balancerTokens[3].address);
+          assert.equal(pull1.crvToken, crvTokens[3].address);
+          assert.equal(pull1.vaultAmount, ether('154533.694210646329428272'));
+          assert.equal(pull1.crvAmountExpected,   ether('154533.694210646329428272'));
+          assert.equal(pull1.crvAmountActual,   ether('98095.765794748653897825'));
+          assert.equal(pull1.usdcAmount, mwei('107086.733208'));
+          assert.equal(pull1.vaultReserve, ether('41657.837378850978367378'));
+
+          const push0 = res.logs[4].args;
+          assert.equal(res.logs[4].event, 'PushLiquidity');
+          assert.equal(push0.vaultToken, balancerTokens[0].address);
+          assert.equal(push0.crvToken, crvTokens[0].address);
+          assert.equal(push0.vaultAmount, ether('120976.826060222018822314'));
+          assert.equal(push0.crvAmount,   ether('120976.826060222018822314'));
+          assert.equal(push0.usdcAmount, mwei('128867.539540'));
+
+          const push1 = res.logs[5].args;
+          assert.equal(res.logs[5].event, 'PushLiquidity');
+          assert.equal(push1.vaultToken, balancerTokens[2].address);
+          assert.equal(push1.crvToken, crvTokens[2].address);
+          assert.equal(push1.vaultAmount, ether('23677.591619658229120076'));
+          assert.equal(push1.crvAmount,   ether('23677.591619658229120076'));
+          assert.equal(push1.usdcAmount, mwei('24034.318215'));
+
+          const push2 = res.logs[6].args;
+          assert.equal(res.logs[6].event, 'PushLiquidity');
+          assert.equal(push2.vaultToken, balancerTokens[1].address);
+          assert.equal(push2.crvToken, crvTokens[1].address);
+          assert.equal(push2.vaultAmount, ether('8572.221342880286645105'));
+          assert.equal(push2.crvAmount,   ether('8572.221342880286645105'));
+          assert.equal(push2.usdcAmount, mwei('8698.867341'));
+
+          await time.increase(pokePeriod * 2);
+
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[0].address), ether('0.132370679337861024'))
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[1].address), ether('0.373088863460271325'))
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[2].address), ether('0.181946865339872727'))
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[3].address), ether('0.224065128438652867'))
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[4].address), ether('0.088528463423342056'))
+
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[0].address), ether('3.309266983446525607'))
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[1].address), ether('9.327221586506783136'))
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[2].address), ether('4.548671633496818185'))
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[3].address), ether('5.601628210966321663'))
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.213211585583551406'))
+          assert.equal(await pool.getTotalDenormalizedWeight(), ether('24.999999999999999997'))
+
+          assert.equal(await pool.getBalance(balancerTokens[0].address), ether('472854.360745752227390877'))
+          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1611207.040141882312344320'))
+          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('773679.237859342374218775'))
+          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('902398.724100562906779156'))
+          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('355041.699183313432318458'))
+
+          res = await weightStrategy.getFeesToRefund();
+          assert.equal(res.length, 2);
+          assert.equal(res[0].vaultToken, balancerTokens[4].address);
+          assert.equal(res[0].crvToken, crvTokens[4].address);
+          assert.equal(res[0].crvAmount, ether('33337.335187428210426296'));
+
+          assert.equal(res[1].vaultToken, balancerTokens[3].address);
+          assert.equal(res[1].crvToken, crvTokens[3].address);
+          assert.equal(res[1].crvAmount, ether('56437.928415897675530447'));
+        })
       })
 
       describe('owner methods', () => {
-        it('should allow the owner setting a new curvePoolRegistry', async () => {
-          const res = await weightStrategy.setCurvePoolRegistry(alice, { from: minter });
-          assert.equal(await weightStrategy.curvePoolRegistry(), alice);
-          expectEvent(res, 'SetCurvePoolRegistry', {
-            curvePoolRegistry: alice
+        describe('setCurvePoolRegistry()', () => {
+          it('should allow the owner setting a new curvePoolRegistry', async () => {
+            const res = await weightStrategy.setCurvePoolRegistry(alice, { from: minter });
+            assert.equal(await weightStrategy.curvePoolRegistry(), alice);
+            expectEvent(res, 'SetCurvePoolRegistry', {
+              curvePoolRegistry: alice
+            })
+            await expectRevert(
+              weightStrategy.setCurvePoolRegistry(alice, { from: alice }),
+              'Ownable: caller is not the owner'
+            );
           })
-          await expectRevert(
-            weightStrategy.setCurvePoolRegistry(alice, { from: alice }),
-            'Ownable: caller is not the owner'
-          );
         })
 
-        it('should allow the owner adding a new pool', async () => {
-          const crv2 = await MockERC20.new('TKN2', 'TKN2', 18, ether(1e16));
-          const vault2 = await MockVault.new(crv2.address, ether(1), ether(10));
+        describe('syncPoolTokens()', () => {
+          it('should allow the owner syncing tokens of an existing pool', async () => {
+            const crv2 = await MockERC20.new('TKN2', 'TKN2', 18, ether(1e16));
+            const vault2 = await MockVault.new(crv2.address, ether(10), ether(10));
 
-          const crv3 = await MockERC20.new('TKN3', 'TKN3', 18, ether(1e16));
-          const vault3 = await MockVault.new(crv3.address, ether(2), ether(20));
+            const crv3 = await MockERC20.new('TKN3', 'TKN3', 18, ether(1e16));
+            const vault3 = await MockVault.new(crv3.address, ether(20), ether(20));
 
-          // await pool.
-          const pool2 = await this.makePowerIndexPool([vault2, vault3], [ether(1), ether(2)]);
+            await vault2.approve(poolController.address, ether(3));
+            await vault3.approve(poolController.address, ether(3));
+            await poolController.bind(vault2.address, ether(3), ether(5), await getTimestamp(5), await getTimestamp(60));
+            await poolController.bind(vault3.address, ether(3), ether(5), await getTimestamp(5), await getTimestamp(60));
 
-          const res = await weightStrategy.addPool(pool2.address, alice, constants.ZERO_ADDRESS, { from: minter });
+            const res = await weightStrategy.syncPoolTokens({ from: minter });
 
-          expectEvent(res, 'AddPool', {
-            pool: pool2.address,
-            poolController: alice
-          });
-          expectEvent(res, 'UpdatePool', {
-            pool: pool2.address,
-            poolTokensBefore: [],
-            poolTokensAfter: [vault2.address, vault3.address],
-          });
+            const expectedTokens = tokens.map(t => t.address).concat([vault2.address, vault3.address]);
+            expectEvent(res, 'UpdatePool', {
+              poolTokensBefore: tokens.map(t => t.address),
+              poolTokensAfter: expectedTokens,
+            });
+            assert.sameMembers(await weightStrategy.getPoolTokens(), expectedTokens);
+            assert.sameMembers(await pool.getCurrentTokens(), expectedTokens);
 
-          assert.sameMembers(await weightStrategy.getPoolsList(), [pool.address, pool2.address]);
-          assert.sameMembers(await weightStrategy.getPoolTokens(pool.address), tokens.map(t=> t.address));
-          assert.sameMembers(await weightStrategy.getPoolTokens(pool2.address), [vault2.address, vault3.address]);
-
-          await expectRevert(
-            weightStrategy.addPool(alice, alice, alice, { from: bob }),
-            'Ownable: caller is not the owner'
-          );
-        })
-
-        it('should allow the owner setting details of an existing pool', async () => {
-          const crv2 = await MockERC20.new('TKN2', 'TKN2', 18, ether(1e16));
-          const vault2 = await MockVault.new(crv2.address, ether(10), ether(10));
-
-          const crv3 = await MockERC20.new('TKN3', 'TKN3', 18, ether(1e16));
-          const vault3 = await MockVault.new(crv3.address, ether(20), ether(20));
-
-          await vault2.approve(poolController.address, ether(3));
-          await vault3.approve(poolController.address, ether(3));
-          await poolController.bind(vault2.address, ether(3), ether(5), await getTimestamp(5), await getTimestamp(60));
-          await poolController.bind(vault3.address, ether(3), ether(5), await getTimestamp(5), await getTimestamp(60));
-
-          const res = await weightStrategy.setPool(pool.address, alice, alice, { from: minter });
-          assert.sameMembers(await weightStrategy.getPoolsList(), [pool.address]);
-
-          expectEvent(res, 'SetPool', {
-            poolController: alice
-          });
-          const expectedTokens = tokens.map(t => t.address).concat([vault2.address, vault3.address]);
-          expectEvent(res, 'UpdatePool', {
-            pool: pool.address,
-            poolTokensBefore: tokens.map(t => t.address),
-            poolTokensAfter: expectedTokens,
-          });
-          assert.sameMembers(await weightStrategy.getPoolTokens(pool.address), expectedTokens);
-          assert.sameMembers(await pool.getCurrentTokens(), expectedTokens);
-
-          await expectRevert(
-            weightStrategy.setPool(alice, alice, alice, true, { from: alice }),
-            'Ownable: caller is not the owner'
-          );
-        })
-
-        it('should allow the owner setting a new strategy constraints', async () => {
-          let constraints = await weightStrategy.constraints();
-          assert.equal(constraints.minUSDCRemainder, mwei(5));
-          assert.equal(constraints.useVirtualPriceEstimation, false);
-
-          const res = await weightStrategy.setStrategyConstraints({
-            minUSDCRemainder: 42,
-            useVirtualPriceEstimation: true
-          }, { from: minter });
-
-          constraints = await weightStrategy.constraints();
-          assert.equal(constraints.minUSDCRemainder, '42');
-          assert.equal(constraints.useVirtualPriceEstimation, true);
-          expectEvent(res, 'SetStrategyConstraints', {
-            minUSDCRemainder: '42',
-            useVirtualPriceEstimation: true
+            await expectRevert(
+              weightStrategy.syncPoolTokens({ from: alice }),
+              'Ownable: caller is not the owner'
+            );
           })
-          await expectRevert(
-            weightStrategy.setStrategyConstraints({
+        })
+
+        describe('setStrategyConstraints', () => {
+          it('should allow the owner setting a new strategy constraints', async () => {
+            let constraints = await weightStrategy.constraints();
+            assert.equal(constraints.minUSDCRemainder, mwei(5));
+            assert.equal(constraints.useVirtualPriceEstimation, false);
+
+            const res = await weightStrategy.setStrategyConstraints({
               minUSDCRemainder: 42,
               useVirtualPriceEstimation: true
-            }, { from: alice }),
-            'Ownable: caller is not the owner'
-          );
-        })
-      });
+            }, { from: minter });
 
+            constraints = await weightStrategy.constraints();
+            assert.equal(constraints.minUSDCRemainder, '42');
+            assert.equal(constraints.useVirtualPriceEstimation, true);
+            expectEvent(res, 'SetStrategyConstraints', {
+              minUSDCRemainder: '42',
+              useVirtualPriceEstimation: true
+            })
+            await expectRevert(
+              weightStrategy.setStrategyConstraints({
+                minUSDCRemainder: 42,
+                useVirtualPriceEstimation: true
+              }, { from: alice }),
+              'Ownable: caller is not the owner'
+            );
+          })
+        });
+      });
     });
 
     describe('MCapWeightStrategy', () => {

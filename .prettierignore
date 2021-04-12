@@ -17,7 +17,7 @@ contracts/interfaces/IUniswapV2Router02.sol
 contracts/interfaces/aave/
 contracts/test/MockWETH.sol
 contracts/test/MockYearnGovernance.sol
-contracts/test/MockYVaultV1.sol
+contracts/test/MockYearnVaultV1.sol
 contracts/test/AragonVoting.sol
 
 # files

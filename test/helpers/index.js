@@ -172,7 +172,7 @@ function ether(value) {
 }
 
 function fromEther(value) {
-  return parseFloat(web3.utils.fromWei(value, 'ether'));
+  return parseFloat(web3.utils.fromWei(value.toString(), 'ether'));
 }
 
 function gwei(value) {
