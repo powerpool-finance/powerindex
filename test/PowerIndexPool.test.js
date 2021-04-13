@@ -76,7 +76,7 @@ function ether(v) {
   return ozEther(v).toString(10);
 }
 
-describe('PowerIndexPool', () => {
+describe.skip('PowerIndexPool', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const name = 'My Pool';
   const symbol = 'MP';

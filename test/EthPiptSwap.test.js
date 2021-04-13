@@ -77,7 +77,7 @@ function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei) {
   assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));
 }
 
-describe.only('EthPiptSwap and Erc20PiptSwap', () => {
+describe.skip('EthPiptSwap and Erc20PiptSwap', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const swapFee = ether('0.0001');
   const communitySwapFee = ether('0.001');

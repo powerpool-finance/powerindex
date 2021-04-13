@@ -14,12 +14,14 @@ require('./tasks/deployPoolRestrictions');
 require('./tasks/deployMainnetYeti');
 require('./tasks/deployYearnRouter');
 require('./tasks/deployAaveRouter');
+require('./tasks/deploySushiRouter');
 require('./tasks/deployProxyFactory');
 require('./tasks/deployMainnetAssy');
 require('./tasks/deployMainnetYla');
 require('./tasks/rebindMCapWeights');
 require('./tasks/deployMainnetWeightsStrategy');
 require('./tasks/testVestedLpMiningProxy');
+require('./tasks/testVestedLpMiningPool');
 require('./tasks/deployIndicesSupplyRedeemZap');
 
 const fs = require('fs');

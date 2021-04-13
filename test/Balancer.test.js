@@ -19,7 +19,7 @@ const { web3 } = BFactory;
 
 const { mulScalarBN, divScalarBN, subBN, addBN, assertEqualWithAccuracy } = require('./helpers');
 
-describe('Balancer', () => {
+describe.skip('Balancer', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const name = 'My Pool';
   const symbol = 'MP';
