@@ -8,7 +8,7 @@ const Reservoir = artifacts.require('Reservoir');
 const { web3 } = Reservoir;
 const { toBN } = web3.utils;
 
-describe('LPMining', () => {
+describe.skip('LPMining', () => {
   let alice, bob, carol, minter;
   before(async function () {
     [alice, bob, carol, minter] = await web3.eth.getAccounts();

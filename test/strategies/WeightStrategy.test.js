@@ -1032,8 +1032,10 @@ describe('WeightStrategy', () => {
       it('pokeFromReporter and pokeFromSlasher should work properly with wrapped tokens', async () => {
         const defaultFactoryArguments = buildBasicRouterArgs(web3, buildBasicRouterConfig(
           this.poolRestrictions.address,
+          poke.address,
           constants.ZERO_ADDRESS,
           constants.ZERO_ADDRESS,
+          ether(0),
           ether(0),
           '0',
           permanentVotingPower,

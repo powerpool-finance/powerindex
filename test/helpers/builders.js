@@ -1,15 +1,15 @@
-function buildBasicRouterConfig(poolRestrictions, voting, staking, reserveRatio, rebalancingInterval, pvp, pvpFee, rewardPools, refundMaxGasPrice, refundPct) {
+function buildBasicRouterConfig(poolRestrictions, powerPoke, voting, staking, reserveRatio, reserveRatioToForceRebalance, claimRewardsInterval, pvp, pvpFee, rewardPools) {
   return {
     poolRestrictions,
+    powerPoke,
     voting,
     staking,
     reserveRatio,
-    rebalancingInterval,
+    reserveRatioToForceRebalance,
+    claimRewardsInterval,
     pvp,
     pvpFee,
     rewardPools,
-    refundMaxGasPrice,
-    refundPct,
   };
 }
 
@@ -43,10 +43,12 @@ function buildSushiRouterConfig(SUSHI) {
 
 const BasicConfig = {
   poolRestrictions: 'address',
+  powerPoke: 'address',
   voting: 'address',
   staking: 'address',
   reserveRatio: 'uint256',
-  rebalancingInterval: 'uint256',
+  reserveRatioToForceRebalance: 'uint256',
+  claimRewardsInterval: 'uint256',
   pvp: 'address',
   pvpFee: 'uint256',
   rewardPools: 'address[]',
@@ -74,6 +76,22 @@ function buildAaveRouterArgs(web3, basicConfig, aaveConfig) {
       },
     ],
     [basicConfig, aaveConfig],
+  );
+}
+
+function buildSushiRouterArgs(web3, basicConfig, sushiConfig) {
+  return web3.eth.abi.encodeParameters(
+    [
+      {
+        BasicConfig,
+      },
+      {
+        SushiConfig: {
+          SUSHI: 'address',
+        },
+      },
+    ],
+    [basicConfig, sushiConfig],
   );
 }
 
@@ -107,4 +125,5 @@ module.exports = {
   buildBasicRouterArgs,
   buildYearnRouterArgs,
   buildAaveRouterArgs,
+  buildSushiRouterArgs,
 };

@@ -17,7 +17,7 @@ contract MockCurveDepositor4 is MockCurveDepositor, ICurveDepositor4 {
 
   function add_liquidity(uint256[4] memory _amounts, uint256 _min_mint_amount) external override {
     require(_amounts[index] != 0, "NULL_ADD_LIQUIDITY_AMOUNT");
-    uint256 out = _amounts[index].mul(1 ether).div(rate);
+    uint256 out = _amounts[index].mul(1e30).div(rate);
     usdc.transferFrom(msg.sender, address(this), _amounts[index]);
     token.mint(msg.sender, out);
   }

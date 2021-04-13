@@ -23,7 +23,7 @@ contract MockRouter is PowerIndexBasicRouter {
     return 0;
   }
 
-  function piTokenCallback(uint256 _withdrawAmount) external payable virtual override {
+  function piTokenCallback(address sender, uint256 _withdrawAmount) external payable virtual override {
     emit MockWrapperCallback(_withdrawAmount);
   }
 

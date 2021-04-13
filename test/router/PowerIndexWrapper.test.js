@@ -16,6 +16,7 @@ const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRouterFactory');
 const PowerIndexBasicRouter = artifacts.require('MockPowerIndexBasicRouter');
 const ProxyFactory = artifacts.require('ProxyFactory');
+const MockPoke = artifacts.require('MockPoke');
 
 const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
@@ -87,10 +88,13 @@ describe('PowerIndexWrapper', () => {
   let minter, alice, communityWallet, poolRestrictions, stub;
   before(async function () {
     [minter, alice, communityWallet, poolRestrictions, stub] = await web3.eth.getAccounts();
+    const poke = await MockPoke.new(true);
     defaultFactoryArguments = buildBasicRouterArgs(web3, buildBasicRouterConfig(
       poolRestrictions,
+      poke.address,
       constants.ZERO_ADDRESS,
       constants.ZERO_ADDRESS,
+      ether(0),
       ether(0),
       '0',
       stub,
@@ -302,7 +306,7 @@ describe('PowerIndexWrapper', () => {
             mulScalarBN(price, ether('1.05')),
             { from: alice },
           ),
-          'function call failed to execute',
+          'revert',
         );
 
         await poolWrapper.swapExactAmountIn(
@@ -476,7 +480,7 @@ describe('PowerIndexWrapper', () => {
             mulScalarBN(price, ether('1.05')),
             { from: alice },
           ),
-          'function call failed to execute',
+          'revert',
         );
 
         await poolWrapper.swapExactAmountOut(
@@ -948,7 +952,7 @@ describe('PowerIndexWrapper', () => {
         //
         // await expectRevert(
         //   poolWrapper.joinPool(poolOutAmount, [token1InAmount, token2InAmount], { from: alice }),
-        //   'function call failed to execute',
+        //   'revert',
         // );
 
         const res = await poolWrapper.joinPool(
@@ -983,7 +987,7 @@ describe('PowerIndexWrapper', () => {
         );
         await expectRevert(
           poolWrapper.exitPool(poolOutAmountAfterFee, [token1OutAmount, token2OutAmount], { from: alice }),
-          'function call failed to execute',
+          'revert',
         );
 
         token1AliceBalanceBefore = await this.token1.balanceOf(alice);
@@ -1073,7 +1077,7 @@ describe('PowerIndexWrapper', () => {
         );
         await expectRevert(
           poolWrapper.exitPool(poolOutAmountAfterFee, [token2OutAmount, token1OutAmount], { from: alice }),
-          'function call failed to execute',
+          'revert',
         );
 
         token1AliceBalanceBefore = await this.token1.balanceOf(alice);
