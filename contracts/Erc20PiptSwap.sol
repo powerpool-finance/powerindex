@@ -44,6 +44,7 @@ contract Erc20PiptSwap is EthPiptSwap {
     address _swapToken,
     uint256 _swapAmount,
     uint256 _slippage,
+    uint256 _minPoolAmount,
     uint256 _diffPercent
   ) external payable returns (uint256 poolAmountOut) {
     IERC20(_swapToken).safeTransferFrom(msg.sender, address(this), _swapAmount);
@@ -55,6 +56,7 @@ contract Erc20PiptSwap is EthPiptSwap {
     uint256 wrapperFee = getWrapFee(tokens);
     (, uint256 ethSwapAmount) = calcEthFee(ethAmount, wrapperFee);
     (, ethInUniswap, poolAmountOut) = calcSwapEthToPiptInputs(ethSwapAmount, tokens, _slippage);
+    require(poolAmountOut >= _minPoolAmount, "MIN_POOL_AMOUNT_OUT");
     require(_diffPercent >= getMaxDiffPercent(ethInUniswap), "MAX_DIFF_PERCENT");
 
     (poolAmountOut, ) = _swapWethToPiptByPoolOut(ethAmount, poolAmountOut, tokens, wrapperFee);

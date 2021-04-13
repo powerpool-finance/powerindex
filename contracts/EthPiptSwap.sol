@@ -74,19 +74,20 @@ contract EthPiptSwap is ProgressiveFee {
     piptWrapper = PowerIndexWrapperInterface(_piptWrapper);
     feeManager = _feeManager;
     defaultSlippage = 0.02 ether;
-    defaultDiffPercent = 0.02 ether;
+    defaultDiffPercent = 0.04 ether;
   }
 
   receive() external payable {
     if (msg.sender != tx.origin) {
       return;
     }
-    swapEthToPipt(defaultSlippage, defaultDiffPercent);
+    swapEthToPipt(defaultSlippage, defaultDiffPercent, 0);
   }
 
   function swapEthToPipt(
     uint256 _slippage,
-    uint256 _diffPercent
+    uint256 _minPoolAmount,
+    uint256 _maxDiffPercent
   ) public payable returns (uint256 poolAmountOutAfterFee, uint256 oddEth) {
     address[] memory tokens = getPiptTokens();
 
@@ -94,7 +95,8 @@ contract EthPiptSwap is ProgressiveFee {
     (, uint256 swapAmount) = calcEthFee(msg.value, wrapperFee);
 
     (, uint256[] memory ethInUniswap, uint256 poolAmountOut) = calcSwapEthToPiptInputs(swapAmount, tokens, _slippage);
-    require(_diffPercent >= getMaxDiffPercent(ethInUniswap), "MAX_DIFF_PERCENT");
+    require(poolAmountOut >= _minPoolAmount, "MIN_POOL_AMOUNT_OUT");
+    require(_maxDiffPercent >= getMaxDiffPercent(ethInUniswap), "MAX_DIFF_PERCENT");
 
     weth.deposit{ value: msg.value }();
 
@@ -103,8 +105,14 @@ contract EthPiptSwap is ProgressiveFee {
 
   function getMaxDiffPercent(uint256[] memory _ethInUniswap) public view returns (uint256 maxDiffPercent) {
     uint256 len = _ethInUniswap.length;
+    uint256 minEthInUniswap = _ethInUniswap[0];
     for (uint256 i = 1; i < len; i++) {
-      uint256 diffPercent = _ethInUniswap[i].mul(1 ether).div(_ethInUniswap[0]);
+      if (_ethInUniswap[i] < minEthInUniswap) {
+        minEthInUniswap = _ethInUniswap[i];
+      }
+    }
+    for (uint256 i = 0; i < len; i++) {
+      uint256 diffPercent = _ethInUniswap[i].mul(1 ether).div(minEthInUniswap);
       diffPercent = diffPercent > 1 ether ? diffPercent - 1 ether : 1 ether - diffPercent;
       if (diffPercent > maxDiffPercent) {
         maxDiffPercent = diffPercent;
