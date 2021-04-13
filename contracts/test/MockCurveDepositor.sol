@@ -27,7 +27,7 @@ contract MockCurveDepositor is ICurveDepositor {
   }
 
   function calc_withdraw_one_coin(uint256 _tokenAmount, int128) public view override returns (uint256) {
-    return _tokenAmount.mul(rate).div(1 ether);
+    return _tokenAmount.mul(rate).div(1e30);
   }
 
   function remove_liquidity_one_coin(
@@ -37,6 +37,6 @@ contract MockCurveDepositor is ICurveDepositor {
   ) external override {
     uint256 calculated = calc_withdraw_one_coin(_tokenAmount, _i);
     require(calculated >= _minAmount, "REMOVE_MIN_AMOUNT");
-    usdc.transfer(msg.sender, calc_withdraw_one_coin(_tokenAmount, _i));
+    usdc.transfer(msg.sender, calculated);
   }
 }
