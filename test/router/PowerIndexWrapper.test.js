@@ -1,6 +1,6 @@
 const { expectRevert, time, constants, expectEvent } = require('@openzeppelin/test-helpers');
 const { buildBasicRouterConfig, buildBasicRouterArgs } = require('../helpers/builders');
-const { ether } = require('../helpers');
+const { ether, mulBN } = require('../helpers');
 const assert = require('chai').assert;
 const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
 const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
@@ -189,6 +189,20 @@ describe('PowerIndexWrapper', () => {
       await this.token2.approve(poolWrapper.address, token2Amount);
       return [token1Amount, token2Amount];
     };
+  });
+
+  it('should replacePoolTokenWithExistingPiToken with custom rate', async () => {
+    assert.equal(await pool.getBalance(this.token1.address), balances[0]);
+
+    const res = await poolController.createPiToken(this.token1.address, routerFactory.address, defaultFactoryArguments, 'W T 1', 'WT1');
+    const CreatePiToken = res.receipt.logs.filter(l => l.event === 'CreatePiToken')[0].args;
+    const router1 = await PowerIndexBasicRouter.at(CreatePiToken.router);
+    await router1.mockSetRate(ether('0.5'));
+    await router1.setPiTokenEthFee(piTokenEthFee);
+    await poolController.replacePoolTokenWithExistingPiToken(this.token1.address, CreatePiToken.piToken, {
+      value: piTokenEthFee
+    });
+    assert.equal(await pool.getBalance(CreatePiToken.piToken), mulBN(balances[0], 2));
   });
 
   it('ethFee should update correctly', async () => {
