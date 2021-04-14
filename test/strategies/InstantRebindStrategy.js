@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-const { time, expectRevert, expectEvent } = require('@openzeppelin/test-helpers');
+const { time, expectRevert, expectEvent, constants } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
 const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
 const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
@@ -224,6 +224,35 @@ describe('Instant Rebind Strategy', () => {
       });
     });
 
+    describe('setPoolController()', () => {
+      it('should allow the owner setting a new poolController', async () => {
+        const res = await strategy.setPoolController(alice, { from: minter });
+        assert.equal(await strategy.poolController(), alice);
+        expectEvent(res, 'SetPoolController', {
+          poolController: alice,
+        });
+        await expectRevert(
+          strategy.setPoolController(alice, { from: alice }),
+          'Ownable: caller is not the owner',
+        );
+      });
+    });
+
+    describe('removeApprovals()', () => {
+      it('should allow the owner removing unnecessary approvals', async () => {
+        const controller = await strategy.poolController();
+        assert.equal(await vault.allowance(strategy.address, pool.address), constants.MAX_UINT256.toString());
+        assert.equal(await vault.allowance(strategy.address, controller), constants.MAX_UINT256.toString());
+        await strategy.removeApprovals([vault.address, vault.address], [pool.address, controller], { from: minter });
+        assert.equal(await vault.allowance(strategy.address, pool.address), '0');
+        assert.equal(await vault.allowance(strategy.address, controller), '0');
+        await expectRevert(
+          strategy.removeApprovals([vault.address, vault.address], [pool.address, controller], { from: alice }),
+          'Ownable: caller is not the owner',
+        );
+      });
+    });
+
     describe('syncPoolTokens()', () => {
       it('should allow the owner syncing tokens of an existing pool', async () => {
         const crv2 = await MockERC20.new('TKN2', 'TKN2', 18, ether(1e16));
@@ -244,6 +273,36 @@ describe('Instant Rebind Strategy', () => {
         assert.sameMembers(await pool.getCurrentTokens(), expectedTokens);
 
         await expectRevert(strategy.syncPoolTokens({ from: alice }), 'Ownable: caller is not the owner');
+      });
+    });
+
+    describe('seizeERC20()', () => {
+      it('should allow the owner withdrawing any ERC20', async () => {
+        const foo = await MockERC20.new('TKN', 'TKN', 18, ether(1e16));
+        const bar = await MockERC20.new('TKN', 'TKN', 18, ether(1e16));
+        await foo.transfer(strategy.address, ether(5));
+        await bar.transfer(strategy.address, ether(4));
+
+        const res = await strategy.seizeERC20([foo.address, bar.address], [stub, stub], [ether(5), ether(4)], {
+          from: minter,
+        });
+        expectEvent(res, 'SeizeERC20', {
+          token: foo.address,
+          to: stub,
+          amount: ether(5),
+        });
+        expectEvent(res, 'SeizeERC20', {
+          token: bar.address,
+          to: stub,
+          amount: ether(4),
+        });
+        assert.equal(await foo.balanceOf(stub), ether(5));
+        assert.equal(await bar.balanceOf(stub), ether(4));
+
+        await expectRevert(
+          strategy.seizeERC20([foo.address, bar.address], [stub, stub], [ether(5), ether(4)], { from: alice }),
+          'Ownable: caller is not the owner',
+        );
       });
     });
   });

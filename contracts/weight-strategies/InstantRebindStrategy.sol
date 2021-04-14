@@ -26,6 +26,7 @@ contract InstantRebindStrategy is SinglePoolManagement, YearnFeeRefund, WeightVa
   event InstantRebind(uint256 poolCurrentTokensCount, uint256 usdcPulled, uint256 usdcRemainder);
   event UpdatePool(address[] poolTokensBefore, address[] poolTokensAfter);
   event VaultWithdrawFee(address indexed vaultToken, uint256 crvAmount);
+  event SeizeERC20(address indexed token, address indexed to, uint256 amount);
 
   event PullLiquidity(
     address indexed vaultToken,
@@ -187,6 +188,16 @@ contract InstantRebindStrategy is SinglePoolManagement, YearnFeeRefund, WeightVa
 
     for (uint256 i = 0; i < len; i++) {
       _tokens[i].approve(_tos[i], uint256(0));
+    }
+  }
+
+  function seizeERC20(address[] calldata _tokens, address[] calldata _tos, uint256[] calldata _amounts) external onlyOwner {
+    uint256 len = _tokens.length;
+    require(len == _tos.length && len == _amounts.length, "LENGTHS");
+
+    for (uint256 i = 0; i < len; i++) {
+      IERC20(_tokens[i]).transfer(_tos[i], _amounts[i]);
+      emit SeizeERC20(_tokens[i], _tos[i], _amounts[i]);
     }
   }
 
