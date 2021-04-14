@@ -321,17 +321,9 @@ contract InstantRebindStrategy is SinglePoolManagement, YearnFeeRefund, WeightVa
         uint256 usdcIn;
 
         if (constraints.useVirtualPriceEstimation) {
-          // usdcIn =
-          // (ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(
-          //    IVault(cfg.token).token()
-          // ) * crvAmount) / 1e18;
-          usdcIn =
-            (
-              ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IVault(cfg.token).token()).mul(
-                crvAmount
-              )
-            ) /
-            1e18;
+          uint256 virtualPrice = ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IVault(cfg.token).token());
+          // usdcIn = virtualPrice * crvAmount / 1e18
+          usdcIn = bmul(virtualPrice, crvAmount);
         } else {
           usdcIn = ICurveDepositor(vc.depositor).calc_withdraw_one_coin(crvAmount, int128(vc.usdcIndex));
         }
