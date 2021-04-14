@@ -4,15 +4,22 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../../interfaces/IVault.sol";
 import "./PoolManagement.sol";
 import "./SinglePoolManagement.sol";
 
-abstract contract YearnFeeRefund is SinglePoolManagement {
+abstract contract YearnFeeRefund is SinglePoolManagement, ReentrancyGuard {
   using SafeMath for uint256;
   using EnumerableSet for EnumerableSet.AddressSet;
 
-  event RefundFees(address indexed vaultToken, address from, uint256 crvAmount);
+  event RefundFees(
+    address indexed vaultToken,
+    address indexed crvToken,
+    address from,
+    uint256 crvAmount,
+    uint256 vaultAmount
+  );
 
   struct FeeToRefund {
     address vaultToken;
@@ -50,7 +57,7 @@ abstract contract YearnFeeRefund is SinglePoolManagement {
     address _refundFrom,
     address[] calldata _vaultTokens,
     uint256[] calldata _crvAmounts
-  ) external {
+  ) external nonReentrant {
     uint256 len = _vaultTokens.length;
 
     for (uint256 i = 0; i < len; i++) {
@@ -59,13 +66,21 @@ abstract contract YearnFeeRefund is SinglePoolManagement {
 
       address crvToken = IVault(vaultToken).token();
       uint256 pendingCrvAmount = fees[vaultToken];
+      uint256 crvAmount = _crvAmounts[i];
+      require(crvAmount <= pendingCrvAmount, "AMOUNT_GT_PENDING");
 
-      IERC20(crvToken).transferFrom(_refundFrom, address(this), pendingCrvAmount);
-      IERC20(crvToken).approve(vaultToken, pendingCrvAmount);
-      IVault(vaultToken).deposit(pendingCrvAmount);
-      uint256 vaultBalance = IERC20(vaultToken).balanceOf(address(this));
-      IERC20(vaultToken).transfer(pool, vaultBalance);
+      IERC20(crvToken).transferFrom(_refundFrom, address(this), crvAmount);
+
+      fees[vaultToken] = pendingCrvAmount - crvAmount;
+
+      IERC20(crvToken).approve(vaultToken, crvAmount);
+      uint256 vaultBalanceBefore = IERC20(vaultToken).balanceOf(address(this));
+      IVault(vaultToken).deposit(crvAmount);
+      uint256 vaultReceived = IERC20(vaultToken).balanceOf(address(this)).sub(vaultBalanceBefore);
+      IERC20(vaultToken).transfer(pool, vaultReceived);
       BPoolInterface(pool).gulp(vaultToken);
+
+      emit RefundFees(vaultToken, crvToken, _refundFrom, crvAmount, vaultReceived);
     }
   }
 }

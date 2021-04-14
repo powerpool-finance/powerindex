@@ -191,7 +191,11 @@ contract InstantRebindStrategy is SinglePoolManagement, YearnFeeRefund, WeightVa
     }
   }
 
-  function seizeERC20(address[] calldata _tokens, address[] calldata _tos, uint256[] calldata _amounts) external onlyOwner {
+  function seizeERC20(
+    address[] calldata _tokens,
+    address[] calldata _tos,
+    uint256[] calldata _amounts
+  ) external onlyOwner {
     uint256 len = _tokens.length;
     require(len == _tos.length && len == _amounts.length, "LENGTHS");
 
@@ -292,8 +296,9 @@ contract InstantRebindStrategy is SinglePoolManagement, YearnFeeRefund, WeightVa
 
         // 2nd step. Vault.withdraw()
         mem.crvExpected = (mem.ycrvBalance * IVault(cfg.token).getPricePerFullShare()) / 1e18;
+        uint256 crvBefore = IERC20(mem.crvToken).balanceOf(address(this));
         IVault(cfg.token).withdraw(mem.ycrvBalance);
-        mem.crvActual = IERC20(mem.crvToken).balanceOf(address(this));
+        mem.crvActual = IERC20(mem.crvToken).balanceOf(address(this)).sub(crvBefore);
 
         // 3rd step. CurvePool.remove_liquidity_one_coin()
         mem.usdcBefore = USDC.balanceOf(address(this));
@@ -321,7 +326,8 @@ contract InstantRebindStrategy is SinglePoolManagement, YearnFeeRefund, WeightVa
         uint256 usdcIn;
 
         if (constraints.useVirtualPriceEstimation) {
-          uint256 virtualPrice = ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IVault(cfg.token).token());
+          uint256 virtualPrice =
+            ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IVault(cfg.token).token());
           // usdcIn = virtualPrice * crvAmount / 1e18
           usdcIn = bmul(virtualPrice, crvAmount);
         } else {

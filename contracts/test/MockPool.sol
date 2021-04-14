@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/IERC20.so
 
 contract MockPool {
   address[] internal currentTokens;
+
   constructor() public {
     currentTokens.push(address(1));
     currentTokens.push(address(2));

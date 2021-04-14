@@ -2,9 +2,11 @@
 
 pragma solidity ^0.6.12;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MockYearnVaultController {
+  using SafeMath for uint256;
   mapping(address => uint256) public balanceOf;
   uint256 public withdrawNominator = 1;
   uint256 public withdrawDenominator = 1;
@@ -19,6 +21,8 @@ contract MockYearnVaultController {
   }
 
   function withdraw(address _crvToken, uint256 _amount) external {
-    IERC20(_crvToken).transfer(msg.sender, (_amount * withdrawNominator) / withdrawDenominator);
+    uint256 calculated = (_amount * withdrawNominator) / withdrawDenominator;
+    balanceOf[_crvToken] = balanceOf[_crvToken].sub(calculated);
+    IERC20(_crvToken).transfer(msg.sender, calculated);
   }
 }
