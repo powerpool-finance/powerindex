@@ -322,19 +322,18 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
 
       await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('20000').toString(10)], { from: minter });
 
-      let bobBalanceBefore = await web3.eth.getBalance(bob);
-
       const {
         tokenAmountInAfterFee: poolOutAfterFee,
         tokenAmountFee: poolOutFee,
       } = await pool.calcAmountWithCommunityFee(swapEthToPiptInputs.poolOut, communityJoinFee, ethPiptSwap.address);
 
       await expectRevert(
-        ethPiptSwap.swapEthToPipt(slippage, maxDiff, addBN(swapEthToPiptInputs.poolOut, '1'), { from: bob, value: ethToSwap, gasPrice }),
+        ethPiptSwap.swapEthToPipt(slippage, addBN(swapEthToPiptInputs.poolOut, '1'), maxDiff, { from: bob, value: ethToSwap, gasPrice }),
         'MIN_POOL_AMOUNT_OUT',
       );
+      let bobBalanceBefore = await web3.eth.getBalance(bob);
 
-      let res = await ethPiptSwap.swapEthToPipt(slippage, poolOutAfterFee, maxDiff, { from: bob, value: ethToSwap, gasPrice });
+      let res = await ethPiptSwap.swapEthToPipt(slippage, swapEthToPiptInputs.poolOut, maxDiff, { from: bob, value: ethToSwap, gasPrice });
 
       let weiUsed = res.receipt.gasUsed * gasPrice;
       console.log('        swapEthToPipt gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
@@ -557,7 +556,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
       );
     })
 
-    describe.only('swapErc20ToPipt with piToken and ethFee should work properly', async () => {
+    describe('swapErc20ToPipt with piToken and ethFee should work properly', async () => {
       let erc20PiptSwap, piTokenTotalEthFee;
       const piTokenEthFee = ether(0.0001).toString();
 
@@ -613,10 +612,6 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         await poolWrapper.setController(poolController.address);
         await pool.setController(poolController.address);
 
-        console.log('1 swapErc20ToPiptInputs.ethInUniswap', swapErc20ToPiptInputs.ethInUniswap)
-        console.log('1 swapEthToPiptInputs.maxDiffPercent', fromEther(await erc20PiptSwap.getMaxDiffPercent(swapErc20ToPiptInputs.ethInUniswap)));
-
-        console.log('balance before', await erc20PiptSwap.getPiptTokenBalance(balancerTokens[0].address));
         let res = await poolController.createPiToken(balancerTokens[0].address, routerFactory.address, defaultFactoryArguments, 'W T 1', 'WT1');
         let CreatePiToken = res.receipt.logs.filter(l => l.event === 'CreatePiToken')[0].args;
         const router1 = await PowerIndexBasicRouter.at(CreatePiToken.router);
@@ -626,10 +621,6 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           value: piTokenEthFee
         });
 
-        console.log('piToken balance', await pool.getBalance(CreatePiToken.piToken));
-        console.log('balance after', await erc20PiptSwap.getPiptTokenBalance(balancerTokens[0].address));
-        console.log('balance after 2', await poolWrapper.getBalance(balancerTokens[0].address));
-
         swapErc20ToPiptInputs = await erc20PiptSwap.calcSwapErc20ToPiptInputs(
           tokenAddress,
           amountToSwap,
@@ -637,8 +628,6 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           slippage,
           true,
         );
-        console.log('2 swapErc20ToPiptInputs.ethInUniswap', swapErc20ToPiptInputs.ethInUniswap)
-        console.log('2 swapEthToPiptInputs.maxDiffPercent', fromEther(await erc20PiptSwap.getMaxDiffPercent(swapErc20ToPiptInputs.ethInUniswap)));
         res = await poolController.createPiToken(balancerTokens[1].address, routerFactory.address, defaultFactoryArguments, 'W T 2', 'WT2');
         CreatePiToken = res.receipt.logs.filter(l => l.event === 'CreatePiToken')[0].args;
         const router2 = await PowerIndexBasicRouter.at(CreatePiToken.router);
@@ -667,8 +656,6 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           slippage,
           true,
         );
-        console.log('3 swapErc20ToPiptInputs.ethInUniswap', swapErc20ToPiptInputs.ethInUniswap)
-        console.log('3 swapEthToPiptInputs.maxDiffPercent', fromEther(await erc20PiptSwap.getMaxDiffPercent(swapErc20ToPiptInputs.ethInUniswap)));
       });
 
       it('swapEthToPipt should work properly', async () => {
@@ -686,14 +673,13 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           slippage,
         );
 
-        let bobBalanceBefore = await web3.eth.getBalance(bob);
-
         const {
           tokenAmountInAfterFee: poolOutAfterFee,
           tokenAmountFee: poolOutFee,
         } = await pool.calcAmountWithCommunityFee(swapEthToPiptInputs.poolOut, communityJoinFee, erc20PiptSwap.address);
 
         await expectRevert(erc20PiptSwap.swapEthToPipt(slippage, addBN(swapEthToPiptInputs.poolOut, '1'), maxDiff, {from: bob, value: ethToSwap, gasPrice}), 'MIN_POOL_AMOUNT_OUT')
+        let bobBalanceBefore = await web3.eth.getBalance(bob);
         let res = await erc20PiptSwap.swapEthToPipt(slippage, swapEthToPiptInputs.poolOut, maxDiff, {from: bob, value: ethToSwap, gasPrice});
 
         let weiUsed = res.receipt.gasUsed * gasPrice;
@@ -780,8 +766,6 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           } = await pool.calcAmountWithCommunityFee(swapErc20ToPiptInputs.poolOut, communityJoinFee, erc20PiptSwap.address);
 
           await usdToken.approve(erc20PiptSwap.address, amountToSwap, {from: bob});
-          console.log('swapErc20ToPiptInputs.ethInUniswap', swapErc20ToPiptInputs.ethInUniswap)
-          console.log('swapEthToPiptInputs.maxDiffPercent', fromEther(await erc20PiptSwap.getMaxDiffPercent(swapErc20ToPiptInputs.ethInUniswap)));
 
           let res = await erc20PiptSwap.swapErc20ToPipt(tokenAddress, amountToSwap, slippage, swapErc20ToPiptInputs.poolOut, maxDiff, {from: bob, gasPrice});
           let weiUsed = res.receipt.gasUsed * gasPrice;
