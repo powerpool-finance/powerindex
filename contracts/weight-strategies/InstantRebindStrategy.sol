@@ -6,6 +6,7 @@ pragma experimental ABIEncoderV2;
 import "@powerpool/poweroracle/contracts/interfaces/IPowerPoke.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../interfaces/IVault.sol";
 import "../interfaces/ICurveDepositor.sol";
@@ -20,6 +21,7 @@ import "./blocks/SinglePoolManagement.sol";
 
 contract InstantRebindStrategy is SinglePoolManagement, YearnFeeRefund, WeightValueAbstract {
   using SafeMath for uint256;
+  using SafeERC20 for IERC20;
 
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
 
@@ -200,7 +202,7 @@ contract InstantRebindStrategy is SinglePoolManagement, YearnFeeRefund, WeightVa
     require(len == _tos.length && len == _amounts.length, "LENGTHS");
 
     for (uint256 i = 0; i < len; i++) {
-      IERC20(_tokens[i]).transfer(_tos[i], _amounts[i]);
+      IERC20(_tokens[i]).safeTransfer(_tos[i], _amounts[i]);
       emit SeizeERC20(_tokens[i], _tos[i], _amounts[i]);
     }
   }

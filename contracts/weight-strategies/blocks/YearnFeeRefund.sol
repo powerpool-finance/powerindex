@@ -11,6 +11,7 @@ import "./SinglePoolManagement.sol";
 
 abstract contract YearnFeeRefund is SinglePoolManagement, ReentrancyGuard {
   using SafeMath for uint256;
+  using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
 
   event RefundFees(
@@ -69,7 +70,7 @@ abstract contract YearnFeeRefund is SinglePoolManagement, ReentrancyGuard {
       uint256 crvAmount = _crvAmounts[i];
       require(crvAmount <= pendingCrvAmount, "AMOUNT_GT_PENDING");
 
-      IERC20(crvToken).transferFrom(_refundFrom, address(this), crvAmount);
+      IERC20(crvToken).safeTransferFrom(_refundFrom, address(this), crvAmount);
 
       fees[vaultToken] = pendingCrvAmount - crvAmount;
 
@@ -77,7 +78,7 @@ abstract contract YearnFeeRefund is SinglePoolManagement, ReentrancyGuard {
       uint256 vaultBalanceBefore = IERC20(vaultToken).balanceOf(address(this));
       IVault(vaultToken).deposit(crvAmount);
       uint256 vaultReceived = IERC20(vaultToken).balanceOf(address(this)).sub(vaultBalanceBefore);
-      IERC20(vaultToken).transfer(pool, vaultReceived);
+      IERC20(vaultToken).safeTransfer(pool, vaultReceived);
       BPoolInterface(pool).gulp(vaultToken);
 
       emit RefundFees(vaultToken, crvToken, _refundFrom, crvAmount, vaultReceived);
