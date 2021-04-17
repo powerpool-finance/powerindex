@@ -17,6 +17,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     address indexed underlyingToken,
     address indexed piToken,
     uint256 balance,
+    uint256 piTokenBalance,
     uint256 denormalizedWeight
   );
 
@@ -170,16 +171,16 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     pool.unbind(_underlyingToken);
 
     IERC20(_underlyingToken).approve(address(_piToken), balance);
-    _piToken.deposit{ value: msg.value }(balance);
+    uint256 piTokenBalance = _piToken.deposit{ value: msg.value }(balance);
 
-    _piToken.approve(address(pool), balance);
-    _bindNewToken(address(_piToken), balance, denormalizedWeight);
+    _piToken.approve(address(pool), piTokenBalance);
+    _bindNewToken(address(_piToken), piTokenBalance, denormalizedWeight);
 
     if (address(poolWrapper) != address(0)) {
       poolWrapper.setPiTokenForUnderlying(_underlyingToken, address(_piToken));
     }
 
-    emit ReplacePoolTokenWithPiToken(_underlyingToken, address(_piToken), balance, denormalizedWeight);
+    emit ReplacePoolTokenWithPiToken(_underlyingToken, address(_piToken), balance, piTokenBalance, denormalizedWeight);
   }
 
   function _bindNewToken(
