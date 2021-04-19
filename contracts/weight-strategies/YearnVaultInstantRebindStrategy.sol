@@ -127,7 +127,6 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
     __Ownable_init();
 
     __SinglePoolManagement_init(_poolController);
-    _updatePool(address(0), _poolController);
 
     powerPoke = IPowerPoke(_powerPoke);
     curvePoolRegistry = ICurvePoolRegistry(_curvePoolRegistry);

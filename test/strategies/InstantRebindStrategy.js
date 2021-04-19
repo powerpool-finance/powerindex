@@ -101,6 +101,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
       await poke.addCredit(strategy.address, ether(30000), { from: minter });
       await poke.setBonusPlan(strategy.address, 1, true, 20, 17520000, 100 * 1000, { from: strategyOwner });
       await poke.setMinimalDeposit(strategy.address, slasherDeposit, { from: strategyOwner });
+      await strategy.syncPoolTokens();
     };
 
     this.makePowerIndexPool = async (_tokens, _balances, _totalDenormalizedWeight = 50, _customWeights = []) => {
@@ -174,6 +175,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
         ],
         { proxyAdminOwner: minter },
       );
+      await strategy.syncPoolTokens();
     });
 
     describe('setCurvePoolRegistry()', () => {

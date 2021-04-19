@@ -60,6 +60,7 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
       cfg.usdcIndex,
     );
   }
+  await weightStrategy.syncPoolTokens();
 
   await weightStrategy.transferOwnership(admin);
 
