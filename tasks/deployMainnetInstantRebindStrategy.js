@@ -7,12 +7,12 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
   const IVault = artifacts.require('IVault');
-  const InstantRebindStrategy = artifacts.require('InstantRebindStrategy');
+  const YearnVaultInstantRebindStrategy = artifacts.require('YearnVaultInstantRebindStrategy');
   const ICurvePoolRegistry = artifacts.require('ICurvePoolRegistry');
   const PowerPoke = await artifacts.require('PowerPoke');
   const ERC20 = await artifacts.require('@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20');
   const { web3 } = PowerIndexPoolController;
-  InstantRebindStrategy.numberFormat = 'String';
+  YearnVaultInstantRebindStrategy.numberFormat = 'String';
   ICurvePoolRegistry.numberFormat = 'String';
 
   const { toWei } = web3.utils;
@@ -32,7 +32,7 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   const curePoolRegistryAddress = '0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c';
 
   const weightStrategy =  await deployProxied(
-    InstantRebindStrategy,
+    YearnVaultInstantRebindStrategy,
     [poolAddress, usdcAddress],
     [powerPokeAddress, curePoolRegistryAddress, poolControllerAddress, {
       minUSDCRemainder: '20',

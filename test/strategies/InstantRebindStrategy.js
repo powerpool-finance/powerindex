@@ -11,7 +11,7 @@ const WETH = artifacts.require('MockWETH');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const ProxyFactory = artifacts.require('ProxyFactory');
-const MockInstantRebindStrategy = artifacts.require('MockInstantRebindStrategy');
+const MockYearnVaultInstantRebindStrategy = artifacts.require('MockYearnVaultInstantRebindStrategy');
 const MockOracle = artifacts.require('MockOracle');
 const PowerPoke = artifacts.require('PowerPoke');
 const MockFastGasOracle = artifacts.require('MockFastGasOracle');
@@ -36,7 +36,7 @@ MockCurveDepositor2.numberFormat = 'String';
 MockCurveDepositor3.numberFormat = 'String';
 MockCurveDepositor4.numberFormat = 'String';
 MockCurvePoolRegistry.numberFormat = 'String';
-MockInstantRebindStrategy.numberFormat = 'String';
+MockYearnVaultInstantRebindStrategy.numberFormat = 'String';
 
 const { web3 } = PowerIndexPoolFactory;
 
@@ -53,7 +53,7 @@ async function getTimestamp(shift = 0) {
   return currentTimestamp + shift;
 }
 
-describe('Instant Rebind Strategy', () => {
+describe('Yearn Vault Instant Rebind Strategy', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const swapFee = ether('0.0001');
   const communitySwapFee = ether('0.001');
@@ -157,7 +157,7 @@ describe('Instant Rebind Strategy', () => {
       pool = await MockPool.new();
       await pool.setCurrentTokens([vault.address]);
       strategy = await deployProxied(
-        MockInstantRebindStrategy,
+        MockYearnVaultInstantRebindStrategy,
         // [pool, usdc]
         [pool.address, stub],
         [
@@ -415,7 +415,7 @@ describe('Instant Rebind Strategy', () => {
         poolController = await PowerIndexPoolController.new(pool.address, zeroAddress, zeroAddress, zeroAddress);
 
         weightStrategy = await deployProxied(
-          MockInstantRebindStrategy,
+          MockYearnVaultInstantRebindStrategy,
           [pool.address, usdc.address],
           [
             poke.address,

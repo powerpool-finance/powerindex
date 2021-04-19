@@ -19,7 +19,7 @@ import "./blocks/PoolManagement.sol";
 import "./blocks/YearnFeeRefund.sol";
 import "./blocks/SinglePoolManagement.sol";
 
-contract InstantRebindStrategy is SinglePoolManagement, YearnFeeRefund, WeightValueAbstract {
+contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund, WeightValueAbstract {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
