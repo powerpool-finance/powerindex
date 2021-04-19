@@ -6,8 +6,9 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./powerindex-router/PowerIndexWrappedController.sol";
+import "./interfaces/PowerIndexPoolControllerInterface.sol";
 
-contract PowerIndexPoolController is PowerIndexWrappedController {
+contract PowerIndexPoolController is PowerIndexPoolControllerInterface, PowerIndexWrappedController {
   using SafeERC20 for IERC20;
 
   /* ==========  Storage  ========== */
@@ -220,7 +221,7 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     uint256 balance,
     uint256 denorm,
     uint256 deposit
-  ) external onlyWeightsStrategy {
+  ) external override onlyWeightsStrategy {
     uint256 balanceBefore = IERC20(token).balanceOf(address(this));
 
     IERC20(token).safeTransferFrom(msg.sender, address(this), deposit);
@@ -235,7 +236,7 @@ contract PowerIndexPoolController is PowerIndexWrappedController {
     address token,
     uint256 balance,
     uint256 denorm
-  ) external onlyWeightsStrategy {
+  ) external override onlyWeightsStrategy {
     uint256 balanceBefore = IERC20(token).balanceOf(address(this));
     pool.rebind(token, balance, denorm);
     uint256 balanceAfter = IERC20(token).balanceOf(address(this));

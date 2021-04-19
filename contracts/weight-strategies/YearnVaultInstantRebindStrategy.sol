@@ -5,17 +5,16 @@ pragma experimental ABIEncoderV2;
 
 import "@powerpool/poweroracle/contracts/interfaces/IPowerPoke.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../interfaces/IVault.sol";
+import "../interfaces/PowerIndexPoolControllerInterface.sol";
 import "../interfaces/ICurveDepositor.sol";
 import "../interfaces/ICurveDepositor2.sol";
 import "../interfaces/ICurveDepositor3.sol";
 import "../interfaces/ICurveDepositor4.sol";
 import "../interfaces/ICurvePoolRegistry.sol";
 import "./WeightValueAbstract.sol";
-import "./blocks/PoolManagement.sol";
 import "./blocks/YearnFeeRefund.sol";
 import "./blocks/SinglePoolManagement.sol";
 
@@ -292,7 +291,11 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
         mem.yDiff = (cfg.oldBalance - cfg.newBalance);
 
         // 1st step. Rebind
-        PowerIndexPoolController(poolController_).rebindByStrategyRemove(cfg.token, cfg.newBalance, cfg.newWeight);
+        PowerIndexPoolControllerInterface(poolController_).rebindByStrategyRemove(
+          cfg.token,
+          cfg.newBalance,
+          cfg.newWeight
+        );
         mem.ycrvBalance = IERC20(cfg.token).balanceOf(address(this));
 
         // 2nd step. Vault.withdraw()
@@ -362,7 +365,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
 
         // uint256 newBalance = IVault(cfg.token).balanceOf(address(this)) + BPoolInterface(_pool).getBalance(cfg.token)
         uint256 newBalance = IVault(cfg.token).balanceOf(address(this)).add(BPoolInterface(pool).getBalance(cfg.token));
-        PowerIndexPoolController(poolController_).rebindByStrategyAdd(
+        PowerIndexPoolControllerInterface(poolController_).rebindByStrategyAdd(
           cfg.token,
           newBalance,
           cfg.newWeight,

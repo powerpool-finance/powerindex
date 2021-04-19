@@ -5,8 +5,10 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "../../interfaces/BPoolInterface.sol";
 import "../../interfaces/IVault.sol";
-import "./PoolManagement.sol";
 import "./SinglePoolManagement.sol";
 
 abstract contract YearnFeeRefund is SinglePoolManagement, ReentrancyGuard {
