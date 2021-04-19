@@ -921,6 +921,29 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res[1].crvToken, token3.address);
           assert.equal(res[1].crvAmount, ether('67565.606276522799369245'));
         });
+
+        it('should deny 0 amounts', async () => {
+          await weightStrategy.mockPoke();
+
+          amount3 = (BigInt(ether('56438.206081079793598276'))).toString();
+          amount4 = '0';
+          await token3.approve(weightStrategy.address, amount3, { from: alice });
+          await token4.approve(weightStrategy.address, amount4, { from: alice });
+          await token3.transfer(alice, amount3);
+          await token4.transfer(alice, amount4);
+
+          await expectRevert(
+            weightStrategy.refundFees(alice, [vault3.address, vault4.address], [amount3, amount4], { from: alice }),
+            "AMOUNT_IS_0"
+          );
+        });
+
+        it('should deny different lengths arg arrays', async () => {
+          await expectRevert(
+            weightStrategy.refundFees(alice, [vault3.address, vault4.address], [amount3], { from: alice }),
+            "REFUND_LENGTHS_MISMATCH"
+          );
+        });
       });
     });
   });

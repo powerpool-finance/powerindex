@@ -60,6 +60,7 @@ abstract contract YearnFeeRefund is SinglePoolManagement, ReentrancyGuard {
     uint256[] calldata _crvAmounts
   ) external nonReentrant {
     uint256 len = _vaultTokens.length;
+    require(len == _crvAmounts.length, "REFUND_LENGTHS_MISMATCH");
 
     for (uint256 i = 0; i < len; i++) {
       address vaultToken = _vaultTokens[i];
@@ -68,7 +69,9 @@ abstract contract YearnFeeRefund is SinglePoolManagement, ReentrancyGuard {
       address crvToken = IVault(vaultToken).token();
       uint256 pendingCrvAmount = fees[vaultToken];
       uint256 crvAmount = _crvAmounts[i];
+
       require(crvAmount <= pendingCrvAmount, "AMOUNT_GT_PENDING");
+      require(crvAmount > 0, "AMOUNT_IS_0");
 
       IERC20(crvToken).safeTransferFrom(_refundFrom, address(this), crvAmount);
 
