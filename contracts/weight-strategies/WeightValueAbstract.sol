@@ -57,7 +57,7 @@ abstract contract WeightValueAbstract is BNum, OwnableUpgradeSafe {
       uint256[] memory newTokensValues
     )
   {
-    (weightsChange, lenToPush, newTokensValues) = computeWeightsChange(
+    (weightsChange, lenToPush, newTokensValues, ) = computeWeightsChange(
       _pool,
       _tokens,
       _piTokens,
@@ -83,16 +83,17 @@ abstract contract WeightValueAbstract is BNum, OwnableUpgradeSafe {
     returns (
       uint256[3][] memory weightsChange,
       uint256 lenToPush,
-      uint256[] memory newTokenValues
+      uint256[] memory newTokenValues,
+      uint256 newTokenValueSum
     )
   {
     uint256 len = _tokens.length;
     newTokenValues = new uint256[](len);
 
-    uint256 newTokenValueSum;
     for (uint256 i = 0; i < len; i++) {
-      newTokenValues[i] = getTokenValue(_pool, _tokens[i]);
-      newTokenValueSum = badd(newTokenValueSum, newTokenValues[i]);
+      uint256 value = getTokenValue(_pool, _tokens[i]);
+      newTokenValues[i] = value;
+      newTokenValueSum = badd(newTokenValueSum, value);
     }
 
     weightsChange = new uint256[3][](len);
