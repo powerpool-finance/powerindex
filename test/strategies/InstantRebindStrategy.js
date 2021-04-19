@@ -934,14 +934,14 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
 
           await expectRevert(
             weightStrategy.refundFees(alice, [vault3.address, vault4.address], [amount3, amount4], { from: alice }),
-            "AMOUNT_IS_0"
+            'AMOUNT_IS_0'
           );
         });
 
         it('should deny different lengths arg arrays', async () => {
           await expectRevert(
             weightStrategy.refundFees(alice, [vault3.address, vault4.address], [amount3], { from: alice }),
-            "REFUND_LENGTHS_MISMATCH"
+            'REFUND_LENGTHS_MISMATCH'
           );
         });
       });
