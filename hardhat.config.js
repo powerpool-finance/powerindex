@@ -20,6 +20,7 @@ require('./tasks/deployMainnetAssy');
 require('./tasks/deployMainnetYla');
 require('./tasks/rebindMCapWeights');
 require('./tasks/deployMainnetWeightsStrategy');
+require('./tasks/deployMainnetInstantRebindStrategy');
 require('./tasks/testVestedLpMiningProxy');
 require('./tasks/testVestedLpMiningPool');
 require('./tasks/deployIndicesSupplyRedeemZap');

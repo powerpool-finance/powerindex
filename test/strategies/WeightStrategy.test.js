@@ -25,8 +25,15 @@ const MockProxyCall = artifacts.require('MockProxyCall');
 const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRouterFactory');
+const MockCurveDepositor2 = artifacts.require('MockCurveDepositor2');
+const MockCurveDepositor3 = artifacts.require('MockCurveDepositor3');
+const MockCurveDepositor4 = artifacts.require('MockCurveDepositor4');
+const MockYearnVaultV1 = artifacts.require('MockYearnVaultV1');
+const MockYearnVaultController = artifacts.require('MockYearnVaultController');
+const MockCurvePoolRegistry = artifacts.require('MockCurvePoolRegistry');
 const ethers = require('ethers');
 const pIteration = require('p-iteration');
+const { deployProxied, gwei } = require('../helpers');
 
 WETH.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
@@ -35,11 +42,16 @@ UniswapV2Router02.numberFormat = 'String';
 MCapWeightStrategy.numberFormat = 'String';
 PowerIndexPool.numberFormat = 'String';
 PowerPoke.numberFormat = 'String';
+MockYearnVaultV1.numberFormat = 'String';
+MockYearnVaultController.numberFormat = 'String';
+MockCurveDepositor2.numberFormat = 'String';
+MockCurveDepositor3.numberFormat = 'String';
+MockCurveDepositor4.numberFormat = 'String';
+MockCurvePoolRegistry.numberFormat = 'String';
 
 const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
 
-const { deployProxied, gwei } = require('../helpers');
 const {buildBasicRouterConfig, buildBasicRouterArgs} = require('../helpers/builders');
 
 function ether(val) {
@@ -122,23 +134,25 @@ describe('WeightStrategy', () => {
       await pool.setController(poolController.address);
       await weightStrategy.addPool(pool.address, poolController.address, zeroAddress);
       await poolController.setWeightsStrategy(weightStrategy.address);
-
-      await poke.addClient(weightStrategy.address, weightStrategyOwner, true, gwei(300), pokePeriod, pokePeriod * 2, { from: minter });
-      await this.cvpToken.approve(poke.address, ether(30000), { from: minter })
-      await poke.addCredit(weightStrategy.address, ether(30000), { from: minter });
-      await poke.setBonusPlan(weightStrategy.address, 1,  true, 20, 17520000, 100 * 1000, { from: weightStrategyOwner });
-
-      await poke.setMinimalDeposit(weightStrategy.address, slasherDeposit, { from: weightStrategyOwner });
+      await this.initStrategyPoker(weightStrategy, pool, poolController, poke);
     }
 
-    this.makePowerIndexPool = async (_tokens, _balances) => {
+    this.initStrategyPoker = async (strategy, pool, poolController, poke) => {
+      await poke.addClient(strategy.address, weightStrategyOwner, true, gwei(300), pokePeriod, pokePeriod * 2, { from: minter });
+      await this.cvpToken.approve(poke.address, ether(30000), { from: minter })
+      await poke.addCredit(strategy.address, ether(30000), { from: minter });
+      await poke.setBonusPlan(strategy.address, 1,  true, 20, 17520000, 100 * 1000, { from: weightStrategyOwner });
+      await poke.setMinimalDeposit(strategy.address, slasherDeposit, { from: weightStrategyOwner });
+    }
+
+    this.makePowerIndexPool = async (_tokens, _balances, _totalDenormalizedWeight = 50, _customWeights = []) => {
       const fromTimestamp = await getTimestamp(100);
       const targetTimestamp = await getTimestamp(100 + 60 * 60 * 24 * 5);
       for (let i = 0; i < _tokens.length; i++) {
         await _tokens[i].approve(this.bActions.address, '0x' + 'f'.repeat(64));
       }
 
-      const weightPart = 50 / _tokens.length;
+      const weightPart = _totalDenormalizedWeight / _tokens.length;
       const minWeightPerSecond = ether('0');
       const maxWeightPerSecond = ether('0.1');
 
@@ -159,7 +173,7 @@ describe('WeightStrategy', () => {
         _tokens.map((t, i) => ({
           token: t.address,
           balance: _balances[i],
-          targetDenorm: ether(weightPart),
+          targetDenorm: _customWeights && _customWeights.length > 0 ? _customWeights[i] : ether(weightPart),
           fromTimestamp: fromTimestamp.toString(),
           targetTimestamp: targetTimestamp.toString()
         })),

@@ -18,10 +18,10 @@ const ProxyFactory = artifacts.require('ProxyFactory');
 const IndicesSupplyRedeemZap = artifacts.require('IndicesSupplyRedeemZap');
 const MockPoke = artifacts.require('MockPoke');
 const MockVault = artifacts.require('MockVault');
-const MockVaultDepositor2 = artifacts.require('MockVaultDepositor2');
-const MockVaultDepositor3 = artifacts.require('MockVaultDepositor3');
-const MockVaultDepositor4 = artifacts.require('MockVaultDepositor4');
-const MockVaultRegistry = artifacts.require('MockVaultRegistry');
+const MockCurveDepositor2 = artifacts.require('MockCurveDepositor2');
+const MockCurveDepositor3 = artifacts.require('MockCurveDepositor3');
+const MockCurveDepositor4 = artifacts.require('MockCurveDepositor4');
+const MockCurvePoolRegistry = artifacts.require('MockCurvePoolRegistry');
 
 WETH.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
@@ -642,20 +642,20 @@ describe('IndicesSupplyRedeemZap', () => {
       bPoolBalances = [];
       const vaultsData = JSON.parse(fs.readFileSync('data/vaultsData.json', { encoding: 'utf8' }));
 
-      usdc = await MockERC20.new('USDC', 'USDC', '18', ether('50000000'));
+      usdc = await MockERC20.new('USDC', 'USDC', '6', mwei('50000000'));
 
-      vaultRegistry = await MockVaultRegistry.new();
+      vaultRegistry = await MockCurvePoolRegistry.new();
       for (let i = 0; i < vaultsData.length; i++) {
         const v = vaultsData[i];
         const lpToken = await MockERC20.new('', '', '18', v.totalSupply);
         const vault = await MockVault.new(lpToken.address, v.usdtValue, v.totalSupply);
         let depositor;
         if (v.config.amountsLength === 2) {
-          depositor = await MockVaultDepositor2.new(lpToken.address, usdc.address, v.config.usdcIndex, v.usdcToLpRate);
+          depositor = await MockCurveDepositor2.new(lpToken.address, usdc.address, v.config.usdcIndex, v.usdcToLpRate);
         } else if (v.config.amountsLength === 3) {
-          depositor = await MockVaultDepositor3.new(lpToken.address, usdc.address, v.config.usdcIndex, v.usdcToLpRate);
+          depositor = await MockCurveDepositor3.new(lpToken.address, usdc.address, v.config.usdcIndex, v.usdcToLpRate);
         } else if (v.config.amountsLength === 4) {
-          depositor = await MockVaultDepositor4.new(lpToken.address, usdc.address, v.config.usdcIndex, v.usdcToLpRate);
+          depositor = await MockCurveDepositor4.new(lpToken.address, usdc.address, v.config.usdcIndex, v.usdcToLpRate);
         }
         await lpToken.transfer(depositor.address, v.totalSupply);
         await vaultRegistry.set_virtual_price(lpToken.address, v.usdcToLpRate);

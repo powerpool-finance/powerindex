@@ -11,7 +11,7 @@ interface IVault {
 
   function getPricePerFullShare() external view returns (uint256);
 
-  function deposit(uint256 _amount) external virtual;
+  function deposit(uint256 _amount) external;
 
-  function withdraw(uint256 _amount) external virtual;
+  function withdraw(uint256 _amount) external;
 }

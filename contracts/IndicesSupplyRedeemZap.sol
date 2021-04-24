@@ -10,11 +10,11 @@ import "@powerpool/poweroracle/contracts/interfaces/IPowerPoke.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./interfaces/PowerIndexPoolInterface.sol";
 import "./interfaces/TokenInterface.sol";
-import "./interfaces/IVaultDepositor2.sol";
-import "./interfaces/IVaultDepositor3.sol";
-import "./interfaces/IVaultDepositor4.sol";
+import "./interfaces/ICurveDepositor2.sol";
+import "./interfaces/ICurveDepositor3.sol";
+import "./interfaces/ICurveDepositor4.sol";
 import "./interfaces/IVault.sol";
-import "./interfaces/IVaultRegistry.sol";
+import "./interfaces/ICurvePoolRegistry.sol";
 import "./interfaces/IErc20PiptSwap.sol";
 import "./interfaces/IErc20VaultPoolSwap.sol";
 
