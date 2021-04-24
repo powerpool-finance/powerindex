@@ -38,10 +38,6 @@ function ether(val) {
   return web3.utils.toWei(val.toString(), 'ether');
 }
 
-function fromEther(val) {
-  return web3.utils.fromWei(val.toString(), 'ether');
-}
-
 async function getTimestamp(shift = 0) {
   const currentTimestamp = (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp;
   return currentTimestamp + shift;
@@ -590,19 +586,6 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           {from: minter},
         );
 
-        const {token: usdToken} = tokenBySymbol['USDC'];
-
-        const tokenAddress = usdToken.address;
-        const amountToSwap = (100 * 10 ** 6).toString(10);
-        const slippage = ether('0.02');
-
-        let swapErc20ToPiptInputs = await erc20PiptSwap.calcSwapErc20ToPiptInputs(
-          tokenAddress,
-          amountToSwap,
-          await pool.getCurrentTokens(),
-          slippage,
-          true,
-        );
         const piTokenFactory = await WrappedPiErc20Factory.new();
         const routerFactory = await BasicPowerIndexRouterFactory.new();
         const poolController = await PowerIndexPoolController.new(pool.address, poolWrapper.address, piTokenFactory.address, zeroAddress);
@@ -621,13 +604,6 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           value: piTokenEthFee
         });
 
-        swapErc20ToPiptInputs = await erc20PiptSwap.calcSwapErc20ToPiptInputs(
-          tokenAddress,
-          amountToSwap,
-          await erc20PiptSwap.getPiptTokens(),
-          slippage,
-          true,
-        );
         res = await poolController.createPiToken(balancerTokens[1].address, routerFactory.address, defaultFactoryArguments, 'W T 2', 'WT2');
         CreatePiToken = res.receipt.logs.filter(l => l.event === 'CreatePiToken')[0].args;
         const router2 = await PowerIndexBasicRouter.at(CreatePiToken.router);
@@ -648,14 +624,6 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         assert.sameMembers(balancerTokens.map(t => t.address), await erc20PiptSwap.getPiptTokens());
 
         await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('20000').toString(10)], {from: minter});
-
-        swapErc20ToPiptInputs = await erc20PiptSwap.calcSwapErc20ToPiptInputs(
-          tokenAddress,
-          amountToSwap,
-          await erc20PiptSwap.getPiptTokens(),
-          slippage,
-          true,
-        );
       });
 
       it('swapEthToPipt should work properly', async () => {
