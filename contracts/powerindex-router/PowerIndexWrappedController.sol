@@ -83,7 +83,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
    * @param _routerFactory Router factory, to creating router by buildRouter function.
    * @param _routerArgs Router args, depends on router implementation.
    * @param _name Name of piToken.
-   * @param _name Symbol of piToken.
+   * @param _symbol Symbol of piToken.
    */
   function createPiToken(
     address _underlyingToken,
@@ -101,7 +101,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
    * @param _routerFactory Router factory, to creating router by buildRouter function.
    * @param _routerArgs Router args, depends on router implementation.
    * @param _name Name of piToken.
-   * @param _name Symbol of piToken.
+   * @param _symbol Symbol of piToken.
    */
   function replacePoolTokenWithNewPiToken(
     address _underlyingToken,
