@@ -76,6 +76,9 @@ describe('PowerIndex BasicRouter Test', () => {
       const router = await PowerIndexBasicRouter.new(piToken.address, defaultBasicConfig);
       const router2 = await PowerIndexBasicRouter.new(piToken.address, defaultBasicConfig);
 
+      const otherToken = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
+      await otherToken.transfer(router.address, ether('200'));
+
       assert.equal(await web3.eth.getBalance(router.address), ether(0));
 
       const receivedFee = ether(0.1);
@@ -98,10 +101,13 @@ describe('PowerIndex BasicRouter Test', () => {
 
       assert.equal(await piToken.totalSupply(), ether('100'));
       assert.equal(await piToken.balanceOf(alice), ether('100'));
+      assert.equal(await otherToken.balanceOf(router.address), ether('200'));
 
       await expectRevert(piToken.changeRouter(bob), 'ONLY_ROUTER');
-      await router.migrateToNewRouter(piToken.address, router2.address);
+      await router.migrateToNewRouter(piToken.address, router2.address, [otherToken.address]);
 
+      assert.equal(await otherToken.balanceOf(router.address), '0');
+      assert.equal(await otherToken.balanceOf(router2.address), ether('200'));
       assert.equal(await web3.eth.getBalance(router2.address), receivedFee);
       assert.equal(await web3.eth.getBalance(router.address), ether(0));
 

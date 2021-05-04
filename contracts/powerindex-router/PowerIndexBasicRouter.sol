@@ -144,10 +144,20 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     piToken.withdrawEthFee(_receiver);
   }
 
-  function migrateToNewRouter(address _piToken, address payable _newRouter) public override onlyOwner {
-    super.migrateToNewRouter(_piToken, _newRouter);
+  function migrateToNewRouter(
+    address _piToken,
+    address payable _newRouter,
+    address[] memory _tokens
+  ) public override onlyOwner {
+    super.migrateToNewRouter(_piToken, _newRouter, _tokens);
 
     _newRouter.transfer(address(this).balance);
+
+    uint256 len = _tokens.length;
+    for (uint256 i = 0; i < len; i++) {
+      IERC20 t = IERC20(_tokens[i]);
+      t.safeTransfer(_newRouter, t.balanceOf(address(this)));
+    }
   }
 
   function pokeFromReporter(

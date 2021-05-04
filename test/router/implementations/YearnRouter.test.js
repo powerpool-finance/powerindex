@@ -635,7 +635,7 @@ describe('YearnRouter Tests', () => {
           [usdc.address, weth.address, yfi.address],
         ),
       );
-      await yfiRouter.migrateToNewRouter(piYfi.address, router.address, { from: piGov });
+      await yfiRouter.migrateToNewRouter(piYfi.address, router.address, [], { from: piGov });
       await yearnGovernance.notifyRewardAmount(ether(2000), { from: rewardDistributor });
       await time.increase(1);
       await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
@@ -666,7 +666,7 @@ describe('YearnRouter Tests', () => {
           [],
         ),
       );
-      await yfiRouter.migrateToNewRouter(piYfi.address, router.address, { from: piGov });
+      await yfiRouter.migrateToNewRouter(piYfi.address, router.address, [], { from: piGov });
       await yearnGovernance.notifyRewardAmount(ether(2000), { from: rewardDistributor });
       await time.increase(1);
       await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_SWAP_PATH');
