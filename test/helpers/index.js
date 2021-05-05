@@ -287,7 +287,7 @@ async function forkReplacePoolTokenWithNewPiToken(
   const token = await MockERC20.at(tokenAddress);
   const PowerIndexPool = await artifacts.require('PowerIndexPool');
   const WrappedPiErc20 = await artifacts.require('WrappedPiErc20');
-  console.log(routerArgs.SUSHI ? 'SushiPowerIndexRouter' : 'AavePowerIndexRouter');
+  console.log(routerArgs.sushi ? 'SushiPowerIndexRouter' : 'AavePowerIndexRouter');
   const PowerIndexRouter = await artifacts.require(type === 'aave' ? 'AavePowerIndexRouter' : 'SushiPowerIndexRouter');
   const pool = await PowerIndexPool.at(await callContract(controller, 'pool'))
   console.log('pool getBalance before', await callContract(pool, 'getBalance', [token.address]));
