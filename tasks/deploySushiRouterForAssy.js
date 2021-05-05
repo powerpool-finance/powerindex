@@ -104,12 +104,12 @@ task('deploy-sushi-router-for-assy', 'Deploy SUSHI Router for ASSY')
     await cvp.approve(powerPoke.address, ether(10000), {from: admin});
     await powerPoke.addCredit(router.address, ether(10000), {from: admin});
 
-    console.log('sushi balance after', await callContract(token, 'balanceOf', [pool.address]));
-    console.log('sushi wrapper balance after', await callContract(token, 'balanceOf', [wrappedToken.address]));
+    console.log('sushi balance after', fromEther(await callContract(token, 'balanceOf', [pool.address])));
+    console.log('sushi wrapper balance after', fromEther(await callContract(token, 'balanceOf', [wrappedToken.address])));
     console.log('wrapped balance', await callContract(wrappedToken, 'balanceOf', [pool.address]));
 
     await router.pokeFromReporter('1', false, powerPokeOpts, {from: pokerReporter});
-    console.log('wrapped balance ratio 80%', fromEther(await callContract(token, 'balanceOf', [wrappedToken.address])));
+    console.log('sushi balance ratio 80%', fromEther(await callContract(token, 'balanceOf', [wrappedToken.address])));
 
     await router.setReserveConfig(ether(0.2), '3600', {from: admin});
     // await router.pokeFromReporter('1', false, powerPokeOpts, {from: pokerReporter});
@@ -117,7 +117,7 @@ task('deploy-sushi-router-for-assy', 'Deploy SUSHI Router for ASSY')
 
     await increaseTime(MIN_REPORT_INTERVAL);
     await router.pokeFromReporter('1', false, powerPokeOpts, {from: pokerReporter});
-    console.log('wrapped balance ratio 20%', fromEther(await callContract(token, 'balanceOf', [wrappedToken.address])));
+    console.log('sushi balance ratio 20%', fromEther(await callContract(token, 'balanceOf', [wrappedToken.address])));
 
     const staker = await IERC20.at(stakingAddr);
     console.log('staker.balanceOf(wrappedToken.address)', fromEther(await callContract(staker, 'balanceOf', [wrappedToken.address])));
