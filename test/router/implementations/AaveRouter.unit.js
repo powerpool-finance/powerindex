@@ -627,7 +627,7 @@ describe('AaveRouter Tests', () => {
             aave.address
           ),
         );
-        await aaveRouter.migrateToNewRouter(piAave.address, router.address, { from: piGov });
+        await aaveRouter.migrateToNewRouter(piAave.address, router.address, [], { from: piGov });
         await time.increase(1);
         await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
       });
@@ -658,7 +658,7 @@ describe('AaveRouter Tests', () => {
         await piAave.transfer(poolA.address, 10, { from: alice });
         await piAave.transfer(poolB.address, 20, { from: alice });
 
-        await aaveRouter.migrateToNewRouter(piAave.address, router.address, { from: piGov });
+        await aaveRouter.migrateToNewRouter(piAave.address, router.address, [], { from: piGov });
         await time.increase(1);
         await router.poke(true, { from: bob });
         const res = await router.poke(true, { from: bob });

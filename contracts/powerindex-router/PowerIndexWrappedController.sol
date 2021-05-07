@@ -36,6 +36,9 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
   /** @dev Emitted on poolWrapper update. */
   event SetPoolWrapper(address indexed poolWrapper);
 
+  /** @dev Emitted on poolWrapper call. */
+  event CallPoolWrapper(bool indexed success, bytes4 indexed inputSig, bytes inputData, bytes outputData);
+
   /** @dev Emitted on piTokenFactory update. */
   event SetPiTokenFactory(address indexed piTokenFactory);
 
@@ -66,6 +69,17 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
   function setPoolWrapper(address _poolWrapper) external onlyOwner {
     poolWrapper = PowerIndexWrapperInterface(_poolWrapper);
     emit SetPoolWrapper(_poolWrapper);
+  }
+
+  /**
+   * @notice Call any function from poolWrapper by owner.
+   * @param signature Method signature
+   * @param args Encoded method inputs
+   */
+  function callPoolWrapper(bytes4 signature, bytes calldata args) external onlyOwner {
+    (bool success, bytes memory data) = address(poolWrapper).call(abi.encodePacked(signature, args));
+    require(success, "NOT_SUCCESS");
+    emit CallPoolWrapper(success, signature, args, data);
   }
 
   /**

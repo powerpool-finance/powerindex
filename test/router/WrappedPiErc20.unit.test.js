@@ -67,7 +67,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
   describe('callExternal', async () => {
     beforeEach(async () => {
-      await router.migrateToNewRouter(piYfi.address, alice);
+      await router.migrateToNewRouter(piYfi.address, alice, []);
     });
 
     it('should call the external methods', async () => {

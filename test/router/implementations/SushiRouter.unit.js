@@ -515,7 +515,7 @@ describe('SushiRouter Tests', () => {
           sushi.address
         ),
       );
-      await sushiRouter.migrateToNewRouter(piSushi.address, router.address, { from: piGov });
+      await sushiRouter.migrateToNewRouter(piSushi.address, router.address, [], { from: piGov });
       await sushi.transfer(xSushi.address, ether(2000));
       await time.increase(1);
       await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
