@@ -286,9 +286,10 @@ async function forkReplacePoolTokenWithNewPiToken(
   const {web3} = MockERC20;
   const token = await MockERC20.at(tokenAddress);
   const PowerIndexPool = await artifacts.require('PowerIndexPool');
+  const PowerIndexPoolController = await artifacts.require('PowerIndexPoolController');
   const WrappedPiErc20 = await artifacts.require('WrappedPiErc20');
-  console.log(routerArgs.sushi ? 'SushiPowerIndexRouter' : 'AavePowerIndexRouter');
-  const PowerIndexRouter = await artifacts.require(type === 'aave' ? 'AavePowerIndexRouter' : 'SushiPowerIndexRouter');
+  console.log('type', type);
+  const PowerIndexRouter = await artifacts.require(type === 'aave' ? 'AavePowerIndexRouter' : 'contracts/powerindex-router/implementations/SushiPowerIndexRouter.sol:SushiPowerIndexRouter');
   const pool = await PowerIndexPool.at(await callContract(controller, 'pool'))
   console.log('pool getBalance before', await callContract(pool, 'getBalance', [token.address]));
 
@@ -300,18 +301,30 @@ async function forkReplacePoolTokenWithNewPiToken(
   })
   // await pool.setController(controller.address, {from: admin});
 
+  const balanceBefore = fromEther(await web3.eth.getBalance(admin));
   console.log('await callContract(pool, "getDenormalizedWeight", [token])', await callContract(pool, 'getDenormalizedWeight', [tokenAddress]));
-  const res = await controller.replacePoolTokenWithNewPiToken(
+  const data = controller.contract.methods.replacePoolTokenWithNewPiToken(
     tokenAddress,
     factoryAddress,
     routerArgs,
-    'Wrapped TOKEN',
-    'WTOKEN',
-    {from: admin}
-  );
+    'Power Index Sushi',
+    'piSushi'
+  ).encodeABI();
+  const options = { from: admin, to: controller.address, data };
+  const gas = await web3.eth.estimateGas(options);
+  const gasLimit = gas * 1.2;
+  console.log('gasLimit', gasLimit);
+  console.log('data', data);
+  const txRes = await web3.eth.sendTransaction({ gasLimit, ...options });
+  const receipt = await web3.eth.getTransactionReceipt(txRes.transactionHash);
+  const logs = PowerIndexPoolController.decodeLogs(receipt.logs);
+  const balanceAfter = fromEther(await web3.eth.getBalance(admin));
+  console.log('replacePoolTokenWithNewPiToken ETH spent', balanceBefore - balanceAfter);
 
-  const wrappedTokenAddress = res.logs.filter(l => l.event === 'CreatePiToken')[0].args.piToken;
+  const wrappedTokenAddress = logs.filter(l => l.event === 'CreatePiToken')[0].args.piToken;
   const wrappedToken = await WrappedPiErc20.at(wrappedTokenAddress);
+  console.log('wrappedToken symbol', await callContract(wrappedToken, 'symbol'));
+  console.log('wrappedToken name', await callContract(wrappedToken, 'name'));
   const router = await PowerIndexRouter.at(await callContract(wrappedToken, 'router', []));
 
   await increaseTime(60);
