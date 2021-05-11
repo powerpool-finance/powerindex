@@ -401,7 +401,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
     }
 
     (uint256[3][] memory weightsChange, , uint256[] memory newTokenValuesUSDC, uint256 totalValueUSDC) =
-      computeWeightsChange(_pool, _tokens, new address[](0), 0, 100 ether, block.timestamp, block.timestamp + 1);
+      computeWeightsChange(_pool, _tokens, new address[](0), 0, block.timestamp, block.timestamp + 1);
 
     configs = new RebindConfig[](len);
 
