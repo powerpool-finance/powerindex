@@ -99,8 +99,7 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
     }
 
     uint256 now = block.timestamp;
-    (uint256[3][] memory weightsChange, , , ) =
-      computeWeightsChange(_pool, _tokens, new address[](0), 0, now, now + 1);
+    (uint256[3][] memory weightsChange, , , ) = computeWeightsChange(_pool, _tokens, new address[](0), 0, now, now + 1);
 
     configs = new RebindConfig[](len);
     for (uint256 i = 0; i < len; i++) {
