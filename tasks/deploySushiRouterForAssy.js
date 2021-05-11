@@ -17,7 +17,7 @@ task('deploy-sushi-router-for-assy', 'Deploy SUSHI Router for ASSY')
 
     const [deployer] = await web3.eth.getAccounts();
     console.log('deployer', deployer);
-    const sendOptions = {from: deployer};
+    // const sendOptions = {from: deployer};
 
     const sushi = '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2';
     const votingAddr = '0x0000000000000000000000000000000000000000';
