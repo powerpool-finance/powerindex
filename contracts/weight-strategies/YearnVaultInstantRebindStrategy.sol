@@ -412,7 +412,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
       configs[si] = RebindConfig(
         _tokens[oi],
         // (totalWeight * newTokenValuesUSDC[oi]) / totalValueUSDC,
-        (totalWeight.mul(newTokenValuesUSDC[oi])) / totalValueUSDC,
+        wc[2],
         oldBalances[oi],
         // (totalUSDCPool * newTokenValuesUSDC[oi] / totalValueUSDC) / (poolUSDCBalances[oi] / oldBalances[oi]))
         bdiv(
