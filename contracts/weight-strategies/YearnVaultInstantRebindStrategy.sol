@@ -135,7 +135,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
 
   /*** GETTERS ***/
   function getTokenValue(PowerIndexPoolInterface, address _token) public view override returns (uint256) {
-    return getVaultVirtualPriceEstimation(_token, IVault(_token).balance());
+    return getVaultVirtualPriceEstimation(_token, IVault(_token).totalAssets());
   }
 
   function getVaultVirtualPriceEstimation(address _token, uint256 _amount) public view returns (uint256) {
@@ -299,7 +299,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
         mem.ycrvBalance = IERC20(cfg.token).balanceOf(address(this));
 
         // 2nd step. Vault.withdraw()
-        mem.crvExpected = (mem.ycrvBalance * IVault(cfg.token).getPricePerFullShare()) / 1e18;
+        mem.crvExpected = (mem.ycrvBalance * IVault(cfg.token).pricePerShare()) / 1e18;
         uint256 crvBefore = IERC20(mem.crvToken).balanceOf(address(this));
         IVault(cfg.token).withdraw(mem.ycrvBalance);
         mem.crvActual = IERC20(mem.crvToken).balanceOf(address(this)).sub(crvBefore);
@@ -326,7 +326,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
         );
       } else {
         uint256 yDiff = cfg.newBalance - cfg.oldBalance;
-        uint256 crvAmount = IVault(cfg.token).getPricePerFullShare().mul(yDiff) / 1e18;
+        uint256 crvAmount = IVault(cfg.token).pricePerShare().mul(yDiff) / 1e18;
         uint256 usdcIn;
 
         if (constraints.useVirtualPriceEstimation) {

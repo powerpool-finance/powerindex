@@ -164,7 +164,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   function calcVaultOutByUsdc(address _token, uint256 _usdcIn) public view returns (uint256 amountOut) {
     VaultConfig storage vc = vaultConfig[_token];
     uint256 lpByUsdcPrice = ICurvePoolRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
-    uint256 vaultByLpPrice = IVault(_token).getPricePerFullShare();
+    uint256 vaultByLpPrice = IVault(_token).pricePerShare();
     return _usdcIn.mul(1e30).div(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether));
   }
 
@@ -201,7 +201,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   function calcUsdcOutByVault(address _token, uint256 _vaultIn) public view returns (uint256 amountOut) {
     VaultConfig storage vc = vaultConfig[_token];
     uint256 lpByUsdcPrice = ICurvePoolRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
-    uint256 vaultByLpPrice = IVault(_token).getPricePerFullShare();
+    uint256 vaultByLpPrice = IVault(_token).pricePerShare();
     return _vaultIn.mul(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether)).div(1e30);
   }
 

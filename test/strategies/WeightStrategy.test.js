@@ -781,8 +781,8 @@ describe('WeightStrategy', () => {
 
         await this.checkWeights(pool, balancerTokens, newWeights);
 
-        let newBalance = mulScalarBN(await tokens[0].balance(), ether(1.1));
-        await tokens[0].setBalance(newBalance);
+        let newBalance = mulScalarBN(await tokens[0].totalAssets(), ether(1.1));
+        await tokens[0].setTotalAssets(newBalance);
 
         await expectRevert(
           weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter}),
@@ -828,8 +828,8 @@ describe('WeightStrategy', () => {
           ether(1.765645146758023025),
         ]);
 
-        newBalance = mulScalarBN(await tokens[0].balance(), ether(2));
-        await tokens[0].setBalance(newBalance);
+        newBalance = mulScalarBN(await tokens[0].totalAssets(), ether(2));
+        await tokens[0].setTotalAssets(newBalance);
         await time.increase(pokePeriod);
 
         res = await weightStrategy.pokeFromReporter('1', [pool.address], compensationOpts, {from: reporter});
@@ -843,8 +843,8 @@ describe('WeightStrategy', () => {
           ether(1.652022964782976675),
         ]);
 
-        newBalance = mulScalarBN(await tokens[4].balance(), ether(0.5));
-        await tokens[4].setBalance(newBalance);
+        newBalance = mulScalarBN(await tokens[4].totalAssets(), ether(0.5));
+        await tokens[4].setTotalAssets(newBalance);
 
         await time.increase(pokePeriod);
 
@@ -860,7 +860,7 @@ describe('WeightStrategy', () => {
         ]);
 
         for (let i = 0; i < tokens.length; i++) {
-          await tokens[i].setBalance(vaultsData[i].usdtValue);
+          await tokens[i].setTotalAssets(vaultsData[i].usdtValue);
         }
 
         await time.increase(pokePeriod);
