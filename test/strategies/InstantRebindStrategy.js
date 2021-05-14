@@ -556,12 +556,12 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getNormalizedWeight(balancerTokens[3].address), ether('0.224065128438652867'));
           assert.equal(await pool.getNormalizedWeight(balancerTokens[4].address), ether('0.088528463423342056'));
 
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[0].address), ether('3.309266983446525607'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[1].address), ether('9.327221586506783136'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[2].address), ether('4.548671633496818185'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[3].address), ether('5.601628210966321663'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.213211585583551406'));
-          assert.equal(await pool.getTotalDenormalizedWeight(), ether('24.999999999999999997'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[0].address), ether('3.309266983446525600'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[1].address), ether('9.327221586506783125'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[2].address), ether('4.548671633496818175'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[3].address), ether('5.601628210966321675'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.213211585583551400'));
+          assert.equal(await pool.getTotalDenormalizedWeight(), ether('24.999999999999999975'));
 
           assert.equal(await pool.getBalance(balancerTokens[0].address), ether('546336.044553543206721268'));
           assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1616414.343541401540630964'));
@@ -652,12 +652,12 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getNormalizedWeight(balancerTokens[3].address), ether('0.224065128438652867'));
           assert.equal(await pool.getNormalizedWeight(balancerTokens[4].address), ether('0.088528463423342056'));
 
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[0].address), ether('3.309266983446525607'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[1].address), ether('9.327221586506783136'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[2].address), ether('4.548671633496818185'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[3].address), ether('5.601628210966321663'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.213211585583551406'));
-          assert.equal(await pool.getTotalDenormalizedWeight(), ether('24.999999999999999997'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[0].address), ether('3.309266983446525600'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[1].address), ether('9.327221586506783125'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[2].address), ether('4.548671633496818175'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[3].address), ether('5.601628210966321675'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.213211585583551400'));
+          assert.equal(await pool.getTotalDenormalizedWeight(), ether('24.999999999999999975'));
 
           assert.equal(await pool.getBalance(balancerTokens[0].address), ether('546336.044553543206721268'));
           assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1616414.343542386981585696'));
@@ -752,12 +752,12 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getNormalizedWeight(balancerTokens[3].address), ether('0.224065128438652867'));
           assert.equal(await pool.getNormalizedWeight(balancerTokens[4].address), ether('0.088528463423342056'));
 
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[0].address), ether('3.309266983446525607'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[1].address), ether('9.327221586506783136'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[2].address), ether('4.548671633496818185'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[3].address), ether('5.601628210966321663'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.213211585583551406'));
-          assert.equal(await pool.getTotalDenormalizedWeight(), ether('24.999999999999999997'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[0].address), ether('3.309266983446525600'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[1].address), ether('9.327221586506783125'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[2].address), ether('4.548671633496818175'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[3].address), ether('5.601628210966321675'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.213211585583551400'));
+          assert.equal(await pool.getTotalDenormalizedWeight(), ether('24.999999999999999975'));
 
           assert.equal(await pool.getBalance(balancerTokens[0].address), ether('472854.158622462929120091'));
           assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1611207.343518669756710041'));
