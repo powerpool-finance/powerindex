@@ -1,7 +1,7 @@
 require('@nomiclabs/hardhat-truffle5');
 require('@nomiclabs/hardhat-ethers');
 
-task('deploy-sushi-router', 'Deploy SUSHI Router')
+task('deploy-sushi-router-for-assy', 'Deploy SUSHI Router for ASSY')
   .setAction(async (__, {ethers, network}) => {
     const PowerIndexPoolController = await artifacts.require('PowerIndexPoolController');
     const PowerIndexWrapper = await artifacts.require('PowerIndexWrapper');
@@ -17,7 +17,7 @@ task('deploy-sushi-router', 'Deploy SUSHI Router')
 
     const [deployer] = await web3.eth.getAccounts();
     console.log('deployer', deployer);
-    const sendOptions = {from: deployer};
+    // const sendOptions = {from: deployer};
 
     const sushi = '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2';
     const votingAddr = '0x0000000000000000000000000000000000000000';
@@ -28,11 +28,10 @@ task('deploy-sushi-router', 'Deploy SUSHI Router')
     const pool = await PowerIndexPool.at(poolAddress);
     const poolRestrictionsAddress = '0x3885c4e1107b445dd370d09008d90b5153132fff';
 
-    const poolWrapper = await PowerIndexWrapper.new(poolAddress, sendOptions);
+    const poolWrapper = await PowerIndexWrapper.at('0x43fa8ef8e334720b80367cf94e438cf90c562abe');
     const controller = await PowerIndexPoolController.at('0x99655673c57a29518c60775252716c320a9e7d2f');
-    await poolWrapper.setController(controller.address, sendOptions);
-    const sushiRouterFactory = await PowerIndexRouterFactory.new();
-    const wrapperFactory = await WrappedPiErc20Factory.new(sendOptions);
+    const sushiRouterFactory = await PowerIndexRouterFactory.at('0x64c389529ceb54bcd8dc5166855109678416e001');
+    const wrapperFactory = await WrappedPiErc20Factory.at('0x9cdda9f8a4533d829b424f47ac9a7850e46982e3');
 
     if (network.name !== 'mainnetfork') {
       return;
@@ -65,6 +64,10 @@ task('deploy-sushi-router', 'Deploy SUSHI Router')
     const PER_GAS = '10000';
     const MIN_SLASHING_DEPOSIT = ether(40);
 
+    // const newController = await PowerIndexPoolController.new(poolAddress, poolWrapper.address, wrapperFactory.address, '0x25be31ca0b36d5077a922d4ee54c08111a7e034e');
+    // await newController.transferOwnership(admin, {from: deployer});
+
+    // await controller.migrateController(newController.address, [poolAddress, poolWrapper.address], {from: admin});
     await controller.setPoolWrapper(poolWrapper.address, {from: admin});
     await controller.setPiTokenFactory(wrapperFactory.address, {from: admin});
 
@@ -79,11 +82,11 @@ task('deploy-sushi-router', 'Deploy SUSHI Router')
         powerPoke: powerPokeAddress,
         voting: votingAddr,
         staking: stakingAddr,
-        reserveRatio: ether(0.8),
-        reserveRatioToForceRebalance: ether(0.1),
-        claimRewardsInterval: '3600',
-        pvp: '0xd132973eaebbd6d7ca7b88e9170f2cca058de430',
+        reserveRatio: ether(0.2),
+        reserveRatioToForceRebalance: ether(0.05),
+        claimRewardsInterval: 60 * 60 * 24 * 7,
         pvpFee: ether(0.003),
+        pvp: '0xd132973eaebbd6d7ca7b88e9170f2cca058de430',
         rewardPools: ['0xb4bebd34f6daafd808f73de0d10235a92fbb6c3d', '0xfa2562da1bba7b954f26c74725df51fb62646313'],
       }, {
         SUSHI: sushi,
@@ -91,6 +94,8 @@ task('deploy-sushi-router', 'Deploy SUSHI Router')
       admin,
       'sushi'
     );
+
+    console.log('wrappedToken.address', wrappedToken.address);
 
     const powerPoke = await PowerPoke.at(powerPokeAddress);
     await powerPoke.addClient(router.address, admin, true, MAX_GAS_PRICE, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, {from: admin});
@@ -102,12 +107,12 @@ task('deploy-sushi-router', 'Deploy SUSHI Router')
     await cvp.approve(powerPoke.address, ether(10000), {from: admin});
     await powerPoke.addCredit(router.address, ether(10000), {from: admin});
 
-    console.log('sushi balance after', await callContract(token, 'balanceOf', [pool.address]));
-    console.log('sushi wrapper balance after', await callContract(token, 'balanceOf', [wrappedToken.address]));
+    console.log('sushi balance after', fromEther(await callContract(token, 'balanceOf', [pool.address])));
+    console.log('sushi wrapper balance after', fromEther(await callContract(token, 'balanceOf', [wrappedToken.address])));
     console.log('wrapped balance', await callContract(wrappedToken, 'balanceOf', [pool.address]));
 
     await router.pokeFromReporter('1', false, powerPokeOpts, {from: pokerReporter});
-    console.log('wrapped balance ratio 80%', fromEther(await callContract(token, 'balanceOf', [wrappedToken.address])));
+    console.log('sushi balance ratio 80%', fromEther(await callContract(token, 'balanceOf', [wrappedToken.address])));
 
     await router.setReserveConfig(ether(0.2), '3600', {from: admin});
     // await router.pokeFromReporter('1', false, powerPokeOpts, {from: pokerReporter});
@@ -115,7 +120,7 @@ task('deploy-sushi-router', 'Deploy SUSHI Router')
 
     await increaseTime(MIN_REPORT_INTERVAL);
     await router.pokeFromReporter('1', false, powerPokeOpts, {from: pokerReporter});
-    console.log('wrapped balance ratio 20%', fromEther(await callContract(token, 'balanceOf', [wrappedToken.address])));
+    console.log('sushi balance ratio 20%', fromEther(await callContract(token, 'balanceOf', [wrappedToken.address])));
 
     const staker = await IERC20.at(stakingAddr);
     console.log('staker.balanceOf(wrappedToken.address)', fromEther(await callContract(staker, 'balanceOf', [wrappedToken.address])));
@@ -131,6 +136,14 @@ task('deploy-sushi-router', 'Deploy SUSHI Router')
     }
     await pool.approve(poolWrapper.address, ether(10000), {from: poolHolder});
     await poolWrapper.exitPool(ether(10000), [1,1,1,1], {from: poolHolder});
+    for(let i = 0; i < tokens.length; i++) {
+      const t = await IERC20.at(tokens[i]);
+      console.log(i, 'token balance after', tokens[i], fromEther(await callContract(t, 'balanceOf', [poolHolder])));
+    }
+
+    const sushiBalance = await callContract(sushiToken, 'balanceOf', [poolHolder]);
+    await sushiToken.approve(poolWrapper.address, sushiBalance, {from: poolHolder});
+    await poolWrapper.swapExactAmountIn(sushiToken.address, sushiBalance, tokens[0], '1', ether(1000), {from: poolHolder})
     for(let i = 0; i < tokens.length; i++) {
       const t = await IERC20.at(tokens[i]);
       console.log(i, 'token balance after', tokens[i], fromEther(await callContract(t, 'balanceOf', [poolHolder])));
