@@ -1,0 +1,67 @@
+[
+ {
+  "address": "0x2a38B9B0201Ca39B17B460eD2f11e4929559071E",
+  "totalSupply": "7054689496826862169118586",
+  "usdtValue": "7059950152590298197157570",
+  "balancerBalance": "2093463451858314581509072",
+  "usdcToLpRate": "1016434766012184326",
+  "config": {
+   "lpToken": "0xd2967f45c4f384deea880f807be904762a3dea07",
+   "depositor": "0x64448b78561690b70e17cbe8029a3e5c1bb7136e",
+   "amountsLength": 4,
+   "usdcIndex": 2
+  }
+ },
+ {
+  "address": "0x4B5BfD52124784745c1071dcB244C6688d2533d3",
+  "totalSupply": "16704521493304121859686784",
+  "usdtValue": "16709532311305923825264017",
+  "balancerBalance": "3006970379366983405488498",
+  "usdcToLpRate": "1106502045715190960",
+  "config": {
+   "lpToken": "0xdf5e0e81dff6faf3a7e52ba697820c5e32d806a8",
+   "depositor": "0xbbc81d23ea2c3ec7e56d39296f0cbb648873a5d3",
+   "amountsLength": 4,
+   "usdcIndex": 1
+  }
+ },
+ {
+  "address": "0x8ee57c05741aA9DB947A744E713C15d4d19D8822",
+  "totalSupply": "16169140576806952432896918",
+  "usdtValue": "16181514498901834218333250",
+  "balancerBalance": "1216223819911040758019140",
+  "usdcToLpRate": "1112242405312505035",
+  "config": {
+   "lpToken": "0x3b3ac5386837dc563660fb6a0937dfaa5924333b",
+   "depositor": "0xb6c057591e073249f2d9d88ba59a46cfc9b59edb",
+   "amountsLength": 4,
+   "usdcIndex": 1
+  }
+ },
+ {
+  "address": "0xD6Ea40597Be05c201845c0bFd2e96A60bACde267",
+  "totalSupply": "36824556087032129358786507",
+  "usdtValue": "36888968675484214818119319",
+  "balancerBalance": "971230478401715511810375",
+  "usdcToLpRate": "1075210757461071963",
+  "config": {
+   "lpToken": "0x845838df265dcd2c412a1dc9e959c7d08537f8a2",
+   "depositor": "0xeb21209ae4c2c9ff2a86aca31e123764a3b6bc06",
+   "amountsLength": 2,
+   "usdcIndex": 1
+  }
+ },
+ {
+  "address": "0x84E13785B5a27879921D6F685f041421C7F482dA",
+  "totalSupply": "6567157655037229963308732",
+  "usdtValue": "6571381002340883546273358",
+  "balancerBalance": "4245704416324490344176750",
+  "usdcToLpRate": "1016522292185013086",
+  "config": {
+   "lpToken": "0x6c3f90f043a72fa612cbac8115ee7e52bde6e490",
+   "depositor": "0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7",
+   "amountsLength": 3,
+   "usdcIndex": 1
+  }
+ }
+]
