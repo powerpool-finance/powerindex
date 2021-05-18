@@ -17,25 +17,24 @@ const PowerPoke = artifacts.require('PowerPoke');
 const MockFastGasOracle = artifacts.require('MockFastGasOracle');
 const MockStaking = artifacts.require('MockStaking');
 const MockCvp = artifacts.require('MockCvp');
-const MockVault = artifacts.require('MockVault');
 const MockCurveDepositor2 = artifacts.require('MockCurveDepositor2');
 const MockCurveDepositor3 = artifacts.require('MockCurveDepositor3');
 const MockCurveDepositor4 = artifacts.require('MockCurveDepositor4');
-const MockYearnVaultV1 = artifacts.require('MockYearnVaultV1');
-const MockYearnVaultController = artifacts.require('MockYearnVaultController');
 const MockCurvePoolRegistry = artifacts.require('MockCurvePoolRegistry');
-const { deployProxied, gwei } = require('../helpers');
+const MockYearnStrategy = artifacts.require('MockYearnStrategy');
+const { deployProxied, gwei, artifactFromBytecode } = require('../helpers');
+
+const YVaultV2 = artifactFromBytecode('yearn/YVaultV2');
 
 WETH.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
 PowerIndexPool.numberFormat = 'String';
 PowerPoke.numberFormat = 'String';
-MockYearnVaultV1.numberFormat = 'String';
-MockYearnVaultController.numberFormat = 'String';
 MockCurveDepositor2.numberFormat = 'String';
 MockCurveDepositor3.numberFormat = 'String';
 MockCurveDepositor4.numberFormat = 'String';
 MockCurvePoolRegistry.numberFormat = 'String';
+MockYearnStrategy.numberFormat = 'String';
 MockYearnVaultInstantRebindStrategy.numberFormat = 'String';
 
 const { web3 } = PowerIndexPoolFactory;
@@ -154,7 +153,22 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
     let vault;
 
     beforeEach(async () => {
-      vault = await MockVault.new(stub, ether(10), ether(10));
+      const crv = await MockERC20.new('TKN', 'TKN', 18, ether(1e16));
+      vault = await YVaultV2.new();
+      await vault.initialize(
+        // token
+        crv.address,
+        // governance
+        stub,
+        // rewards
+        stub,
+        // nameOverride
+        '',
+        // symbolOverride
+        '',
+        // guardian
+        stub,
+      );
       pool = await MockPool.new();
       await pool.setCurrentTokens([vault.address]);
       strategy = await deployProxied(
@@ -168,6 +182,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           stub,
           // poolController
           stub,
+          1,
           {
             minUSDCRemainder: mwei('5'),
             useVirtualPriceEstimation: false,
@@ -252,10 +267,13 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
     describe('syncPoolTokens()', () => {
       it('should allow the owner syncing tokens of an existing pool', async () => {
         const crv2 = await MockERC20.new('TKN2', 'TKN2', 18, ether(1e16));
-        const vault2 = await MockVault.new(crv2.address, ether(10), ether(10));
+        const vault2 = await YVaultV2.new();
+        await vault2.initialize(crv2.address, stub, stub, '', '', stub);
 
         const crv3 = await MockERC20.new('TKN3', 'TKN3', 18, ether(1e16));
-        const vault3 = await MockVault.new(crv3.address, ether(20), ether(20));
+        const vault3 = await YVaultV2.new();
+        await vault3.initialize(crv3.address, stub, stub, '', '', stub);
+
         await pool.setCurrentTokens([vault2.address, vault3.address]);
 
         const res = await strategy.syncPoolTokens({ from: minter });
@@ -395,12 +413,27 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
             vaultsData[i].config.usdcIndex,
             BigInt(vaultsData[i].curvePool.virtualPrice),
           );
-          const ycrvVault = await MockYearnVaultV1.new(crvToken.address, minter);
+          const ycrvVault = await YVaultV2.new();
+          await ycrvVault.initialize(
+            // token
+            crvToken.address,
+            // governance
+            stub,
+            // rewards
+            stub,
+            // nameOverride
+            '',
+            // symbolOverride
+            '',
+            // guardian
+            stub,
+          );
+          await ycrvVault.setDepositLimit('1000000000000000000000000000', { from: stub });
+          await ycrvVault.setManagementFee('0', { from: stub });
+
           await curvePoolRegistry.set_virtual_price(crvToken.address, vaultsData[i].curvePool.virtualPrice);
 
-          const yController = await MockYearnVaultController.new();
           await crvToken.approve(ycrvVault.address, vaultsData[i].yearnVault.totalSupply);
-          await ycrvVault.setController(yController.address);
           await ycrvVault.deposit(vaultsData[i].yearnVault.totalSupply);
 
           await usdc.transfer(crvDepositor.address, mwei(1e12));
@@ -423,6 +456,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
             poke.address,
             curvePoolRegistry.address,
             poolController.address,
+            1,
             {
               minUSDCRemainder: mwei('5'),
               useVirtualPriceEstimation: false,
@@ -669,13 +703,27 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
         it('should correctly rebalance token balances with insufficient underlying tokens on vault', async () => {
           for (let i in Object.keys(tokens)) {
             const vault = tokens[i];
-            await vault.setMin(9990);
 
-            await vault.earn();
-
-            const vaultController = await MockYearnVaultController.at(await vault.controller());
-            await vaultController.setWithdrawRatio(5, 10);
+            // https://etherscan.io/address/0xB3E1a513a2fE74EcF397dF9C0E6BCe5B57A961C8
+            const yearnVaultStrategy = await MockYearnStrategy.new(vault.address);
+            await yearnVaultStrategy.setWithdrawalLossRate(5, 10);
+            await vault.addStrategy(
+              yearnVaultStrategy.address,
+              // debtRatio
+              9990,
+              // minDebtPerHarvest
+              0,
+              // maxDebtPerHarvest
+              constants.MAX_UINT256,
+              // performanceFee
+              1000,
+              { from: stub },
+            );
+            await yearnVaultStrategy.harvest();
           }
+
+          // 50%
+          await weightStrategy.setMaxWithdrawalLoss(5000);
 
           assert.equal(await crvTokens[3].balanceOf(weightStrategy.address), '0');
           let res = await weightStrategy.mockPoke();
@@ -691,17 +739,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
             usdcPulled: mwei('161601.043736'),
             usdcRemainder: '1',
           });
-          expectEvent(res, 'VaultWithdrawFee', {
-            vaultToken: balancerTokens[4].address,
-            crvAmount: ether('33337.281816828744424193'),
-          });
-          expectEvent(res, 'VaultWithdrawFee', {
-            vaultToken: balancerTokens[3].address,
-            crvAmount: ether('56438.206081079793598276'),
-          });
 
-          const pull0 = res.logs[1].args;
-          assert.equal(res.logs[1].event, 'PullLiquidity');
+          const pull0 = res.logs[0].args; //++
+          assert.equal(res.logs[0].event, 'PullLiquidity');
           assert.equal(pull0.vaultToken, balancerTokens[4].address);
           assert.equal(pull0.crvToken, crvTokens[4].address);
           assert.equal(pull0.vaultAmount, ether('83064.520893416796979428'));
@@ -710,8 +750,8 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(pull0.usdcAmount, mwei('54513.940887'));
           assert.equal(pull0.vaultReserve, ether('16389.957259759308131043'));
 
-          const pull1 = res.logs[3].args;
-          assert.equal(res.logs[3].event, 'PullLiquidity');
+          const pull1 = res.logs[1].args; // ++
+          assert.equal(res.logs[1].event, 'PullLiquidity');
           assert.equal(pull1.vaultToken, balancerTokens[3].address);
           assert.equal(pull1.crvToken, crvTokens[3].address);
           assert.equal(pull1.vaultAmount, ether('154534.249541010565563929'));
@@ -720,24 +760,24 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(pull1.usdcAmount, mwei('107087.102849'));
           assert.equal(pull1.vaultReserve, ether('41657.837378850978367378'));
 
-          const push0 = res.logs[4].args;
-          assert.equal(res.logs[4].event, 'PushLiquidity');
+          const push0 = res.logs[2].args; //++
+          assert.equal(res.logs[2].event, 'PushLiquidity');
           assert.equal(push0.vaultToken, balancerTokens[0].address);
           assert.equal(push0.crvToken, crvTokens[0].address);
           assert.equal(push0.vaultAmount, ether('120976.623936932720551528'));
           assert.equal(push0.crvAmount, ether('120976.623936932720551528'));
           assert.equal(push0.usdcAmount, mwei('128867.393072'));
 
-          const push1 = res.logs[5].args;
-          assert.equal(res.logs[5].event, 'PushLiquidity');
+          const push1 = res.logs[3].args; //++
+          assert.equal(res.logs[3].event, 'PushLiquidity');
           assert.equal(push1.vaultToken, balancerTokens[2].address);
           assert.equal(push1.crvToken, crvTokens[2].address);
           assert.equal(push1.vaultAmount, ether('23677.741907671639579292'));
           assert.equal(push1.crvAmount, ether('23677.741907671639579292'));
           assert.equal(push1.usdcAmount, mwei('24034.474240'));
 
-          const push2 = res.logs[6].args;
-          assert.equal(res.logs[6].event, 'PushLiquidity');
+          const push2 = res.logs[4].args;
+          assert.equal(res.logs[4].event, 'PushLiquidity');
           assert.equal(push2.vaultToken, balancerTokens[1].address);
           assert.equal(push2.crvToken, crvTokens[1].address);
           assert.equal(push2.vaultAmount, ether('8572.524719667731010826'));
@@ -764,185 +804,6 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getBalance(balancerTokens[2].address), ether('773679.388147355784677991'));
           assert.equal(await pool.getBalance(balancerTokens[3].address), ether('902398.168770198670643499'));
           assert.equal(await pool.getBalance(balancerTokens[4].address), ether('355041.805924512364322665'));
-
-          res = await weightStrategy.getFeesToRefund();
-          assert.equal(res.length, 2);
-          assert.equal(res[0].vaultToken, balancerTokens[4].address);
-          assert.equal(res[0].crvToken, crvTokens[4].address);
-          assert.equal(res[0].crvAmount, ether('33337.281816828744424193'));
-
-          assert.equal(res[1].vaultToken, balancerTokens[3].address);
-          assert.equal(res[1].crvToken, crvTokens[3].address);
-          assert.equal(res[1].crvAmount, ether('56438.206081079793598276'));
-        });
-      });
-
-      describe('fee compensation', () => {
-        let vault3;
-        let vault4;
-        let token3;
-        let token4;
-        let amount3;
-        let amount4;
-        beforeEach(async () => {
-          for (let i in Object.keys(tokens)) {
-            const vault = tokens[i];
-            await vault.setMin(9990);
-
-            await vault.earn();
-
-            const vaultController = await MockYearnVaultController.at(await vault.controller());
-            await vaultController.setWithdrawRatio(5, 10);
-          }
-
-          vault3 = balancerTokens[3];
-          vault4 = balancerTokens[4];
-          token3 = crvTokens[3];
-          token4 = crvTokens[4];
-          amount3 = ether('56438.206081079793598276');
-          amount4 = ether('33337.281816828744424193');
-        })
-
-        it('should allow full fee compensation', async () => {
-          await weightStrategy.mockPoke();
-
-          // values before
-          let res = await weightStrategy.getFeesToRefund();
-          assert.equal(res.length, 2);
-          assert.equal(res[0].vaultToken, vault4.address);
-          assert.equal(res[0].crvToken, token4.address);
-          assert.equal(res[0].crvAmount, amount4);
-
-          assert.equal(res[1].vaultToken, vault3.address);
-          assert.equal(res[1].crvToken, token3.address);
-          assert.equal(res[1].crvAmount, amount3);
-
-          await token3.transfer(alice, amount3);
-          await token4.transfer(alice, amount4);
-
-          // add some dust
-          await token3.transfer(weightStrategy.address, '300');
-          await token4.transfer(weightStrategy.address, '300');
-          await vault3.transfer(weightStrategy.address, '500');
-          await vault4.transfer(weightStrategy.address, '500');
-
-          await token3.approve(weightStrategy.address, amount3, { from: alice });
-          await token4.approve(weightStrategy.address, amount4, { from: alice });
-
-          res = await weightStrategy.refundFees(
-            alice,
-            [balancerTokens[3].address, balancerTokens[4].address],
-            [amount3, amount4],
-            { from: alice },
-          );
-          expectEvent(res, 'RefundFees', {
-            vaultToken: vault3.address,
-            crvToken: token3.address,
-            from: alice,
-            crvAmount: amount3,
-            vaultAmount: ether('56361.562892183477021648')
-          });
-          expectEvent(res, 'RefundFees', {
-            vaultToken: vault4.address,
-            crvToken: token4.address,
-            from: alice,
-            crvAmount: amount4,
-            vaultAmount: ether('33269.267207638547388559')
-          });
-
-          // values after
-          res = await weightStrategy.getFeesToRefund();
-          assert.equal(res.length, 2);
-          assert.equal(res[0].vaultToken, vault4.address);
-          assert.equal(res[0].crvToken, token4.address);
-          assert.equal(res[0].crvAmount, '0');
-
-          assert.equal(res[1].vaultToken, vault3.address);
-          assert.equal(res[1].crvToken, token3.address);
-          assert.equal(res[1].crvAmount, '0');
-        });
-
-        it('should allow partial fee compensation', async () => {
-          await weightStrategy.mockPoke();
-
-          amount3 = (BigInt(ether('56438.206081079793598276')) - 1000n).toString();
-          amount4 = (BigInt(ether('33337.281816828744424193')) - 1000n).toString();
-          await token3.approve(weightStrategy.address, amount3, { from: alice });
-          await token4.approve(weightStrategy.address, amount4, { from: alice });
-          await token3.transfer(alice, amount3);
-          await token4.transfer(alice, amount4);
-
-          assert.equal(await pool.getBalance(vault3.address), ether('902398.168770198670643499'));
-          assert.equal(await pool.getBalance(vault4.address), ether('355041.805924512364322665'));
-          await weightStrategy.refundFees(
-            alice,
-            [vault3.address, vault4.address],
-            [amount3, amount4],
-            { from: alice },
-          );
-          assert.equal(await pool.getBalance(vault3.address), ether('958759.731662382147664148'));
-          assert.equal(await pool.getBalance(vault4.address), ether('388311.073132150911710226'));
-
-          const res = await weightStrategy.getFeesToRefund();
-          assert.equal(res.length, 2);
-          assert.equal(res[0].vaultToken, vault4.address);
-          assert.equal(res[0].crvToken, token4.address);
-          assert.equal(res[0].crvAmount, '1000');
-
-          assert.equal(res[1].vaultToken, vault3.address);
-          assert.equal(res[1].crvToken, token3.address);
-          assert.equal(res[1].crvAmount, '1000');
-        });
-
-        it('should allow increment fees between pokes', async () => {
-          // 1st poke
-          await weightStrategy.mockPoke();
-          let res = await weightStrategy.getFeesToRefund();
-          assert.equal(res.length, 2);
-          assert.equal(res[0].vaultToken, vault4.address);
-          assert.equal(res[0].crvToken, token4.address);
-          assert.equal(res[0].crvAmount, amount4);
-
-          assert.equal(res[1].vaultToken, vault3.address);
-          assert.equal(res[1].crvToken, token3.address);
-          assert.equal(res[1].crvAmount, amount3);
-
-          // 2nd poke (already imbalanced due the vault high fees)
-          await time.increase(pokePeriod + 1);
-          await weightStrategy.mockPoke();
-
-          res = await weightStrategy.getFeesToRefund();
-          assert.equal(res.length, 2);
-          assert.equal(res[0].vaultToken, vault4.address);
-          assert.equal(res[0].crvToken, token4.address);
-          assert.equal(res[0].crvAmount, ether('37836.388626269312645498'));
-
-          assert.equal(res[1].vaultToken, vault3.address);
-          assert.equal(res[1].crvToken, token3.address);
-          assert.equal(res[1].crvAmount, ether('67565.606276522799369245'));
-        });
-
-        it('should deny 0 amounts', async () => {
-          await weightStrategy.mockPoke();
-
-          amount3 = (BigInt(ether('56438.206081079793598276'))).toString();
-          amount4 = '0';
-          await token3.approve(weightStrategy.address, amount3, { from: alice });
-          await token4.approve(weightStrategy.address, amount4, { from: alice });
-          await token3.transfer(alice, amount3);
-          await token4.transfer(alice, amount4);
-
-          await expectRevert(
-            weightStrategy.refundFees(alice, [vault3.address, vault4.address], [amount3, amount4], { from: alice }),
-            'AMOUNT_IS_0'
-          );
-        });
-
-        it('should deny different lengths arg arrays', async () => {
-          await expectRevert(
-            weightStrategy.refundFees(alice, [vault3.address, vault4.address], [amount3], { from: alice }),
-            'REFUND_LENGTHS_MISMATCH'
-          );
         });
       });
     });
