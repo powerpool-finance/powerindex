@@ -25,6 +25,7 @@ require('./tasks/deployMainnetWeightsStrategy');
 require('./tasks/deployMainnetInstantRebindStrategy');
 require('./tasks/testVestedLpMiningProxy');
 require('./tasks/testVestedLpMiningPool');
+require('./tasks/testAaveDelegate');
 require('./tasks/deployIndicesSupplyRedeemZap');
 
 const fs = require('fs');

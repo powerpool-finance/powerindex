@@ -312,7 +312,7 @@ async function forkReplacePoolTokenWithNewPiToken(
   ).encodeABI();
   const options = { from: admin, to: controller.address, data };
   const gas = await web3.eth.estimateGas(options);
-  const gasLimit = gas * 1.2;
+  const gasLimit = Math.round(gas * 1.2);
   console.log('gasLimit', gasLimit);
   console.log('data', data);
   const txRes = await web3.eth.sendTransaction({ gasLimit, ...options });

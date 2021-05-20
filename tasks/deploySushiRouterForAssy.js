@@ -112,7 +112,7 @@ task('deploy-sushi-router-for-assy', 'Deploy SUSHI Router for ASSY')
     console.log('wrapped balance', await callContract(wrappedToken, 'balanceOf', [pool.address]));
 
     await router.pokeFromReporter('1', false, powerPokeOpts, {from: pokerReporter});
-    console.log('sushi balance ratio 80%', fromEther(await callContract(token, 'balanceOf', [wrappedToken.address])));
+    console.log('sushi balance ratio 20%', fromEther(await callContract(token, 'balanceOf', [wrappedToken.address])));
 
     await router.setReserveConfig(ether(0.2), '3600', {from: admin});
     // await router.pokeFromReporter('1', false, powerPokeOpts, {from: pokerReporter});
