@@ -419,8 +419,8 @@ describe('WeightStrategy', () => {
         for (let i = 0; i < balancerTokens.length; i++) {
           const dw = await pool.getDynamicWeightSettings(balancerTokens[i].address);
           assert.notEqual(targetWeights[i], dw.targetDenorm);
-          assertEqualWithAccuracy(dw.targetDenorm, currentWeights[i], '5000000000000');
-          assertEqualWithAccuracy(await pool.getNormalizedWeight(balancerTokens[i].address), normalizedCurrentWeights[i], '5000000000000');
+          assertEqualWithAccuracy(dw.targetDenorm, currentWeights[i], '5500000000000');
+          assertEqualWithAccuracy(await pool.getNormalizedWeight(balancerTokens[i].address), normalizedCurrentWeights[i], '5500000000000');
           assert.equal(dw.targetTimestamp, addBN(pauseTimestamp, '2'));
         }
 
