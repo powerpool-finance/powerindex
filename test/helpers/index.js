@@ -385,11 +385,14 @@ function addBN(bn1, bn2) {
     .add(toBN(bn2.toString(10)))
     .toString(10);
 }
-function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei) {
+function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei = '100000000') {
   bn1 = toBN(bn1.toString(10));
   bn2 = toBN(bn2.toString(10));
   const bn1GreaterThenBn2 = bn1.gt(bn2);
   let diff = bn1GreaterThenBn2 ? bn1.sub(bn2) : bn2.sub(bn1);
+  if (diff.toString() === '0') {
+    return;
+  }
   let diffPercent = divScalarBN(diff, bn1);
   const lowerThenAccurancy = toBN(diffPercent).lte(toBN(accuracyPercentWei));
   assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));

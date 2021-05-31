@@ -26,7 +26,7 @@ async function getTimestamp(shift = 0) {
   return currentTimestamp + shift;
 }
 
-describe.skip('PowerIndexPool Unit', () => {
+describe('PowerIndexPool Unit', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const name = 'My Pool';
   const symbol = 'MP';
