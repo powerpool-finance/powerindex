@@ -72,8 +72,10 @@ abstract contract YearnFeeRefund is SinglePoolManagement, ReentrancyGuard {
       uint256 pendingCrvAmount = fees[vaultToken];
       uint256 crvAmount = _crvAmounts[i];
 
-      require(crvAmount <= pendingCrvAmount, "AMOUNT_GT_PENDING");
       require(crvAmount > 0, "AMOUNT_IS_0");
+      if (crvAmount > pendingCrvAmount) {
+        crvAmount = pendingCrvAmount;
+      }
 
       IERC20(crvToken).safeTransferFrom(_refundFrom, address(this), crvAmount);
 

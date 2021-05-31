@@ -171,9 +171,9 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
   ) external onlyOwner {
     vaultConfig[_vault] = VaultConfig(_depositor, _depositorTokenLength, _usdcIndex);
     IERC20 crvToken = IERC20(IYearnVaultV2(_vault).token());
-    USDC.approve(_depositor, uint256(-1));
-    crvToken.approve(_vault, uint256(-1));
-    crvToken.approve(_depositor, uint256(-1));
+    USDC.safeApprove(_depositor, uint256(-1));
+    crvToken.safeApprove(_vault, uint256(-1));
+    crvToken.safeApprove(_depositor, uint256(-1));
     emit SetVaultConfig(_vault, _depositor, _depositorTokenLength, _usdcIndex);
   }
 
@@ -197,7 +197,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     uint256 len = _tokens.length;
 
     for (uint256 i = 0; i < len; i++) {
-      _tokens[i].approve(_tos[i], uint256(0));
+      _tokens[i].safeApprove(_tos[i], uint256(0));
     }
   }
 
@@ -228,8 +228,8 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
       // remove approval
       for (uint256 i = 0; i < len; i++) {
         IERC20 vaultToken = IERC20(poolTokensBefore[i]);
-        vaultToken.approve(pool, uint256(0));
-        vaultToken.approve(address(_oldController), uint256(0));
+        vaultToken.safeApprove(pool, uint256(0));
+        vaultToken.safeApprove(address(_oldController), uint256(0));
       }
     }
 
@@ -240,8 +240,8 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     len = poolTokensAfter.length;
     for (uint256 i = 0; i < len; i++) {
       IERC20 vaultToken = IERC20(poolTokensAfter[i]);
-      vaultToken.approve(pool, uint256(-1));
-      vaultToken.approve(address(_newController), uint256(-1));
+      vaultToken.safeApprove(pool, uint256(-1));
+      vaultToken.safeApprove(address(_newController), uint256(-1));
     }
 
     emit UpdatePool(poolTokensBefore, poolTokensAfter);
@@ -405,7 +405,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     }
 
     (uint256[3][] memory weightsChange, , uint256[] memory newTokenValuesUSDC, uint256 totalValueUSDC) =
-      computeWeightsChange(_pool, _tokens, new address[](0), 0, 100 ether, block.timestamp, block.timestamp + 1);
+      computeWeightsChange(_pool, _tokens, new address[](0), 0, block.timestamp, block.timestamp + 1);
 
     configs = new RebindConfig[](len);
 
