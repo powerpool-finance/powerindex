@@ -7,7 +7,7 @@ import "@powerpool/poweroracle/contracts/interfaces/IPowerPoke.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "../interfaces/IVault.sol";
+import "../interfaces/IYearnVaultV2.sol";
 import "../interfaces/PowerIndexPoolControllerInterface.sol";
 import "../interfaces/ICurveDepositor.sol";
 import "../interfaces/ICurveDepositor2.sol";
@@ -15,10 +15,9 @@ import "../interfaces/ICurveDepositor3.sol";
 import "../interfaces/ICurveDepositor4.sol";
 import "../interfaces/ICurvePoolRegistry.sol";
 import "./WeightValueAbstract.sol";
-import "./blocks/YearnFeeRefund.sol";
 import "./blocks/SinglePoolManagement.sol";
 
-contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund, WeightValueAbstract {
+contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbstract {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
@@ -28,6 +27,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
   event UpdatePool(address[] poolTokensBefore, address[] poolTokensAfter);
   event VaultWithdrawFee(address indexed vaultToken, uint256 crvAmount);
   event SeizeERC20(address indexed token, address indexed to, uint256 amount);
+  event SetMaxWithdrawalLoss(uint256 maxWithdrawalLoss);
 
   event PullLiquidity(
     address indexed vaultToken,
@@ -88,6 +88,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
   IPowerPoke public powerPoke;
   ICurvePoolRegistry public curvePoolRegistry;
   uint256 public lastUpdate;
+  uint256 public maxWithdrawalLoss;
 
   StrategyConstraints public constraints;
 
@@ -121,12 +122,14 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
     address _powerPoke,
     address _curvePoolRegistry,
     address _poolController,
+    uint256 _maxWithdrawalLoss,
     StrategyConstraints memory _constraints
   ) external initializer {
     __Ownable_init();
 
     __SinglePoolManagement_init(_poolController);
 
+    maxWithdrawalLoss = _maxWithdrawalLoss;
     powerPoke = IPowerPoke(_powerPoke);
     curvePoolRegistry = ICurvePoolRegistry(_curvePoolRegistry);
     constraints = _constraints;
@@ -135,12 +138,14 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
 
   /*** GETTERS ***/
   function getTokenValue(PowerIndexPoolInterface, address _token) public view override returns (uint256) {
-    return getVaultVirtualPriceEstimation(_token, IVault(_token).balance());
+    return getVaultVirtualPriceEstimation(_token, IYearnVaultV2(_token).totalAssets());
   }
 
   function getVaultVirtualPriceEstimation(address _token, uint256 _amount) public view returns (uint256) {
     return
-      ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IVault(_token).token()).mul(_amount) / 1e18;
+      ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IYearnVaultV2(_token).token()).mul(
+        _amount
+      ) / 1e18;
   }
 
   function getVaultUsdcEstimation(address _token, uint256 _amount) public view returns (uint256) {
@@ -165,7 +170,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
     int8 _usdcIndex
   ) external onlyOwner {
     vaultConfig[_vault] = VaultConfig(_depositor, _depositorTokenLength, _usdcIndex);
-    IERC20 crvToken = IERC20(IVault(_vault).token());
+    IERC20 crvToken = IERC20(IYearnVaultV2(_vault).token());
     USDC.approve(_depositor, uint256(-1));
     crvToken.approve(_vault, uint256(-1));
     crvToken.approve(_depositor, uint256(-1));
@@ -181,6 +186,11 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
   function syncPoolTokens() external onlyOwner {
     address controller = poolController;
     _updatePool(controller, controller);
+  }
+
+  function setMaxWithdrawalLoss(uint256 _maxWithdrawalLoss) external onlyOwner {
+    maxWithdrawalLoss = _maxWithdrawalLoss;
+    emit SetMaxWithdrawalLoss(_maxWithdrawalLoss);
   }
 
   function removeApprovals(IERC20[] calldata _tokens, address[] calldata _tos) external onlyOwner {
@@ -285,7 +295,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
 
       if (cfg.newBalance <= cfg.oldBalance) {
         PullDataHelper memory mem;
-        mem.crvToken = IVault(cfg.token).token();
+        mem.crvToken = IYearnVaultV2(cfg.token).token();
         mem.vaultReserve = IERC20(mem.crvToken).balanceOf(cfg.token);
 
         mem.yDiff = (cfg.oldBalance - cfg.newBalance);
@@ -299,21 +309,15 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
         mem.ycrvBalance = IERC20(cfg.token).balanceOf(address(this));
 
         // 2nd step. Vault.withdraw()
-        mem.crvExpected = (mem.ycrvBalance * IVault(cfg.token).getPricePerFullShare()) / 1e18;
+        mem.crvExpected = (mem.ycrvBalance * IYearnVaultV2(cfg.token).pricePerShare()) / 1e18;
         uint256 crvBefore = IERC20(mem.crvToken).balanceOf(address(this));
-        IVault(cfg.token).withdraw(mem.ycrvBalance);
+
+        IYearnVaultV2(cfg.token).withdraw(mem.ycrvBalance, address(this), maxWithdrawalLoss);
         mem.crvActual = IERC20(mem.crvToken).balanceOf(address(this)).sub(crvBefore);
 
         // 3rd step. CurvePool.remove_liquidity_one_coin()
         mem.usdcBefore = USDC.balanceOf(address(this));
         ICurveDepositor(vc.depositor).remove_liquidity_one_coin(mem.crvActual, vc.usdcIndex, 0);
-
-        // Increase fee accumulator
-        if (mem.crvExpected > mem.crvActual) {
-          uint256 diff = mem.crvExpected - mem.crvActual;
-          _accountFee(cfg.token, diff);
-          emit VaultWithdrawFee(cfg.token, diff);
-        }
 
         emit PullLiquidity(
           cfg.token,
@@ -326,12 +330,12 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
         );
       } else {
         uint256 yDiff = cfg.newBalance - cfg.oldBalance;
-        uint256 crvAmount = IVault(cfg.token).getPricePerFullShare().mul(yDiff) / 1e18;
+        uint256 crvAmount = IYearnVaultV2(cfg.token).pricePerShare().mul(yDiff) / 1e18;
         uint256 usdcIn;
 
         if (constraints.useVirtualPriceEstimation) {
           uint256 virtualPrice =
-            ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IVault(cfg.token).token());
+            ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IYearnVaultV2(cfg.token).token());
           // usdcIn = virtualPrice * crvAmount / 1e18
           usdcIn = bmul(virtualPrice, crvAmount);
         } else {
@@ -356,15 +360,15 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
         _addUSDC2CurvePool(vaultConfigs[si], usdcAmount);
 
         // 2nd step. Vault.deposit()
-        IERC20 crvToken = IERC20(IVault(cfg.token).token());
+        IERC20 crvToken = IERC20(IYearnVaultV2(cfg.token).token());
         uint256 crvBalance = crvToken.balanceOf(address(this));
-        IVault(cfg.token).deposit(crvBalance);
+        IYearnVaultV2(cfg.token).deposit(crvBalance);
 
         // 3rd step. Rebind
-        uint256 vaultBalance = IVault(cfg.token).balanceOf(address(this));
+        uint256 vaultBalance = IERC20(cfg.token).balanceOf(address(this));
 
-        // uint256 newBalance = IVault(cfg.token).balanceOf(address(this)) + BPoolInterface(_pool).getBalance(cfg.token)
-        uint256 newBalance = IVault(cfg.token).balanceOf(address(this)).add(BPoolInterface(pool).getBalance(cfg.token));
+        // uint256 newBalance = IERC20(cfg.token).balanceOf(address(this)) + BPoolInterface(_pool).getBalance(cfg.token)
+        uint256 newBalance = IERC20(cfg.token).balanceOf(address(this)).add(BPoolInterface(pool).getBalance(cfg.token));
         PowerIndexPoolControllerInterface(poolController_).rebindByStrategyAdd(
           cfg.token,
           newBalance,
@@ -412,7 +416,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, YearnFeeRefund
       configs[si] = RebindConfig(
         _tokens[oi],
         // (totalWeight * newTokenValuesUSDC[oi]) / totalValueUSDC,
-        (totalWeight.mul(newTokenValuesUSDC[oi])) / totalValueUSDC,
+        wc[2],
         oldBalances[oi],
         // (totalUSDCPool * newTokenValuesUSDC[oi] / totalValueUSDC) / (poolUSDCBalances[oi] / oldBalances[oi]))
         bdiv(
