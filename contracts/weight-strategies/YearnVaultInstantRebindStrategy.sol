@@ -280,7 +280,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     require(poolController_ != address(0), "CFG_NOT_SET");
 
     RebindConfig[] memory configs =
-      getRebindConfigs(PowerIndexPoolInterface(pool), BPoolInterface(pool).getCurrentTokens());
+      getRebindConfigs(PowerIndexPoolInterface(pool), BPoolInterface(pool).getCurrentTokens(), false);
 
     uint256 toPushUSDCTotal;
     uint256 len = configs.length;
@@ -385,7 +385,11 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     emit InstantRebind(len, usdcPulled, usdcRemainder);
   }
 
-  function getRebindConfigs(PowerIndexPoolInterface _pool, address[] memory _tokens)
+  function getRebindConfigs(
+    PowerIndexPoolInterface _pool,
+    address[] memory _tokens,
+    bool _allowNotBound
+  )
     internal
     view
     returns (RebindConfig[] memory configs)
@@ -396,7 +400,12 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     uint256 totalUSDCPool = 0;
 
     for (uint256 oi = 0; oi < len; oi++) {
-      uint256 balance = IERC20(_tokens[oi]).balanceOf(address(_pool));
+      uint256 balance;
+      try IERC20(_tokens[oi]).balanceOf(address(_pool)) returns (uint256 _balance) {
+        balance = _balance;
+      } catch {
+        balance = 0;
+      }
       oldBalances[oi] = balance;
       uint256 poolUSDCBalance = getVaultUsdcEstimation(_tokens[oi], balance);
       poolUSDCBalances[oi] = poolUSDCBalance;
@@ -412,6 +421,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     for (uint256 si = 0; si < len; si++) {
       uint256[3] memory wc = weightsChange[si];
       uint256 oi = wc[0];
+      require(wc[1] != 0 || _allowNotBound, "TOKEN_NOT_BOUND");
 
       configs[si] = RebindConfig(
         _tokens[oi],

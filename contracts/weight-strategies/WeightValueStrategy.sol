@@ -142,6 +142,7 @@ contract WeightValueStrategy is PoolManagement, WeightValueAbstract {
       dws = new PowerIndexPoolController.DynamicWeightInput[](lenToPush);
 
       for (uint256 i = 0; i < pv.tokensLen; i++) {
+        require(weightsChange[i][1] != 0, "TOKEN_NOT_BOUND");
         uint256 wps =
           getWeightPerSecond(
             weightsChange[i][1],
