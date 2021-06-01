@@ -19,6 +19,6 @@ contract VaultBalanceWeightStrategy is WeightLastValueWeightStrategy {
   }
 
   function getVaultBalance(address _token) public view returns (uint256) {
-    return IVault(_token).balance();
+    return IVault(_token).totalAssets();
   }
 }
