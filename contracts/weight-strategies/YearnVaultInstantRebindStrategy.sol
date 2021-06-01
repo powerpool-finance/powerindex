@@ -284,7 +284,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
       }
     }
 
-    _instantRebind(true, _newTokens);
+    _instantRebind(_newTokens, true);
   }
 
   /*** POKERS ***/
@@ -312,7 +312,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     }
     lastUpdate = block.timestamp;
 
-    _instantRebind(false, BPoolInterface(pool).getCurrentTokens());
+    _instantRebind(BPoolInterface(pool).getCurrentTokens(), false);
   }
 
   function _vaultToUsdc(
@@ -361,7 +361,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     vaultBalance = IERC20(_token).balanceOf(address(this));
   }
 
-  function _instantRebind(bool _allowNotBound, address[] memory _tokens) internal {
+  function _instantRebind(address[] memory _tokens, bool _allowNotBound) internal {
     address poolController_ = poolController;
     require(poolController_ != address(0), "CFG_NOT_SET");
 
