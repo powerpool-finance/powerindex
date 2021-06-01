@@ -133,7 +133,6 @@ contract WeightValueStrategy is PoolManagement, WeightValueAbstract {
           pv.tokens,
           pv.piTokens,
           pv.minWPS,
-          pv.maxWPS,
           pv.fromTimestamp,
           pv.fromTimestamp + weightsChangeDuration
         );

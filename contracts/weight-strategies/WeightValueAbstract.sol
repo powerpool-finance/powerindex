@@ -46,7 +46,6 @@ abstract contract WeightValueAbstract is BNum, OwnableUpgradeSafe {
     address[] memory _tokens,
     address[] memory _piTokens,
     uint256 _minWPS,
-    uint256 _maxWPS,
     uint256 fromTimestamp,
     uint256 toTimestamp
   )
@@ -62,7 +61,6 @@ abstract contract WeightValueAbstract is BNum, OwnableUpgradeSafe {
       _tokens,
       _piTokens,
       _minWPS,
-      _maxWPS,
       fromTimestamp,
       toTimestamp
     );
@@ -74,7 +72,6 @@ abstract contract WeightValueAbstract is BNum, OwnableUpgradeSafe {
     address[] memory _tokens,
     address[] memory _piTokens,
     uint256 _minWPS,
-    uint256 _maxWPS,
     uint256 fromTimestamp,
     uint256 toTimestamp
   )
