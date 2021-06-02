@@ -16,6 +16,7 @@ import "../interfaces/ICurveDepositor4.sol";
 import "../interfaces/ICurvePoolRegistry.sol";
 import "./WeightValueAbstract.sol";
 import "./blocks/SinglePoolManagement.sol";
+import "hardhat/console.sol";
 
 contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbstract {
   using SafeMath for uint256;
@@ -488,10 +489,13 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
 
     configs = new RebindConfig[](len);
 
+    console.log("totalUSDCPool", totalUSDCPool);
+    console.log("totalValueUSDC", totalValueUSDC);
     for (uint256 si = 0; si < len; si++) {
       uint256[3] memory wc = weightsChange[si];
       require(wc[1] != 0 || _allowNotBound, "TOKEN_NOT_BOUND");
 
+      console.log("newTokenValuesUSDC", newTokenValuesUSDC[wc[0]]);
       configs[si] = RebindConfig(
         _tokens[wc[0]],
         // (totalWeight * newTokenValuesUSDC[oi]) / totalValueUSDC,
