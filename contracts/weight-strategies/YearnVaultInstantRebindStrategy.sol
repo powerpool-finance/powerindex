@@ -14,11 +14,11 @@ import "../interfaces/ICurveDepositor2.sol";
 import "../interfaces/ICurveDepositor3.sol";
 import "../interfaces/ICurveDepositor4.sol";
 import "../interfaces/ICurvePoolRegistry.sol";
-import "./WeightValueAbstract.sol";
 import "./blocks/SinglePoolManagement.sol";
 import "hardhat/console.sol";
+import "./WeightValueChangeRateAbstract.sol";
 
-contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbstract {
+contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueChangeRateAbstract {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
@@ -138,8 +138,11 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
   }
 
   /*** GETTERS ***/
-  function getTokenValue(PowerIndexPoolInterface, address _token) public view override returns (uint256) {
-    return getVaultVirtualPriceEstimation(_token, IYearnVaultV2(_token).totalAssets());
+  function getTokenValue(PowerIndexPoolInterface, address _token) public view override returns (uint256 value) {
+    value = getVaultVirtualPriceEstimation(_token, IYearnVaultV2(_token).totalAssets());
+    if (valueChangeRate[_token] != 0) {
+      value = bmul(value, valueChangeRate[_token]);
+    }
   }
 
   function getVaultVirtualPriceEstimation(address _token, uint256 _amount) public view returns (uint256) {
@@ -495,13 +498,12 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
       uint256[3] memory wc = weightsChange[si];
       require(wc[1] != 0 || _allowNotBound, "TOKEN_NOT_BOUND");
 
-      console.log("newTokenValuesUSDC", newTokenValuesUSDC[wc[0]]);
       configs[si] = RebindConfig(
         _tokens[wc[0]],
         // (totalWeight * newTokenValuesUSDC[oi]) / totalValueUSDC,
         wc[2],
         oldBalances[wc[0]],
-        // (totalUSDCPool * newTokenValuesUSDC[oi] / totalValueUSDC) / (poolUSDCBalances / totalSupply))
+        // (totalUSDCPool * weight / totalWeight) / (poolUSDCBalances / totalSupply))
         getNewTokenBalance(_tokens, wc, poolUSDCBalances, newTokenValuesUSDC, totalUSDCPool, totalValueUSDC)
       );
     }
@@ -515,11 +517,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     uint256 totalUSDCPool,
     uint256 totalValueUSDC
   ) internal view returns (uint256) {
-    return
-      bdiv(
-        bdiv(bmul(totalUSDCPool, newTokenValuesUSDC[wc[0]]), totalValueUSDC),
-        bdiv(poolUSDCBalances[wc[0]], IERC20(_tokens[wc[0]]).totalSupply())
-      ) * 1e12;
+    return bdiv(bdiv(bmul(wc[2], totalUSDCPool), totalWeight), bdiv(poolUSDCBalances[wc[0]], IERC20(_tokens[wc[0]]).totalSupply())) * 1e12;
   }
 
   function getRebindConfigBalances(PowerIndexPoolInterface _pool, address[] memory _tokens)
