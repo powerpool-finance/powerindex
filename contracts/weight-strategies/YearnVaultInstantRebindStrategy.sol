@@ -15,7 +15,6 @@ import "../interfaces/ICurveDepositor3.sol";
 import "../interfaces/ICurveDepositor4.sol";
 import "../interfaces/ICurvePoolRegistry.sol";
 import "./blocks/SinglePoolManagement.sol";
-import "hardhat/console.sol";
 import "./WeightValueChangeRateAbstract.sol";
 
 contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueChangeRateAbstract {
@@ -24,6 +23,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
 
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
 
+  event ChangePoolTokens(address[] poolTokensBefore,  address[] poolTokensAfter);
   event InstantRebind(uint256 poolCurrentTokensCount, uint256 usdcPulled, uint256 usdcRemainder);
   event UpdatePool(address[] poolTokensBefore, address[] poolTokensAfter);
   event VaultWithdrawFee(address indexed vaultToken, uint256 crvAmount);
@@ -289,6 +289,8 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
     }
 
     _instantRebind(_newTokens, true);
+
+    emit ChangePoolTokens(_currentTokens, _newTokens);
   }
 
   /*** POKERS ***/
@@ -492,8 +494,6 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
 
     configs = new RebindConfig[](len);
 
-    console.log("totalUSDCPool", totalUSDCPool);
-    console.log("totalValueUSDC", totalValueUSDC);
     for (uint256 si = 0; si < len; si++) {
       uint256[3] memory wc = weightsChange[si];
       require(wc[1] != 0 || _allowNotBound, "TOKEN_NOT_BOUND");

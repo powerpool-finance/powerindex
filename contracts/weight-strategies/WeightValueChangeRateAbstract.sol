@@ -4,7 +4,6 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "./WeightValueAbstract.sol";
-import "hardhat/console.sol";
 
 abstract contract WeightValueChangeRateAbstract is WeightValueAbstract {
   mapping(address => uint256) public lastValue;
@@ -23,18 +22,15 @@ abstract contract WeightValueChangeRateAbstract is WeightValueAbstract {
     address[] memory _tokens,
     uint256[] memory _newTokenValues
   ) internal {
-    console.log("_updatePoolByPoke");
     uint256 len = _tokens.length;
     for (uint256 i = 0; i < len; i++) {
       uint256 oldValue = lastValue[_tokens[i]];
       lastValue[_tokens[i]] = _newTokenValues[i];
-      console.log("_newTokenValues[i]", _newTokenValues[i]);
 
       uint256 lastChangeRate;
       if (oldValue != 0 && !rateChangeDisabled) {
         lastChangeRate = valueChangeRate[_tokens[i]] == 0 ? 1 ether : valueChangeRate[_tokens[i]];
         valueChangeRate[_tokens[i]] = bmul(bdiv(_newTokenValues[i], oldValue), lastChangeRate);
-        console.log("valueChangeRate[_tokens[i]]", valueChangeRate[_tokens[i]]);
       }
       emit UpdatePoolTokenValue(_tokens[i], oldValue, _newTokenValues[i], lastChangeRate, valueChangeRate[_tokens[i]]);
     }

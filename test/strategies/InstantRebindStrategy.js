@@ -935,10 +935,20 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getBalance(balancerTokens[4].address), ether('438106.326817929161302093')); // BUSD
 
           const tokensToChange = balancerTokens.map(t => t.address).slice(1).concat([ycrvVault.address]);
-          await weightStrategy.setValueChangeRates([ycrvVault.address], [ether(1.05)]);
+          let res = await weightStrategy.setValueChangeRates([ycrvVault.address], [ether(1.05)]);
+          expectEvent(res, 'SetValueChangeRate', {
+            token: ycrvVault.address,
+            oldRate: '0',
+            newRate: ether(1.05),
+          });
           assert.equal(await weightStrategy.valueChangeRate(ycrvVault.address), ether(1.05));
           // ACTION
-          const res = await weightStrategy.changePoolTokens(tokensToChange);
+          res = await weightStrategy.changePoolTokens(tokensToChange);
+
+          expectEvent(res, 'ChangePoolTokens', {
+            poolTokensBefore: balancerTokens.map(t => t.address),
+            poolTokensAfter: tokensToChange
+          });
 
           expectEvent(res, 'InstantRebind', {
             poolCurrentTokensCount: '5',
