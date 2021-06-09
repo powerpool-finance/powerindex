@@ -547,6 +547,8 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
             usdcRemainder: '1',
           });
 
+          res.logs = res.logs.filter(l => l.event !== 'UpdatePoolTokenValue');
+
           const pull0 = res.logs[0].args;
           assert.equal(res.logs[0].event, 'PullLiquidity');
           assert.equal(pull0.vaultToken, balancerTokens[4].address);
@@ -635,13 +637,15 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           );
 
           // ACTION
-          const res = await weightStrategy.mockPoke();
+          let res = await weightStrategy.mockPoke();
 
           expectEvent(res, 'InstantRebind', {
             poolCurrentTokensCount: '5',
             usdcPulled: mwei('259758.195299'),
             usdcRemainder: '1',
           });
+
+          res.logs = res.logs.filter(l => l.event !== 'UpdatePoolTokenValue');
 
           const pull0 = res.logs[0].args;
           assert.equal(res.logs[0].event, 'PullLiquidity');
@@ -707,6 +711,39 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getBalance(balancerTokens[2].address), ether('788061.250223962626874946'));
           assert.equal(await pool.getBalance(balancerTokens[3].address), ether('902398.434802000000000000'));
           assert.equal(await pool.getBalance(balancerTokens[4].address), ether('355041.757045000000000000'));
+
+          await curvePoolRegistry.set_virtual_price(balancerTokens[0].address, mulScalarBN(vaultsData[0].curvePool.virtualPrice, ether(1.05)));
+
+          res = await weightStrategy.mockPoke();
+
+          const update1 = res.logs[0].args;
+          assert.equal(res.logs[0].event, 'UpdatePoolTokenValue');
+          assert.equal(update1.token, balancerTokens[0].address);
+          assert.equal(update1.oldTokenValue, ether('26865809.076845363062913167'));
+          assert.equal(update1.newTokenValue, ether('27281690.820944925854810447'));
+          assert.equal(update1.lastChangeRate, ether('1'));
+          assert.equal(update1.newChangeRate, ether('1.015479963507147668'));
+
+          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[0].address), ether('1.015479963507147668'));
+
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[0].address), ether('0.134417966278405918'));
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[1].address), ether('0.373221650864339100'));
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[2].address), ether('0.182325312239455525'));
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[3].address), ether('0.222402838368144340'));
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[4].address), ether('0.087632232249655117'));
+
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[0].address), ether('3.360449156960147950'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[1].address), ether('9.330541271608477500'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[2].address), ether('4.558132805986388125'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[3].address), ether('5.560070959203608500'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.190805806241377925'));
+          assert.equal(await pool.getTotalDenormalizedWeight(), ether('25'));
+
+          assert.equal(await pool.getBalance(balancerTokens[0].address), ether('554785.979841178742129653'));
+          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1616989.413362809362919481'));
+          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('789700.406447882644590129'));
+          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('895703.738629000000000000'));
+          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('351447.438581000000000000'));
         });
 
         it('should correctly rebalance token balances with insufficient underlying tokens on vault', async () => {
@@ -748,6 +785,8 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
             usdcPulled: mwei('161600.925321'),
             usdcRemainder: '2',
           });
+
+          res.logs = res.logs.filter(l => l.event !== 'UpdatePoolTokenValue');
 
           const pull0 = res.logs[0].args; //++
           assert.equal(res.logs[0].event, 'PullLiquidity');
@@ -841,6 +880,8 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
             usdcPulled: mwei('634587.142411'),
             usdcRemainder: '1',
           });
+
+          res.logs = res.logs.filter(l => l.event !== 'UpdatePoolTokenValue');
 
           const pull0 = res.logs[0].args;
           assert.equal(res.logs[0].event, 'PullLiquidity');
@@ -955,6 +996,8 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
             usdcPulled: mwei('660959.107138'),
             usdcRemainder: '1',
           });
+
+          res.logs = res.logs.filter(l => l.event !== 'UpdatePoolTokenValue');
 
           const pull0 = res.logs[0].args;
           assert.equal(res.logs[0].event, 'PullLiquidity');
@@ -1071,6 +1114,8 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
             usdcPulled: mwei('653052.239634'),
             usdcRemainder: '1',
           });
+
+          res.logs = res.logs.filter(l => l.event !== 'UpdatePoolTokenValue');
 
           const pull0 = res.logs[0].args;
           assert.equal(res.logs[0].event, 'PullLiquidity');
@@ -1192,6 +1237,8 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
             usdcPulled: mwei('653052.239634'),
             usdcRemainder: '1',
           });
+
+          res.logs = res.logs.filter(l => l.event !== 'UpdatePoolTokenValue');
 
           const pull0 = res.logs[0].args;
           assert.equal(res.logs[0].event, 'PullLiquidity');

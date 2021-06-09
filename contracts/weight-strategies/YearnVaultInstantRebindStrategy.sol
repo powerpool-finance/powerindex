@@ -372,7 +372,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
     address poolController_ = poolController;
     require(poolController_ != address(0), "CFG_NOT_SET");
 
-    RebindConfig[] memory configs = getRebindConfigs(PowerIndexPoolInterface(pool), _tokens, _allowNotBound);
+    RebindConfig[] memory configs = fetchRebindConfigs(PowerIndexPoolInterface(pool), _tokens, _allowNotBound);
 
     uint256 toPushUSDCTotal;
     uint256 len = configs.length;
@@ -481,11 +481,11 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
     emit InstantRebind(len, usdcPulled, usdcRemainder);
   }
 
-  function getRebindConfigs(
+  function fetchRebindConfigs(
     PowerIndexPoolInterface _pool,
     address[] memory _tokens,
     bool _allowNotBound
-  ) internal view returns (RebindConfig[] memory configs) {
+  ) internal returns (RebindConfig[] memory configs) {
     uint256 len = _tokens.length;
     (uint256[] memory oldBalances, uint256[] memory poolUSDCBalances, uint256 totalUSDCPool) =
       getRebindConfigBalances(_pool, _tokens);
@@ -508,6 +508,8 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
         getNewTokenBalance(_tokens, wc, poolUSDCBalances, newTokenValuesUSDC, totalUSDCPool, totalValueUSDC)
       );
     }
+
+    _updatePoolByPoke(pool, _tokens, newTokenValuesUSDC);
   }
 
   function getNewTokenBalance(
