@@ -140,8 +140,9 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
   /*** GETTERS ***/
   function getTokenValue(PowerIndexPoolInterface, address _token) public view override returns (uint256 value) {
     value = getVaultVirtualPriceEstimation(_token, IYearnVaultV2(_token).totalAssets());
-    if (valueChangeRate[_token] != 0) {
-      value = bmul(value, valueChangeRate[_token]);
+    (, uint256 newValueChangeRate) = getValueChangeRate(_token, lastValue[_token], value);
+    if (newValueChangeRate != 0) {
+      value = bmul(value, newValueChangeRate);
     }
   }
 

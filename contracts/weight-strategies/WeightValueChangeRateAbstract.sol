@@ -28,12 +28,23 @@ abstract contract WeightValueChangeRateAbstract is WeightValueAbstract {
       lastValue[_tokens[i]] = _newTokenValues[i];
 
       uint256 lastChangeRate;
-      if (oldValue != 0 && !rateChangeDisabled) {
-        lastChangeRate = valueChangeRate[_tokens[i]] == 0 ? 1 ether : valueChangeRate[_tokens[i]];
-        valueChangeRate[_tokens[i]] = bmul(bdiv(_newTokenValues[i], oldValue), lastChangeRate);
-      }
+      (lastChangeRate, valueChangeRate[_tokens[i]]) = getValueChangeRate(_tokens[i], oldValue, _newTokenValues[i]);
+
       emit UpdatePoolTokenValue(_tokens[i], oldValue, _newTokenValues[i], lastChangeRate, valueChangeRate[_tokens[i]]);
     }
+  }
+
+  function getValueChangeRate(
+    address _token,
+    uint256 oldTokenValue,
+    uint256 newTokenValue
+  ) public view returns (uint256 lastChangeRate, uint256 newChangeRate) {
+    lastChangeRate = valueChangeRate[_token] == 0 ? 1 ether : valueChangeRate[_token];
+    if (oldTokenValue == 0) {
+      newChangeRate = lastChangeRate;
+      return (lastChangeRate, newChangeRate);
+    }
+    newChangeRate = rateChangeDisabled ? lastChangeRate : bmul(bdiv(newTokenValue, oldTokenValue), lastChangeRate);
   }
 
   function getTokenValue(PowerIndexPoolInterface _pool, address _token) public view virtual override returns (uint256 value) {
