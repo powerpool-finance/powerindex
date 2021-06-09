@@ -11,7 +11,13 @@ abstract contract WeightValueChangeRateAbstract is WeightValueAbstract {
 
   bool public rateChangeDisabled;
 
-  event UpdatePoolTokenValue(address indexed token, uint256 oldTokenValue, uint256 newTokenValue, uint256 lastChangeRate, uint256 newChangeRate);
+  event UpdatePoolTokenValue(
+    address indexed token,
+    uint256 oldTokenValue,
+    uint256 newTokenValue,
+    uint256 lastChangeRate,
+    uint256 newChangeRate
+  );
   event SetValueChangeRate(address indexed token, uint256 oldRate, uint256 newRate);
   event SetRateChangeDisabled(bool rateChangeDisabled);
 
@@ -47,7 +53,13 @@ abstract contract WeightValueChangeRateAbstract is WeightValueAbstract {
     newChangeRate = rateChangeDisabled ? lastChangeRate : bmul(bdiv(newTokenValue, oldTokenValue), lastChangeRate);
   }
 
-  function getTokenValue(PowerIndexPoolInterface _pool, address _token) public view virtual override returns (uint256 value) {
+  function getTokenValue(PowerIndexPoolInterface _pool, address _token)
+    public
+    view
+    virtual
+    override
+    returns (uint256 value)
+  {
     value = getTVL(_pool, _token);
     if (valueChangeRate[_token] != 0) {
       value = bmul(value, valueChangeRate[_token]);

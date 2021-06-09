@@ -23,7 +23,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
 
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
 
-  event ChangePoolTokens(address[] poolTokensBefore,  address[] poolTokensAfter);
+  event ChangePoolTokens(address[] poolTokensBefore, address[] poolTokensAfter);
   event InstantRebind(uint256 poolCurrentTokensCount, uint256 usdcPulled, uint256 usdcRemainder);
   event UpdatePool(address[] poolTokensBefore, address[] poolTokensAfter);
   event VaultWithdrawFee(address indexed vaultToken, uint256 crvAmount);
@@ -518,7 +518,11 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
     uint256 totalUSDCPool,
     uint256 totalValueUSDC
   ) internal view returns (uint256) {
-    return bdiv(bdiv(bmul(wc[2], totalUSDCPool), totalWeight), bdiv(poolUSDCBalances[wc[0]], IERC20(_tokens[wc[0]]).totalSupply())) * 1e12;
+    return
+      bdiv(
+        bdiv(bmul(wc[2], totalUSDCPool), totalWeight),
+        bdiv(poolUSDCBalances[wc[0]], IERC20(_tokens[wc[0]]).totalSupply())
+      ) * 1e12;
   }
 
   function getRebindConfigBalances(PowerIndexPoolInterface _pool, address[] memory _tokens)
