@@ -478,6 +478,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           await weightStrategy.setVaultConfig(
             tokens[i].address,
             crvDepositors[i].address,
+            vaultsData[i].config.depositorType || 1,
             vaultsData[i].config.amountsLength,
             vaultsData[i].config.usdcIndex,
           );
@@ -861,6 +862,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           await weightStrategy.setVaultConfig(
             ycrvVault.address,
             crvDepositor.address,
+            vaultsData[0].config.depositorType || 1,
             vaultsData[0].config.amountsLength,
             vaultsData[0].config.usdcIndex,
           );
@@ -957,6 +959,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           await weightStrategy.setVaultConfig(
             ycrvVault.address,
             crvDepositor.address,
+            vaultItem.config.depositorType || 1,
             vaultItem.config.amountsLength,
             vaultItem.config.usdcIndex,
           );
@@ -1074,6 +1077,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           await weightStrategy.setVaultConfig(
             ycrvVault.address,
             crvDepositor.address,
+            vaultItem.config.depositorType || 1,
             vaultItem.config.amountsLength,
             vaultItem.config.usdcIndex,
           );
@@ -1205,6 +1209,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           await weightStrategy.setVaultConfig(
             ycrvVault.address,
             crvDepositor.address,
+            vaultItem.config.depositorType || 1,
             vaultItem.config.amountsLength,
             vaultItem.config.usdcIndex,
           );

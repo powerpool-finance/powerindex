@@ -13,6 +13,10 @@ import "../interfaces/ICurveDepositor.sol";
 import "../interfaces/ICurveDepositor2.sol";
 import "../interfaces/ICurveDepositor3.sol";
 import "../interfaces/ICurveDepositor4.sol";
+import "../interfaces/ICurveZapDepositor.sol";
+import "../interfaces/ICurveZapDepositor2.sol";
+import "../interfaces/ICurveZapDepositor3.sol";
+import "../interfaces/ICurveZapDepositor4.sol";
 import "../interfaces/ICurvePoolRegistry.sol";
 import "./blocks/SinglePoolManagement.sol";
 import "./WeightValueChangeRateAbstract.sol";
@@ -52,7 +56,13 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
 
   event SetCurvePoolRegistry(address curvePoolRegistry);
 
-  event SetVaultConfig(address indexed vault, address indexed depositor, uint8 depositorTokenLength, int8 usdcIndex);
+  event SetVaultConfig(
+    address indexed vault,
+    address indexed depositor,
+    uint8 depositorType,
+    uint8 depositorTokenLength,
+    int8 usdcIndex
+  );
 
   event SetStrategyConstraints(uint256 minUSDCRemainder, bool useVirtualPriceEstimation);
 
@@ -65,6 +75,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
 
   struct VaultConfig {
     address depositor;
+    uint8 depositorType;
     uint8 depositorTokenLength;
     int8 usdcIndex;
   }
@@ -153,9 +164,13 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
       ) / 1e18;
   }
 
-  function getVaultUsdcEstimation(address _token, uint256 _amount) public view returns (uint256) {
+  function getVaultUsdcEstimation(address _token, address _crvToken, uint256 _amount) public view returns (uint256) {
     VaultConfig memory vc = vaultConfig[_token];
-    return ICurveDepositor(vc.depositor).calc_withdraw_one_coin(_amount, int128(vc.usdcIndex));
+    if (vc.depositorType == 2) {
+      return ICurveZapDepositor(vc.depositor).calc_withdraw_one_coin(_crvToken, _amount, int128(vc.usdcIndex));
+    } else {
+      return ICurveDepositor(vc.depositor).calc_withdraw_one_coin(_amount, int128(vc.usdcIndex));
+    }
   }
 
   function getPoolTokens() public view returns (address[] memory) {
@@ -171,15 +186,16 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
   function setVaultConfig(
     address _vault,
     address _depositor,
+    uint8 _depositorType,
     uint8 _depositorTokenLength,
     int8 _usdcIndex
   ) external onlyOwner {
-    vaultConfig[_vault] = VaultConfig(_depositor, _depositorTokenLength, _usdcIndex);
+    vaultConfig[_vault] = VaultConfig(_depositor, _depositorType, _depositorTokenLength, _usdcIndex);
     IERC20 crvToken = IERC20(IYearnVaultV2(_vault).token());
     USDC.safeApprove(_depositor, uint256(-1));
     crvToken.safeApprove(_vault, uint256(-1));
     crvToken.safeApprove(_depositor, uint256(-1));
-    emit SetVaultConfig(_vault, _depositor, _depositorTokenLength, _usdcIndex);
+    emit SetVaultConfig(_vault, _depositor, _depositorType, _depositorTokenLength, _usdcIndex);
   }
 
   function setPoolController(address _poolController) public onlyOwner {
@@ -276,8 +292,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
         _vaultToUsdc(
           _currentTokens[i],
           IYearnVaultV2(_currentTokens[i]).token(),
-          vaultConfig[_currentTokens[i]].depositor,
-          vaultConfig[_currentTokens[i]].usdcIndex
+          vaultConfig[_currentTokens[i]]
         );
         _removeApprovalVault(_currentTokens[i], address(poolController));
       }
@@ -325,8 +340,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
   function _vaultToUsdc(
     address _token,
     address _crvToken,
-    address _depositor,
-    int8 _usdcIndex
+    VaultConfig memory _vc
   )
     internal
     returns (
@@ -342,7 +356,11 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
     crvReceived = IERC20(_crvToken).balanceOf(address(this)).sub(crvBefore);
 
     usdcBefore = USDC.balanceOf(address(this));
-    ICurveDepositor(_depositor).remove_liquidity_one_coin(crvReceived, _usdcIndex, 0);
+    if (_vc.depositorType == 2) {
+      ICurveZapDepositor(_vc.depositor).remove_liquidity_one_coin(_crvToken, crvReceived, _vc.usdcIndex, 0);
+    } else {
+      ICurveDepositor(_vc.depositor).remove_liquidity_one_coin(crvReceived, _vc.usdcIndex, 0);
+    }
   }
 
   function _usdcToVault(
@@ -357,10 +375,11 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
       address crvToken
     )
   {
-    _addUSDC2CurvePool(_vc, _usdcAmount);
+    crvToken = IYearnVaultV2(_token).token();
+
+    _addUSDC2CurvePool(crvToken, _vc, _usdcAmount);
 
     // 2nd step. Vault.deposit()
-    crvToken = IYearnVaultV2(_token).token();
     crvBalance = IERC20(crvToken).balanceOf(address(this));
     IYearnVaultV2(_token).deposit(crvBalance);
 
@@ -403,8 +422,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
         (mem.ycrvBalance, mem.crvActual, mem.usdcBefore) = _vaultToUsdc(
           cfg.token,
           mem.crvToken,
-          vc.depositor,
-          vc.usdcIndex
+          vc
         );
 
         // 2nd step. Vault.withdraw()
@@ -424,13 +442,14 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
         uint256 crvAmount = IYearnVaultV2(cfg.token).pricePerShare().mul(yDiff) / 1e18;
         uint256 usdcIn;
 
+        address crvToken = IYearnVaultV2(cfg.token).token();
         if (constraints.useVirtualPriceEstimation) {
           uint256 virtualPrice =
-            ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IYearnVaultV2(cfg.token).token());
+            ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(crvToken);
           // usdcIn = virtualPrice * crvAmount / 1e18
           usdcIn = bmul(virtualPrice, crvAmount);
         } else {
-          usdcIn = ICurveDepositor(vc.depositor).calc_withdraw_one_coin(crvAmount, int128(vc.usdcIndex));
+          usdcIn = getVaultUsdcEstimation(cfg.token, crvToken, crvAmount);
         }
 
         // toPushUSDCTotal += usdcIn;
@@ -544,7 +563,9 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
     for (uint256 oi = 0; oi < len; oi++) {
       try IERC20(_tokens[oi]).balanceOf(address(_pool)) returns (uint256 _balance) {
         oldBalances[oi] = _balance;
-        totalUSDCPool = totalUSDCPool.add(getVaultUsdcEstimation(_tokens[oi], oldBalances[oi]));
+        totalUSDCPool = totalUSDCPool.add(
+          getVaultUsdcEstimation(_tokens[oi], IYearnVaultV2(_tokens[oi]).token(), oldBalances[oi])
+        );
       } catch {
         oldBalances[oi] = 0;
       }
@@ -553,23 +574,35 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
     }
   }
 
-  function _addUSDC2CurvePool(VaultConfig memory vc, uint256 _usdcAmount) internal {
-    if (vc.depositorTokenLength == 2) {
+  function _addUSDC2CurvePool(address _crvToken, VaultConfig memory _vc, uint256 _usdcAmount) internal {
+    if (_vc.depositorTokenLength == 2) {
       uint256[2] memory amounts;
-      amounts[uint256(vc.usdcIndex)] = _usdcAmount;
-      ICurveDepositor2(vc.depositor).add_liquidity(amounts, 1);
+      amounts[uint256(_vc.usdcIndex)] = _usdcAmount;
+      if (_vc.depositorType == 2) {
+        ICurveZapDepositor2(_vc.depositor).add_liquidity(_crvToken, amounts, 1);
+      } else {
+        ICurveDepositor2(_vc.depositor).add_liquidity(amounts, 1);
+      }
     }
 
-    if (vc.depositorTokenLength == 3) {
+    if (_vc.depositorTokenLength == 3) {
       uint256[3] memory amounts;
-      amounts[uint256(vc.usdcIndex)] = _usdcAmount;
-      ICurveDepositor3(vc.depositor).add_liquidity(amounts, 1);
+      amounts[uint256(_vc.usdcIndex)] = _usdcAmount;
+      if (_vc.depositorType == 2) {
+        ICurveZapDepositor3(_vc.depositor).add_liquidity(_crvToken, amounts, 1);
+      } else {
+        ICurveDepositor3(_vc.depositor).add_liquidity(amounts, 1);
+      }
     }
 
-    if (vc.depositorTokenLength == 4) {
+    if (_vc.depositorTokenLength == 4) {
       uint256[4] memory amounts;
-      amounts[uint256(vc.usdcIndex)] = _usdcAmount;
-      ICurveDepositor4(vc.depositor).add_liquidity(amounts, 1);
+      amounts[uint256(_vc.usdcIndex)] = _usdcAmount;
+      if (_vc.depositorType == 2) {
+        ICurveZapDepositor4(_vc.depositor).add_liquidity(_crvToken, amounts, 1);
+      } else {
+        ICurveDepositor4(_vc.depositor).add_liquidity(amounts, 1);
+      }
     }
   }
 
