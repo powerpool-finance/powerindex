@@ -15,4 +15,12 @@ interface PowerIndexPoolControllerInterface {
     uint256 balance,
     uint256 denorm
   ) external;
+
+  function bindByStrategy(
+    address token,
+    uint256 balance,
+    uint256 denorm
+  ) external;
+
+  function unbindByStrategy(address token) external;
 }

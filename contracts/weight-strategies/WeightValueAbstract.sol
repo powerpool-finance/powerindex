@@ -97,9 +97,17 @@ abstract contract WeightValueAbstract is BNum, OwnableUpgradeSafe {
     for (uint256 i = 0; i < len; i++) {
       uint256 oldWeight;
       if (_piTokens.length == _tokens.length) {
-        oldWeight = _pool.getDenormalizedWeight(_piTokens[i]);
+        try _pool.getDenormalizedWeight(_piTokens[i]) returns (uint256 _weight) {
+          oldWeight = _weight;
+        } catch {
+          oldWeight = 0;
+        }
       } else {
-        oldWeight = _pool.getDenormalizedWeight(_tokens[i]);
+        try _pool.getDenormalizedWeight(_tokens[i]) returns (uint256 _weight) {
+          oldWeight = _weight;
+        } catch {
+          oldWeight = 0;
+        }
       }
       uint256 newWeight = bmul(bdiv(newTokenValues[i], newTokenValueSum), totalWeight);
       weightsChange[i] = [i, oldWeight, newWeight];

@@ -242,4 +242,21 @@ contract PowerIndexPoolController is PowerIndexPoolControllerInterface, PowerInd
     uint256 balanceAfter = IERC20(token).balanceOf(address(this));
     IERC20(token).safeTransfer(msg.sender, balanceAfter.sub(balanceBefore));
   }
+
+  function bindByStrategy(
+    address token,
+    uint256 balance,
+    uint256 denorm
+  ) external override onlyWeightsStrategy {
+    IERC20(token).safeTransferFrom(msg.sender, address(this), balance);
+    IERC20(token).approve(address(pool), balance);
+    pool.bind(token, balance, denorm);
+  }
+
+  function unbindByStrategy(address token) external override onlyWeightsStrategy {
+    uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+    pool.unbind(token);
+    uint256 balanceAfter = IERC20(token).balanceOf(address(this));
+    IERC20(token).safeTransfer(msg.sender, balanceAfter.sub(balanceBefore));
+  }
 }

@@ -14,15 +14,16 @@ import "../interfaces/ICurveDepositor2.sol";
 import "../interfaces/ICurveDepositor3.sol";
 import "../interfaces/ICurveDepositor4.sol";
 import "../interfaces/ICurvePoolRegistry.sol";
-import "./WeightValueAbstract.sol";
 import "./blocks/SinglePoolManagement.sol";
+import "./WeightValueChangeRateAbstract.sol";
 
-contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbstract {
+contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueChangeRateAbstract {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
 
+  event ChangePoolTokens(address[] poolTokensBefore, address[] poolTokensAfter);
   event InstantRebind(uint256 poolCurrentTokensCount, uint256 usdcPulled, uint256 usdcRemainder);
   event UpdatePool(address[] poolTokensBefore, address[] poolTokensAfter);
   event VaultWithdrawFee(address indexed vaultToken, uint256 crvAmount);
@@ -137,8 +138,12 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
   }
 
   /*** GETTERS ***/
-  function getTokenValue(PowerIndexPoolInterface, address _token) public view override returns (uint256) {
-    return getVaultVirtualPriceEstimation(_token, IYearnVaultV2(_token).totalAssets());
+  function getTokenValue(PowerIndexPoolInterface, address _token) public view override returns (uint256 value) {
+    value = getVaultVirtualPriceEstimation(_token, IYearnVaultV2(_token).totalAssets());
+    (, uint256 newValueChangeRate) = getValueChangeRate(_token, lastValue[_token], value);
+    if (newValueChangeRate != 0) {
+      value = bmul(value, newValueChangeRate);
+    }
   }
 
   function getVaultVirtualPriceEstimation(address _token, uint256 _amount) public view returns (uint256) {
@@ -227,9 +232,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     if (_oldController != address(0)) {
       // remove approval
       for (uint256 i = 0; i < len; i++) {
-        IERC20 vaultToken = IERC20(poolTokensBefore[i]);
-        vaultToken.safeApprove(pool, uint256(0));
-        vaultToken.safeApprove(address(_oldController), uint256(0));
+        _removeApprovalVault(poolTokensBefore[i], address(_oldController));
       }
     }
 
@@ -239,12 +242,56 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     // approve
     len = poolTokensAfter.length;
     for (uint256 i = 0; i < len; i++) {
-      IERC20 vaultToken = IERC20(poolTokensAfter[i]);
-      vaultToken.safeApprove(pool, uint256(-1));
-      vaultToken.safeApprove(address(_newController), uint256(-1));
+      _approveVault(poolTokensAfter[i], address(_newController));
     }
 
     emit UpdatePool(poolTokensBefore, poolTokensAfter);
+  }
+
+  function _approveVault(address _vaultToken, address _controller) internal {
+    IERC20 vaultToken = IERC20(_vaultToken);
+    vaultToken.safeApprove(pool, uint256(-1));
+    vaultToken.safeApprove(_controller, uint256(-1));
+  }
+
+  function _removeApprovalVault(address _vaultToken, address _controller) internal {
+    IERC20 vaultToken = IERC20(_vaultToken);
+    vaultToken.safeApprove(pool, uint256(0));
+    vaultToken.safeApprove(_controller, uint256(0));
+  }
+
+  function changePoolTokens(address[] memory _newTokens) external onlyOwner {
+    address[] memory _currentTokens = BPoolInterface(pool).getCurrentTokens();
+    uint256 cLen = _currentTokens.length;
+    uint256 nLen = _newTokens.length;
+    for (uint256 i = 0; i < cLen; i++) {
+      bool existsInNewTokens = false;
+      for (uint256 j = 0; j < nLen; j++) {
+        if (_currentTokens[i] == _newTokens[j]) {
+          existsInNewTokens = true;
+        }
+      }
+      if (!existsInNewTokens) {
+        PowerIndexPoolControllerInterface(poolController).unbindByStrategy(_currentTokens[i]);
+        _vaultToUsdc(
+          _currentTokens[i],
+          IYearnVaultV2(_currentTokens[i]).token(),
+          vaultConfig[_currentTokens[i]].depositor,
+          vaultConfig[_currentTokens[i]].usdcIndex
+        );
+        _removeApprovalVault(_currentTokens[i], address(poolController));
+      }
+    }
+
+    for (uint256 j = 0; j < nLen; j++) {
+      if (!BPoolInterface(pool).isBound(_newTokens[j])) {
+        _approveVault(_newTokens[j], address(poolController));
+      }
+    }
+
+    _instantRebind(_newTokens, true);
+
+    emit ChangePoolTokens(_currentTokens, _newTokens);
   }
 
   /*** POKERS ***/
@@ -272,15 +319,60 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     }
     lastUpdate = block.timestamp;
 
-    _instantRebind();
+    _instantRebind(BPoolInterface(pool).getCurrentTokens(), false);
   }
 
-  function _instantRebind() internal {
+  function _vaultToUsdc(
+    address _token,
+    address _crvToken,
+    address _depositor,
+    int8 _usdcIndex
+  )
+    internal
+    returns (
+      uint256 crvBalance,
+      uint256 crvReceived,
+      uint256 usdcBefore
+    )
+  {
+    crvBalance = IERC20(_token).balanceOf(address(this));
+    uint256 crvBefore = IERC20(_crvToken).balanceOf(address(this));
+
+    IYearnVaultV2(_token).withdraw(crvBalance, address(this), maxWithdrawalLoss);
+    crvReceived = IERC20(_crvToken).balanceOf(address(this)).sub(crvBefore);
+
+    usdcBefore = USDC.balanceOf(address(this));
+    ICurveDepositor(_depositor).remove_liquidity_one_coin(crvReceived, _usdcIndex, 0);
+  }
+
+  function _usdcToVault(
+    address _token,
+    VaultConfig memory _vc,
+    uint256 _usdcAmount
+  )
+    internal
+    returns (
+      uint256 crvBalance,
+      uint256 vaultBalance,
+      address crvToken
+    )
+  {
+    _addUSDC2CurvePool(_vc, _usdcAmount);
+
+    // 2nd step. Vault.deposit()
+    crvToken = IYearnVaultV2(_token).token();
+    crvBalance = IERC20(crvToken).balanceOf(address(this));
+    IYearnVaultV2(_token).deposit(crvBalance);
+
+    // 3rd step. Rebind
+    vaultBalance = IERC20(_token).balanceOf(address(this));
+  }
+
+  function _instantRebind(address[] memory _tokens, bool _allowNotBound) internal {
     address poolController_ = poolController;
     require(poolController_ != address(0), "CFG_NOT_SET");
 
-    RebindConfig[] memory configs =
-      getRebindConfigs(PowerIndexPoolInterface(pool), BPoolInterface(pool).getCurrentTokens());
+    RebindConfig[] memory configs = fetchRebindConfigs(PowerIndexPoolInterface(pool), _tokens, _allowNotBound);
 
     uint256 toPushUSDCTotal;
     uint256 len = configs.length;
@@ -306,18 +398,17 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
           cfg.newBalance,
           cfg.newWeight
         );
-        mem.ycrvBalance = IERC20(cfg.token).balanceOf(address(this));
+
+        // 3rd step. CurvePool.remove_liquidity_one_coin()
+        (mem.ycrvBalance, mem.crvActual, mem.usdcBefore) = _vaultToUsdc(
+          cfg.token,
+          mem.crvToken,
+          vc.depositor,
+          vc.usdcIndex
+        );
 
         // 2nd step. Vault.withdraw()
         mem.crvExpected = (mem.ycrvBalance * IYearnVaultV2(cfg.token).pricePerShare()) / 1e18;
-        uint256 crvBefore = IERC20(mem.crvToken).balanceOf(address(this));
-
-        IYearnVaultV2(cfg.token).withdraw(mem.ycrvBalance, address(this), maxWithdrawalLoss);
-        mem.crvActual = IERC20(mem.crvToken).balanceOf(address(this)).sub(crvBefore);
-
-        // 3rd step. CurvePool.remove_liquidity_one_coin()
-        mem.usdcBefore = USDC.balanceOf(address(this));
-        ICurveDepositor(vc.depositor).remove_liquidity_one_coin(mem.crvActual, vc.usdcIndex, 0);
 
         emit PullLiquidity(
           cfg.token,
@@ -349,6 +440,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     }
 
     uint256 usdcPulled = USDC.balanceOf(address(this));
+    require(usdcPulled > 0, "USDC_PULLED_NULL");
 
     for (uint256 si = 0; si < len; si++) {
       if (toPushUSDC[si] > 0) {
@@ -357,25 +449,29 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
         // 1st step. Add USDC to Curve pool
         // uint256 usdcAmount = (usdcPulled * toPushUSDC[si]) / toPushUSDCTotal;
         uint256 usdcAmount = (usdcPulled.mul(toPushUSDC[si])) / toPushUSDCTotal;
-        _addUSDC2CurvePool(vaultConfigs[si], usdcAmount);
 
-        // 2nd step. Vault.deposit()
-        IERC20 crvToken = IERC20(IYearnVaultV2(cfg.token).token());
-        uint256 crvBalance = crvToken.balanceOf(address(this));
-        IYearnVaultV2(cfg.token).deposit(crvBalance);
-
-        // 3rd step. Rebind
-        uint256 vaultBalance = IERC20(cfg.token).balanceOf(address(this));
+        (uint256 crvBalance, uint256 vaultBalance, address crvToken) =
+          _usdcToVault(cfg.token, vaultConfigs[si], usdcAmount);
 
         // uint256 newBalance = IERC20(cfg.token).balanceOf(address(this)) + BPoolInterface(_pool).getBalance(cfg.token)
-        uint256 newBalance = IERC20(cfg.token).balanceOf(address(this)).add(BPoolInterface(pool).getBalance(cfg.token));
-        PowerIndexPoolControllerInterface(poolController_).rebindByStrategyAdd(
-          cfg.token,
-          newBalance,
-          cfg.newWeight,
-          vaultBalance
-        );
-        emit PushLiquidity(cfg.token, address(crvToken), vaultBalance, crvBalance, usdcAmount);
+        uint256 newBalance;
+        try BPoolInterface(pool).getBalance(cfg.token) returns (uint256 _poolBalance) {
+          newBalance = IERC20(cfg.token).balanceOf(address(this)).add(_poolBalance);
+        } catch {
+          newBalance = IERC20(cfg.token).balanceOf(address(this));
+        }
+        if (cfg.oldBalance == 0) {
+          require(_allowNotBound, "BIND_NOT_ALLOW");
+          PowerIndexPoolControllerInterface(poolController_).bindByStrategy(cfg.token, newBalance, cfg.newWeight);
+        } else {
+          PowerIndexPoolControllerInterface(poolController_).rebindByStrategyAdd(
+            cfg.token,
+            newBalance,
+            cfg.newWeight,
+            vaultBalance
+          );
+        }
+        emit PushLiquidity(cfg.token, crvToken, vaultBalance, crvBalance, usdcAmount);
       }
     }
 
@@ -385,24 +481,14 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
     emit InstantRebind(len, usdcPulled, usdcRemainder);
   }
 
-  function getRebindConfigs(PowerIndexPoolInterface _pool, address[] memory _tokens)
-    internal
-    view
-    returns (RebindConfig[] memory configs)
-  {
+  function fetchRebindConfigs(
+    PowerIndexPoolInterface _pool,
+    address[] memory _tokens,
+    bool _allowNotBound
+  ) internal returns (RebindConfig[] memory configs) {
     uint256 len = _tokens.length;
-    uint256[] memory oldBalances = new uint256[](len);
-    uint256[] memory poolUSDCBalances = new uint256[](len);
-    uint256 totalUSDCPool = 0;
-
-    for (uint256 oi = 0; oi < len; oi++) {
-      uint256 balance = IERC20(_tokens[oi]).balanceOf(address(_pool));
-      oldBalances[oi] = balance;
-      uint256 poolUSDCBalance = getVaultUsdcEstimation(_tokens[oi], balance);
-      poolUSDCBalances[oi] = poolUSDCBalance;
-      // totalUSDCPool += poolUSDCBalance;
-      totalUSDCPool = totalUSDCPool.add(poolUSDCBalance);
-    }
+    (uint256[] memory oldBalances, uint256[] memory poolUSDCBalances, uint256 totalUSDCPool) =
+      getRebindConfigBalances(_pool, _tokens);
 
     (uint256[3][] memory weightsChange, , uint256[] memory newTokenValuesUSDC, uint256 totalValueUSDC) =
       computeWeightsChange(_pool, _tokens, new address[](0), 0, block.timestamp, block.timestamp + 1);
@@ -411,19 +497,59 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueAbs
 
     for (uint256 si = 0; si < len; si++) {
       uint256[3] memory wc = weightsChange[si];
-      uint256 oi = wc[0];
+      require(wc[1] != 0 || _allowNotBound, "TOKEN_NOT_BOUND");
 
       configs[si] = RebindConfig(
-        _tokens[oi],
+        _tokens[wc[0]],
         // (totalWeight * newTokenValuesUSDC[oi]) / totalValueUSDC,
         wc[2],
-        oldBalances[oi],
-        // (totalUSDCPool * newTokenValuesUSDC[oi] / totalValueUSDC) / (poolUSDCBalances[oi] / oldBalances[oi]))
-        bdiv(
-          bdiv(bmul(totalUSDCPool, newTokenValuesUSDC[oi]), totalValueUSDC),
-          bdiv(poolUSDCBalances[oi], oldBalances[oi])
-        )
+        oldBalances[wc[0]],
+        // (totalUSDCPool * weight / totalWeight) / (poolUSDCBalances / totalSupply))
+        getNewTokenBalance(_tokens, wc, poolUSDCBalances, newTokenValuesUSDC, totalUSDCPool, totalValueUSDC)
       );
+    }
+
+    _updatePoolByPoke(pool, _tokens, newTokenValuesUSDC);
+  }
+
+  function getNewTokenBalance(
+    address[] memory _tokens,
+    uint256[3] memory wc,
+    uint256[] memory poolUSDCBalances,
+    uint256[] memory newTokenValuesUSDC,
+    uint256 totalUSDCPool,
+    uint256 totalValueUSDC
+  ) internal view returns (uint256) {
+    return
+      bdiv(
+        bdiv(bmul(wc[2], totalUSDCPool), totalWeight),
+        bdiv(poolUSDCBalances[wc[0]], IERC20(_tokens[wc[0]]).totalSupply())
+      ) * 1e12;
+  }
+
+  function getRebindConfigBalances(PowerIndexPoolInterface _pool, address[] memory _tokens)
+    internal
+    view
+    returns (
+      uint256[] memory oldBalances,
+      uint256[] memory poolUSDCBalances,
+      uint256 totalUSDCPool
+    )
+  {
+    uint256 len = _tokens.length;
+    oldBalances = new uint256[](len);
+    poolUSDCBalances = new uint256[](len);
+    totalUSDCPool = USDC.balanceOf(address(this));
+
+    for (uint256 oi = 0; oi < len; oi++) {
+      try IERC20(_tokens[oi]).balanceOf(address(_pool)) returns (uint256 _balance) {
+        oldBalances[oi] = _balance;
+        totalUSDCPool = totalUSDCPool.add(getVaultUsdcEstimation(_tokens[oi], oldBalances[oi]));
+      } catch {
+        oldBalances[oi] = 0;
+      }
+      uint256 poolUSDCBalance = getVaultVirtualPriceEstimation(_tokens[oi], IYearnVaultV2(_tokens[oi]).totalAssets());
+      poolUSDCBalances[oi] = poolUSDCBalance;
     }
   }
 

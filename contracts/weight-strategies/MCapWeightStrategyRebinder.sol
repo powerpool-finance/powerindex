@@ -104,6 +104,7 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
     configs = new RebindConfig[](len);
     for (uint256 i = 0; i < len; i++) {
       uint256[3] memory wc = weightsChange[i];
+      require(wc[1] != 0, "TOKEN_NOT_BOUND");
       uint256 ti = wc[0];
       uint256 oldWeight = wc[1] / _oldWeightDiv;
       uint256 newWeight = wc[2];

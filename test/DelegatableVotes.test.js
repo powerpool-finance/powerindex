@@ -2,7 +2,7 @@ const { time } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
 const MockDelegatableVotes = artifacts.require('MockDelegatableVotes');
 
-describe.skip('DelegatableVotes', () => {
+describe('DelegatableVotes', () => {
   let alice, bob, carol, carl;
   before(async function () {
     [, alice, bob, carol, carl] = await web3.eth.getAccounts();
