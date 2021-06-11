@@ -6,6 +6,7 @@ const MockERC20 = artifacts.require('MockERC20');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PowerIndexBasicRouter = artifacts.require('PowerIndexBasicRouter');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
+const MockPoke = artifacts.require('MockPoke');
 
 MockERC20.numberFormat = 'String';
 PowerIndexBasicRouter.numberFormat = 'String';
@@ -27,10 +28,13 @@ describe('PowerIndex BasicRouter Test', () => {
   before(async function () {
     [deployer, bob, alice, stub, piGov] = await web3.eth.getAccounts();
     poolRestrictions = await PoolRestrictions.new();
+    const poke = await MockPoke.new(true);
     defaultBasicConfig = buildBasicRouterConfig(
       poolRestrictions.address,
+      poke.address,
       constants.ZERO_ADDRESS,
       constants.ZERO_ADDRESS,
+      ether(0),
       ether(0),
       0,
       stub,
@@ -72,6 +76,9 @@ describe('PowerIndex BasicRouter Test', () => {
       const router = await PowerIndexBasicRouter.new(piToken.address, defaultBasicConfig);
       const router2 = await PowerIndexBasicRouter.new(piToken.address, defaultBasicConfig);
 
+      const otherToken = await MockERC20.new('My Token 3', 'MT3', '18', ether('1000000'));
+      await otherToken.transfer(router.address, ether('200'));
+
       assert.equal(await web3.eth.getBalance(router.address), ether(0));
 
       const receivedFee = ether(0.1);
@@ -94,10 +101,13 @@ describe('PowerIndex BasicRouter Test', () => {
 
       assert.equal(await piToken.totalSupply(), ether('100'));
       assert.equal(await piToken.balanceOf(alice), ether('100'));
+      assert.equal(await otherToken.balanceOf(router.address), ether('200'));
 
       await expectRevert(piToken.changeRouter(bob), 'ONLY_ROUTER');
-      await router.migrateToNewRouter(piToken.address, router2.address);
+      await router.migrateToNewRouter(piToken.address, router2.address, [otherToken.address]);
 
+      assert.equal(await otherToken.balanceOf(router.address), '0');
+      assert.equal(await otherToken.balanceOf(router2.address), ether('200'));
       assert.equal(await web3.eth.getBalance(router2.address), receivedFee);
       assert.equal(await web3.eth.getBalance(router.address), ether(0));
 
@@ -127,10 +137,10 @@ describe('PowerIndex BasicRouter Test', () => {
         const res = await router.setReserveConfig(ether('0.2'), 3600, { from: piGov });
         expectEvent(res, 'SetReserveConfig', {
           ratio: ether('0.2'),
-          rebalancingInterval: '3600'
+          claimRewardsInterval: '3600'
         });
         assert.equal(await router.reserveRatio(), ether('0.2'))
-        assert.equal(await router.rebalancingInterval(), 3600)
+        assert.equal(await router.claimRewardsInterval(), 3600)
       });
 
       it('should deny setting a reserve ratio greater or equal 100%', async () => {

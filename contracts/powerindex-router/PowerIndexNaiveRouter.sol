@@ -11,11 +11,15 @@ import "../interfaces/PowerIndexNaiveRouterInterface.sol";
 contract PowerIndexNaiveRouter is PowerIndexNaiveRouterInterface, Ownable {
   using SafeMath for uint256;
 
-  function migrateToNewRouter(address _piToken, address payable _newRouter) public virtual override onlyOwner {
+  function migrateToNewRouter(
+    address _piToken,
+    address payable _newRouter,
+    address[] memory _tokens
+  ) public virtual override onlyOwner {
     WrappedPiErc20Interface(_piToken).changeRouter(_newRouter);
   }
 
-  function piTokenCallback(uint256 _withdrawAmount) external payable virtual override {
+  function piTokenCallback(address sender, uint256 _withdrawAmount) external payable virtual override {
     // DO NOTHING
   }
 }

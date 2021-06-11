@@ -14,6 +14,8 @@ interface WrappedPiErc20Interface is IERC20 {
 
   function setEthFee(uint256 _newEthFee) external;
 
+  function withdrawEthFee(address payable receiver) external;
+
   function approveUnderlying(address _to, uint256 _amount) external;
 
   function getPiEquivalentForUnderlying(uint256 _underlyingAmount) external view returns (uint256);

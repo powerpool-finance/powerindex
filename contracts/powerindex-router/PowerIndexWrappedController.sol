@@ -17,6 +17,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     address indexed underlyingToken,
     address indexed piToken,
     uint256 balance,
+    uint256 piTokenBalance,
     uint256 denormalizedWeight
   );
 
@@ -34,6 +35,9 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
 
   /** @dev Emitted on poolWrapper update. */
   event SetPoolWrapper(address indexed poolWrapper);
+
+  /** @dev Emitted on poolWrapper call. */
+  event CallPoolWrapper(bool indexed success, bytes4 indexed inputSig, bytes inputData, bytes outputData);
 
   /** @dev Emitted on piTokenFactory update. */
   event SetPiTokenFactory(address indexed piTokenFactory);
@@ -68,6 +72,17 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
   }
 
   /**
+   * @notice Call any function from poolWrapper by owner.
+   * @param signature Method signature
+   * @param args Encoded method inputs
+   */
+  function callPoolWrapper(bytes4 signature, bytes calldata args) external onlyOwner {
+    (bool success, bytes memory data) = address(poolWrapper).call(abi.encodePacked(signature, args));
+    require(success, "NOT_SUCCESS");
+    emit CallPoolWrapper(success, signature, args, data);
+  }
+
+  /**
    * @dev Set piTokenFactory contract address.
    * @param _piTokenFactory Address of PiToken factory.
    */
@@ -82,7 +97,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
    * @param _routerFactory Router factory, to creating router by buildRouter function.
    * @param _routerArgs Router args, depends on router implementation.
    * @param _name Name of piToken.
-   * @param _name Symbol of piToken.
+   * @param _symbol Symbol of piToken.
    */
   function createPiToken(
     address _underlyingToken,
@@ -100,7 +115,7 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
    * @param _routerFactory Router factory, to creating router by buildRouter function.
    * @param _routerArgs Router args, depends on router implementation.
    * @param _name Name of piToken.
-   * @param _name Symbol of piToken.
+   * @param _symbol Symbol of piToken.
    */
   function replacePoolTokenWithNewPiToken(
     address _underlyingToken,
@@ -170,16 +185,16 @@ contract PowerIndexWrappedController is PowerIndexAbstractController {
     pool.unbind(_underlyingToken);
 
     IERC20(_underlyingToken).approve(address(_piToken), balance);
-    _piToken.deposit{ value: msg.value }(balance);
+    uint256 piTokenBalance = _piToken.deposit{ value: msg.value }(balance);
 
-    _piToken.approve(address(pool), balance);
-    _bindNewToken(address(_piToken), balance, denormalizedWeight);
+    _piToken.approve(address(pool), piTokenBalance);
+    _bindNewToken(address(_piToken), piTokenBalance, denormalizedWeight);
 
     if (address(poolWrapper) != address(0)) {
       poolWrapper.setPiTokenForUnderlying(_underlyingToken, address(_piToken));
     }
 
-    emit ReplacePoolTokenWithPiToken(_underlyingToken, address(_piToken), balance, denormalizedWeight);
+    emit ReplacePoolTokenWithPiToken(_underlyingToken, address(_piToken), balance, piTokenBalance, denormalizedWeight);
   }
 
   function _bindNewToken(

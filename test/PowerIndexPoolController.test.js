@@ -2,6 +2,7 @@ const { expectRevert, expectEvent, time, constants } = require('@openzeppelin/te
 const { ether } = require('./helpers');
 const { buildBasicRouterConfig } = require('./helpers/builders');
 const assert = require('chai').assert;
+const ethers = require('ethers');
 const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
 const ProxyFactory = artifacts.require('ProxyFactory');
 const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
@@ -10,7 +11,7 @@ const MockERC20 = artifacts.require('MockERC20');
 const MockCvp = artifacts.require('MockCvp');
 const WETH = artifacts.require('MockWETH');
 const ExchangeProxy = artifacts.require('ExchangeProxy');
-const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
+const PowerIndexWrapper = artifacts.require('MockPowerIndexWrapper');
 const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
 const PiptController = artifacts.require('PiptController');
@@ -98,7 +99,9 @@ describe('PowerIndexPoolController', () => {
       poolRestrictions.address,
       constants.ZERO_ADDRESS,
       constants.ZERO_ADDRESS,
-      ether(0),
+      constants.ZERO_ADDRESS,
+      '0',
+      '0',
       '0',
       stub,
       ether(0),
@@ -107,10 +110,12 @@ describe('PowerIndexPoolController', () => {
     defaultFactoryArgs = web3.eth.abi.encodeParameter({
       BasicConfig: {
         poolRestrictions: 'address',
+        powerPoke: 'address',
         voting: 'address',
         staking: 'address',
         reserveRatio: 'uint256',
-        rebalancingInterval: 'uint256',
+        reserveRatioToForceRebalance: 'uint256',
+        claimRewardsInterval: 'uint256',
         pvp: 'address',
         pvpFee: 'uint256',
         rewardPools: 'address[]',
@@ -218,6 +223,28 @@ describe('PowerIndexPoolController', () => {
     await controller.callPool(setControllerSig, setControllerArgs);
 
     assert.equal(await pool.getController(), newController.address);
+  });
+
+  it('callPoolWrapper function should work properly', async () => {
+    controller = await PowerIndexPoolController.new(pool.address, poolWrapper.address, wrapperFactory.address, weightsStrategy);
+    await poolWrapper.setController(controller.address);
+    assert.equal(await poolWrapper.getController(), controller.address);
+
+    const {address} = ethers.Wallet.createRandom();
+
+    await web3.eth.sendTransaction({ from: alice, to: poolWrapper.address, value: ether(2) });
+
+    assert.equal(await web3.eth.getBalance(address).then(r => r.toString()), '0');
+    assert.equal(await web3.eth.getBalance(poolWrapper.address).then(r => r.toString()), ether(2));
+
+    const withdrawOddEthFeeSig = poolWrapper.contract._jsonInterface.filter(item => item.name === 'withdrawOddEthFee')[0]
+      .signature;
+    const withdrawOddEthFeeArgs = web3.eth.abi.encodeParameters(['address'], [address]);
+    await expectRevert(controller.callPoolWrapper(withdrawOddEthFeeSig, withdrawOddEthFeeArgs, {from: alice}), 'Ownable');
+    await controller.callPoolWrapper(withdrawOddEthFeeSig, withdrawOddEthFeeArgs);
+
+    assert.equal(await web3.eth.getBalance(poolWrapper.address).then(r => r.toString()), '0');
+    assert.equal(await web3.eth.getBalance(address).then(r => r.toString()), ether(2));
   });
 
   it('setDynamicWeightListByStrategy should work properly', async () => {

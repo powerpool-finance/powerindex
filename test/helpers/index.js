@@ -4,6 +4,7 @@ const template = artifacts.require('Migrations');
 const { promisify } = require('util');
 const { assert } = require('chai');
 const { web3 } = template;
+const { toBN } = web3.utils;
 const BigNumber = require('bignumber.js')
 const fs = require('fs')
 
@@ -171,15 +172,23 @@ function ether(value) {
 }
 
 function fromEther(value) {
-  return web3.utils.fromWei(value, 'ether');
+  return parseFloat(web3.utils.fromWei(value.toString(), 'ether'));
 }
 
 function gwei(value) {
   return web3.utils.toWei(value.toString(), 'gwei').toString();
 }
 
+function fromGwei(value) {
+  return web3.utils.fromWei(value.toString(), 'gwei').toString();
+}
+
 function mwei(value) {
   return web3.utils.toWei(value.toString(), 'mwei').toString(10);
+}
+
+function fromMwei(value) {
+  return web3.utils.fromWei(value.toString(), 'mwei').toString();
 }
 
 async function getResTimestamp(res) {
@@ -270,14 +279,17 @@ async function forkReplacePoolTokenWithNewPiToken(
   tokenAddress,
   factoryAddress,
   routerArgs,
-  admin
+  admin,
+  type = 'aave'
 ) {
   const MockERC20 = await artifacts.require('MockERC20');
   const {web3} = MockERC20;
   const token = await MockERC20.at(tokenAddress);
   const PowerIndexPool = await artifacts.require('PowerIndexPool');
+  const PowerIndexPoolController = await artifacts.require('PowerIndexPoolController');
   const WrappedPiErc20 = await artifacts.require('WrappedPiErc20');
-  const AavePowerIndexRouter = await artifacts.require('AavePowerIndexRouter');
+  console.log('type', type);
+  const PowerIndexRouter = await artifacts.require(type === 'aave' ? 'AavePowerIndexRouter' : 'contracts/powerindex-router/implementations/SushiPowerIndexRouter.sol:SushiPowerIndexRouter');
   const pool = await PowerIndexPool.at(await callContract(controller, 'pool'))
   console.log('pool getBalance before', await callContract(pool, 'getBalance', [token.address]));
 
@@ -287,27 +299,39 @@ async function forkReplacePoolTokenWithNewPiToken(
     to: admin,
     value: ether(10)
   })
-  await pool.setController(controller.address, {from: admin});
+  // await pool.setController(controller.address, {from: admin});
 
+  const balanceBefore = fromEther(await web3.eth.getBalance(admin));
   console.log('await callContract(pool, "getDenormalizedWeight", [token])', await callContract(pool, 'getDenormalizedWeight', [tokenAddress]));
-  const res = await controller.replacePoolTokenWithNewPiToken(
+  const data = controller.contract.methods.replacePoolTokenWithNewPiToken(
     tokenAddress,
     factoryAddress,
     routerArgs,
-    'Wrapped TOKEN',
-    'WTOKEN',
-    {from: admin}
-  );
+    'Power Index Sushi',
+    'piSushi'
+  ).encodeABI();
+  const options = { from: admin, to: controller.address, data };
+  const gas = await web3.eth.estimateGas(options);
+  const gasLimit = gas * 1.2;
+  console.log('gasLimit', gasLimit);
+  console.log('data', data);
+  const txRes = await web3.eth.sendTransaction({ gasLimit, ...options });
+  const receipt = await web3.eth.getTransactionReceipt(txRes.transactionHash);
+  const logs = PowerIndexPoolController.decodeLogs(receipt.logs);
+  const balanceAfter = fromEther(await web3.eth.getBalance(admin));
+  console.log('replacePoolTokenWithNewPiToken ETH spent', balanceBefore - balanceAfter);
 
-  const wrappedTokenAddress = res.logs.filter(l => l.event === 'CreatePiToken')[0].args.piToken;
+  const wrappedTokenAddress = logs.filter(l => l.event === 'CreatePiToken')[0].args.piToken;
   const wrappedToken = await WrappedPiErc20.at(wrappedTokenAddress);
-  const router = await AavePowerIndexRouter.at(await callContract(wrappedToken, 'router', []));
+  console.log('wrappedToken symbol', await callContract(wrappedToken, 'symbol'));
+  console.log('wrappedToken name', await callContract(wrappedToken, 'name'));
+  const router = await PowerIndexRouter.at(await callContract(wrappedToken, 'router', []));
 
   await increaseTime(60);
 
-  await controller.finishReplace();
-
-  await wrappedToken.pokeRouter();
+  if(controller.finishReplace) {
+    await controller.finishReplace();
+  }
 
   console.log('await callContract(pool, "isBound", [token])', await callContract(pool, 'isBound', [tokenAddress]));
   console.log('await callContract(pool, "isBound", [wrappedTokenAddress])', await callContract(pool, 'isBound', [wrappedTokenAddress]));
@@ -321,9 +345,59 @@ async function forkReplacePoolTokenWithNewPiToken(
 }
 
 function callContract(contract, method, args = []) {
-  console.log(method, args);
+  // console.log(method, args);
   return contract.contract.methods[method].apply(contract.contract, args).call();
 }
+
+function isBnGreater(bn1, bn2) {
+  return toBN(bn1.toString(10)).gt(toBN(bn2.toString(10)));
+}
+
+function mulScalarBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .mul(toBN(bn2.toString(10)))
+    .div(toBN(ether('1').toString(10)))
+    .toString(10);
+}
+function divScalarBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .mul(toBN(ether('1').toString(10)))
+    .div(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function mulBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .mul(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function divBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .div(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function subBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .sub(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function addBN(bn1, bn2) {
+  return toBN(bn1.toString(10))
+    .add(toBN(bn2.toString(10)))
+    .toString(10);
+}
+function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei = '100000000') {
+  bn1 = toBN(bn1.toString(10));
+  bn2 = toBN(bn2.toString(10));
+  const bn1GreaterThenBn2 = bn1.gt(bn2);
+  let diff = bn1GreaterThenBn2 ? bn1.sub(bn2) : bn2.sub(bn1);
+  if (diff.toString() === '0') {
+    return;
+  }
+  let diffPercent = divScalarBN(diff, bn1);
+  const lowerThenAccurancy = toBN(diffPercent).lte(toBN(accuracyPercentWei));
+  assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));
+}
+
 
 module.exports = {
   deployProxied,
@@ -337,7 +411,9 @@ module.exports = {
   fromEther,
   ethUsed,
   gwei,
+  fromGwei,
   mwei,
+  fromMwei,
   expectExactRevert,
   getResTimestamp,
   forkContractUpgrade,
@@ -347,5 +423,13 @@ module.exports = {
   evmSetNextBlockTimestamp: buildEndpoint('evm_setNextBlockTimestamp'),
   impersonateAccount,
   callContract,
-  forkReplacePoolTokenWithNewPiToken
+  forkReplacePoolTokenWithNewPiToken,
+  isBnGreater,
+  mulScalarBN,
+  divScalarBN,
+  mulBN,
+  divBN,
+  subBN,
+  addBN,
+  assertEqualWithAccuracy
 }

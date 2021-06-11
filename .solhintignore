@@ -18,4 +18,5 @@ contracts/test/MockUniswapV2Library.sol
 contracts/test/MockUniswapV2Library2.sol
 contracts/test/MockWETH.sol
 contracts/test/MockYearnGovernance.sol
+contracts/test/MockYearnVaultV1.sol
 contracts/test/AragonVoting.sol

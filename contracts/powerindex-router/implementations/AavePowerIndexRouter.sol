@@ -11,7 +11,6 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   event TriggerCooldown();
   event Stake(address indexed sender, uint256 amount);
   event Redeem(address indexed sender, uint256 amount);
-  event IgnoreRedeemDueCoolDown(uint256 coolDownFinishesAt, uint256 unstakeFinishesAt);
   event IgnoreDueMissingStaking();
   event ClaimRewards(address indexed sender, uint256 aaveReward);
   event DistributeRewards(
@@ -37,15 +36,12 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     AaveConfig memory _aaveConfig
   ) public PowerIndexBasicRouter(_piToken, _basicConfig) {
     AAVE = IERC20(_aaveConfig.AAVE);
-    require(
-      _basicConfig.rebalancingInterval < IStakedAave(_basicConfig.staking).UNSTAKE_WINDOW(),
-      "REBALANCING_GT_UNSTAKE"
-    );
-  }
-
-  function setReserveConfig(uint256 _reserveRatio, uint256 _rebalancingInterval) public override onlyOwner {
-    require(_rebalancingInterval < IStakedAave(staking).UNSTAKE_WINDOW(), "REBALANCING_GT_UNSTAKE");
-    PowerIndexBasicRouter.setReserveConfig(_reserveRatio, _rebalancingInterval);
+    if (_basicConfig.staking != address(0)) {
+      require(
+        _basicConfig.claimRewardsInterval < IStakedAave(_basicConfig.staking).UNSTAKE_WINDOW(),
+        "REBALANCING_GT_UNSTAKE"
+      );
+    }
   }
 
   /*** THE PROXIED METHOD EXECUTORS FOR VOTING ***/
@@ -60,9 +56,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     _callVoting(IAaveGovernanceV2(0).submitVote.selector, abi.encode(_proposalId, _support));
   }
 
-  /*** PERMISSIONLESS REWARD CLAIMING AND DISTRIBUTION ***/
-
-  function claimRewards() external {
+  function _claimRewards() internal override {
     uint256 rewardsPending = IStakedAave(staking).getTotalRewardsBalance(address(piToken));
     require(rewardsPending > 0, "NOTHING_TO_CLAIM");
 
@@ -71,7 +65,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     emit ClaimRewards(msg.sender, rewardsPending);
   }
 
-  function distributeRewards() external {
+  function _distributeRewards() internal override {
     uint256 pendingReward = AAVE.balanceOf(address(this));
     require(pendingReward > 0, "NO_PENDING_REWARD");
 
@@ -103,34 +97,18 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     _triggerCoolDown();
   }
 
-  /*** PI TOKEN CALLBACK ***/
+  /*** POKE FUNCTION ***/
 
-  function piTokenCallback(uint256 _withdrawAmount) external payable override onlyPiToken {
-    address piToken_ = msg.sender;
-
-    // Ignore the tokens without a voting assigned
-    if (staking == address(0)) {
-      emit IgnoreDueMissingStaking();
-      return;
-    }
-
-    if (!_rebalanceHook()) {
-      return;
-    }
-
-    (ReserveStatus reserveStatus, uint256 diff, ) =
-      _getReserveStatus(IERC20(staking).balanceOf(piToken_), _withdrawAmount);
+  function _rebalancePoke(ReserveStatus reserveStatus, uint256 diff) internal override {
+    require(staking != address(0), "STACKING_IS_NULL");
 
     if (reserveStatus == ReserveStatus.SHORTAGE) {
       (CoolDownStatus coolDownStatus, uint256 coolDownFinishesAt, uint256 unstakeFinishesAt) = getCoolDownStatus();
+      require(coolDownStatus != CoolDownStatus.COOLDOWN, "COOLDOWN");
       if (coolDownStatus == CoolDownStatus.NONE) {
         _triggerCoolDown();
       } else if (coolDownStatus == CoolDownStatus.UNSTAKE_WINDOW) {
         _redeem(diff);
-      }
-      /* if (coolDownStatus == CoolDownStatus.COOLDOWN) */
-      else {
-        emit IgnoreRedeemDueCoolDown(coolDownFinishesAt, unstakeFinishesAt);
       }
     } else if (reserveStatus == ReserveStatus.EXCESS) {
       _stake(diff);
@@ -170,6 +148,10 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   /*** INTERNALS ***/
 
+  function _getUnderlyingStaked() internal view override returns (uint256) {
+    return IERC20(staking).balanceOf(address(piToken));
+  }
+
   function _triggerCoolDown() internal {
     _callStaking(IStakedAave(0).cooldown.selector, "");
     emit TriggerCooldown();
@@ -187,7 +169,6 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   function _redeem(uint256 _amount) internal {
     require(_amount > 0, "CANT_REDEEM_0");
 
-    _callStaking(IERC20(0).approve.selector, abi.encode(staking, _amount));
     _callStaking(IStakedAave(0).redeem.selector, abi.encode(address(piToken), _amount));
 
     emit Redeem(msg.sender, _amount);

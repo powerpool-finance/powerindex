@@ -16,38 +16,8 @@ const PowerIndexWrapper = artifacts.require('PowerIndexWrapper');
 BPool.numberFormat = 'String';
 
 const { web3 } = BFactory;
-const { toBN } = web3.utils;
 
-function mulScalarBN(bn1, bn2) {
-  return toBN(bn1.toString(10))
-    .mul(toBN(bn2.toString(10)))
-    .div(toBN(ether('1').toString(10)))
-    .toString(10);
-}
-function divScalarBN(bn1, bn2) {
-  return toBN(bn1.toString(10))
-    .mul(toBN(ether('1').toString(10)))
-    .div(toBN(bn2.toString(10)))
-    .toString(10);
-}
-function subBN(bn1, bn2) {
-  return toBN(bn1.toString(10))
-    .sub(toBN(bn2.toString(10)))
-    .toString(10);
-}
-function addBN(bn1, bn2) {
-  return toBN(bn1.toString(10))
-    .add(toBN(bn2.toString(10)))
-    .toString(10);
-}
-
-function assertEqualWithAccuracy(bn1, bn2, message, accuracyWei = '30') {
-  bn1 = toBN(bn1.toString(10));
-  bn2 = toBN(bn2.toString(10));
-  const bn1GreaterThenBn2 = bn1.gt(bn2);
-  let diff = bn1GreaterThenBn2 ? bn1.sub(bn2) : bn2.sub(bn1);
-  assert.equal(diff.lte(toBN(accuracyWei)), true, message);
-}
+const { mulScalarBN, divScalarBN, subBN, addBN, assertEqualWithAccuracy } = require('./helpers');
 
 describe('Balancer', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';

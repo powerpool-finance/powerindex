@@ -27,6 +27,7 @@ const StakedAaveV2 = artifactFromBytecode('aave/StakedAaveV2');
 const AaveGovernanceV2 = artifactFromBytecode('aave/AaveGovernanceV2');
 const AaveGovernanceStrategy = artifactFromBytecode('aave/AaveGovernanceStrategy');
 const AaveExecutor = artifactFromBytecode('aave/AaveExecutor');
+const MockPoke = artifacts.require('MockPoke');
 
 MockERC20.numberFormat = 'String';
 AavePowerIndexRouter.numberFormat = 'String';
@@ -85,7 +86,7 @@ describe('AaveRouter Tests', () => {
     ] = await web3.eth.getAccounts();
   });
 
-  let aave, stakedAave, piAave, aaveRouter, poolRestrictions;
+  let aave, stakedAave, piAave, aaveRouter, poolRestrictions, poke;
   let cooldownPeriod, unstakeWindow;
 
   // https://github.com/aave/aave-stake-v2
@@ -133,13 +134,16 @@ describe('AaveRouter Tests', () => {
 
       poolRestrictions = await PoolRestrictions.new();
       piAave = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'piAAVE');
+      poke = await MockPoke.new(true);
       aaveRouter = await AavePowerIndexRouter.new(
         piAave.address,
         buildBasicRouterConfig(
           poolRestrictions.address,
+          poke.address,
           constants.ZERO_ADDRESS,
           stakedAave.address,
           ether('0.2'),
+          ether('0.02'),
           '0',
           pvp,
           ether('0.2'),
@@ -161,13 +165,16 @@ describe('AaveRouter Tests', () => {
     });
 
     it('should deny initializing contract with rebalancingInterval LT UNSTAKE_WINDOW', async () => {
+      poke = await MockPoke.new(true);
       await expectRevert(AavePowerIndexRouter.new(
         piAave.address,
         buildBasicRouterConfig(
           poolRestrictions.address,
+          poke.address,
           constants.ZERO_ADDRESS,
           stakedAave.address,
           ether('0.2'),
+          ether('0.02'),
           '172801',
           pvp,
           ether('0.2'),
@@ -175,10 +182,6 @@ describe('AaveRouter Tests', () => {
         ),
         buildAaveRouterConfig(aave.address),
       ), 'REBALANCING_GT_UNSTAKE');
-    });
-
-    it('should deny non-piToken calling piTokenCallback', async () => {
-      await expectRevert(aaveRouter.piTokenCallback(0), 'ONLY_PI_TOKEN_ALLOWED');
     });
 
     it('should allow depositing Aave and staking it in a StakedAave contract', async () => {});
@@ -189,18 +192,14 @@ describe('AaveRouter Tests', () => {
           const res = await aaveRouter.setReserveConfig(ether('0.2'), 3600, { from: piGov });
           expectEvent(res, 'SetReserveConfig', {
             ratio: ether('0.2'),
-            rebalancingInterval: '3600'
+            claimRewardsInterval: '3600'
           });
           assert.equal(await aaveRouter.reserveRatio(), ether('0.2'))
-          assert.equal(await aaveRouter.rebalancingInterval(), 3600)
+          assert.equal(await aaveRouter.claimRewardsInterval(), 3600)
         });
 
         it('should deny setting a reserve ratio greater or equal 100%', async () => {
           await expectRevert(aaveRouter.setReserveConfig(ether('1.01'), 0, { from: piGov }), 'RR_GREATER_THAN_100_PCT');
-        });
-
-        it('should deny setting a rebalancingInterval greater than UNSTAKE_WINDOW', async () => {
-          await expectRevert(aaveRouter.setReserveConfig(ether('0.2'), 172801, { from: piGov }), 'REBALANCING_GT_UNSTAKE');
         });
 
         it('should deny non-owner setting reserve config', async () => {
@@ -213,6 +212,7 @@ describe('AaveRouter Tests', () => {
           await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
           await aave.approve(piAave.address, ether('10000'), { from: alice });
           await piAave.deposit(ether('10000'), { from: alice });
+          await aaveRouter.poke(false);
 
           assert.equal(await aave.balanceOf(piAave.address), ether(2000));
           assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
@@ -298,6 +298,7 @@ describe('AaveRouter Tests', () => {
       it('it should initially stake the excess of funds to the staking contract immediately', async () => {
         await aave.approve(piAave.address, ether(10000), { from: alice });
         await piAave.deposit(ether('10000'), { from: alice });
+        await aaveRouter.poke(false);
 
         assert.equal(await piAave.totalSupply(), ether(10000));
         assert.equal(await piAave.balanceOf(alice), ether(10000));
@@ -315,12 +316,14 @@ describe('AaveRouter Tests', () => {
         beforeEach(async () => {
           await aave.approve(piAave.address, ether(10000), { from: alice });
           await piAave.deposit(ether(10000), { from: alice });
+          await aaveRouter.poke(false);
         });
 
         it('it should stake the excess of funds to the staking contract immediately', async () => {
           // 2nd
           await aave.approve(piAave.address, ether(10000), { from: bob });
           await piAave.deposit(ether(10000), { from: bob });
+          await aaveRouter.poke(false);
 
           assert.equal(await piAave.totalSupply(), ether(20000));
           assert.equal(await piAave.balanceOf(alice), ether(10000));
@@ -340,11 +343,13 @@ describe('AaveRouter Tests', () => {
           await piAave.withdraw(ether(500), { from: alice });
           await piAave.withdraw(ether(500), { from: alice });
           await piAave.withdraw(ether(500), { from: alice });
+          await aaveRouter.poke(false);
 
           assert.equal((await aaveRouter.getCoolDownStatus()).status, COOLDOWN_STATUS.COOLDOWN);
 
           await aave.approve(piAave.address, ether(10000), { from: bob });
           await piAave.deposit(ether(10000), { from: bob });
+          await aaveRouter.poke(false);
         });
       });
     });
@@ -354,12 +359,14 @@ describe('AaveRouter Tests', () => {
         await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
         await aave.approve(piAave.address, ether(1000), { from: alice });
         await piAave.deposit(ether(1000), { from: alice });
+        await aaveRouter.poke(false);
         await aave.transfer(piAave.address, ether(50), { from: alice });
         assert.equal(await aave.balanceOf(piAave.address), ether(250));
         assert.equal(await aave.balanceOf(stakedAave.address), ether(42800));
 
         // 2nd
         await piAave.withdraw(ether(50), { from: alice });
+        await aaveRouter.poke(false);
 
         // The router has partially staked the deposit with regard to the reserve ration value (20/80)
         assert.equal(await aave.balanceOf(piAave.address), ether(200));
@@ -371,6 +378,7 @@ describe('AaveRouter Tests', () => {
       await aave.transfer(alice, ether(100000), { from: aaveDistributor });
       await aave.approve(piAave.address, ether(10000), { from: alice });
       await piAave.deposit(ether(10000), { from: alice });
+      await aaveRouter.poke(false);
 
       await aaveRouter.triggerCooldown({ from: piGov });
       await time.increase(cooldownPeriod + 1);
@@ -383,22 +391,16 @@ describe('AaveRouter Tests', () => {
       assert.equal(await piAave.balanceOf(alice), ether(10000));
       assert.equal(await piAave.totalSupply(), ether(10000));
 
-      const res = await piAave.withdraw(ether(1000), { from: alice });
-      await expectEvent.inTransaction(res.tx, aaveRouter, 'IgnoreDueMissingStaking');
-
-      assert.equal(await aave.balanceOf(stakedAave.address), ether(42000));
-      assert.equal(await stakedAave.balanceOf(piAave.address), ether(0));
-      assert.equal(await aave.balanceOf(piAave.address), ether(9000));
+      await expectRevert(aaveRouter.poke(false), 'call to a non-contract account');
     });
 
     describe('when interval enabled', () => {
-      let firstDepositAt;
 
       beforeEach(async () => {
         await aave.transfer(alice, ether(100000), { from: aaveDistributor });
         await aave.approve(piAave.address, ether(10000), { from: alice });
-        const res = await piAave.deposit(ether(10000), { from: alice });
-        firstDepositAt = await getResTimestamp(res);
+        await piAave.deposit(ether(10000), { from: alice });
+        await aaveRouter.poke(false);
 
         assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
         assert.equal(await aave.balanceOf(piAave.address), ether(2000));
@@ -410,8 +412,8 @@ describe('AaveRouter Tests', () => {
         await time.increase(time.duration.minutes(61));
 
         await aave.approve(piAave.address, ether(1000), { from: alice });
-        const res = await piAave.deposit(ether(1000), { from: alice });
-        await expectEvent.notEmitted.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing');
+        await piAave.deposit(ether(1000), { from: alice });
+        await aaveRouter.poke(false);
 
         assert.equal(await aave.balanceOf(stakedAave.address), ether(50800));
         assert.equal(await stakedAave.balanceOf(piAave.address), ether(8800));
@@ -421,8 +423,8 @@ describe('AaveRouter Tests', () => {
       it('should trigger cooldown on withdrawal if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(61));
 
-        const res = await piAave.withdraw(ether(1000), { from: alice });
-        await expectEvent.notEmitted.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing');
+        await piAave.withdraw(ether(1000), { from: alice });
+        const res = await aaveRouter.poke(false);
         await expectEvent.inTransaction(res.tx, stakedAave, 'Cooldown', {
           user: piAave.address
         });
@@ -436,8 +438,8 @@ describe('AaveRouter Tests', () => {
         await aaveRouter.triggerCooldown({ from: piGov });
         await time.increase(cooldownPeriod + 1);
 
-        const res = await piAave.withdraw(ether(1000), { from: alice });
-        await expectEvent.notEmitted.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing');
+        await piAave.withdraw(ether(1000), { from: alice });
+        await aaveRouter.poke(false);
 
         assert.equal(await aave.balanceOf(stakedAave.address), ether(49200));
         assert.equal(await stakedAave.balanceOf(piAave.address), ether(7200));
@@ -446,35 +448,16 @@ describe('AaveRouter Tests', () => {
 
       it('should NOT rebalance on deposit if the rebalancing interval has not passed', async () => {
         await time.increase(time.duration.minutes(59));
+        await poke.setMinMaxReportIntervals(time.duration.minutes(59), time.duration.minutes(118))
 
+        await aaveRouter.poke(false);
         await aave.approve(piAave.address, ether(1000), { from: alice });
-        const res = await piAave.deposit(ether(1000), { from: alice });
-        const now = await getResTimestamp(res);
-        await expectEvent.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing', {
-          blockTimestamp: now,
-          lastRebalancedAt: firstDepositAt,
-          rebalancingInterval: time.duration.hours(1),
-        });
+        await piAave.deposit(ether(1000), { from: alice });
+        await expectRevert(aaveRouter.pokeFromReporter('0', false, '0x'), 'MIN_INTERVAL_NOT_REACHED');
 
         assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
         assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
         assert.equal(await aave.balanceOf(piAave.address), ether(3000));
-      });
-
-      it('should NOT rebalance on withdrawal if the rebalancing interval has not passed', async () => {
-        await time.increase(time.duration.minutes(59));
-
-        const res = await piAave.withdraw(ether(1000), { from: alice });
-        const now = await getResTimestamp(res);
-        await expectEvent.inTransaction(res.tx, aaveRouter, 'IgnoreRebalancing', {
-          blockTimestamp: now,
-          lastRebalancedAt: firstDepositAt,
-          rebalancingInterval: time.duration.hours(1),
-        });
-
-        assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
-        assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
-        assert.equal(await aave.balanceOf(piAave.address), ether(1000));
       });
     });
 
@@ -496,12 +479,11 @@ describe('AaveRouter Tests', () => {
 
         beforeEach(async () => {
           await piAave.deposit(ether(1000), { from: alice });
+          await aaveRouter.poke(false);
           await time.increase(1);
 
-          let res = await piAave.withdraw(ether(200), { from: alice });
-          await expectEvent.inTransaction(res.tx, StakedAaveV2, 'Cooldown', {
-            user: piAave.address
-          });
+          await piAave.withdraw(ether(200), { from: alice });
+          let res = await aaveRouter.poke(false);
           cooldownActivatedAt = parseInt(await getResTimestamp(res));
         });
 
@@ -554,6 +536,7 @@ describe('AaveRouter Tests', () => {
 
         await aave.approve(piAave.address, ether(10000), { from: alice });
         await piAave.deposit(ether('10000'), { from: alice });
+        await aaveRouter.poke(false);
 
         await piAave.transfer(poolA.address, 10, { from: alice });
         await piAave.transfer(poolB.address, 20, { from: alice });
@@ -574,69 +557,67 @@ describe('AaveRouter Tests', () => {
           await increaseTimeTo(increaseTo);
         }
 
-        const claimRes = await aaveRouter.claimRewards({ from: bob });
-        const distributeRes = await aaveRouter.distributeRewards({ from: bob });
+        const claimRes = await aaveRouter.poke(true, { from: bob });
 
         // The following assertions will fail when running coverage
         expectEvent(claimRes, 'ClaimRewards', {
           sender: bob,
-          aaveReward: '97000000000000000000'
+          aaveReward: '96000000000000000000'
         });
         await expectEvent.inTransaction(claimRes.tx, stakedAave, 'RewardsClaimed', {
           from: piAave.address,
           to: aaveRouter.address,
-          amount: '97000000000000000000'
+          amount: '96000000000000000000'
         });
 
-        expectEvent(distributeRes, 'DistributeRewards', {
+        expectEvent(claimRes, 'DistributeRewards', {
           sender: bob,
-          aaveReward: '97000000000000000000',
-          pvpReward: '19400000000000000000',
-          poolRewardsUnderlying: '77600000000000000000',
-          poolRewardsPi: '77600000000000000000',
+          aaveReward: '96000000000000000000',
+          pvpReward: '19200000000000000000',
+          poolRewardsUnderlying: '76800000000000000000',
+          poolRewardsPi: '76800000000000000000',
           pools: [poolA.address, poolB.address, poolC.address],
         });
 
-        await expectEvent.inTransaction(distributeRes.tx, poolA, 'Gulp');
-        await expectEvent.inTransaction(distributeRes.tx, poolB, 'Gulp');
-        await expectEvent.notEmitted.inTransaction(distributeRes.tx, poolC, 'Gulp');
-        await expectEvent.notEmitted.inTransaction(distributeRes.tx, poolD, 'Gulp');
+        await expectEvent.inTransaction(claimRes.tx, poolA, 'Gulp');
+        await expectEvent.inTransaction(claimRes.tx, poolB, 'Gulp');
+        await expectEvent.notEmitted.inTransaction(claimRes.tx, poolC, 'Gulp');
+        await expectEvent.notEmitted.inTransaction(claimRes.tx, poolD, 'Gulp');
 
-        assert.equal(distributeRes.logs.length, 4);
-        assert.equal(distributeRes.logs[1].args.pool, poolA.address);
-        assert.equal(distributeRes.logs[1].args.amount, '25866666666666666666');
-        assert.equal(distributeRes.logs[2].args.pool, poolB.address);
-        assert.equal(distributeRes.logs[2].args.amount, '51733333333333333333');
+        assert.equal(claimRes.logs.length, 4);
+        assert.equal(claimRes.logs[1].args.pool, poolA.address);
+        assert.equal(claimRes.logs[1].args.amount, '25600000000000000000');
+        assert.equal(claimRes.logs[2].args.pool, poolB.address);
+        assert.equal(claimRes.logs[2].args.amount, '51200000000000000000');
 
-        assert.equal(await piAave.balanceOf(poolA.address), 25866666666666666666 + 10);
-        assert.equal(await piAave.balanceOf(poolB.address), 51733333333333333333 + 20);
+        assert.equal(await piAave.balanceOf(poolA.address), 25600000000000000000 + 10);
+        assert.equal(await piAave.balanceOf(poolB.address), 51200000000000000000 + 20);
         assert.equal(await piAave.balanceOf(poolC.address), '0');
         assert.equal(await piAave.balanceOf(poolD.address), '0');
 
         assert.equal(await aave.balanceOf(aaveRouter.address), '0');
-        assert.equal(await piAave.balanceOf(aaveRouter.address), '1');
+        assert.equal(await piAave.balanceOf(aaveRouter.address), '0');
       });
 
-      it('should revert claimRewards() if there is no reward available', async () => {
+      it('should revert poke if there is no reward available', async () => {
         await stakedAave.configureAssets(
           [buildAaveAssetConfigInput(0, '0', stakedAave.address)],
           { from: emissionManager },
         );
-        await expectRevert(aaveRouter.claimRewards({ from: alice }), 'NOTHING_TO_CLAIM');
-      });
-
-      it('should revert distribute rewards() if there is no yCrv on the balance', async () => {
-        await expectRevert(aaveRouter.distributeRewards({ from: bob }), 'NO_PENDING_REWARD');
+        await expectRevert(aaveRouter.poke(true, { from: alice }), 'NOTHING_TO_CLAIM');
       });
 
       it('should revert distributing rewards when missing reward pools config', async () => {
+        poke = await MockPoke.new(true);
         const router = await AavePowerIndexRouter.new(
           piAave.address,
           buildBasicRouterConfig(
             poolRestrictions.address,
+            poke.address,
             constants.ZERO_ADDRESS,
             stakedAave.address,
             ether('0.2'),
+            ether('0.02'),
             '0',
             pvp,
             ether('0.2'),
@@ -646,22 +627,24 @@ describe('AaveRouter Tests', () => {
             aave.address
           ),
         );
-        await aaveRouter.migrateToNewRouter(piAave.address, router.address, { from: piGov });
+        await aaveRouter.migrateToNewRouter(piAave.address, router.address, [], { from: piGov });
         await time.increase(1);
-        await router.claimRewards({ from: bob });
-        await expectRevert(router.distributeRewards({ from: bob }), 'MISSING_REWARD_POOLS');
+        await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
       });
 
       it('should correctly distribute pvpFee', async () => {
         const poolA = await MockGulpingBPool.new();
         const poolB = await MockGulpingBPool.new();
+        poke = await MockPoke.new(true);
         const router = await AavePowerIndexRouter.new(
           piAave.address,
           buildBasicRouterConfig(
             poolRestrictions.address,
+            poke.address,
             constants.ZERO_ADDRESS,
             stakedAave.address,
             ether('0.2'),
+            ether('0.02'),
             '0',
             pvp,
             0,
@@ -675,17 +658,17 @@ describe('AaveRouter Tests', () => {
         await piAave.transfer(poolA.address, 10, { from: alice });
         await piAave.transfer(poolB.address, 20, { from: alice });
 
-        await aaveRouter.migrateToNewRouter(piAave.address, router.address, { from: piGov });
+        await aaveRouter.migrateToNewRouter(piAave.address, router.address, [], { from: piGov });
         await time.increase(1);
-        await router.claimRewards({ from: bob });
-        const res = await router.distributeRewards({ from: bob });
+        await router.poke(true, { from: bob });
+        const res = await router.poke(true, { from: bob });
 
         expectEvent(res, 'DistributeRewards', {
           sender: bob,
           pvpReward: '0',
         });
-        assert.isTrue(parseInt(res.logs[3].args.poolRewardsUnderlying) > 1);
-        assert.isTrue(parseInt(res.logs[3].args.poolRewardsPi.length) > 1);
+        assert.isTrue(parseInt(res.logs.filter(l => l.event === 'DistributeRewards')[0].args.poolRewardsUnderlying) > 1);
+        assert.isTrue(parseInt(res.logs.filter(l => l.event === 'DistributeRewards')[0].args.poolRewardsPi.length) > 1);
       });
     });
 
@@ -746,6 +729,9 @@ describe('AaveRouter Tests', () => {
         await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
         await aave.approve(piAave.address, ether('10000'), { from: alice });
         await piAave.deposit(ether('10000'), { from: alice });
+        await aaveRouter.poke(false);
+
+        await aaveRouter.poke(false);
 
         assert.equal(await piAave.totalSupply(), ether('10000'));
         assert.equal(await piAave.balanceOf(alice), ether('10000'));
@@ -761,6 +747,7 @@ describe('AaveRouter Tests', () => {
         await aave.transfer(alice, ether(12300000), { from: aaveDistributor });
         await aave.approve(piAave.address, ether(12300000), { from: alice });
         await piAave.deposit(ether(12300000), { from: alice });
+        await aaveRouter.poke(false);
         assert.equal(await stakedAave.balanceOf(piAave.address), ether(9848000));
         assert.equal(await aave.balanceOf(piAave.address), ether(2462000));
 

@@ -4,7 +4,6 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./interfaces/BPoolInterface.sol";
@@ -14,8 +13,9 @@ import "./interfaces/IPoolRestrictions.sol";
 import "./interfaces/IUniswapV2Pair.sol";
 import "./interfaces/IUniswapV2Factory.sol";
 import "./lib/UniswapV2Library.sol";
+import "./traits/ProgressiveFee.sol";
 
-contract EthPiptSwap is Ownable {
+contract EthPiptSwap is ProgressiveFee {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
   using SafeERC20 for TokenInterface;
@@ -26,15 +26,11 @@ contract EthPiptSwap is Ownable {
   BPoolInterface public pipt;
   PowerIndexWrapperInterface public piptWrapper;
 
-  uint256[] public feeLevels;
-  uint256[] public feeAmounts;
-  address public feePayout;
-  address public feeManager;
-
   mapping(address => address) public uniswapEthPairByTokenAddress;
   mapping(address => address) public uniswapEthPairToken0;
   mapping(address => bool) public reApproveTokens;
   uint256 public defaultSlippage;
+  uint256 public defaultDiffPercent;
 
   struct CalculationStruct {
     uint256 tokenAmount;
@@ -46,13 +42,6 @@ contract EthPiptSwap is Ownable {
   event SetTokenSetting(address indexed token, bool indexed reApprove, address indexed uniswapPair);
   event SetDefaultSlippage(uint256 newDefaultSlippage);
   event SetPiptWrapper(address _piptWrapper);
-  event SetFees(
-    address indexed sender,
-    uint256[] newFeeLevels,
-    uint256[] newFeeAmounts,
-    address indexed feePayout,
-    address indexed feeManager
-  );
 
   event EthToPiptSwap(
     address indexed user,
@@ -77,38 +66,58 @@ contract EthPiptSwap is Ownable {
     address _pipt,
     address _piptWrapper,
     address _feeManager
-  ) public Ownable() {
+  ) public {
+    __Ownable_init();
     weth = TokenInterface(_weth);
     cvp = TokenInterface(_cvp);
     pipt = BPoolInterface(_pipt);
     piptWrapper = PowerIndexWrapperInterface(_piptWrapper);
     feeManager = _feeManager;
     defaultSlippage = 0.02 ether;
-  }
-
-  modifier onlyFeeManagerOrOwner() {
-    require(msg.sender == feeManager || msg.sender == owner(), "NOT_FEE_MANAGER");
-    _;
+    defaultDiffPercent = 0.04 ether;
   }
 
   receive() external payable {
     if (msg.sender != tx.origin) {
       return;
     }
-    swapEthToPipt(defaultSlippage);
+    swapEthToPipt(defaultSlippage, defaultDiffPercent, 0);
   }
 
-  function swapEthToPipt(uint256 _slippage) public payable returns (uint256 poolAmountOutAfterFee, uint256 oddEth) {
+  function swapEthToPipt(
+    uint256 _slippage,
+    uint256 _minPoolAmount,
+    uint256 _maxDiffPercent
+  ) public payable returns (uint256 poolAmountOutAfterFee, uint256 oddEth) {
     address[] memory tokens = getPiptTokens();
 
     uint256 wrapperFee = getWrapFee(tokens);
     (, uint256 swapAmount) = calcEthFee(msg.value, wrapperFee);
 
-    (, , uint256 poolAmountOut) = calcSwapEthToPiptInputs(swapAmount, tokens, _slippage);
+    (, uint256[] memory ethInUniswap, uint256 poolAmountOut) = calcSwapEthToPiptInputs(swapAmount, tokens, _slippage);
+    require(poolAmountOut >= _minPoolAmount, "MIN_POOL_AMOUNT_OUT");
+    require(_maxDiffPercent >= getMaxDiffPercent(ethInUniswap), "MAX_DIFF_PERCENT");
 
     weth.deposit{ value: msg.value }();
 
     return _swapWethToPiptByPoolOut(msg.value, poolAmountOut, tokens, wrapperFee);
+  }
+
+  function getMaxDiffPercent(uint256[] memory _ethInUniswap) public view returns (uint256 maxDiffPercent) {
+    uint256 len = _ethInUniswap.length;
+    uint256 minEthInUniswap = _ethInUniswap[0];
+    for (uint256 i = 1; i < len; i++) {
+      if (_ethInUniswap[i] < minEthInUniswap) {
+        minEthInUniswap = _ethInUniswap[i];
+      }
+    }
+    for (uint256 i = 0; i < len; i++) {
+      uint256 diffPercent = _ethInUniswap[i].mul(1 ether).div(minEthInUniswap);
+      diffPercent = diffPercent > 1 ether ? diffPercent - 1 ether : 1 ether - diffPercent;
+      if (diffPercent > maxDiffPercent) {
+        maxDiffPercent = diffPercent;
+      }
+    }
   }
 
   function swapEthToPiptByPoolOut(uint256 _poolAmountOut)
@@ -126,7 +135,7 @@ contract EthPiptSwap is Ownable {
     ethOutAmount = _swapPiptToWeth(_poolAmountIn);
 
     weth.withdraw(ethOutAmount);
-    msg.sender.transfer(ethOutAmount);
+    Address.sendValue(msg.sender, ethOutAmount);
   }
 
   function convertOddToCvpAndSendToPayout(address[] memory oddTokens) external {
@@ -144,20 +153,6 @@ contract EthPiptSwap is Ownable {
     cvp.safeTransfer(feePayout, cvpOut);
 
     emit PayoutCVP(feePayout, wethBalance, cvpOut);
-  }
-
-  function setFees(
-    uint256[] calldata _feeLevels,
-    uint256[] calldata _feeAmounts,
-    address _feePayout,
-    address _feeManager
-  ) external onlyFeeManagerOrOwner {
-    feeLevels = _feeLevels;
-    feeAmounts = _feeAmounts;
-    feePayout = _feePayout;
-    feeManager = _feeManager;
-
-    emit SetFees(msg.sender, _feeLevels, _feeAmounts, _feePayout, _feeManager);
   }
 
   function setTokensSettings(
@@ -291,27 +286,11 @@ contract EthPiptSwap is Ownable {
   }
 
   function calcEthFee(uint256 ethAmount, uint256 wrapperFee) public view returns (uint256 ethFee, uint256 ethAfterFee) {
-    uint256 len = feeLevels.length;
-    for (uint256 i = 0; i < len; i++) {
-      if (ethAmount >= feeLevels[i]) {
-        ethFee = ethAmount.mul(feeAmounts[i]).div(1 ether);
-        break;
-      }
-    }
-    ethFee = ethFee.add(wrapperFee);
-    ethAfterFee = ethAmount.sub(ethFee);
+    return calcFee(ethAmount, wrapperFee);
   }
 
   function calcEthFee(uint256 ethAmount) external view returns (uint256 ethFee, uint256 ethAfterFee) {
     (ethFee, ethAfterFee) = calcEthFee(ethAmount, getWrapFee(getPiptTokens()));
-  }
-
-  function getFeeLevels() external view returns (uint256[] memory) {
-    return feeLevels;
-  }
-
-  function getFeeAmounts() external view returns (uint256[] memory) {
-    return feeAmounts;
   }
 
   function getWrapFee(address[] memory tokens) public view returns (uint256 wrapperFee) {
@@ -421,7 +400,7 @@ contract EthPiptSwap is Ownable {
     oddEth = swapAmount.sub(totalEthSwap);
     if (oddEth > 0) {
       weth.withdraw(oddEth);
-      msg.sender.transfer(oddEth);
+      Address.sendValue(msg.sender, oddEth);
       emit OddEth(msg.sender, oddEth);
     }
   }

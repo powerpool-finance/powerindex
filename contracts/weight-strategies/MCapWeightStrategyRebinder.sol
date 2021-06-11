@@ -29,8 +29,11 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
 
   address public operationsContract;
 
-  constructor(address _oracle, address _operationsContract) public MCapWeightAbstract(_oracle) {
+  constructor(address _oracle, address _operationsContract) public OwnableUpgradeSafe() {
+    __Ownable_init();
+    oracle = IPowerOracle(_oracle);
     operationsContract = _operationsContract;
+    totalWeight = 25 * BONE;
   }
 
   function setOperationsContract(address _operationsContract) public onlyOwner {
@@ -96,12 +99,12 @@ contract MCapWeightStrategyRebinder is MCapWeightAbstract {
     }
 
     uint256 now = block.timestamp;
-    (uint256[3][] memory weightsChange, , ) =
-      computeWeightsChange(_pool, _tokens, new address[](0), 0, 100 ether, now, now + 1);
+    (uint256[3][] memory weightsChange, , , ) = computeWeightsChange(_pool, _tokens, new address[](0), 0, now, now + 1);
 
     configs = new RebindConfig[](len);
     for (uint256 i = 0; i < len; i++) {
       uint256[3] memory wc = weightsChange[i];
+      require(wc[1] != 0, "TOKEN_NOT_BOUND");
       uint256 ti = wc[0];
       uint256 oldWeight = wc[1] / _oldWeightDiv;
       uint256 newWeight = wc[2];

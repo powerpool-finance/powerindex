@@ -1,6 +1,6 @@
 const { expectRevert, time, constants, expectEvent } = require('@openzeppelin/test-helpers');
 const { buildBasicRouterConfig, buildBasicRouterArgs } = require('../helpers/builders');
-const { ether } = require('../helpers');
+const { ether, mulBN } = require('../helpers');
 const assert = require('chai').assert;
 const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
 const PowerIndexPoolActions = artifacts.require('PowerIndexPoolActions');
@@ -16,6 +16,7 @@ const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const BasicPowerIndexRouterFactory = artifacts.require('MockBasicPowerIndexRouterFactory');
 const PowerIndexBasicRouter = artifacts.require('MockPowerIndexBasicRouter');
 const ProxyFactory = artifacts.require('ProxyFactory');
+const MockPoke = artifacts.require('MockPoke');
 
 const { web3 } = PowerIndexPoolFactory;
 const { toBN } = web3.utils;
@@ -87,10 +88,13 @@ describe('PowerIndexWrapper', () => {
   let minter, alice, communityWallet, poolRestrictions, stub;
   before(async function () {
     [minter, alice, communityWallet, poolRestrictions, stub] = await web3.eth.getAccounts();
+    const poke = await MockPoke.new(true);
     defaultFactoryArguments = buildBasicRouterArgs(web3, buildBasicRouterConfig(
       poolRestrictions,
+      poke.address,
       constants.ZERO_ADDRESS,
       constants.ZERO_ADDRESS,
+      ether(0),
       ether(0),
       '0',
       stub,
@@ -185,6 +189,20 @@ describe('PowerIndexWrapper', () => {
       await this.token2.approve(poolWrapper.address, token2Amount);
       return [token1Amount, token2Amount];
     };
+  });
+
+  it('should replacePoolTokenWithExistingPiToken with custom rate', async () => {
+    assert.equal(await pool.getBalance(this.token1.address), balances[0]);
+
+    const res = await poolController.createPiToken(this.token1.address, routerFactory.address, defaultFactoryArguments, 'W T 1', 'WT1');
+    const CreatePiToken = res.receipt.logs.filter(l => l.event === 'CreatePiToken')[0].args;
+    const router1 = await PowerIndexBasicRouter.at(CreatePiToken.router);
+    await router1.mockSetRate(ether('0.5'));
+    await router1.setPiTokenEthFee(piTokenEthFee);
+    await poolController.replacePoolTokenWithExistingPiToken(this.token1.address, CreatePiToken.piToken, {
+      value: piTokenEthFee
+    });
+    assert.equal(await pool.getBalance(CreatePiToken.piToken), mulBN(balances[0], 2));
   });
 
   it('ethFee should update correctly', async () => {
@@ -302,7 +320,7 @@ describe('PowerIndexWrapper', () => {
             mulScalarBN(price, ether('1.05')),
             { from: alice },
           ),
-          'function call failed to execute',
+          'revert',
         );
 
         await poolWrapper.swapExactAmountIn(
@@ -476,7 +494,7 @@ describe('PowerIndexWrapper', () => {
             mulScalarBN(price, ether('1.05')),
             { from: alice },
           ),
-          'function call failed to execute',
+          'revert',
         );
 
         await poolWrapper.swapExactAmountOut(
@@ -948,7 +966,7 @@ describe('PowerIndexWrapper', () => {
         //
         // await expectRevert(
         //   poolWrapper.joinPool(poolOutAmount, [token1InAmount, token2InAmount], { from: alice }),
-        //   'function call failed to execute',
+        //   'revert',
         // );
 
         const res = await poolWrapper.joinPool(
@@ -983,7 +1001,7 @@ describe('PowerIndexWrapper', () => {
         );
         await expectRevert(
           poolWrapper.exitPool(poolOutAmountAfterFee, [token1OutAmount, token2OutAmount], { from: alice }),
-          'function call failed to execute',
+          'revert',
         );
 
         token1AliceBalanceBefore = await this.token1.balanceOf(alice);
@@ -1073,7 +1091,7 @@ describe('PowerIndexWrapper', () => {
         );
         await expectRevert(
           poolWrapper.exitPool(poolOutAmountAfterFee, [token2OutAmount, token1OutAmount], { from: alice }),
-          'function call failed to execute',
+          'revert',
         );
 
         token1AliceBalanceBefore = await this.token1.balanceOf(alice);
