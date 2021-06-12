@@ -70,9 +70,9 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   function setVaultConfigs(
     address[] memory _tokens,
     address[] memory _depositors,
+    uint8[] memory _depositorTypes,
     uint8[] memory _depositorAmountLength,
     uint8[] memory _depositorIndexes,
-    uint8[] memory _depositorTypes,
     address[] memory _lpTokens,
     address[] memory _vaultRegistries
   ) external onlyOwner {

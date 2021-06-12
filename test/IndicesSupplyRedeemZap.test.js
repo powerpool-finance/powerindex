@@ -690,6 +690,7 @@ describe('IndicesSupplyRedeemZap', () => {
       await vaultPoolSwap.setVaultConfigs(
         vaults.map(v => v.vault.address),
         vaults.map(v => v.depositor.address),
+        vaults.map(v => v.config.depositorType || 1),
         vaults.map(v => v.config.amountsLength),
         vaults.map(v => v.config.usdcIndex),
         vaults.map(v => v.lpToken.address),
