@@ -3,7 +3,7 @@ require('@nomiclabs/hardhat-truffle5');
 const configByTokenAddress = require('./config/ylaPool');
 
 task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind Strategy').setAction(async (__, {ethers, network}) => {
-  const {impersonateAccount, gwei, fromEther, ethUsed, deployProxied} = require('../test/helpers');
+  const {impersonateAccount, gwei, fromEther, ethUsed, deployProxied, callContract, forkContractUpgrade} = require('../test/helpers');
   const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
   const IVault = artifacts.require('IVault');
@@ -29,12 +29,12 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   const poolControllerAddress = '0xb258302c3f209491d604165549079680708581cc';
   const powerPokeAddress = '0x04D7aA22ef7181eE3142F5063e026Af1BbBE5B96';
   const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
-  const curePoolRegistryAddress = '0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c';
+  const curePoolRegistryAddress = '0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5';
 
   const weightStrategy =  await deployProxied(
     YearnVaultInstantRebindStrategy,
     [poolAddress, usdcAddress],
-    [powerPokeAddress, curePoolRegistryAddress, poolControllerAddress, {
+    [powerPokeAddress, curePoolRegistryAddress, poolControllerAddress, 5000, {
       minUSDCRemainder: '20',
       useVirtualPriceEstimation: false
     }],
@@ -44,10 +44,12 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
       implementation: ''
     }
   );
+  // const weightStrategy = await YearnVaultInstantRebindStrategy.at('0x1Ba0CbCA5571d9c27CBe266701789c4Ab6D25CcE');
   console.log('weightStrategyProxy.address', weightStrategy.address);
-  console.log('weightStrategyImplementation.address', weightStrategy.initialImplementation.address);
+  // console.log('weightStrategyImplementation.address', weightStrategy.initialImplementation.address);
 
   const controller = await PowerIndexPoolController.new(poolAddress, zeroAddress, zeroAddress, weightStrategy.address);
+  // const controller = await PowerIndexPoolController.at('0x45dEE342d89d9B9f789908c3b5722F8b78F7F565');
   console.log('controller.address', controller.address);
   await weightStrategy.setPoolController(controller.address);
 
@@ -56,6 +58,7 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
     await weightStrategy.setVaultConfig(
       vaultAddress,
       cfg.depositor,
+      cfg.depositorType || '1',
       cfg.amountsLength,
       cfg.usdcIndex,
     );
@@ -67,6 +70,50 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   if (network.name !== 'mainnetfork') {
     return;
   }
+  await impersonateAccount(ethers, admin);
+
+  const curvePoolRegistry = await ICurvePoolRegistry.at(curePoolRegistryAddress);
+
+  const pool = await PowerIndexPool.at(poolAddress);
+  await forkContractUpgrade(ethers, admin, proxyAdminAddr, pool.address, await PowerIndexPool.new().then(p => p.address));
+  if(controller.address.toLowerCase() !== await callContract(pool, 'getController').then(c => c.toLowerCase())) {
+    await pool.setController(controller.address, {from: admin});
+  }
+  console.log('controller', await callContract(pool, 'getController'))
+
+  const [poolTvlBefore] = await getTVL(pool);
+  let cpRes = await weightStrategy.changePoolTokens([
+    '0xd6ea40597be05c201845c0bfd2e96a60bacde267', //'0x6ede7f19df5df6ef23bd5b9cedb651580bdf56ca',
+    '0x84e13785b5a27879921d6f685f041421c7f482da', //'0xc4daf3b5e2a9e93861c3fbdd25f1e943b8d87417',
+    '0x2a38b9b0201ca39b17b460ed2f11e4929559071e', //'0x5fa5b62c8af877cb37031e0a3b2f34a78e3c56a6',
+    '0xf8768814b88281de4f532a3beefa5b85b69b9324',
+    '0xa74d4b67b3368e83797a35382afb776baae4f5c8'
+  ], {from: admin});
+  console.log('res.receipt.gasUsed', cpRes.receipt.gasUsed);
+
+  cpRes = await weightStrategy.changePoolTokens([
+    '0xd6ea40597be05c201845c0bfd2e96a60bacde267', //'0x6ede7f19df5df6ef23bd5b9cedb651580bdf56ca',
+    '0xc4daf3b5e2a9e93861c3fbdd25f1e943b8d87417',
+    '0x5fa5b62c8af877cb37031e0a3b2f34a78e3c56a6',
+    '0xf8768814b88281de4f532a3beefa5b85b69b9324',
+    '0xa74d4b67b3368e83797a35382afb776baae4f5c8'
+  ], {from: admin});
+  console.log('res.receipt.gasUsed', cpRes.receipt.gasUsed);
+
+  cpRes = await weightStrategy.changePoolTokens([
+    '0x6ede7f19df5df6ef23bd5b9cedb651580bdf56ca',
+    '0xc4daf3b5e2a9e93861c3fbdd25f1e943b8d87417',
+    '0x5fa5b62c8af877cb37031e0a3b2f34a78e3c56a6',
+    '0xf8768814b88281de4f532a3beefa5b85b69b9324',
+    '0xa74d4b67b3368e83797a35382afb776baae4f5c8'
+  ], {from: admin});
+  console.log('res.receipt.gasUsed', cpRes.receipt.gasUsed);
+
+  const [poolTvlAfter] = await getTVL(pool);
+
+  console.log('poolTvlBefore', poolTvlBefore);
+  console.log('poolTvlAfter', poolTvlAfter);
+
   const BONUS_NUMERATOR = '7610350076';
   const BONUS_DENUMERATOR = '10000000000000000';
   const MIN_REPORT_INTERVAL = 60 * 60 * 24 * 14;
@@ -75,17 +122,11 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   const PER_GAS = '10000';
   const MIN_SLASHING_DEPOSIT = ether(40);
 
-  await impersonateAccount(ethers, admin);
-
-  const pool = await PowerIndexPool.at(poolAddress);
-  await pool.setController(controller.address, {from: admin});
-
   const powerPoke = await PowerPoke.at(powerPokeAddress);
   await powerPoke.addClient(weightStrategy.address, admin, true, MAX_GAS_PRICE, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, {from: admin});
   await powerPoke.setMinimalDeposit(weightStrategy.address, MIN_SLASHING_DEPOSIT, {from: admin});
   await powerPoke.setBonusPlan(weightStrategy.address, '1', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, PER_GAS, {from: admin});
   await powerPoke.setFixedCompensations(weightStrategy.address, 200000, 60000, {from: admin});
-  const curvePoolRegistry = await ICurvePoolRegistry.at(curePoolRegistryAddress);
 
   const cvp = await PowerIndexPool.at('0x38e4adb44ef08f22f5b5b76a8f0c2d0dcbe7dca1');
   await cvp.approve(powerPoke.address, ether(10000), {from: admin});
@@ -137,7 +178,7 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
       // bpool eval
       {
         const vaultBalance = await vault.balanceOf(pool.address);
-        const vaultPerShare = await vault.getPricePerFullShare();
+        const vaultPerShare = await vault.pricePerShare();
         const crvBalance = BigInt(vaultBalance) * BigInt(vaultPerShare) / (10n ** 18n);
         const virtualPrice = await curvePoolRegistry.get_virtual_price_from_lp_token(await vault.token());
         const tokenBpoolEval = (BigInt(crvBalance) * BigInt(virtualPrice)) / (10n ** 18n);
@@ -146,7 +187,7 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
 
       // total eval
       {
-        const crvBalance = await vault.balance();
+        const crvBalance = await vault.totalAssets();
         const virtualPrice = await curvePoolRegistry.get_virtual_price_from_lp_token(await vault.token());
         const tokenBpoolEval = (BigInt(crvBalance) * BigInt(virtualPrice)) / (10n ** 18n);
 
