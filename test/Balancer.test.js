@@ -119,6 +119,23 @@ describe('Balancer', () => {
     await expectRevert(pool.exitswapExternAmountOut(alice, '0', '0'), 'NOT_BOUND');
   });
 
+  it('disabled swap should work properly', async () => {
+    assert.equal(await pool.isSwapsDisabled(), false);
+    await expectRevert(pool.setSwapsDisabled(true, {from: alice}), 'NOT_CONTROLLER');
+    assert.equal(await pool.isSwapsDisabled(), false);
+    await pool.setSwapsDisabled(true, {from: minter});
+    assert.equal(await pool.isSwapsDisabled(), true);
+
+    await expectRevert(pool.swapExactAmountIn(this.token2.address, '0', this.token1.address, '0', '0'), 'SWAPS_DISABLED');
+    await expectRevert(pool.swapExactAmountIn(this.token1.address, '0', this.token2.address, '0', '0'), 'SWAPS_DISABLED');
+    await expectRevert(pool.swapExactAmountOut(this.token2.address, '0', this.token1.address, '0', '0'), 'SWAPS_DISABLED');
+    await expectRevert(pool.swapExactAmountOut(this.token1.address, '0', this.token2.address, '0', '0'), 'SWAPS_DISABLED');
+    await expectRevert(pool.joinswapExternAmountIn(this.token2.address, '0', '0'), 'SWAPS_DISABLED');
+    await expectRevert(pool.joinswapPoolAmountOut(this.token2.address, '0', '0'), 'SWAPS_DISABLED');
+    await expectRevert(pool.exitswapPoolAmountIn(this.token2.address, '0', '0'), 'SWAPS_DISABLED');
+    await expectRevert(pool.exitswapExternAmountOut(this.token2.address, '0', '0'), 'SWAPS_DISABLED');
+  });
+
   it('controller check should work properly', async () => {
     await expectRevert(pool.setSwapFee('0', { from: alice }), 'NOT_CONTROLLER');
     await expectRevert(pool.setCommunityFeeAndReceiver('0', '0', '0', alice, { from: alice }), 'NOT_CONTROLLER');
@@ -128,10 +145,6 @@ describe('Balancer', () => {
     await expectRevert(pool.bind(alice, '0', '0', { from: alice }), 'NOT_CONTROLLER');
     await expectRevert(pool.rebind(this.token1.address, '0', '0', { from: alice }), 'NOT_CONTROLLER');
     await expectRevert(pool.unbind(this.token1.address, { from: alice }), 'NOT_CONTROLLER');
-  });
-
-  it('finalized check should work properly', async () => {
-    await expectRevert(pool.setPublicSwap(true, { from: minter }), 'IS_FINALIZED');
   });
 
   describe('community fee', () => {

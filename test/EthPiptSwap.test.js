@@ -34,7 +34,7 @@ const { web3 } = PowerIndexPoolFactory;
 
 const { ether, getTimestamp, subBN, addBN, assertEqualWithAccuracy, isBNHigher } = require('./helpers');
 
-describe.only('EthPiptSwap and Erc20PiptSwap', () => {
+describe('EthPiptSwap and Erc20PiptSwap', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const swapFee = ether('0.0001');
   const communitySwapFee = ether('0.001');
