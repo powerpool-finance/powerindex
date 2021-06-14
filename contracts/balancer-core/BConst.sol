@@ -19,7 +19,7 @@ contract BConst {
     // Minimum number of tokens in the pool
     uint public constant MIN_BOUND_TOKENS  = 2;
     // Maximum number of tokens in the pool
-    uint public constant MAX_BOUND_TOKENS  = 9;
+    uint public constant MAX_BOUND_TOKENS  = 21;
     // Minimum swap fee
     uint public constant MIN_FEE           = BONE / 10**6;
     // Maximum swap fee

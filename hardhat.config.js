@@ -26,6 +26,7 @@ require('./tasks/deployMainnetInstantRebindStrategy');
 require('./tasks/testVestedLpMiningProxy');
 require('./tasks/testVestedLpMiningPool');
 require('./tasks/deployIndicesSupplyRedeemZap');
+require('./tasks/deployMainnetSDEFI');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
@@ -89,7 +90,7 @@ const config = {
       url: 'http://127.0.0.1:8545/',
       gasPrice: 48 * 10 ** 9,
       // accounts: getAccounts('mainnet'),
-      gasMultiplier: 2,
+      gasMultiplier: 1.1,
       timeout: 2000000,
     },
     local: {
