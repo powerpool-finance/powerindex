@@ -31,51 +31,68 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
   const curePoolRegistryAddress = '0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5';
 
-  const weightStrategy =  await deployProxied(
-    YearnVaultInstantRebindStrategy,
-    [poolAddress, usdcAddress],
-    [powerPokeAddress, curePoolRegistryAddress, poolControllerAddress, 5000, {
-      minUSDCRemainder: '20',
-      useVirtualPriceEstimation: false
-    }],
-    {
-      proxyAdmin: proxyAdminAddr,
-      // proxyAdminOwner: admin,
-      implementation: ''
-    }
-  );
-  // const weightStrategy = await YearnVaultInstantRebindStrategy.at('0x1Ba0CbCA5571d9c27CBe266701789c4Ab6D25CcE');
+  const curvePoolRegistry = await ICurvePoolRegistry.at(curePoolRegistryAddress);
+
+  console.log('getTVLByTokensBalances', await getTVLByTokensBalances([
+    '0xA74d4B67b3368E83797a35382AFB776bAAE4F5C8',
+    '0xf8768814b88281DE4F532a3beEfA5b85B69b9324',
+    '0x5fA5B62c8AF877CB37031e0a3B2f34A78e3C56A6',
+    '0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417',
+    '0x6Ede7F19df5df6EF23bD5B9CeDb651580Bdf56Ca'
+  ], [
+    ether('2912630.724533'),
+    ether('21833.674103'),
+    ether('2387190.259384'),
+    ether('1561732.602546'),
+    ether('1553130.9825912924')
+  ]))
+
+  // const balanceBefore = fromEther(await web3.eth.getBalance(deployer));
+  // const weightStrategy =  await deployProxied(
+  //   YearnVaultInstantRebindStrategy,
+  //   [poolAddress, usdcAddress],
+  //   [powerPokeAddress, curePoolRegistryAddress, poolControllerAddress, 5000, {
+  //     minUSDCRemainder: '20',
+  //     useVirtualPriceEstimation: false
+  //   }],
+  //   {
+  //     proxyAdmin: proxyAdminAddr,
+  //     // proxyAdminOwner: admin,
+  //     implementation: '0x60ef52b6d56f59817481935f5b2028cfc23c14d3'
+  //   }
+  // );
+  const weightStrategy = await YearnVaultInstantRebindStrategy.at('0xea20d1d24bd9ae0e4ad3982f302d8441ca5e5b99');
   console.log('weightStrategyProxy.address', weightStrategy.address);
   // console.log('weightStrategyImplementation.address', weightStrategy.initialImplementation.address);
 
-  const controller = await PowerIndexPoolController.new(poolAddress, zeroAddress, zeroAddress, weightStrategy.address);
-  // const controller = await PowerIndexPoolController.at('0x45dEE342d89d9B9f789908c3b5722F8b78F7F565');
+  // const controller = await PowerIndexPoolController.new(poolAddress, zeroAddress, zeroAddress, weightStrategy.address);
+  const controller = await PowerIndexPoolController.at('0x750f973f8f2dfe0999321243bf67fa36df7dcb33');
   console.log('controller.address', controller.address);
-  await weightStrategy.setPoolController(controller.address);
-
-  for (let vaultAddress of Object.keys(configByTokenAddress)) {
-    const cfg = configByTokenAddress[vaultAddress];
-    await weightStrategy.setVaultConfig(
-      vaultAddress,
-      cfg.depositor,
-      cfg.depositorType || '1',
-      cfg.amountsLength,
-      cfg.usdcIndex,
-    );
-  }
-  await weightStrategy.syncPoolTokens();
-
-  await weightStrategy.transferOwnership(admin);
+  // await weightStrategy.setPoolController(controller.address);
+  //
+  // for (let vaultAddress of Object.keys(configByTokenAddress)) {
+  //   const cfg = configByTokenAddress[vaultAddress];
+  //   await weightStrategy.setVaultConfig(
+  //     vaultAddress,
+  //     cfg.depositor,
+  //     cfg.depositorType || '1',
+  //     cfg.amountsLength,
+  //     cfg.usdcIndex,
+  //   );
+  // }
+  // await weightStrategy.syncPoolTokens();
+  //
+  // await weightStrategy.transferOwnership(admin);
+  // console.log('ETH spent', balanceBefore - fromEther(await web3.eth.getBalance(deployer)))
 
   if (network.name !== 'mainnetfork') {
     return;
   }
   await impersonateAccount(ethers, admin);
 
-  const curvePoolRegistry = await ICurvePoolRegistry.at(curePoolRegistryAddress);
-
   const pool = await PowerIndexPool.at(poolAddress);
   await forkContractUpgrade(ethers, admin, proxyAdminAddr, pool.address, await PowerIndexPool.new().then(p => p.address));
+  await forkContractUpgrade(ethers, admin, proxyAdminAddr, weightStrategy.address, await YearnVaultInstantRebindStrategy.new(poolAddress, usdcAddress).then(p => p.address));
   if(controller.address.toLowerCase() !== await callContract(pool, 'getController').then(c => c.toLowerCase())) {
     await pool.setController(controller.address, {from: admin});
   }
@@ -168,16 +185,17 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
     return toWei(amount.toString(), 'ether');
   }
 
-  async function getTVL(pool) {
-    /** @type {string[]} */
-    const tokens = await pool.getCurrentTokens();
+  async function getTVLByTokensBalances(tokens, balances) {
     let bpoolEval = 0n;
     let totalEval = 0n;
-    for (let token of tokens) {
+    for (let index = 0; index < tokens.length; index++) {
+      const token = tokens[index];
+      console.log('token', token, 'balance', balances[index]);
       const vault = await IVault.at(token);
       // bpool eval
       {
-        const vaultBalance = await vault.balanceOf(pool.address);
+        const vaultBalance = balances[index];
+        console.log('balance', token, fromEther(vaultBalance));
         const vaultPerShare = await vault.pricePerShare();
         const crvBalance = BigInt(vaultBalance) * BigInt(vaultPerShare) / (10n ** 18n);
         const virtualPrice = await curvePoolRegistry.get_virtual_price_from_lp_token(await vault.token());
@@ -195,6 +213,19 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
       }
     }
     return [bpoolEval, totalEval];
+  }
+
+  async function getTVL(pool) {
+    /** @type {string[]} */
+    const tokens = await pool.getCurrentTokens();
+    console.log('tokens', tokens);
+
+    const balances = [];
+    for (let token of tokens) {
+      const vault = await IVault.at(token);
+      balances.push(await vault.balanceOf(pool.address));
+    }
+    return getTVLByTokensBalances(tokens, balances);
   }
 
   async function filterPushPullLogs(logs) {

@@ -21,6 +21,8 @@ import "../interfaces/ICurvePoolRegistry.sol";
 import "./blocks/SinglePoolManagement.sol";
 import "./WeightValueChangeRateAbstract.sol";
 
+import "hardhat/console.sol";
+
 contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueChangeRateAbstract {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
@@ -395,6 +397,8 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
     address poolController_ = poolController;
     require(poolController_ != address(0), "CFG_NOT_SET");
 
+    console.log("USDC.balanceOf(address(this)", USDC.balanceOf(address(this)));
+
     RebindConfig[] memory configs = fetchRebindConfigs(PowerIndexPoolInterface(pool), _tokens, _allowNotBound);
 
     uint256 toPushUSDCTotal;
@@ -408,6 +412,8 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
       vaultConfigs[si] = vc;
       require(vc.depositor != address(0), "DEPOSIT_CONTRACT_NOT_SET");
 
+      console.log("cfg.oldBalance", cfg.oldBalance);
+      console.log("cfg.newBalance", cfg.newBalance);
       if (cfg.newBalance <= cfg.oldBalance) {
         PullDataHelper memory mem;
         mem.crvToken = IYearnVaultV2(cfg.token).token();
@@ -459,6 +465,8 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
 
     uint256 usdcPulled = USDC.balanceOf(address(this));
     require(usdcPulled > 0, "USDC_PULLED_NULL");
+    console.log("usdcPulled", usdcPulled);
+    console.log("toPushUSDCTotal", toPushUSDCTotal);
 
     for (uint256 si = 0; si < len; si++) {
       if (toPushUSDC[si] > 0) {
@@ -467,6 +475,8 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
         // 1st step. Add USDC to Curve pool
         // uint256 usdcAmount = (usdcPulled * toPushUSDC[si]) / toPushUSDCTotal;
         uint256 usdcAmount = (usdcPulled.mul(toPushUSDC[si])) / toPushUSDCTotal;
+        console.log("usdc rate", bdiv(toPushUSDC[si], toPushUSDCTotal));
+        console.log("usdcAmount", usdcAmount);
 
         (uint256 crvBalance, uint256 vaultBalance, address crvToken) =
           _usdcToVault(cfg.token, vaultConfigs[si], usdcAmount);
@@ -494,6 +504,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
     }
 
     uint256 usdcRemainder = USDC.balanceOf(address(this));
+    console.log("usdcRemainder", usdcRemainder);
     require(usdcRemainder <= constraints.minUSDCRemainder, "USDC_REMAINDER");
 
     emit InstantRebind(len, usdcPulled, usdcRemainder);
@@ -512,9 +523,15 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
       computeWeightsChange(_pool, _tokens, new address[](0), 0, block.timestamp, block.timestamp + 1);
 
     configs = new RebindConfig[](len);
+    console.log("totalUSDCPool", totalUSDCPool);
 
     for (uint256 si = 0; si < len; si++) {
       uint256[3] memory wc = weightsChange[si];
+      console.log("token", _tokens[wc[0]]);
+      console.log("old weight", wc[1]);
+      console.log("new weight", wc[2]);
+      console.log("weight / totalWeight * totalUSDCPool", bdiv(bmul(wc[2], totalUSDCPool), totalWeight));
+      console.log("poolUSDCBalances / totalSupply", bdiv(poolUSDCBalances[wc[0]], IERC20(_tokens[wc[0]]).totalSupply()));
       require(wc[1] != 0 || _allowNotBound, "TOKEN_NOT_BOUND");
 
       configs[si] = RebindConfig(
@@ -567,6 +584,9 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
       } catch {
         oldBalances[oi] = 0;
       }
+      console.log("token", _tokens[oi]);
+      console.log("totalAssets/totalSupply", bdiv(IYearnVaultV2(_tokens[oi]).totalAssets(), IERC20(_tokens[oi]).totalSupply()));
+      console.log("virtual price", ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IYearnVaultV2(_tokens[oi]).token()));
       uint256 poolUSDCBalance = getVaultVirtualPriceEstimation(_tokens[oi], IYearnVaultV2(_tokens[oi]).totalAssets());
       poolUSDCBalances[oi] = poolUSDCBalance;
     }
