@@ -149,19 +149,16 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
   }
 
   /*** GETTERS ***/
-  function getTokenValue(PowerIndexPoolInterface, address _token) public view override returns (uint256 value) {
-    value = getVaultVirtualPriceEstimation(_token, IYearnVaultV2(_token).totalAssets());
-    (, uint256 newValueChangeRate) = getValueChangeRate(_token, lastValue[_token], value);
-    if (newValueChangeRate != 0) {
-      value = bmul(value, newValueChangeRate);
-    }
+  function getTVL(PowerIndexPoolInterface, address _token) public view override returns (uint256) {
+    return getVaultVirtualPriceEstimation(_token, IYearnVaultV2(_token).totalAssets());
   }
 
   function getVaultVirtualPriceEstimation(address _token, uint256 _amount) public view returns (uint256) {
     return
-      ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IYearnVaultV2(_token).token()).mul(
+      bmul(
+        ICurvePoolRegistry(curvePoolRegistry).get_virtual_price_from_lp_token(IYearnVaultV2(_token).token()),
         _amount
-      ) / 1e18;
+      );
   }
 
   function getVaultUsdcEstimation(
@@ -413,6 +410,8 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
         mem.crvToken = IYearnVaultV2(cfg.token).token();
         mem.vaultReserve = IERC20(mem.crvToken).balanceOf(cfg.token);
 
+        uint256 totalUSDCPool = getVaultVirtualPriceEstimation(cfg.token, IYearnVaultV2(cfg.token).totalAssets());
+
         mem.yDiff = (cfg.oldBalance - cfg.newBalance);
 
         // 1st step. Rebind
@@ -426,7 +425,8 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
         (mem.ycrvBalance, mem.crvActual, mem.usdcBefore) = _vaultToUsdc(cfg.token, mem.crvToken, vc);
 
         // 2nd step. Vault.withdraw()
-        mem.crvExpected = (mem.ycrvBalance * IYearnVaultV2(cfg.token).pricePerShare()) / 1e18;
+        mem.crvExpected = bmul(mem.ycrvBalance, IYearnVaultV2(cfg.token).pricePerShare());
+
 
         emit PullLiquidity(
           cfg.token,
@@ -467,6 +467,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
         // 1st step. Add USDC to Curve pool
         // uint256 usdcAmount = (usdcPulled * toPushUSDC[si]) / toPushUSDCTotal;
         uint256 usdcAmount = (usdcPulled.mul(toPushUSDC[si])) / toPushUSDCTotal;
+        uint256 totalUSDCPool = getVaultVirtualPriceEstimation(cfg.token, IYearnVaultV2(cfg.token).totalAssets());
 
         (uint256 crvBalance, uint256 vaultBalance, address crvToken) =
           _usdcToVault(cfg.token, vaultConfigs[si], usdcAmount);
@@ -505,10 +506,10 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
     bool _allowNotBound
   ) internal returns (RebindConfig[] memory configs) {
     uint256 len = _tokens.length;
-    (uint256[] memory oldBalances, uint256[] memory poolUSDCBalances, uint256 totalUSDCPool) =
+    (uint256[] memory oldBalances, uint256[] memory vaultUSDCPrices, uint256 totalUSDCPool) =
       getRebindConfigBalances(_pool, _tokens);
 
-    (uint256[3][] memory weightsChange, , uint256[] memory newTokenValuesUSDC, uint256 totalValueUSDC) =
+    (uint256[3][] memory weightsChange, , , uint256 totalValueUSDC) =
       computeWeightsChange(_pool, _tokens, new address[](0), 0, block.timestamp, block.timestamp + 1);
 
     configs = new RebindConfig[](len);
@@ -522,53 +523,40 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
         // (totalWeight * newTokenValuesUSDC[oi]) / totalValueUSDC,
         wc[2],
         oldBalances[wc[0]],
-        // (totalUSDCPool * weight / totalWeight) / (poolUSDCBalances / totalSupply))
-        getNewTokenBalance(_tokens, wc, poolUSDCBalances, newTokenValuesUSDC, totalUSDCPool, totalValueUSDC)
+        // (totalUSDCPool * weight / totalWeight) / vaultUSDCPrice)
+        bdiv(bdiv(bmul(totalUSDCPool, wc[2]), totalWeight), vaultUSDCPrices[wc[0]])
       );
     }
 
-    _updatePoolByPoke(pool, _tokens, newTokenValuesUSDC);
-  }
-
-  function getNewTokenBalance(
-    address[] memory _tokens,
-    uint256[3] memory wc,
-    uint256[] memory poolUSDCBalances,
-    uint256[] memory newTokenValuesUSDC,
-    uint256 totalUSDCPool,
-    uint256 totalValueUSDC
-  ) internal view returns (uint256) {
-    return
-      bdiv(
-        bdiv(bmul(wc[2], totalUSDCPool), totalWeight),
-        bdiv(poolUSDCBalances[wc[0]], IERC20(_tokens[wc[0]]).totalSupply())
-      ) * 1e12;
+    _updatePoolByPoke(pool, _tokens);
   }
 
   function getRebindConfigBalances(PowerIndexPoolInterface _pool, address[] memory _tokens)
     internal
     returns (
       uint256[] memory oldBalances,
-      uint256[] memory poolUSDCBalances,
+      uint256[] memory vaultUSDCPrices,
       uint256 totalUSDCPool
     )
   {
     uint256 len = _tokens.length;
     oldBalances = new uint256[](len);
-    poolUSDCBalances = new uint256[](len);
+    vaultUSDCPrices = new uint256[](len);
     totalUSDCPool = USDC.balanceOf(address(this));
 
     for (uint256 oi = 0; oi < len; oi++) {
+      uint256 vaultUSDCPrice = bdiv(
+        getVaultVirtualPriceEstimation(_tokens[oi], IYearnVaultV2(_tokens[oi]).totalAssets()),
+        IERC20(_tokens[oi]).totalSupply()
+      );
+
       try PowerIndexPoolInterface(address(_pool)).getBalance(_tokens[oi]) returns (uint256 _balance) {
         oldBalances[oi] = _balance;
-        totalUSDCPool = totalUSDCPool.add(
-          getVaultUsdcEstimation(_tokens[oi], IYearnVaultV2(_tokens[oi]).token(), oldBalances[oi])
-        );
+        totalUSDCPool = totalUSDCPool.add(bmul(oldBalances[oi], vaultUSDCPrice));
       } catch {
         oldBalances[oi] = 0;
       }
-      uint256 poolUSDCBalance = getVaultVirtualPriceEstimation(_tokens[oi], IYearnVaultV2(_tokens[oi]).totalAssets());
-      poolUSDCBalances[oi] = poolUSDCBalance;
+      vaultUSDCPrices[oi] = vaultUSDCPrice;
     }
   }
 

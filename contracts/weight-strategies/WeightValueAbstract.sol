@@ -31,7 +31,7 @@ abstract contract WeightValueAbstract is BNum, OwnableUpgradeSafe {
     return getTVL(_pool, _token);
   }
 
-  function getTVL(PowerIndexPoolInterface _pool, address _token) public view returns (uint256) {
+  function getTVL(PowerIndexPoolInterface _pool, address _token) public view virtual returns (uint256) {
     uint256 balance = _pool.getBalance(_token);
     return bdiv(bmul(balance, oracle.assetPrices(_token)), 1 ether);
   }
