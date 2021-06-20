@@ -33,6 +33,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
   event VaultWithdrawFee(address indexed vaultToken, uint256 crvAmount);
   event SeizeERC20(address indexed token, address indexed to, uint256 amount);
   event SetMaxWithdrawalLoss(uint256 maxWithdrawalLoss);
+  event SetMinPulledUSDC(uint256 minPulledUSDC);
 
   event PullLiquidity(
     address indexed vaultToken,
@@ -106,6 +107,8 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
 
   address[] internal poolTokens;
   mapping(address => VaultConfig) public vaultConfig;
+
+  uint256 public minPulledUSDC;
 
   modifier onlyEOA() {
     require(msg.sender == tx.origin, "ONLY_EOA");
@@ -213,6 +216,11 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
   function setMaxWithdrawalLoss(uint256 _maxWithdrawalLoss) external onlyOwner {
     maxWithdrawalLoss = _maxWithdrawalLoss;
     emit SetMaxWithdrawalLoss(_maxWithdrawalLoss);
+  }
+
+  function setMinPulledUSDC(uint256 _minPulledUSDC) external onlyOwner {
+    minPulledUSDC = _minPulledUSDC;
+    emit SetMinPulledUSDC(_minPulledUSDC);
   }
 
   function removeApprovals(IERC20[] calldata _tokens, address[] calldata _tos) external onlyOwner {
@@ -455,7 +463,7 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
     }
 
     uint256 usdcPulled = USDC.balanceOf(address(this));
-    require(usdcPulled > 0, "USDC_PULLED_NULL");
+    require(usdcPulled > minPulledUSDC, "USDC_PULLED_NOT_ENOUGH");
 
     for (uint256 si = 0; si < len; si++) {
       if (toPushUSDC[si] > 0) {

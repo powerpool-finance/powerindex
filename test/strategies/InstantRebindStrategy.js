@@ -927,6 +927,18 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getBalance(balancerTokens[2].address), ether('784240.523710605441796181'));
           assert.equal(await pool.getBalance(balancerTokens[3].address), ether('889145.216446846535956683'));
           assert.equal(await pool.getBalance(balancerTokens[4].address), ether('348832.958070916927609551'));
+
+          await time.increase(pokePeriod * 2);
+
+          await expectRevert(weightStrategy.setMinPulledUSDC(mwei(1000), {from: alice}), 'Ownable');
+
+          await weightStrategy.setMinPulledUSDC(mwei(100));
+
+          await expectRevert(weightStrategy.mockPoke(), 'USDC_PULLED_NOT_ENOUGH');
+
+          await weightStrategy.setMinPulledUSDC(mwei(10));
+
+          await weightStrategy.mockPoke();
         });
 
         it('should correctly rebalance token balances with insufficient underlying tokens on vault', async () => {
