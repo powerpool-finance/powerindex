@@ -410,8 +410,6 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
         mem.crvToken = IYearnVaultV2(cfg.token).token();
         mem.vaultReserve = IERC20(mem.crvToken).balanceOf(cfg.token);
 
-        uint256 totalUSDCPool = getVaultVirtualPriceEstimation(cfg.token, IYearnVaultV2(cfg.token).totalAssets());
-
         mem.yDiff = (cfg.oldBalance - cfg.newBalance);
 
         // 1st step. Rebind
@@ -426,7 +424,6 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
 
         // 2nd step. Vault.withdraw()
         mem.crvExpected = bmul(mem.ycrvBalance, IYearnVaultV2(cfg.token).pricePerShare());
-
 
         emit PullLiquidity(
           cfg.token,
@@ -467,7 +464,6 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
         // 1st step. Add USDC to Curve pool
         // uint256 usdcAmount = (usdcPulled * toPushUSDC[si]) / toPushUSDCTotal;
         uint256 usdcAmount = (usdcPulled.mul(toPushUSDC[si])) / toPushUSDCTotal;
-        uint256 totalUSDCPool = getVaultVirtualPriceEstimation(cfg.token, IYearnVaultV2(cfg.token).totalAssets());
 
         (uint256 crvBalance, uint256 vaultBalance, address crvToken) =
           _usdcToVault(cfg.token, vaultConfigs[si], usdcAmount);
@@ -542,13 +538,14 @@ contract YearnVaultInstantRebindStrategy is SinglePoolManagement, WeightValueCha
     uint256 len = _tokens.length;
     oldBalances = new uint256[](len);
     vaultUSDCPrices = new uint256[](len);
-    totalUSDCPool = USDC.balanceOf(address(this));
+    totalUSDCPool = USDC.balanceOf(address(this)) * 1e12;
 
     for (uint256 oi = 0; oi < len; oi++) {
-      uint256 vaultUSDCPrice = bdiv(
-        getVaultVirtualPriceEstimation(_tokens[oi], IYearnVaultV2(_tokens[oi]).totalAssets()),
-        IERC20(_tokens[oi]).totalSupply()
-      );
+      uint256 vaultUSDCPrice =
+        bdiv(
+          getVaultVirtualPriceEstimation(_tokens[oi], IYearnVaultV2(_tokens[oi]).totalAssets()),
+          IERC20(_tokens[oi]).totalSupply()
+        );
 
       try PowerIndexPoolInterface(address(_pool)).getBalance(_tokens[oi]) returns (uint256 _balance) {
         oldBalances[oi] = _balance;

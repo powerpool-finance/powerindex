@@ -494,7 +494,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           const res = await weightStrategy.pokeFromReporter('1', compensationOpts, { from: reporter });
           expectEvent(res, 'InstantRebind', {
             poolCurrentTokensCount: '5',
-            usdcPulled: mwei('259758.195299'),
+            usdcPulled: mwei('259758.195298'),
             usdcRemainder: '1',
           });
           await expectRevert(
@@ -507,7 +507,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           const res = await weightStrategy.pokeFromSlasher('2', compensationOpts, { from: slasher });
           expectEvent(res, 'InstantRebind', {
             poolCurrentTokensCount: '5',
-            usdcPulled: mwei('259758.195299'),
+            usdcPulled: mwei('259758.195298'),
             usdcRemainder: '1',
           });
 
@@ -544,7 +544,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
 
           expectEvent(res, 'InstantRebind', {
             poolCurrentTokensCount: '5',
-            usdcPulled: mwei('259758.195299'),
+            usdcPulled: mwei('259758.195298'),
             usdcRemainder: '1',
           });
 
@@ -554,9 +554,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[0].event, 'PullLiquidity');
           assert.equal(pull0.vaultToken, balancerTokens[4].address);
           assert.equal(pull0.crvToken, crvTokens[4].address);
-          assert.equal(pull0.vaultAmount, ether('83064.569772929161302093'));
-          assert.equal(pull0.crvAmountExpected, ether('83064.569772929161302093'));
-          assert.equal(pull0.crvAmountActual, ether('83064.569772929161302093'));
+          assert.equal(pull0.vaultAmount, ether('83064.569772724530052331'));
+          assert.equal(pull0.crvAmountExpected, ether('83064.569772724530052331'));
+          assert.equal(pull0.crvAmountActual, ether('83064.569772724530052331'));
           assert.equal(pull0.usdcAmount, mwei('91060.294731'));
           assert.equal(pull0.vaultReserve, ether('16389957.259759308131042340'));
 
@@ -564,19 +564,19 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[1].event, 'PullLiquidity');
           assert.equal(pull1.vaultToken, balancerTokens[3].address);
           assert.equal(pull1.crvToken, crvTokens[3].address);
-          assert.equal(pull1.vaultAmount, ether('154533.983509209236207428'));
-          assert.equal(pull1.crvAmountExpected, ether('154533.983509209236207428'));
-          assert.equal(pull1.crvAmountActual, ether('154533.983509209236207428'));
-          assert.equal(pull1.usdcAmount, mwei('168697.900568'));
+          assert.equal(pull1.vaultAmount, ether('154533.983508466302418755'));
+          assert.equal(pull1.crvAmountExpected, ether('154533.983508466302418755'));
+          assert.equal(pull1.crvAmountActual, ether('154533.983508466302418755'));
+          assert.equal(pull1.usdcAmount, mwei('168697.900567'));
           assert.equal(pull1.vaultReserve, ether('41657837.378850978367377285'));
 
           const push0 = res.logs[2].args;
           assert.equal(res.logs[2].event, 'PushLiquidity');
           assert.equal(push0.vaultToken, balancerTokens[0].address);
           assert.equal(push0.crvToken, crvTokens[0].address);
-          assert.equal(push0.vaultAmount, ether('194458.636526632471051812'));
-          assert.equal(push0.crvAmount, ether('194458.636526632471051812'));
-          assert.equal(push0.usdcAmount, mwei('207142.311746'));
+          assert.equal(push0.vaultAmount, ether('194458.636524754934445336'));
+          assert.equal(push0.crvAmount, ether('194458.636524754934445336'));
+          assert.equal(push0.usdcAmount, mwei('207142.311744'));
 
           const push1 = res.logs[3].args;
           assert.equal(res.logs[3].event, 'PushLiquidity');
@@ -590,9 +590,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[4].event, 'PushLiquidity');
           assert.equal(push2.vaultToken, balancerTokens[1].address);
           assert.equal(push2.crvToken, crvTokens[1].address);
-          assert.equal(push2.vaultAmount, ether('13779.290783935247110984'));
-          assert.equal(push2.crvAmount, ether('13779.290783935247110984'));
-          assert.equal(push2.usdcAmount, mwei('13982.867992'));
+          assert.equal(push2.vaultAmount, ether('13779.290784920688065716'));
+          assert.equal(push2.crvAmount, ether('13779.290784920688065716'));
+          assert.equal(push2.usdcAmount, mwei('13982.867993'));
 
           await time.increase(pokePeriod * 2);
 
@@ -609,14 +609,14 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.213211585583551400'));
           assert.equal(await pool.getTotalDenormalizedWeight(), ether('24.999999999999999975'));
 
-          assert.equal(await pool.getBalance(balancerTokens[0].address), ether('546336.171212162679620375'));
-          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1616414.109582937272810199'));
+          assert.equal(await pool.getBalance(balancerTokens[0].address), ether('546336.171210285143013899'));
+          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1616414.109583922713764931'));
           assert.equal(await pool.getBalance(balancerTokens[2].address), ether('788061.250223962626874946'));
-          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('902398.434802000000000000'));
-          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('355041.757045000000000000'));
+          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('902398.434802742933788673'));
+          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('355041.757045204631249762'));
         });
 
-        it.only('should correctly rebalance with virtual price estimation approach', async () => {
+        it('should correctly rebalance with virtual price estimation approach', async () => {
           // BEFORE
           for (let t of balancerTokens) {
             assert.equal(await pool.getDenormalizedWeight(t.address), ether('5'));
@@ -755,19 +755,19 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[0].event, 'PullLiquidity');
           assert.equal(pull0.vaultToken, balancerTokens[1].address);
           assert.equal(pull0.crvToken, crvTokens[1].address);
-          assert.equal(pull0.vaultAmount, ether('10843.888950693693022102'));
-          assert.equal(pull0.crvAmountExpected, ether('10843.888950693693022102'));
-          assert.equal(pull0.crvAmountActual, ether('10843.888950693693022102'));
-          assert.equal(pull0.usdcAmount, mwei('11004.098113'));
+          assert.equal(pull0.vaultAmount, ether('10843.888950330903577627'));
+          assert.equal(pull0.crvAmountExpected, ether('10843.888950330903577627'));
+          assert.equal(pull0.crvAmountActual, ether('10843.888950330903577627'));
+          assert.equal(pull0.usdcAmount, mwei('11004.098112'));
           assert.equal(pull0.vaultReserve, ether('74633053.346434666341363789'));
 
           pull1 = res.logs[1].args;
           assert.equal(res.logs[1].event, 'PullLiquidity');
           assert.equal(pull1.vaultToken, balancerTokens[3].address);
           assert.equal(pull1.crvToken, crvTokens[3].address);
-          assert.equal(pull1.vaultAmount, ether('13020.163449727211108674'));
-          assert.equal(pull1.crvAmountExpected, ether('13020.163449727211108674'));
-          assert.equal(pull1.crvAmountActual, ether('13020.163449727211108674'));
+          assert.equal(pull1.vaultAmount, ether('13020.163449526250076359'));
+          assert.equal(pull1.crvAmountExpected, ether('13020.163449526250076359'));
+          assert.equal(pull1.crvAmountActual, ether('13020.163449526250076359'));
           assert.equal(pull1.usdcAmount, mwei('14213.535360'));
           assert.equal(pull1.vaultReserve, ether('41503303.395342512064958530'));
 
@@ -775,9 +775,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[2].event, 'PullLiquidity');
           assert.equal(pull2.vaultToken, balancerTokens[2].address);
           assert.equal(pull2.crvToken, crvTokens[2].address);
-          assert.equal(pull2.vaultAmount, ether('3937.714635333027751836'));
-          assert.equal(pull2.crvAmountExpected, ether('3937.714635333027751836'));
-          assert.equal(pull2.crvAmountActual, ether('3937.714635333027751836'));
+          assert.equal(pull2.vaultAmount, ether('3937.714635155849738554'));
+          assert.equal(pull2.crvAmountExpected, ether('3937.714635155849738554'));
+          assert.equal(pull2.crvAmountActual, ether('3937.714635155849738554'));
           assert.equal(pull2.usdcAmount, mwei('3997.040821'));
           assert.equal(pull2.vaultReserve, ether('36417696.514161634439069642'));
 
@@ -785,9 +785,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[3].event, 'PullLiquidity');
           assert.equal(pull3.vaultToken, balancerTokens[4].address);
           assert.equal(pull3.crvToken, crvTokens[4].address);
-          assert.equal(pull3.vaultAmount, ether('6076.243207590906111155'));
-          assert.equal(pull3.crvAmountExpected, ether('6076.243207590906111155'));
-          assert.equal(pull3.crvAmountActual, ether('6076.243207590906111155'));
+          assert.equal(pull3.vaultAmount, ether('6076.243207512054994412'));
+          assert.equal(pull3.crvAmountExpected, ether('6076.243207512054994412'));
+          assert.equal(pull3.crvAmountActual, ether('6076.243207512054994412'));
           assert.equal(pull3.usdcAmount, mwei('6661.137219'));
           assert.equal(pull3.vaultReserve, ether('16306892.689986583600990009'));
 
@@ -795,9 +795,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[4].event, 'PushLiquidity');
           assert.equal(push0.vaultToken, balancerTokens[0].address);
           assert.equal(push0.crvToken, crvTokens[0].address);
-          assert.equal(push0.vaultAmount, ether('33679.074702291568257618'));
-          assert.equal(push0.crvAmount, ether('33679.074702291568257618'));
-          assert.equal(push0.usdcAmount, mwei('35875.811514'));
+          assert.equal(push0.vaultAmount, ether('33679.074701352799954380'));
+          assert.equal(push0.crvAmount, ether('33679.074701352799954380'));
+          assert.equal(push0.usdcAmount, mwei('35875.811513'));
 
           assert.equal(await weightStrategy.valueChangeRate(balancerTokens[0].address), ether('1.058095770602295191'));
           assert.equal(await weightStrategy.valueChangeRate(balancerTokens[1].address), ether('1.000184661281676961'));
@@ -817,11 +817,11 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.161031457252809750'));
           assert.equal(await pool.getTotalDenormalizedWeight(), ether('25'));
 
-          assert.equal(await pool.getBalance(balancerTokens[0].address), ether('580015.245912576711271517'));
-          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1605570.220633229020742829'));
-          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('784123.535588629599123110'));
-          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('889378.271353015722679999'));
-          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('348965.513837613725138607'));
+          assert.equal(await pool.getBalance(balancerTokens[0].address), ether('580015.245911637942968279'));
+          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1605570.220633591810187304'));
+          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('784123.535588806777136392'));
+          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('889378.271353216683712314'));
+          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('348965.513837692576255350'));
 
           await time.increase(pokePeriod * 2);
 
@@ -830,33 +830,33 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[0].event, 'UpdatePoolTokenValue');
           assert.equal(update1.token, balancerTokens[0].address);
           assert.equal(update1.oldTokenValue, ether('28426598.958018831203351211'));
-          assert.equal(update1.newTokenValue, ether('28464268.560108531203334371'));
+          assert.equal(update1.newTokenValue, ether('28464268.560107481203334371'));
           assert.equal(update1.lastChangeRate, ether('1.058095770602295191'));
-          assert.equal(update1.newChangeRate, ether('1.059497909729464304'));
+          assert.equal(update1.newChangeRate, ether('1.059497909729425221'));
 
           update2 = res.logs[1].args;
           assert.equal(res.logs[1].event, 'UpdatePoolTokenValue');
           assert.equal(update2.token, balancerTokens[1].address);
           assert.equal(update2.oldTokenValue, ether('75735692.725184736779949860'));
-          assert.equal(update2.newTokenValue, ether('75724688.627071484432934228'));
+          assert.equal(update2.newTokenValue, ether('75724688.627071852582281718'));
           assert.equal(update2.lastChangeRate, ether('1.000184661281676961'));
-          assert.equal(update2.newChangeRate, ether('1.000039338386380412'));
+          assert.equal(update2.newChangeRate, ether('1.000039338386385274'));
 
           update3 = res.logs[2].args;
           assert.equal(res.logs[2].event, 'UpdatePoolTokenValue');
           assert.equal(update3.token, balancerTokens[2].address);
           assert.equal(update3.oldTokenValue, ether('36966370.871124451451360374'));
-          assert.equal(update3.newTokenValue, ether('36962373.830302889037388966'));
+          assert.equal(update3.newTokenValue, ether('36962373.830303068884792182'));
           assert.equal(update3.lastChangeRate, ether('1.001046178775182639'));
-          assert.equal(update3.newChangeRate, ether('1.000937939249729007'));
+          assert.equal(update3.newChangeRate, ether('1.000937939249733878'));
 
           update4 = res.logs[3].args;
           assert.equal(res.logs[3].event, 'UpdatePoolTokenValue');
           assert.equal(update4.token, balancerTokens[3].address);
           assert.equal(update4.oldTokenValue, ether('45307316.814496888010131378'));
-          assert.equal(update4.newTokenValue, ether('45293103.279136241926038178'));
+          assert.equal(update4.newTokenValue, ether('45293103.279136461306290197'));
           assert.equal(update4.lastChangeRate, ether('0.996290398320414954'));
-          assert.equal(update4.newChangeRate, ether('0.995977848167335300'));
+          assert.equal(update4.newChangeRate, ether('0.995977848167340124'));
 
           res.logs = res.logs.filter(l => l.event !== 'UpdatePoolTokenValue');
 
@@ -864,29 +864,29 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[0].event, 'PullLiquidity');
           assert.equal(pull0.vaultToken, balancerTokens[3].address);
           assert.equal(pull0.crvToken, crvTokens[3].address);
-          assert.equal(pull0.vaultAmount, ether('233.054906140645226255'));
-          assert.equal(pull0.crvAmountExpected, ether('233.054906140645226255'));
-          assert.equal(pull0.crvAmountActual, ether('233.054906140645226255'));
+          assert.equal(pull0.vaultAmount, ether('233.054906370147755631'));
+          assert.equal(pull0.crvAmountExpected, ether('233.054906370147755631'));
+          assert.equal(pull0.crvAmountActual, ether('233.054906370147755631'));
           assert.equal(pull0.usdcAmount, mwei('254.415711'));
-          assert.equal(pull0.vaultReserve, ether('41490283.231892784853849856'));
+          assert.equal(pull0.vaultReserve, ether('41490283.231892985814882171'));
 
           pull1 = res.logs[1].args;
           assert.equal(res.logs[1].event, 'PullLiquidity');
           assert.equal(pull1.vaultToken, balancerTokens[4].address);
           assert.equal(pull1.crvToken, crvTokens[4].address);
-          assert.equal(pull1.vaultAmount, ether('132.555766685593231130'));
-          assert.equal(pull1.crvAmountExpected, ether('132.555766685593231130'));
-          assert.equal(pull1.crvAmountActual, ether('132.555766685593231130'));
+          assert.equal(pull1.vaultAmount, ether('132.555766775648645799'));
+          assert.equal(pull1.crvAmountExpected, ether('132.555766775648645799'));
+          assert.equal(pull1.crvAmountActual, ether('132.555766775648645799'));
           assert.equal(pull1.usdcAmount, mwei('145.315472'));
-          assert.equal(pull1.vaultReserve, ether('16300816.446778992694878854'));
+          assert.equal(pull1.vaultReserve, ether('16300816.446779071545995597'));
 
           push0 = res.logs[2].args;
           assert.equal(res.logs[2].event, 'PushLiquidity');
           assert.equal(push0.vaultToken, balancerTokens[1].address);
           assert.equal(push0.crvToken, crvTokens[1].address);
-          assert.equal(push0.vaultAmount, ether('120.159218560721666786'));
-          assert.equal(push0.crvAmount, ether('120.159218560721666786'));
-          assert.equal(push0.usdcAmount, mwei('121.934468'));
+          assert.equal(push0.vaultAmount, ether('120.159217575280712053'));
+          assert.equal(push0.crvAmount, ether('120.159217575280712053'));
+          assert.equal(push0.usdcAmount, mwei('121.934467'));
 
           push1 = res.logs[3].args;
           assert.equal(res.logs[3].event, 'PushLiquidity');
@@ -900,138 +900,33 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[4].event, 'PushLiquidity');
           assert.equal(push2.vaultToken, balancerTokens[0].address);
           assert.equal(push2.crvToken, crvTokens[0].address);
-          assert.equal(push2.vaultAmount, ether('149.307372658641528399'));
-          assert.equal(push2.crvAmount, ether('149.307372658641528399'));
-          assert.equal(push2.usdcAmount, mwei('159.046031'));
+          assert.equal(push2.vaultAmount, ether('149.307373597409831637'));
+          assert.equal(push2.crvAmount, ether('149.307373597409831637'));
+          assert.equal(push2.usdcAmount, mwei('159.046032'));
 
-          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[0].address), ether('1.059497909729464304'));
-          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[1].address), ether('1.000039338386380412'));
-          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[2].address), ether('1.000937939249729007'));
-          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[3].address), ether('0.995977848167335300'));
+          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[0].address), ether('1.059497909729425221'));
+          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[1].address), ether('1.000039338386385274'));
+          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[2].address), ether('1.000937939249733878'));
+          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[3].address), ether('0.995977848167340124'));
 
-          assert.equal(await pool.getNormalizedWeight(balancerTokens[0].address), ether('0.146563590593960883'));
-          assert.equal(await pool.getNormalizedWeight(balancerTokens[1].address), ether('0.368027730737004651'));
-          assert.equal(await pool.getNormalizedWeight(balancerTokens[2].address), ether('0.179801358809501259'));
-          assert.equal(await pool.getNormalizedWeight(balancerTokens[3].address), ether('0.219233905377777826'));
-          assert.equal(await pool.getNormalizedWeight(balancerTokens[4].address), ether('0.086373414481755381'));
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[0].address), ether('0.146563590593950441'));
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[1].address), ether('0.368027730737009159'));
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[2].address), ether('0.179801358809503463'));
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[3].address), ether('0.219233905377780503'));
+          assert.equal(await pool.getNormalizedWeight(balancerTokens[4].address), ether('0.086373414481756434'));
 
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[0].address), ether('3.664089764849022075'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[1].address), ether('9.200693268425116275'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[2].address), ether('4.495033970237531475'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[3].address), ether('5.480847634444445650'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.159335362043884525'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[0].address), ether('3.664089764848761025'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[1].address), ether('9.200693268425228975'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[2].address), ether('4.495033970237586575'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[3].address), ether('5.480847634444512575'));
+          assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.159335362043910850'));
           assert.equal(await pool.getTotalDenormalizedWeight(), ether('25'));
 
           assert.equal(await pool.getBalance(balancerTokens[0].address), ether('580164.553285235352799916'));
-          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1605690.379851789742409615'));
-          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('784240.523710428263782899'));
-          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('889145.216446875077453744'));
-          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('348832.958070928131907477'));
-
-          await time.increase(pokePeriod * 2);
-
-          res = await weightStrategy.mockPoke();
-          update1 = res.logs[0].args;
-          assert.equal(res.logs[0].event, 'UpdatePoolTokenValue');
-          assert.equal(update1.token, balancerTokens[0].address);
-          assert.equal(update1.oldTokenValue, ether('28464268.560108531203334371'));
-          assert.equal(update1.newTokenValue, ether('28464435.558441081203334296'));
-          assert.equal(update1.lastChangeRate, ether('1.059497909729464304'));
-          assert.equal(update1.newChangeRate, ether('1.059504125746710326'));
-
-          update2 = res.logs[1].args;
-          assert.equal(res.logs[1].event, 'UpdatePoolTokenValue');
-          assert.equal(update2.token, balancerTokens[1].address);
-          assert.equal(update2.oldTokenValue, ether('75724688.627071484432934228'));
-          assert.equal(update2.newTokenValue, ether('75724810.561539484432934227'));
-          assert.equal(update2.lastChangeRate, ether('1.000039338386380412'));
-          assert.equal(update2.newChangeRate, ether('1.000040948683720897'));
-
-          update3 = res.logs[2].args;
-          assert.equal(res.logs[2].event, 'UpdatePoolTokenValue');
-          assert.equal(update3.token, balancerTokens[2].address);
-          assert.equal(update3.oldTokenValue, ether('36962373.830302889037388966'));
-          assert.equal(update3.newTokenValue, ether('36962492.580984889037388966'));
-          assert.equal(update3.lastChangeRate, ether('1.000937939249729007'));
-          assert.equal(update3.newChangeRate, ether('1.000941155008096456'));
-
-          update4 = res.logs[3].args;
-          assert.equal(res.logs[3].event, 'UpdatePoolTokenValue');
-          assert.equal(update4.token, balancerTokens[3].address);
-          assert.equal(update4.oldTokenValue, ether('45293103.279136241926038178'));
-          assert.equal(update4.newTokenValue, ether('45292848.863424627221469766'));
-          assert.equal(update4.lastChangeRate, ether('0.995977848167335300'));
-          assert.equal(update4.newChangeRate, ether('0.995972253664096422'));
-
-          res.logs = res.logs.filter(l => l.event !== 'UpdatePoolTokenValue');
-
-          pull0 = res.logs[0].args;
-          assert.equal(res.logs[0].event, 'PullLiquidity');
-          assert.equal(pull0.vaultToken, balancerTokens[3].address);
-          assert.equal(pull0.crvToken, crvTokens[3].address);
-          assert.equal(pull0.vaultAmount, ether('8.563072765126355698'));
-          assert.equal(pull0.crvAmountExpected, ether('8.563072765126355698'));
-          assert.equal(pull0.crvAmountActual, ether('8.563072765126355698'));
-          assert.equal(pull0.usdcAmount, mwei('9.347927'));
-          assert.equal(pull0.vaultReserve, ether('41490050.176986644208623601'));
-
-          pull1 = res.logs[1].args;
-          assert.equal(res.logs[1].event, 'PullLiquidity');
-          assert.equal(pull1.vaultToken, balancerTokens[4].address);
-          assert.equal(pull1.crvToken, crvTokens[4].address);
-          assert.equal(pull1.vaultAmount, ether('5.113946170315473353'));
-          assert.equal(pull1.crvAmountExpected, ether('5.113946170315473353'));
-          assert.equal(pull1.crvAmountActual, ether('5.113946170315473353'));
-          assert.equal(pull1.usdcAmount, mwei('5.606210'));
-          assert.equal(pull1.vaultReserve, ether('16300683.891012307101647724'));
-
-          push0 = res.logs[2].args;
-          assert.equal(res.logs[2].event, 'PushLiquidity');
-          assert.equal(push0.vaultToken, balancerTokens[1].address);
-          assert.equal(push0.crvToken, crvTokens[1].address);
-          assert.equal(push0.vaultAmount, ether('7.745811278995320015'));
-          assert.equal(push0.crvAmount, ether('7.745811278995320015'));
-          assert.equal(push0.usdcAmount, mwei('7.860249'));
-
-          push1 = res.logs[3].args;
-          assert.equal(res.logs[3].event, 'PushLiquidity');
-          assert.equal(push1.vaultToken, balancerTokens[2].address);
-          assert.equal(push1.crvToken, crvTokens[2].address);
-          assert.equal(push1.vaultAmount, ether('6.296676350586369816'));
-          assert.equal(push1.crvAmount, ether('6.296676350586369816'));
-          assert.equal(push1.usdcAmount, mwei('6.391543'));
-
-          push2 = res.logs[4].args;
-          assert.equal(res.logs[4].event, 'PushLiquidity');
-          assert.equal(push2.vaultToken, balancerTokens[0].address);
-          assert.equal(push2.crvToken, crvTokens[0].address);
-          assert.equal(push2.vaultAmount, ether('0.659340162706142870'));
-          assert.equal(push2.crvAmount, ether('0.659340162706142870'));
-          assert.equal(push2.usdcAmount, mwei('0.702346'));
-
-          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[0].address), ether('1.059504125746710326'));
-          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[1].address), ether('1.000040948683720897'));
-          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[2].address), ether('1.000941155008096456'));
-          assert.equal(await weightStrategy.valueChangeRate(balancerTokens[3].address), ether('0.995972253664096422'));
-
-          assert.equal(await pool.getNormalizedWeight(balancerTokens[0].address), ether('0.146565282124838451'));
-          assert.equal(await pool.getNormalizedWeight(balancerTokens[1].address), ether('0.368028845059305701'));
-          assert.equal(await pool.getNormalizedWeight(balancerTokens[2].address), ether('0.179802479484526900'));
-          assert.equal(await pool.getNormalizedWeight(balancerTokens[3].address), ether('0.219231400234300424'));
-          assert.equal(await pool.getNormalizedWeight(balancerTokens[4].address), ether('0.086371993097028524'));
-
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[0].address), ether('3.664132053120961275'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[1].address), ether('9.200721126482642525'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[2].address), ether('4.495061987113172500'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[3].address), ether('5.480785005857510600'));
-          assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.159299827425713100'));
-          assert.equal(await pool.getTotalDenormalizedWeight(), ether('25'));
-
-          assert.equal(await pool.getBalance(balancerTokens[0].address), ether('580165.212625398058942786'));
-          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1605698.125663068737729630'));
-          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('784246.820386778850152715'));
-          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('889136.653374109951098046'));
-          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('348827.844124757816434124'));
+          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1605690.379851167090899357'));
+          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('784240.523710605441796181'));
+          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('889145.216446846535956683'));
+          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('348832.958070916927609551'));
         });
 
         it('should correctly rebalance token balances with insufficient underlying tokens on vault', async () => {
@@ -1080,9 +975,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[0].event, 'PullLiquidity');
           assert.equal(pull0.vaultToken, balancerTokens[4].address);
           assert.equal(pull0.crvToken, crvTokens[4].address);
-          assert.equal(pull0.vaultAmount, ether('83064.569772929161302093'));
-          assert.equal(pull0.crvAmountExpected, ether('83064.569772929161302093'));
-          assert.equal(pull0.crvAmountActual, ether('49727.263516344234716568'));
+          assert.equal(pull0.vaultAmount, ether('83064.569772724530052331'));
+          assert.equal(pull0.crvAmountExpected, ether('83064.569772724530052331'));
+          assert.equal(pull0.crvAmountActual, ether('49727.263516241919091687'));
           assert.equal(pull0.usdcAmount, mwei('54513.967680'));
           assert.equal(pull0.vaultReserve, ether('16389.957259759308131043'));
 
@@ -1090,9 +985,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[1].event, 'PullLiquidity');
           assert.equal(pull1.vaultToken, balancerTokens[3].address);
           assert.equal(pull1.crvToken, crvTokens[3].address);
-          assert.equal(pull1.vaultAmount, ether('154533.983509209236207428'));
-          assert.equal(pull1.crvAmountExpected, ether('154533.983509209236207428'));
-          assert.equal(pull1.crvAmountActual, ether('98095.910444030107287403'));
+          assert.equal(pull1.vaultAmount, ether('154533.983508466302418755'));
+          assert.equal(pull1.crvAmountExpected, ether('154533.983508466302418755'));
+          assert.equal(pull1.crvAmountActual, ether('98095.910443658640393066'));
           assert.equal(pull1.usdcAmount, mwei('107086.957641'));
           assert.equal(pull1.vaultReserve, ether('41657.837378850978367378'));
 
@@ -1138,8 +1033,8 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getBalance(balancerTokens[0].address), ether('472854.259069732607305175'));
           assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1611207.199502386868280928'));
           assert.equal(await pool.getBalance(balancerTokens[2].address), ether('773679.310052937740814072'));
-          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('902398.434802000000000000'));
-          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('355041.757045000000000000'));
+          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('902398.434802742933788673'));
+          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('355041.757045204631249762'));
         });
       });
 
@@ -1166,49 +1061,51 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
 
           expectEvent(res, 'InstantRebind', {
             poolCurrentTokensCount: '5',
-            usdcPulled: mwei('634587.142411'),
+            usdcPulled: mwei('634587.142410'),
             usdcRemainder: '1',
           });
 
+          assert.equal(await weightStrategy.valueChangeRate(ycrvVault.address), ether(1));
+
           res.logs = res.logs.filter(l => l.event !== 'UpdatePoolTokenValue');
 
-          const pull0 = res.logs[0].args;
+          let pull0 = res.logs[0].args;
           assert.equal(res.logs[0].event, 'PullLiquidity');
           assert.equal(pull0.vaultToken, balancerTokens[4].address);
           assert.equal(pull0.crvToken, crvTokens[4].address);
-          assert.equal(pull0.vaultAmount, ether('83064.569772929161302093'));
-          assert.equal(pull0.crvAmountExpected, ether('83064.569772929161302093'));
-          assert.equal(pull0.crvAmountActual, ether('83064.569772929161302093'));
+          assert.equal(pull0.vaultAmount, ether('83064.569772779045146663'));
+          assert.equal(pull0.crvAmountExpected, ether('83064.569772779045146663'));
+          assert.equal(pull0.crvAmountActual, ether('83064.569772779045146663'));
           assert.equal(pull0.usdcAmount, mwei('91060.294731'));
           assert.equal(pull0.vaultReserve, ether('16389957.259759308131042340'));
 
-          const pull1 = res.logs[1].args;
+          let pull1 = res.logs[1].args;
           assert.equal(res.logs[1].event, 'PullLiquidity');
           assert.equal(pull1.vaultToken, balancerTokens[3].address);
           assert.equal(pull1.crvToken, crvTokens[3].address);
-          assert.equal(pull1.vaultAmount, ether('154533.983509209236207428'));
-          assert.equal(pull1.crvAmountExpected, ether('154533.983509209236207428'));
-          assert.equal(pull1.crvAmountActual, ether('154533.983509209236207428'));
-          assert.equal(pull1.usdcAmount, mwei('168697.900568'));
+          assert.equal(pull1.vaultAmount, ether('154533.983508604861714448'));
+          assert.equal(pull1.crvAmountExpected, ether('154533.983508604861714448'));
+          assert.equal(pull1.crvAmountActual, ether('154533.983508604861714448'));
+          assert.equal(pull1.usdcAmount, mwei('168697.900567'));
           assert.equal(pull1.vaultReserve, ether('41657837.378850978367377285'));
 
-          const push0 = res.logs[2].args;
-          assert.equal(res.logs[2].event, 'PushLiquidity');
+          let push0 = res.logs[2].args;
+          assert.equal(res.logs[3].event, 'PushLiquidity');
           assert.equal(push0.vaultToken, balancerTokens[2].address);
           assert.equal(push0.crvToken, crvTokens[2].address);
           assert.equal(push0.vaultAmount, ether('38059.603984278481776247'));
           assert.equal(push0.crvAmount, ether('38059.603984278481776247'));
           assert.equal(push0.usdcAmount, mwei('38633.015560'));
 
-          const push1 = res.logs[3].args;
+          let push1 = res.logs[3].args;
           assert.equal(res.logs[3].event, 'PushLiquidity');
           assert.equal(push1.vaultToken, ycrvVault.address);
           assert.equal(push1.crvToken, await ycrvVault.token());
-          assert.equal(push1.vaultAmount, ether('546336.171211528947833946'));
-          assert.equal(push1.crvAmount, ether('546336.171211528947833946'));
-          assert.equal(push1.usdcAmount, mwei('581971.258858'));
+          assert.equal(push1.vaultAmount, ether('546336.171210590179530708'));
+          assert.equal(push1.crvAmount, ether('546336.171210590179530708'));
+          assert.equal(push1.usdcAmount, mwei('581971.258857'));
 
-          const push2 = res.logs[4].args;
+          let push2 = res.logs[4].args;
           assert.equal(res.logs[4].event, 'PushLiquidity');
           assert.equal(push2.vaultToken, balancerTokens[1].address);
           assert.equal(push2.crvToken, crvTokens[1].address);
@@ -1231,11 +1128,11 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.213211585583551400'));
           assert.equal(await pool.getTotalDenormalizedWeight(), ether('24.999999999999999975'));
 
-          assert.equal(await pool.getBalance(ycrvVault.address), ether('546336.171211528947833946'));
+          assert.equal(await pool.getBalance(ycrvVault.address), ether('546336.171210590179530708'));
           assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1616414.109582937272810199'));
           assert.equal(await pool.getBalance(balancerTokens[2].address), ether('788061.250223962626874946'));
-          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('902398.434802000000000000'));
-          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('355041.757045000000000000'));
+          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('902398.434802604374492980'));
+          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('355041.757045150116155430'));
         });
 
         it('should correctly replace one token with new with higher price', async () => {
@@ -1283,7 +1180,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
 
           expectEvent(res, 'InstantRebind', {
             poolCurrentTokensCount: '5',
-            usdcPulled: mwei('660959.107138'),
+            usdcPulled: mwei('660959.107136'),
             usdcRemainder: '1',
           });
 
@@ -1293,9 +1190,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[0].event, 'PullLiquidity');
           assert.equal(pull0.vaultToken, balancerTokens[4].address);
           assert.equal(pull0.crvToken, crvTokens[4].address);
-          assert.equal(pull0.vaultAmount, ether('87817.289549929161302093'));
-          assert.equal(pull0.crvAmountExpected, ether('87817.289549929161302093'));
-          assert.equal(pull0.crvAmountActual, ether('87817.289549929161302093'));
+          assert.equal(pull0.vaultAmount, ether('87817.289550122889370686'));
+          assert.equal(pull0.crvAmountExpected, ether('87817.289550122889370686'));
+          assert.equal(pull0.crvAmountActual, ether('87817.289550122889370686'));
           assert.equal(pull0.usdcAmount, mwei('96270.507278'));
           assert.equal(pull0.vaultReserve, ether('16389957.259759308131042340'));
 
@@ -1303,37 +1200,37 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[1].event, 'PullLiquidity');
           assert.equal(pull1.vaultToken, balancerTokens[3].address);
           assert.equal(pull1.crvToken, crvTokens[3].address);
-          assert.equal(pull1.vaultAmount, ether('166613.821452209236207428'));
-          assert.equal(pull1.crvAmountExpected, ether('166613.821452209236207428'));
-          assert.equal(pull1.crvAmountActual, ether('166613.821452209236207428'));
-          assert.equal(pull1.usdcAmount, mwei('181884.924250'));
+          assert.equal(pull1.vaultAmount, ether('166613.821451681127844353'));
+          assert.equal(pull1.crvAmountExpected, ether('166613.821451681127844353'));
+          assert.equal(pull1.crvAmountActual, ether('166613.821451681127844353'));
+          assert.equal(pull1.usdcAmount, mwei('181884.924249'));
           assert.equal(pull1.vaultReserve, ether('41657837.378850978367377285'));
 
           const push0 = res.logs[2].args;
           assert.equal(res.logs[2].event, 'PullLiquidity');
           assert.equal(push0.vaultToken, balancerTokens[1].address);
           assert.equal(push0.crvToken, crvTokens[1].address);
-          assert.equal(push0.vaultAmount, ether('7858.624065002025699215'));
-          assert.equal(push0.crvAmountExpected, ether('7858.624065002025699215'));
-          assert.equal(push0.crvAmountActual, ether('7858.624065002025699215'));
-          assert.equal(push0.usdcAmount, mwei('7974.728498'));
-          assert.equal(pull1.vaultReserve, ether('41657837.378850978367377285'));
+          assert.equal(push0.vaultAmount, ether('7858.624064739913548021'));
+          assert.equal(push0.crvAmountExpected, ether('7858.624064739913548021'));
+          assert.equal(push0.crvAmountActual, ether('7858.624064739913548021'));
+          assert.equal(push0.usdcAmount, mwei('7974.728497'));
+          assert.equal(push0.vaultReserve, ether('74619274.055649745653298073'));
 
-          const push1 = res.logs[3].args;
+          const push2 = res.logs[3].args;
           assert.equal(res.logs[3].event, 'PushLiquidity');
-          assert.equal(push1.vaultToken, balancerTokens[2].address);
-          assert.equal(push1.crvToken, crvTokens[2].address);
-          assert.equal(push1.vaultAmount, ether('27510.325721813558548199'));
-          assert.equal(push1.crvAmount, ether('27510.325721813558548199'));
-          assert.equal(push1.usdcAmount, mwei('27924.800324'));
+          assert.equal(push2.vaultToken, balancerTokens[2].address);
+          assert.equal(push2.crvToken, crvTokens[2].address);
+          assert.equal(push2.vaultAmount, ether('27510.325722798716021220'));
+          assert.equal(push2.crvAmount, ether('27510.325722798716021220'));
+          assert.equal(push2.usdcAmount, mwei('27924.800325'));
 
-          const push2 = res.logs[4].args;
+          const push3 = res.logs[4].args;
           assert.equal(res.logs[4].event, 'PushLiquidity');
-          assert.equal(push2.vaultToken, ycrvVault.address);
-          assert.equal(push2.crvToken, await ycrvVault.token());
-          assert.equal(push2.vaultAmount, ether('565973.849617538644379992'));
-          assert.equal(push2.crvAmount, ether('565973.849617538644379992'));
-          assert.equal(push2.usdcAmount, mwei('633034.306813'));
+          assert.equal(push3.vaultToken, ycrvVault.address);
+          assert.equal(push3.crvToken, await ycrvVault.token());
+          assert.equal(push3.vaultAmount, ether('565973.849614856449227883'));
+          assert.equal(push3.crvAmount, ether('565973.849614856449227883'));
+          assert.equal(push3.usdcAmount, mwei('633034.306810'));
 
           await time.increase(pokePeriod * 2);
 
@@ -1350,11 +1247,11 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getDenormalizedWeight(balancerTokens[4].address), ether('2.183584719826147500'));
           assert.equal(await pool.getTotalDenormalizedWeight(), ether('25'));
 
-          assert.equal(await pool.getBalance(ycrvVault.address), ether('565973.849617538644379992'));
-          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1594776.194734000000000000'));
-          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('777511.971961497703646898'));
-          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('890318.596859000000000000'));
-          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('350289.037268000000000000'));
+          assert.equal(await pool.getBalance(ycrvVault.address), ether('565973.849614856449227883'));
+          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1594776.194734262112151194'));
+          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('777511.971962482861119919'));
+          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('890318.596859528108363075'));
+          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('350289.037267806271931407'));
         });
 
         it('should correctly add new token with new with same price', async () => {
@@ -1402,7 +1299,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
 
           expectEvent(res, 'InstantRebind', {
             poolCurrentTokensCount: '6',
-            usdcPulled: mwei('653052.239634'),
+            usdcPulled: mwei('653052.239632'),
             usdcRemainder: '1',
           });
 
@@ -1412,9 +1309,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[0].event, 'PullLiquidity');
           assert.equal(pull0.vaultToken, balancerTokens[4].address);
           assert.equal(pull0.crvToken, crvTokens[4].address);
-          assert.equal(pull0.vaultAmount, ether('124567.868498929161302093'));
-          assert.equal(pull0.crvAmountExpected, ether('124567.868498929161302093'));
-          assert.equal(pull0.crvAmountActual, ether('124567.868498929161302093'));
+          assert.equal(pull0.vaultAmount, ether('124567.868498953023448797'));
+          assert.equal(pull0.crvAmountExpected, ether('124567.868498953023448797'));
+          assert.equal(pull0.crvAmountActual, ether('124567.868498953023448797'));
           assert.equal(pull0.usdcAmount, mwei('136558.665753'));
           assert.equal(pull0.vaultReserve, ether('16389957.259759308131042340'));
 
@@ -1422,9 +1319,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[1].event, 'PullLiquidity');
           assert.equal(pull1.vaultToken, balancerTokens[2].address);
           assert.equal(pull1.crvToken, crvTokens[2].address);
-          assert.equal(pull1.vaultAmount, ether('54062.353034684145098699'));
-          assert.equal(pull1.crvAmountExpected, ether('54062.353034684145098699'));
-          assert.equal(pull1.crvAmountActual, ether('54062.353034684145098699'));
+          assert.equal(pull1.vaultAmount, ether('54062.353034435376760742'));
+          assert.equal(pull1.crvAmountExpected, ether('54062.353034435376760742'));
+          assert.equal(pull1.crvAmountActual, ether('54062.353034435376760742'));
           assert.equal(pull1.usdcAmount, mwei('54876.864374'));
           assert.equal(pull1.vaultReserve, ether('36379636.910177355957293395'));
 
@@ -1432,20 +1329,19 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[2].event, 'PullLiquidity');
           assert.equal(pull2.vaultToken, balancerTokens[3].address);
           assert.equal(pull2.crvToken, crvTokens[3].address);
-          assert.equal(pull2.vaultAmount, ether('260021.608743209236207428'));
-          assert.equal(pull2.crvAmountExpected, ether('260021.608743209236207428'));
-          assert.equal(pull2.crvAmountActual, ether('260021.608743209236207428'));
-          assert.equal(pull2.usdcAmount, mwei('283854.065632'));
+          assert.equal(pull2.vaultAmount, ether('260021.608742730619318877'));
+          assert.equal(pull2.crvAmountExpected, ether('260021.608742730619318877'));
+          assert.equal(pull2.crvAmountActual, ether('260021.608742730619318877'));
+          assert.equal(pull2.usdcAmount, mwei('283854.065631'));
           assert.equal(pull2.vaultReserve, ether('41657837.378850978367377285'));
 
           const push0 = res.logs[3].args;
           assert.equal(res.logs[3].event, 'PullLiquidity');
           assert.equal(push0.vaultToken, balancerTokens[1].address);
           assert.equal(push0.crvToken, crvTokens[1].address);
-          assert.equal(push0.vaultAmount, ether('175174.589496002025699215'));
-          assert.equal(push0.crvAmountExpected, ether('175174.589496002025699215'));
-          assert.equal(push0.crvAmountActual, ether('175174.589496002025699215'));
-          assert.equal(push0.usdcAmount, mwei('177762.643875'));
+          assert.equal(push0.vaultAmount, ether('175174.589495562503352690'));
+          assert.equal(push0.crvAmountExpected, ether('175174.589495562503352690'));
+          assert.equal(push0.crvAmountActual, ether('175174.589495562503352690'));
           assert.equal(pull1.vaultReserve, ether('36379636.910177355957293395'));
 
           const push1 = res.logs[4].args;
@@ -1460,9 +1356,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[5].event, 'PushLiquidity');
           assert.equal(push2.vaultToken, ycrvVault.address);
           assert.equal(push2.crvToken, await ycrvVault.token());
-          assert.equal(push2.vaultAmount, ether('482471.138806009335005318'));
-          assert.equal(push2.crvAmount, ether('482471.138806009335005318'));
-          assert.equal(push2.usdcAmount, mwei('513940.593373'));
+          assert.equal(push2.vaultAmount, ether('482471.138804131798398842'));
+          assert.equal(push2.crvAmount, ether('482471.138804131798398842'));
+          assert.equal(push2.usdcAmount, mwei('513940.593371'));
 
           await time.increase(pokePeriod * 2);
 
@@ -1482,11 +1378,11 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getTotalDenormalizedWeight(), ether('25.000000000000000025'));
 
           assert.equal(await pool.getBalance(balancerTokens[0].address), ether('482471.138805704298488509'));
-          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1427460.229303000000000000'));
-          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('695939.293205000000000000'));
-          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('796910.809568000000000000'));
-          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('313538.458319000000000000'));
-          assert.equal(await pool.getBalance(ycrvVault.address), ether('482471.138806009335005318'));
+          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1427460.229303439522346525'));
+          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('695939.293205248768337957'));
+          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('796910.809568478616888551'));
+          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('313538.458318976137853296'));
+          assert.equal(await pool.getBalance(ycrvVault.address), ether('482471.138804131798398842'));
         });
 
         it('should correctly remove token', async () => {
@@ -1526,7 +1422,7 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
 
           expectEvent(res, 'InstantRebind', {
             poolCurrentTokensCount: '6',
-            usdcPulled: mwei('653052.239634'),
+            usdcPulled: mwei('653052.239632'),
             usdcRemainder: '1',
           });
 
@@ -1536,9 +1432,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[0].event, 'PullLiquidity');
           assert.equal(pull0.vaultToken, balancerTokens[4].address);
           assert.equal(pull0.crvToken, crvTokens[4].address);
-          assert.equal(pull0.vaultAmount, ether('124567.868498929161302093'));
-          assert.equal(pull0.crvAmountExpected, ether('124567.868498929161302093'));
-          assert.equal(pull0.crvAmountActual, ether('124567.868498929161302093'));
+          assert.equal(pull0.vaultAmount, ether('124567.868498953023448797'));
+          assert.equal(pull0.crvAmountExpected, ether('124567.868498953023448797'));
+          assert.equal(pull0.crvAmountActual, ether('124567.868498953023448797'));
           assert.equal(pull0.usdcAmount, mwei('136558.665753'));
           assert.equal(pull0.vaultReserve, ether('16389957.259759308131042340'));
 
@@ -1546,9 +1442,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[1].event, 'PullLiquidity');
           assert.equal(pull1.vaultToken, balancerTokens[2].address);
           assert.equal(pull1.crvToken, crvTokens[2].address);
-          assert.equal(pull1.vaultAmount, ether('54062.353034684145098699'));
-          assert.equal(pull1.crvAmountExpected, ether('54062.353034684145098699'));
-          assert.equal(pull1.crvAmountActual, ether('54062.353034684145098699'));
+          assert.equal(pull1.vaultAmount, ether('54062.353034435376760742'));
+          assert.equal(pull1.crvAmountExpected, ether('54062.353034435376760742'));
+          assert.equal(pull1.crvAmountActual, ether('54062.353034435376760742'));
           assert.equal(pull1.usdcAmount, mwei('54876.864374'));
           assert.equal(pull1.vaultReserve, ether('36379636.910177355957293395'));
 
@@ -1556,20 +1452,20 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[2].event, 'PullLiquidity');
           assert.equal(pull2.vaultToken, balancerTokens[3].address);
           assert.equal(pull2.crvToken, crvTokens[3].address);
-          assert.equal(pull2.vaultAmount, ether('260021.608743209236207428'));
-          assert.equal(pull2.crvAmountExpected, ether('260021.608743209236207428'));
-          assert.equal(pull2.crvAmountActual, ether('260021.608743209236207428'));
-          assert.equal(pull2.usdcAmount, mwei('283854.065632'));
+          assert.equal(pull2.vaultAmount, ether('260021.608742730619318877'));
+          assert.equal(pull2.crvAmountExpected, ether('260021.608742730619318877'));
+          assert.equal(pull2.crvAmountActual, ether('260021.608742730619318877'));
+          assert.equal(pull2.usdcAmount, mwei('283854.065631'));
           assert.equal(pull2.vaultReserve, ether('41657837.378850978367377285'));
 
           const push0 = res.logs[3].args;
           assert.equal(res.logs[3].event, 'PullLiquidity');
           assert.equal(push0.vaultToken, balancerTokens[1].address);
           assert.equal(push0.crvToken, crvTokens[1].address);
-          assert.equal(push0.vaultAmount, ether('175174.589496002025699215'));
-          assert.equal(push0.crvAmountExpected, ether('175174.589496002025699215'));
-          assert.equal(push0.crvAmountActual, ether('175174.589496002025699215'));
-          assert.equal(push0.usdcAmount, mwei('177762.643875'));
+          assert.equal(push0.vaultAmount, ether('175174.589495562503352690'));
+          assert.equal(push0.crvAmountExpected, ether('175174.589495562503352690'));
+          assert.equal(push0.crvAmountActual, ether('175174.589495562503352690'));
+          assert.equal(push0.usdcAmount, mwei('177762.643874'));
           assert.equal(pull1.vaultReserve, ether('36379636.910177355957293395'));
 
           const push1 = res.logs[4].args;
@@ -1584,9 +1480,9 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(res.logs[5].event, 'PushLiquidity');
           assert.equal(push2.vaultToken, ycrvVault.address);
           assert.equal(push2.crvToken, await ycrvVault.token());
-          assert.equal(push2.vaultAmount, ether('482471.138806009335005318'));
-          assert.equal(push2.crvAmount, ether('482471.138806009335005318'));
-          assert.equal(push2.usdcAmount, mwei('513940.593373'));
+          assert.equal(push2.vaultAmount, ether('482471.138804131798398842'));
+          assert.equal(push2.crvAmount, ether('482471.138804131798398842'));
+          assert.equal(push2.usdcAmount, mwei('513940.593371'));
 
           await time.increase(pokePeriod * 2);
 
@@ -1606,11 +1502,11 @@ describe('Yearn Vault Instant Rebind Strategy', () => {
           assert.equal(await pool.getTotalDenormalizedWeight(), ether('25.000000000000000025'));
 
           assert.equal(await pool.getBalance(balancerTokens[0].address), ether('482471.138805704298488509'));
-          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1427460.229303000000000000'));
-          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('695939.293205000000000000'));
-          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('796910.809568000000000000'));
-          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('313538.458319000000000000'));
-          assert.equal(await pool.getBalance(ycrvVault.address), ether('482471.138806009335005318'));
+          assert.equal(await pool.getBalance(balancerTokens[1].address), ether('1427460.229303439522346525'));
+          assert.equal(await pool.getBalance(balancerTokens[2].address), ether('695939.293205248768337957'));
+          assert.equal(await pool.getBalance(balancerTokens[3].address), ether('796910.809568478616888551'));
+          assert.equal(await pool.getBalance(balancerTokens[4].address), ether('313538.458318976137853296'));
+          assert.equal(await pool.getBalance(ycrvVault.address), ether('482471.138804131798398842'));
         });
       });
     });
