@@ -34,6 +34,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
   event Erc20ToVaultPoolSwap(address indexed user, address indexed pool, uint256 usdcInAmount, uint256 poolOutAmount);
   event VaultPoolToErc20Swap(address indexed user, address indexed pool, uint256 poolInAmount, uint256 usdcOutAmount);
+  event VaultToUsdcSwap(address indexed user, address indexed vaultInToken, uint256 vaultInAmount, uint256 usdcOutAmount);
   event ClaimFee(address indexed token, address indexed payout, uint256 amount);
 
   IERC20 public immutable usdc;
@@ -45,7 +46,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     uint256 depositorIndex;
     address depositor;
     address lpToken;
-    address vaultRegistry;
+    address curvePoolRegistry;
   }
   mapping(address => VaultConfig) public vaultConfig;
 
@@ -68,7 +69,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     uint256[] memory _depositorAmountLength,
     uint256[] memory _depositorIndexes,
     address[] memory _lpTokens,
-    address[] memory _vaultRegistries
+    address[] memory _curvePoolRegistries
   ) external onlyOwner {
     uint256 len = _tokens.length;
     require(
@@ -76,7 +77,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
         len == _depositorAmountLength.length &&
         len == _depositorIndexes.length &&
         len == _lpTokens.length &&
-        len == _vaultRegistries.length,
+        len == _curvePoolRegistries.length,
       "L"
     );
     for (uint256 i = 0; i < len; i++) {
@@ -85,7 +86,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
         _depositorIndexes[i],
         _depositors[i],
         _lpTokens[i],
-        _vaultRegistries[i]
+        _curvePoolRegistries[i]
       );
 
       usdc.approve(_depositors[i], uint256(-1));
@@ -97,7 +98,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
         _depositorAmountLength[i],
         _depositorIndexes[i],
         _lpTokens[i],
-        _vaultRegistries[i]
+        _curvePoolRegistries[i]
       );
     }
   }
@@ -152,18 +153,29 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
     (, uint256 _poolAmountInWithFee) = calcFee(_poolAmountIn, 0);
 
-    erc20Out = _redeemVault(_pool, _poolAmountInWithFee);
+    erc20Out = _redeemPooledVault(_pool, _poolAmountInWithFee);
 
     usdc.safeTransfer(msg.sender, erc20Out);
 
     emit VaultPoolToErc20Swap(msg.sender, _pool, _poolAmountIn, erc20Out);
   }
 
+  function swapVaultToUSDC(
+    address _vaultTokenIn,
+    uint256 _vaultAmountIn
+  ) external override returns (uint256 usdcAmountOut) {
+    IERC20(_vaultTokenIn).safeTransferFrom(msg.sender, address(this), _vaultAmountIn);
+    usdcAmountOut = _redeemVault(_vaultTokenIn, _vaultAmountIn);
+    usdc.safeTransfer(msg.sender, usdcAmountOut);
+
+    emit VaultToUsdcSwap(msg.sender, _vaultTokenIn, _vaultAmountIn, usdcAmountOut);
+  }
+
   /* ==========  View Functions  ========== */
 
   function calcVaultOutByUsdc(address _token, uint256 _usdcIn) public view returns (uint256 amountOut) {
     VaultConfig storage vc = vaultConfig[_token];
-    uint256 lpByUsdcPrice = ICurvePoolRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
+    uint256 lpByUsdcPrice = ICurvePoolRegistry(vc.curvePoolRegistry).get_virtual_price_from_lp_token(vc.lpToken);
     uint256 vaultByLpPrice = IVault(_token).pricePerShare();
     return _usdcIn.mul(1e30).div(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether));
   }
@@ -198,11 +210,11 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     }
   }
 
-  function calcUsdcOutByVault(address _token, uint256 _vaultIn) public view returns (uint256 amountOut) {
-    VaultConfig storage vc = vaultConfig[_token];
-    uint256 lpByUsdcPrice = ICurvePoolRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
-    uint256 vaultByLpPrice = IVault(_token).pricePerShare();
-    return _vaultIn.mul(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether)).div(1e30);
+  function calcUsdcOutByVault(address _vaultTokenIn, uint256 _vaultAmountIn) public view returns (uint256 usdcAmountOut) {
+    VaultConfig storage vc = vaultConfig[_vaultTokenIn];
+    uint256 lpByUsdcPrice = ICurvePoolRegistry(vc.curvePoolRegistry).get_virtual_price_from_lp_token(vc.lpToken);
+    uint256 vaultByLpPrice = IVault(_vaultTokenIn).pricePerShare();
+    return _vaultAmountIn.mul(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether)).div(1e30);
   }
 
   function calcUsdcOutByPool(
@@ -320,7 +332,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     return balanceAfter.sub(balanceBefore);
   }
 
-  function _redeemVault(address _pool, uint256 _totalInputAmount) internal returns (uint256 totalOutputAmount) {
+  function _redeemPooledVault(address _pool, uint256 _totalInputAmount) internal returns (uint256 totalOutputAmount) {
     require(_totalInputAmount != 0, "NULL_INPUT");
     address[] memory tokens = poolTokens[_pool];
     uint256 len = tokens.length;
@@ -347,6 +359,22 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     }
     totalOutputAmount = usdc.balanceOf(address(this)).sub(outputTokenBalanceBefore);
     require(totalOutputAmount != 0, "NULL_OUTPUT");
+  }
+
+  function _redeemVault(address _vault, uint256 _amountIn) internal returns (uint256 amountOut) {
+    uint256 usdcBefore = usdc.balanceOf(address(this));
+
+    VaultConfig storage vc = vaultConfig[_vault];
+    uint256 lpTokenBalanceBefore = IERC20(vc.lpToken).balanceOf(address(this));
+    IVault(_vault).withdraw(_amountIn);
+    ICurveDepositor(vc.depositor).remove_liquidity_one_coin(
+      IERC20(vc.lpToken).balanceOf(address(this)).sub(lpTokenBalanceBefore),
+      int128(vc.depositorIndex),
+      1
+    );
+
+    amountOut = usdc.balanceOf(address(this)).sub(usdcBefore);
+    require(amountOut != 0, "NULL_OUTPUT");
   }
 
   function _updatePool(address _pool) internal {

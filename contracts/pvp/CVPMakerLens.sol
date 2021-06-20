@@ -5,6 +5,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../interfaces/IUniswapV2Router02.sol";
 import "../interfaces/BPoolInterface.sol";
+import "../interfaces/ICVPMakerStrategy.sol";
 import "./CVPMakerViewer.sol";
 import "../powerindex-router/PowerIndexWrapper.sol";
 
@@ -41,12 +42,18 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     uint256 customStrategyId = customStrategies[token_];
     if (customStrategyId > 0) {
       return estimateCustomStrategyIn(token_, customStrategyId);
-    } else {
-      return estimateUniLikeStrategyIn(token_);
     }
+
+    address externalStrategy = externalStrategies[token_];
+    if (externalStrategy != address(0)) {
+      return estimateExternalStrategyIn(token_, externalStrategy);
+    }
+
+    return estimateUniLikeStrategyIn(token_);
   }
 
   // How much CVP can be returned by swapping all the token_ balance
+  // Does not support estimations for the external strategies
   function estimateCvpAmountOut(address token_) external view returns (uint256) {
     if (token_ == cvp) {
       return IERC20(cvp).balanceOf(address(this));
@@ -110,6 +117,10 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     } else {
       revert("INVALID_STRATEGY_ID");
     }
+  }
+
+  function estimateExternalStrategyIn(address token_, address strategy_) public view returns (uint256) {
+    return ICVPMakerStrategy(strategy_).estimateIn(address(this), token_, externalStrategyConfig[token_]);
   }
 
   function estimateCustomStrategyOut(address token_, uint256 strategyId_) public view returns (uint256) {

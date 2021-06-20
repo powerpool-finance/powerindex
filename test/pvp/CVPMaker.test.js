@@ -1,5 +1,5 @@
 const { constants, time, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
-const { ether, gwei, deployProxied } = require('../helpers/index');
+const { ether, gwei, deployProxied, artifactFromBytecode } = require('../helpers/index');
 const { buildBasicRouterConfig } = require('../helpers/builders');
 const assert = require('chai').assert;
 const MockProxyCall = artifacts.require('MockProxyCall');
@@ -13,6 +13,8 @@ const PowerPoke = artifacts.require('PowerPoke');
 const UniswapV2Factory = artifacts.require('MockUniswapV2Factory');
 const UniswapV2Pair = artifacts.require('UniswapV2Pair');
 const UniswapV2Router022 = artifacts.require('UniswapV2Router022');
+const MockCurveDepositor2 = artifacts.require('MockCurveDepositor2');
+const MockCurvePoolRegistry = artifacts.require('MockCurvePoolRegistry');
 const MockOracle = artifacts.require('MockOracle');
 const PowerIndexPoolFactory = artifacts.require('PowerIndexPoolFactory');
 const ProxyFactory = artifacts.require('ProxyFactory');
@@ -25,6 +27,8 @@ const WrappedPiErc20Factory = artifacts.require('WrappedPiErc20Factory');
 const BasicPowerIndexRouterFactory = artifacts.require('BasicPowerIndexRouterFactory');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
+const Erc20VaultPoolSwap = artifacts.require('Erc20VaultPoolSwap');
+const CVPMakerStrategy4 = artifacts.require('CVPMakerStrategy4');
 
 WrappedPiErc20.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
@@ -36,10 +40,20 @@ PowerIndexPool.numberFormat = 'String';
 MockWETH.numberFormat = 'String';
 MockStaking.numberFormat = 'String';
 PowerIndexPoolController.numberFormat = 'String';
+MockCurveDepositor2.numberFormat = 'String';
+MockCurveDepositor2.numberFormat = 'String';
+Erc20VaultPoolSwap.numberFormat = 'String';
+CVPMakerStrategy4.numberFormat = 'String';
+
+const YVaultV2 = artifactFromBytecode('yearn/YVaultV2');
 
 const ETH = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
 const { web3 } = MockERC20;
+
+function mwei(val) {
+  return web3.utils.toWei(val.toString(), 'mwei').toString();
+}
 
 describe('CVPMaker test', () => {
   let deployer, owner, cvpMakerClientOwner, alice, bob, charlie, reporter, slasher, stub;
@@ -363,7 +377,7 @@ describe('CVPMaker test', () => {
 
           const res = await cvpMaker.mockSwap(dai.address);
           expectEvent(res, 'Swap', {
-            swapType: '4',
+            swapType: '5',
             caller: deployer,
             token: dai.address,
             amountIn: '6706892169261616443894',
@@ -590,7 +604,7 @@ describe('CVPMaker test', () => {
           assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
           const res = await cvpMaker.mockSwap(uni.address);
           expectEvent(res, 'Swap', {
-            swapType: '4',
+            swapType: '5',
             caller: deployer,
             token: uni.address,
             amountIn: ether('269.911675708212223606'),
@@ -666,7 +680,7 @@ describe('CVPMaker test', () => {
           assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
           const res = await cvpMaker.mockSwap(sushi.address);
           expectEvent(res, 'Swap', {
-            swapType: '4',
+            swapType: '5',
             caller: deployer,
             token: sushi.address,
             amountIn: ether('503.016912694621233293'),
@@ -1223,6 +1237,104 @@ describe('CVPMaker test', () => {
         });
       });
     });
+
+    describe('external strategies', () => {
+      describe('Strategy #4. Yearn Vault V2 tokens', () => {
+        let ycrvVault;
+        let strategy4;
+
+        beforeEach(async () => {
+          const virtualPrice = ether('1.2');
+          const curvePoolOnVault = BigInt(1e24);
+          usdc = await MockERC20.new('USDC', 'USDC', '6', ether(1e15));
+          await makeUniswapPair(usdc, weth, mwei(2e9), ether(1e6), true);
+
+          const curvePoolToken = await MockERC20.new('crvBuzz', 'crvBuzz', 18, BigInt(1e24).toString());
+          const curvePoolRegistry = await MockCurvePoolRegistry.new();
+
+          await curvePoolRegistry.set_virtual_price(curvePoolToken.address, virtualPrice);
+          const vaultSwap = await Erc20VaultPoolSwap.new(usdc.address);
+          strategy4 = await CVPMakerStrategy4.new(usdc.address, vaultSwap.address, ether('1.05'));
+          const crvDepositor = await MockCurveDepositor2.new(
+            curvePoolToken.address,
+            usdc.address,
+            // usdcIndex
+            1,
+            virtualPrice
+          );
+          ycrvVault = await YVaultV2.new();
+          await ycrvVault.initialize(
+            // token
+            curvePoolToken.address,
+            // governance
+            stub,
+            // rewards
+            stub,
+            // nameOverride
+            '',
+            // symbolOverride
+            '',
+            // guardian
+            stub,
+          );
+          await ycrvVault.setDepositLimit('1000000000000000000000000000', { from: stub });
+          await ycrvVault.setManagementFee('0', { from: stub });
+
+          await curvePoolRegistry.set_virtual_price(curvePoolToken.address, virtualPrice);
+
+          await curvePoolToken.approve(ycrvVault.address, curvePoolOnVault);
+          await ycrvVault.deposit(curvePoolOnVault);
+
+          await vaultSwap.setVaultConfigs(
+            [ycrvVault.address],
+            [crvDepositor.address],
+            [2],
+            [1],
+            [curvePoolToken.address],
+            [curvePoolRegistry.address]
+          );
+
+          await usdc.transfer(crvDepositor.address, mwei(1e12));
+          await cvpMaker.setExternalStrategy(ycrvVault.address, strategy4.address, '0x', { from: owner });
+        })
+
+        it('should unwrap if there is enough assets', async () => {
+          await ycrvVault.transfer(cvpMaker.address, ether(6000));
+
+          // >>> Amounts IN
+          assert.equal(await cvpMaker.estimateSwapAmountIn(usdc.address), mwei('6706.892170'));
+          assert.equal(await cvpMaker.estimateExternalStrategyIn(ycrvVault.address, strategy4.address), ether('5868.530648749999999999'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648749999999999'));
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
+          assert.equal(await ycrvVault.balanceOf(cvpMaker.address), ether(6000));
+
+          await cvpMaker.mockSwap(ycrvVault.address);
+
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
+          const expectedBPoolLeftover = (BigInt(ether(6000)) - BigInt(ether('5868.530648749999999999'))).toString();
+          assert.equal(expectedBPoolLeftover, ether('131.469351250000000001'));
+          assert.equal(await ycrvVault.balanceOf(cvpMaker.address), expectedBPoolLeftover);
+        })
+
+        it('should revert if the balance is not enough', async () => {
+          await ycrvVault.transfer(cvpMaker.address, ether(5500));
+          assert.equal(await ycrvVault.balanceOf(cvpMaker.address), ether('5500'));
+
+          assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648749999999999'));
+
+          await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'INSUFFICIENT_VAULT_AMOUNT_IN');
+        });
+
+        it('should revert if the balance is 0', async () => {
+          assert.equal(await ycrvVault.balanceOf(cvpMaker.address), ether(0));
+
+          assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648749999999999'));
+
+          await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'INSUFFICIENT_VAULT_AMOUNT_IN');
+        });
+      })
+    })
   });
 
   describe('owner interface', () => {

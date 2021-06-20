@@ -5,8 +5,9 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../interfaces/IUniswapV2Router02.sol";
 import "./CVPMakerStorage.sol";
+import "../interfaces/ICVPMakerViewer.sol";
 
-contract CVPMakerViewer is CVPMakerStorage {
+contract CVPMakerViewer is ICVPMakerViewer, CVPMakerStorage {
   using SafeMath for uint256;
 
   address internal constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
@@ -45,7 +46,7 @@ contract CVPMakerViewer is CVPMakerStorage {
     return path;
   }
 
-  function getRouter(address token_) public view returns (address) {
+  function getRouter(address token_) public view override returns (address) {
     address router = routers[token_];
 
     if (router == address(0)) {
@@ -55,7 +56,7 @@ contract CVPMakerViewer is CVPMakerStorage {
     return router;
   }
 
-  function getPath(address token_) public view returns (address[] memory) {
+  function getPath(address token_) public view override returns (address[] memory) {
     address[] storage customPath = customPaths[token_];
 
     if (customPath.length == 0) {
@@ -65,7 +66,7 @@ contract CVPMakerViewer is CVPMakerStorage {
     return customPath;
   }
 
-  function getDefaultPath(address token_) public view returns (address[] memory) {
+  function getDefaultPath(address token_) public view override returns (address[] memory) {
     address[] memory path = new address[](3);
 
     path[0] = token_;
@@ -77,7 +78,7 @@ contract CVPMakerViewer is CVPMakerStorage {
 
   /*** ESTIMATIONS ***/
 
-  function estimateEthStrategyIn() public view returns (uint256) {
+  function estimateEthStrategyIn() public view override returns (uint256) {
     uint256[] memory results = IUniswapV2Router02(uniswapRouter).getAmountsIn(cvpAmountOut, _wethCVPPath());
     return results[0];
   }
@@ -87,7 +88,7 @@ contract CVPMakerViewer is CVPMakerStorage {
    * @param token_ The token to swap for CVP
    * @return The estimated token_ amount in
    */
-  function estimateUniLikeStrategyIn(address token_) public view returns (uint256) {
+  function estimateUniLikeStrategyIn(address token_) public view override returns (uint256) {
     address router = getRouter(token_);
     address[] memory path = getPath(token_);
 
@@ -110,6 +111,7 @@ contract CVPMakerViewer is CVPMakerStorage {
   function calcBPoolGrossAmount(uint256 tokenAmountNet_, uint256 communityFee_)
     public
     view
+    override
     returns (uint256 tokenAmountGross)
   {
     if (address(_restrictions) != address(0) && _restrictions.isWithoutFee(address(this))) {

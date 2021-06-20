@@ -24,6 +24,9 @@ contract CVPMakerStorage is OwnableUpgradeSafe {
   // token => strategyId
   mapping(address => uint256) public customStrategies;
 
+  // token => strategyId
+  mapping(address => address) public externalStrategies;
+
   struct Strategy1Config {
     address bPoolWrapper;
   }
@@ -45,4 +48,6 @@ contract CVPMakerStorage is OwnableUpgradeSafe {
   mapping(address => Strategy2Config) public strategy2Config;
 
   mapping(address => Strategy3Config) public strategy3Config;
+
+  mapping(address => bytes) public externalStrategyConfig;
 }

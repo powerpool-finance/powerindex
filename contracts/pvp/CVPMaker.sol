@@ -9,6 +9,7 @@ import "@powerpool/power-oracle/contracts/interfaces/IPowerPoke.sol";
 import "../interfaces/IUniswapV2Router02.sol";
 import "../interfaces/TokenInterface.sol";
 import "../interfaces/BPoolInterface.sol";
+import "../interfaces/ICVPMakerStrategy.sol";
 import "../powerindex-router/PowerIndexWrapper.sol";
 import "./CVPMakerStorage.sol";
 import "./CVPMakerViewer.sol";
@@ -35,6 +36,8 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   event SetCustomPath(address indexed token_, address router_, address[] path);
   /// @notice The event emitted when the owner assigns a custom strategy for the token
   event SetCustomStrategy(address indexed token, uint256 strategyId);
+  /// @notice The event emitted when the owner configures an external strategy for the token
+  event SetExternalStrategy(address indexed token_, address indexed strategy);
 
   modifier onlyEOA() {
     require(msg.sender == tx.origin, "NOT_EOA");
@@ -158,11 +161,19 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
       if (customStrategyId > 0) {
         amountIn = _executeCustomStrategy(token_, customStrategyId);
         swapType = 3;
-        // Use a Uniswap-like strategy
-      } else {
-        amountIn = _executeUniLikeStrategy(token_);
-        swapType = 4;
+        return;
       }
+
+      address externalStrategy = externalStrategies[token_];
+      if (externalStrategy != address(0)) {
+        amountIn = _executeExternalStrategy(token_, externalStrategy);
+        swapType = 4;
+        return;
+      }
+
+      // Use a Uniswap-like strategy
+      amountIn = _executeUniLikeStrategy(token_);
+      swapType = 5;
     }
     uint256 cvpAfter = IERC20(cvp).balanceOf(xcvp);
     require(cvpAfter >= cvpBefore.add((cvpAmountOut_ * 99) / 100), "LESS_THAN_CVP_AMOUNT_OUT");
@@ -236,6 +247,23 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
       );
     IERC20(token_).approve(router_, 0);
     return amounts[0];
+  }
+
+  function _executeExternalStrategy(address token_, address externalStrategy_) internal returns (uint256 amountIn) {
+    (bool ok, bytes memory result) = externalStrategy_.delegatecall(
+      abi.encodeWithSelector(
+        ICVPMakerStrategy.executeStrategy.selector,
+        token_,
+        externalStrategyConfig[token_]
+      )
+    );
+    require(ok, "EXTERNAL_STRATEGY_FAILED");
+
+    address executeUniLikeFrom;
+    (amountIn, executeUniLikeFrom) = abi.decode(result, (uint256, address));
+    if (executeUniLikeFrom != address(0)) {
+      _executeUniLikeStrategy(executeUniLikeFrom);
+    }
   }
 
   function _executeCustomStrategy(address token_, uint256 strategyId_) internal returns (uint256 amountIn) {
@@ -407,6 +435,12 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     address underlying_
   ) external onlyOwner {
     strategy3Config[token_] = Strategy3Config(bPool_, bPoolWrapper_, underlying_);
+  }
+
+  function setExternalStrategy(address token_, address strategy_, bytes memory config_) external onlyOwner {
+    externalStrategies[token_] = strategy_;
+    externalStrategyConfig[token_] = config_;
+    emit SetExternalStrategy(token_, strategy_);
   }
 
   function setCustomPath(
