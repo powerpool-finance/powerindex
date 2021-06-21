@@ -13,7 +13,7 @@
     "lint:js": "eslint --config .eslintrc.json --ignore-path ./.eslintignore --ext .js .",
     "prettier": "prettier --config .prettierrc --write \"**/*.{js,json,md,sol,ts}\"",
     "prettier:sol": "prettier --config .prettierrc --write \"contracts/**/*.sol\"",
-    "test": "NODE_OPTIONS=--max_old_space_size=8096 mocha --timeout 100000",
+    "test": "NODE_OPTIONS=--max_old_space_size=8096 mocha --timeout 150000",
     "test-ganache": "hardhat test --network ganache"
   },
   "dependencies": {
