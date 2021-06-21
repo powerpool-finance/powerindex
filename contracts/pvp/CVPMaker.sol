@@ -250,13 +250,10 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   }
 
   function _executeExternalStrategy(address token_, address externalStrategy_) internal returns (uint256 amountIn) {
-    (bool ok, bytes memory result) = externalStrategy_.delegatecall(
-      abi.encodeWithSelector(
-        ICVPMakerStrategy.executeStrategy.selector,
-        token_,
-        externalStrategyConfig[token_]
-      )
-    );
+    (bool ok, bytes memory result) =
+      externalStrategy_.delegatecall(
+        abi.encodeWithSelector(ICVPMakerStrategy.executeStrategy.selector, token_, externalStrategyConfig[token_])
+      );
     require(ok, "EXTERNAL_STRATEGY_FAILED");
 
     address executeUniLikeFrom;
@@ -437,7 +434,11 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     strategy3Config[token_] = Strategy3Config(bPool_, bPoolWrapper_, underlying_);
   }
 
-  function setExternalStrategy(address token_, address strategy_, bytes memory config_) external onlyOwner {
+  function setExternalStrategy(
+    address token_,
+    address strategy_,
+    bytes memory config_
+  ) external onlyOwner {
     externalStrategies[token_] = strategy_;
     externalStrategyConfig[token_] = config_;
     emit SetExternalStrategy(token_, strategy_);

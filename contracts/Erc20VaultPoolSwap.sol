@@ -34,7 +34,12 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
   event Erc20ToVaultPoolSwap(address indexed user, address indexed pool, uint256 usdcInAmount, uint256 poolOutAmount);
   event VaultPoolToErc20Swap(address indexed user, address indexed pool, uint256 poolInAmount, uint256 usdcOutAmount);
-  event VaultToUsdcSwap(address indexed user, address indexed vaultInToken, uint256 vaultInAmount, uint256 usdcOutAmount);
+  event VaultToUsdcSwap(
+    address indexed user,
+    address indexed vaultInToken,
+    uint256 vaultInAmount,
+    uint256 usdcOutAmount
+  );
   event ClaimFee(address indexed token, address indexed payout, uint256 amount);
 
   IERC20 public immutable usdc;
@@ -160,10 +165,11 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     emit VaultPoolToErc20Swap(msg.sender, _pool, _poolAmountIn, erc20Out);
   }
 
-  function swapVaultToUSDC(
-    address _vaultTokenIn,
-    uint256 _vaultAmountIn
-  ) external override returns (uint256 usdcAmountOut) {
+  function swapVaultToUSDC(address _vaultTokenIn, uint256 _vaultAmountIn)
+    external
+    override
+    returns (uint256 usdcAmountOut)
+  {
     IERC20(_vaultTokenIn).safeTransferFrom(msg.sender, address(this), _vaultAmountIn);
     usdcAmountOut = _redeemVault(_vaultTokenIn, _vaultAmountIn);
     usdc.safeTransfer(msg.sender, usdcAmountOut);
@@ -210,7 +216,11 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     }
   }
 
-  function calcUsdcOutByVault(address _vaultTokenIn, uint256 _vaultAmountIn) public view returns (uint256 usdcAmountOut) {
+  function calcUsdcOutByVault(address _vaultTokenIn, uint256 _vaultAmountIn)
+    public
+    view
+    returns (uint256 usdcAmountOut)
+  {
     VaultConfig storage vc = vaultConfig[_vaultTokenIn];
     uint256 lpByUsdcPrice = ICurvePoolRegistry(vc.curvePoolRegistry).get_virtual_price_from_lp_token(vc.lpToken);
     uint256 vaultByLpPrice = IVault(_vaultTokenIn).pricePerShare();

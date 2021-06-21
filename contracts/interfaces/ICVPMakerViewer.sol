@@ -4,7 +4,9 @@ pragma solidity 0.6.12;
 
 interface ICVPMakerViewer {
   function getRouter(address token_) external view returns (address);
+
   function getPath(address token_) external view returns (address[] memory);
+
   function getDefaultPath(address token_) external view returns (address[] memory);
 
   /*** ESTIMATIONS ***/
