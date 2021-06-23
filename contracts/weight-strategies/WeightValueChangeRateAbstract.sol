@@ -23,20 +23,19 @@ abstract contract WeightValueChangeRateAbstract is WeightValueAbstract {
 
   constructor() public WeightValueAbstract() {}
 
-  function _updatePoolByPoke(
-    address _pool,
-    address[] memory _tokens,
-    uint256[] memory _newTokenValues
-  ) internal {
+  function _updatePoolByPoke(address _pool, address[] memory _tokens) internal {
     uint256 len = _tokens.length;
+    uint256[] memory newTokenValues = new uint256[](len);
+
     for (uint256 i = 0; i < len; i++) {
       uint256 oldValue = lastValue[_tokens[i]];
-      lastValue[_tokens[i]] = _newTokenValues[i];
+      newTokenValues[i] = getTVL(PowerIndexPoolInterface(_pool), _tokens[i]);
+      lastValue[_tokens[i]] = newTokenValues[i];
 
       uint256 lastChangeRate;
-      (lastChangeRate, valueChangeRate[_tokens[i]]) = getValueChangeRate(_tokens[i], oldValue, _newTokenValues[i]);
+      (lastChangeRate, valueChangeRate[_tokens[i]]) = getValueChangeRate(_tokens[i], oldValue, newTokenValues[i]);
 
-      emit UpdatePoolTokenValue(_tokens[i], oldValue, _newTokenValues[i], lastChangeRate, valueChangeRate[_tokens[i]]);
+      emit UpdatePoolTokenValue(_tokens[i], oldValue, newTokenValues[i], lastChangeRate, valueChangeRate[_tokens[i]]);
     }
   }
 
@@ -61,8 +60,9 @@ abstract contract WeightValueChangeRateAbstract is WeightValueAbstract {
     returns (uint256 value)
   {
     value = getTVL(_pool, _token);
-    if (valueChangeRate[_token] != 0) {
-      value = bmul(value, valueChangeRate[_token]);
+    (, uint256 newValueChangeRate) = getValueChangeRate(_token, lastValue[_token], value);
+    if (newValueChangeRate != 0) {
+      value = bmul(value, newValueChangeRate);
     }
   }
 
