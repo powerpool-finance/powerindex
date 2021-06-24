@@ -7,7 +7,7 @@ task('fetch-vaults-data-4', 'Fetch vaults data').setAction(async () => {
   const MockVault = artifacts.require('MockVault');
   const MockVaultRegistry = artifacts.require('MockCurvePoolRegistry');
 
-  const vaultRegistry = await MockVaultRegistry.at('0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c');
+  const vaultRegistry = await MockVaultRegistry.at('0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5');
   const vaultsPool = await BPool.at('0x9ba60ba98413a60db4c651d4afe5c937bbd8044b');
   const vaults = await callContract(vaultsPool, 'getCurrentTokens');
   const vaultsData = [];
@@ -34,17 +34,10 @@ task('fetch-vaults-data-4', 'Fetch vaults data').setAction(async () => {
       amountsLength: 4,
       usdcIndex: 2,
     },
-    '0xf8768814b88281de4f532a3beefa5b85b69b9324': {
-      lpToken: '0xecd5e75afb02efa118af914515d6521aabd189f1',
-      depositor: '0xa79828df1850e8a3a3064576f380d90aecdd3359',
-      depositorType: 2,
-      amountsLength: 4,
-      usdcIndex: 2,
-    },
-    '0xa74d4b67b3368e83797a35382afb776baae4f5c8': {
-      lpToken: '0x43b4fdfd4ff969587185cdb6f0bd875c5fc83f8c',
-      depositor: '0xa79828df1850e8a3a3064576f380d90aecdd3359',
-      depositorType: 2,
+    '0x3b96d491f067912d18563d56858ba7d6ec67a6fa': {
+      lpToken: '0x4f3e8f405cf5afc05d68142f3783bdfe13811522',
+      depositor: '0x094d12e5b541784701fd8d65f11fc0598fbc6332',
+      depositorType: 1,
       amountsLength: 4,
       usdcIndex: 2,
     }

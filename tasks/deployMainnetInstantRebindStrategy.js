@@ -11,6 +11,8 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   const ICurvePoolRegistry = artifacts.require('ICurvePoolRegistry');
   const PowerPoke = await artifacts.require('PowerPoke');
   const ERC20 = await artifacts.require('@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20');
+  const Erc20VaultPoolSwap = await artifacts.require('Erc20VaultPoolSwap');
+  const IndicesSupplyRedeemZap = artifacts.require('IndicesSupplyRedeemZap');
   const { web3 } = PowerIndexPoolController;
   YearnVaultInstantRebindStrategy.numberFormat = 'String';
   ICurvePoolRegistry.numberFormat = 'String';
@@ -29,9 +31,9 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   const poolControllerAddress = '0xb258302c3f209491d604165549079680708581cc';
   const powerPokeAddress = '0x04D7aA22ef7181eE3142F5063e026Af1BbBE5B96';
   const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
-  const curePoolRegistryAddress = '0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5';
+  const curvePoolRegistryAddress = '0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5';
 
-  const curvePoolRegistry = await ICurvePoolRegistry.at(curePoolRegistryAddress);
+  const curvePoolRegistry = await ICurvePoolRegistry.at(curvePoolRegistryAddress);
 
   console.log('getTVLByTokensBalances', await getTVLByTokensBalances([
     '0xA74d4B67b3368E83797a35382AFB776bAAE4F5C8',
@@ -51,7 +53,7 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   const weightStrategy =  await deployProxied(
     YearnVaultInstantRebindStrategy,
     [poolAddress, usdcAddress],
-    [powerPokeAddress, curePoolRegistryAddress, poolControllerAddress, 5000, {
+    [powerPokeAddress, curvePoolRegistryAddress, poolControllerAddress, 5000, {
       minUSDCRemainder: '20',
       useVirtualPriceEstimation: false
     }],
@@ -127,6 +129,27 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
 
   console.log('poolTvlBefore', poolTvlBefore);
   console.log('poolTvlAfter', poolTvlAfter);
+
+  const zapAddress = '0x85c6d6b0cd1383cc85e8e36c09d0815daf36b9e9';
+  const zap = await IndicesSupplyRedeemZap.at(zapAddress);
+  const erc20VaultPoolSwap = await Erc20VaultPoolSwap.new(usdcAddress);
+
+  const vd = JSON.parse(fs.readFileSync('data/vaultsData.json'));
+  await erc20VaultPoolSwap.setVaultConfigs(
+    vd.map(v => v.address),
+    vd.map(v => v.config.depositor),
+    vd.map(v => v.config.amountsLength),
+    vd.map(v => v.config.usdcIndex),
+    vd.map(v => v.config.lpToken),
+    vd.map(() => curvePoolRegistryAddress),
+  );
+  await erc20VaultPoolSwap.updatePools([poolAddress]);
+
+  await zap.setPoolsSwapContracts([poolAddress], [erc20VaultPoolSwap.address]);
+
+  await increaseTime(roundPeriod + 1);
+
+  return;
 
   const BONUS_NUMERATOR = '7610350076';
   const BONUS_DENUMERATOR = '10000000000000000';

@@ -171,9 +171,45 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
   function calcVaultOutByUsdc(address _token, uint256 _usdcIn) public view returns (uint256 amountOut) {
     VaultConfig storage vc = vaultConfig[_token];
-    uint256 lpByUsdcPrice = ICurvePoolRegistry(vc.vaultRegistry).get_virtual_price_from_lp_token(vc.lpToken);
     uint256 vaultByLpPrice = IVault(_token).pricePerShare();
-    return _usdcIn.mul(1e30).div(vaultByLpPrice.mul(lpByUsdcPrice).div(1 ether));
+    return calcDepositorTokenAmount(vc, _usdcIn, true).mul(1 ether).div(vaultByLpPrice);
+  }
+
+  function calcDepositorTokenAmount(
+    VaultConfig storage vc,
+    uint256 _amount,
+    bool _isDeposit
+  ) internal view returns (uint256) {
+    if (vc.depositorLength == 2) {
+      uint256[2] memory amounts;
+      amounts[vc.depositorIndex] = _amount;
+      if (vc.depositorType == 2) {
+        return ICurveZapDepositor2(vc.depositor).calc_token_amount(vc.lpToken, amounts, _isDeposit);
+      } else {
+        return ICurveDepositor2(vc.depositor).calc_token_amount(amounts, _isDeposit);
+      }
+    }
+
+    if (vc.depositorLength == 3) {
+      uint256[3] memory amounts;
+      amounts[vc.depositorIndex] = _amount;
+      if (vc.depositorType == 2) {
+        return ICurveZapDepositor3(vc.depositor).calc_token_amount(vc.lpToken, amounts, _isDeposit);
+      } else {
+        return ICurveDepositor3(vc.depositor).calc_token_amount(amounts, _isDeposit);
+      }
+    }
+
+    if (vc.depositorLength == 4) {
+      uint256[4] memory amounts;
+      amounts[vc.depositorIndex] = _amount;
+      if (vc.depositorType == 2) {
+        return ICurveZapDepositor4(vc.depositor).calc_token_amount(vc.lpToken, amounts, _isDeposit);
+      } else {
+        return ICurveDepositor4(vc.depositor).calc_token_amount(amounts, _isDeposit);
+      }
+    }
+    return 0;
   }
 
   function calcVaultPoolOutByUsdc(
@@ -361,7 +397,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
       IVault(tokens[i]).withdraw(amounts[i]);
       uint256 lpTokenAmount = IERC20(vc.lpToken).balanceOf(address(this)).sub(lpTokenBalanceBefore);
       if (vc.depositorType == 2) {
-        ICurveDepositor(vc.depositor).remove_liquidity_one_coin(lpTokenAmount, int8(vc.depositorIndex), 1);
+        ICurveZapDepositor(vc.depositor).remove_liquidity_one_coin(vc.lpToken, lpTokenAmount, int8(vc.depositorIndex), 1);
       } else {
         ICurveDepositor(vc.depositor).remove_liquidity_one_coin(lpTokenAmount, int8(vc.depositorIndex), 1);
       }
