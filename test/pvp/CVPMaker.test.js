@@ -1288,7 +1288,11 @@ describe('CVPMaker test', () => {
           await vaultSwap.setVaultConfigs(
             [ycrvVault.address],
             [crvDepositor.address],
+            // depositorType
+            [1],
+            // amountsLength
             [2],
+            // usdcIndex
             [1],
             [curvePoolToken.address],
             [curvePoolRegistry.address]
@@ -1323,7 +1327,7 @@ describe('CVPMaker test', () => {
 
           assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648749999999999'));
 
-          await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'INSUFFICIENT_VAULT_AMOUNT_IN');
+          await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'EXTERNAL_STRATEGY_FAILED');
         });
 
         it('should revert if the balance is 0', async () => {
@@ -1331,7 +1335,7 @@ describe('CVPMaker test', () => {
 
           assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648749999999999'));
 
-          await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'INSUFFICIENT_VAULT_AMOUNT_IN');
+          await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'EXTERNAL_STRATEGY_FAILED');
         });
       })
     })
