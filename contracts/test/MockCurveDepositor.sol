@@ -5,8 +5,9 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./MockERC20.sol";
 import "../interfaces/ICurveDepositor.sol";
+import "../interfaces/ICurveZapDepositor.sol";
 
-contract MockCurveDepositor is ICurveDepositor {
+contract MockCurveDepositor is ICurveDepositor, ICurveZapDepositor {
   using SafeMath for uint256;
 
   MockERC20 public token;
@@ -30,13 +31,31 @@ contract MockCurveDepositor is ICurveDepositor {
     return _tokenAmount.mul(rate).div(1e30);
   }
 
+  function calc_withdraw_one_coin(
+    address _pool,
+    uint256 _tokenAmount,
+    int128
+  ) public view override returns (uint256) {
+    return calc_withdraw_one_coin(_tokenAmount, 0);
+  }
+
   function remove_liquidity_one_coin(
     uint256 _tokenAmount,
     int128 _i,
     uint256 _minAmount
-  ) external override {
+  ) public override {
     uint256 calculated = calc_withdraw_one_coin(_tokenAmount, _i);
     require(calculated >= _minAmount, "REMOVE_MIN_AMOUNT");
     usdc.transfer(msg.sender, calculated);
+    token.transferFrom(msg.sender, address(this), _tokenAmount);
+  }
+
+  function remove_liquidity_one_coin(
+    address _pool,
+    uint256 _tokenAmount,
+    int128 _i,
+    uint256 _minAmount
+  ) public override {
+    remove_liquidity_one_coin(_tokenAmount, _i, _minAmount);
   }
 }
