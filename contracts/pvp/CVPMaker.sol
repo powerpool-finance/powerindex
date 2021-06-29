@@ -81,21 +81,6 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   }
 
   /**
-   * @notice The skip call from the reporter when there is nothing to convert to CVP
-   * @param reporterId_ The current reporter id
-   * @param rewardOpts_ Custom settings for the reporter reward
-   */
-  function skipFromReporter(uint256 reporterId_, bytes calldata rewardOpts_)
-    external
-    onlyEOA
-    onlyReporter(reporterId_, rewardOpts_)
-  {
-    (uint256 minInterval, ) = _getMinMaxReportInterval();
-    require(block.timestamp.sub(lastReporterPokeFrom) > minInterval, "MIN_INTERVAL_NOT_REACHED");
-    lastReporterPokeFrom = block.timestamp;
-  }
-
-  /**
    * @notice The swap call from the reporter
    * @param reporterId_ The current reporter id
    * @param token_ The token to swap to CVP
