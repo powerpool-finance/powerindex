@@ -175,11 +175,12 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     emit VaultPoolToErc20Swap(msg.sender, _pool, _poolAmountIn, erc20Out);
   }
 
-  function swapVaultToUSDC(address _from, address _to, address _vaultTokenIn, uint256 _vaultAmountIn)
-    external
-    override
-    returns (uint256 usdcAmountOut)
-  {
+  function swapVaultToUSDC(
+    address _from,
+    address _to,
+    address _vaultTokenIn,
+    uint256 _vaultAmountIn
+  ) external override returns (uint256 usdcAmountOut) {
     IERC20(_vaultTokenIn).safeTransferFrom(_from, address(this), _vaultAmountIn);
     usdcAmountOut = _redeemVault(_vaultTokenIn, _vaultAmountIn);
     usdc.safeTransfer(_to, usdcAmountOut);

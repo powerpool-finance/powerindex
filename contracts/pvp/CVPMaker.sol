@@ -236,7 +236,10 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
   function _executeExternalStrategy(address token_, address externalStrategy_) internal returns (uint256 amountIn) {
     address executeUniLikeFrom;
-    (amountIn, executeUniLikeFrom) = ICVPMakerStrategy(externalStrategy_).executeStrategy(token_, externalStrategyConfig[token_]);
+    (amountIn, executeUniLikeFrom) = ICVPMakerStrategy(externalStrategy_).executeStrategy(
+      token_,
+      externalStrategyConfig[token_]
+    );
 
     if (executeUniLikeFrom != address(0)) {
       _executeUniLikeStrategy(executeUniLikeFrom);
