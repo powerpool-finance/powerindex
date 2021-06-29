@@ -35,7 +35,6 @@ contract CVPMakerStrategy4 is ICVPMakerStrategy {
   /**
    * @notice Executes the strategy.
    * @dev Does not use the config argument.
-   * @dev Should be call using `delegatecall` only.
    * @param vaultTokenIn_ the address of the YEarnV2 vault token to exit
    * @return vaultIn amountIn in vault tokens
    * @return executeUniLikeFrom always USDC
@@ -45,12 +44,13 @@ contract CVPMakerStrategy4 is ICVPMakerStrategy {
     override
     returns (uint256 vaultIn, address executeUniLikeFrom)
   {
-    vaultIn = estimateIn(address(this), vaultTokenIn_, config_);
+    vaultIn = estimateIn(msg.sender, vaultTokenIn_, config_);
 
-    require(IERC20(vaultTokenIn_).balanceOf(address(this)) > vaultIn, "INSUFFICIENT_VAULT_AMOUNT_IN");
+    require(IERC20(vaultTokenIn_).balanceOf(msg.sender) > vaultIn, "INSUFFICIENT_VAULT_AMOUNT_IN");
 
+    IERC20(vaultTokenIn_).safeTransferFrom(msg.sender, address(this), vaultIn);
     IERC20(vaultTokenIn_).approve(vaultSwap, vaultIn);
-    uint256 usdcOut = Erc20VaultPoolSwap(vaultSwap).swapVaultToUSDC(vaultTokenIn_, vaultIn);
+    uint256 usdcOut = Erc20VaultPoolSwap(vaultSwap).swapVaultToUSDC(address(this), msg.sender, vaultTokenIn_, vaultIn);
     executeUniLikeFrom = USDC;
   }
 

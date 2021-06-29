@@ -1327,7 +1327,7 @@ describe('CVPMaker test', () => {
 
           assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648749999999999'));
 
-          await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'EXTERNAL_STRATEGY_FAILED');
+          await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'INSUFFICIENT_VAULT_AMOUNT_IN');
         });
 
         it('should revert if the balance is 0', async () => {
@@ -1335,7 +1335,7 @@ describe('CVPMaker test', () => {
 
           assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648749999999999'));
 
-          await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'EXTERNAL_STRATEGY_FAILED');
+          await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'INSUFFICIENT_VAULT_AMOUNT_IN');
         });
       })
     })

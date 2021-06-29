@@ -40,6 +40,8 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   event VaultPoolToErc20Swap(address indexed user, address indexed pool, uint256 poolInAmount, uint256 usdcOutAmount);
   event VaultToUsdcSwap(
     address indexed user,
+    address indexed from,
+    address to,
     address indexed vaultInToken,
     uint256 vaultInAmount,
     uint256 usdcOutAmount
@@ -173,16 +175,16 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     emit VaultPoolToErc20Swap(msg.sender, _pool, _poolAmountIn, erc20Out);
   }
 
-  function swapVaultToUSDC(address _vaultTokenIn, uint256 _vaultAmountIn)
+  function swapVaultToUSDC(address _from, address _to, address _vaultTokenIn, uint256 _vaultAmountIn)
     external
     override
     returns (uint256 usdcAmountOut)
   {
-    IERC20(_vaultTokenIn).safeTransferFrom(msg.sender, address(this), _vaultAmountIn);
+    IERC20(_vaultTokenIn).safeTransferFrom(_from, address(this), _vaultAmountIn);
     usdcAmountOut = _redeemVault(_vaultTokenIn, _vaultAmountIn);
-    usdc.safeTransfer(msg.sender, usdcAmountOut);
+    usdc.safeTransfer(_to, usdcAmountOut);
 
-    emit VaultToUsdcSwap(msg.sender, _vaultTokenIn, _vaultAmountIn, usdcAmountOut);
+    emit VaultToUsdcSwap(msg.sender, _from, _to, _vaultTokenIn, _vaultAmountIn, usdcAmountOut);
   }
 
   /* ==========  View Functions  ========== */
@@ -398,11 +400,20 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     VaultConfig storage vc = vaultConfig[_vault];
     uint256 lpTokenBalanceBefore = IERC20(vc.lpToken).balanceOf(address(this));
     IVault(_vault).withdraw(_amountIn);
-    ICurveDepositor(vc.depositor).remove_liquidity_one_coin(
-      IERC20(vc.lpToken).balanceOf(address(this)).sub(lpTokenBalanceBefore),
-      int128(vc.depositorIndex),
-      1
-    );
+    if (vc.depositorType == 2) {
+      ICurveZapDepositor(vc.depositor).remove_liquidity_one_coin(
+        vc.lpToken,
+        IERC20(vc.lpToken).balanceOf(address(this)).sub(lpTokenBalanceBefore),
+        int128(vc.depositorIndex),
+        1
+      );
+    } else {
+      ICurveDepositor(vc.depositor).remove_liquidity_one_coin(
+        IERC20(vc.lpToken).balanceOf(address(this)).sub(lpTokenBalanceBefore),
+        int128(vc.depositorIndex),
+        1
+      );
+    }
 
     amountOut = usdc.balanceOf(address(this)).sub(usdcBefore);
     require(amountOut != 0, "NULL_OUTPUT");
