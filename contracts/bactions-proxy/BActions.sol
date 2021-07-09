@@ -57,8 +57,6 @@ contract BActions {
         if (finalize) {
             pool.finalize();
             require(pool.transfer(msg.sender, pool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
-        } else {
-            pool.setPublicSwap(true);
         }
 
         pool.setController(msg.sender);
@@ -106,10 +104,6 @@ contract BActions {
             }
 
         }
-    }
-
-    function setPublicSwap(BPoolInterface pool, bool publicSwap) external {
-        pool.setPublicSwap(publicSwap);
     }
 
     function setSwapFee(BPoolInterface pool, uint newFee) external {

@@ -75,8 +75,6 @@ contract PowerIndexPoolActions {
     if (args.finalize) {
       pool.finalize();
       require(pool.transfer(msg.sender, pool.balanceOf(address(this))), "ERR_TRANSFER_FAILED");
-    } else {
-      pool.setPublicSwap(true);
     }
 
     pool.setController(msg.sender);

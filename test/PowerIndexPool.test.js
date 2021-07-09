@@ -858,7 +858,7 @@ describe('PowerIndexPool', () => {
       await newToken.approve(poolController.address, b);
       await expectRevert(
         poolController.bind(newToken.address, b, tw, fromTimestamp, targetTimestamp),
-        'NEW_TOKEN_NOT_ALLOWED'
+        'MAX_TARGET_TOTAL_WEIGHT'
       );
 
       await poolController.replaceTokenWithNew(oldTokenAddress, newToken.address, b, fromTimestamp, targetTimestamp);

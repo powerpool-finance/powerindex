@@ -109,7 +109,7 @@ contract BPool is BToken, BMath, BPoolInterface {
     address internal _controller;
 
     // True if PUBLIC can call SWAP & JOIN functions
-    bool private _publicSwap;
+    bool private _swapsDisabled;
 
     // Address of contract which wraps pool operations:
     // join, exit and swaps.
@@ -155,7 +155,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _communitySwapFee = 0;
         _communityJoinFee = 0;
         _communityExitFee = 0;
-        _publicSwap = false;
+        _swapsDisabled = false;
         _finalized = false;
     }
 
@@ -272,11 +272,11 @@ contract BPool is BToken, BMath, BPoolInterface {
      * @notice Check if tokens swap and joining the pool allowed.
      * @return TRUE if allowed, FALSE if not.
      */
-    function isPublicSwap()
+    function isSwapsDisabled()
         external view override
         returns (bool)
     {
-        return _publicSwap;
+        return _swapsDisabled;
     }
 
     /**
@@ -437,18 +437,16 @@ contract BPool is BToken, BMath, BPoolInterface {
     }
 
     /**
-     * @notice Activates public swap.
-     * @dev Possible only when pool is not finalized.
-     * @param public_ boolean variable, TRUE if active, FALSE if not.
+     * @notice Enable or disable swaps.
+     * @param disabled_ boolean variable, TRUE if disable, FALSE if not.
      */
-    function setPublicSwap(bool public_)
+    function setSwapsDisabled(bool disabled_)
         external override
         _logs_
         _lock_
     {
-        _requireContractIsNotFinalized();
         _onlyController();
-        _publicSwap = public_;
+        _swapsDisabled = disabled_;
     }
 
     /**
@@ -479,7 +477,6 @@ contract BPool is BToken, BMath, BPoolInterface {
         require(_tokens.length >= MIN_BOUND_TOKENS, "MIN_TOKENS");
 
         _finalized = true;
-        _publicSwap = true;
 
         _mintPoolShare(INIT_POOL_SUPPLY);
         _pushPoolShare(msg.sender, INIT_POOL_SUPPLY);
@@ -784,11 +781,11 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint tokenAmountOut, uint spotPriceAfter)
     {
+        _checkSwapsDisabled();
         _preventSameTxOrigin();
         _onlyWrapperOrNotWrapperMode();
         _requireTokenIsBound(tokenIn);
         _requireTokenIsBound(tokenOut);
-        require(_publicSwap, "NOT_PUBLIC");
 
         Record storage inRecord = _records[address(tokenIn)];
         Record storage outRecord = _records[address(tokenOut)];
@@ -874,11 +871,11 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint tokenAmountIn, uint spotPriceAfter)
     {
+        _checkSwapsDisabled();
         _preventSameTxOrigin();
         _onlyWrapperOrNotWrapperMode();
         _requireTokenIsBound(tokenIn);
         _requireTokenIsBound(tokenOut);
-        require(_publicSwap, "NOT_PUBLIC");
 
         Record storage inRecord = _records[address(tokenIn)];
         Record storage outRecord = _records[address(tokenOut)];
@@ -957,6 +954,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         returns (uint poolAmountOut)
 
     {
+        _checkSwapsDisabled();
         _preventSameTxOrigin();
         _requireContractIsFinalized();
         _onlyWrapperOrNotWrapperMode();
@@ -1013,6 +1011,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint tokenAmountIn)
     {
+        _checkSwapsDisabled();
         _preventSameTxOrigin();
         _requireContractIsFinalized();
         _onlyWrapperOrNotWrapperMode();
@@ -1072,6 +1071,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint tokenAmountOut)
     {
+        _checkSwapsDisabled();
         _preventSameTxOrigin();
         _requireContractIsFinalized();
         _onlyWrapperOrNotWrapperMode();
@@ -1130,6 +1130,7 @@ contract BPool is BToken, BMath, BPoolInterface {
         _lock_
         returns (uint poolAmountIn)
     {
+        _checkSwapsDisabled();
         _preventSameTxOrigin();
         _requireContractIsFinalized();
         _onlyWrapperOrNotWrapperMode();
@@ -1275,10 +1276,16 @@ contract BPool is BToken, BMath, BPoolInterface {
     }
 
     function _preventSameTxOrigin()
-      internal
+        internal
     {
       require(block.number > _lastSwapBlock[tx.origin], "SAME_TX_ORIGIN");
       _lastSwapBlock[tx.origin] = block.number;
+    }
+
+    function _checkSwapsDisabled()
+        internal
+    {
+      require(!_swapsDisabled, "SWAPS_DISABLED");
     }
 
     /* ==========  Token Query Internal Functions  ========== */
