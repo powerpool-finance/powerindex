@@ -456,12 +456,18 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     if (pType == PoolType.PIPT) {
       IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolSwapContract[round.pool]));
       if (round.inputToken == ETH) {
-        (round.totalOutputAmount, ) = piptSwap.swapEthToPipt{ value: totalInputAmount }(piptSwap.defaultSlippage());
+        (round.totalOutputAmount, ) = piptSwap.swapEthToPipt{ value: totalInputAmount }(
+          piptSwap.defaultSlippage(),
+          0,
+          piptSwap.defaultDiffPercent()
+        );
       } else {
         round.totalOutputAmount = piptSwap.swapErc20ToPipt(
           round.inputToken,
           totalInputAmount,
-          piptSwap.defaultSlippage()
+          piptSwap.defaultSlippage(),
+          0,
+          piptSwap.defaultDiffPercent()
         );
       }
     } else if (pType == PoolType.VAULT) {

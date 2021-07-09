@@ -181,8 +181,8 @@ contract WeightValueStrategy is PoolManagement, WeightValueAbstract {
 
   function _updatePoolByPoke(
     address _pool,
-    address[] memory _tokens,
-    uint256[] memory _newTokenValues
+    address[] memory,
+    uint256[] memory
   ) internal virtual {
     poolsData[_pool].lastWeightsUpdate = block.timestamp;
   }
