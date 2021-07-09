@@ -185,7 +185,7 @@ describe('Erc20VaultPoolSwap', () => {
       await expectRevert(vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, danUsdcSwap, {from: alice}), 'ERC20');
       await vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, danUsdcSwap, {from: dan});
       const danPoolBalance = await pool.balanceOf(dan);
-      assertEqualWithAccuracy(vaultPoolOut, danPoolBalance, ether('0.00000001'));
+      assertEqualWithAccuracy(vaultPoolOut, danPoolBalance, ether('0.0000011'));
 
       for (let i = 0; i < tokens.length; i++) {
         assertEqualWithAccuracy(await tokens[i].balanceOf(vaultPoolSwap.address), ether([

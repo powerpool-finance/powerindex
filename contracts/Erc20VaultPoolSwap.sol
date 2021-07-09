@@ -172,7 +172,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   function calcVaultOutByUsdc(address _token, uint256 _usdcIn) public view returns (uint256 amountOut) {
     VaultConfig storage vc = vaultConfig[_token];
     uint256 vaultByLpPrice = IVault(_token).pricePerShare();
-    return calcDepositorTokenAmount(vc, _usdcIn, true).mul(1 ether).div(vaultByLpPrice);
+    return calcDepositorTokenAmount(vc, _usdcIn, true).mul(1e30).div(vaultByLpPrice);
   }
 
   function calcDepositorTokenAmount(
@@ -382,12 +382,13 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     uint256 len = tokens.length;
 
     uint256[] memory amounts = new uint256[](len);
+    uint256[] memory prevBalances = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
-      amounts[i] = IERC20(tokens[i]).balanceOf(address(this));
+      prevBalances[i] = IERC20(tokens[i]).balanceOf(address(this));
     }
     PowerIndexPoolInterface(_pool).exitPool(_totalInputAmount, amounts);
     for (uint256 i = 0; i < len; i++) {
-      amounts[i] = IERC20(tokens[i]).balanceOf(address(this)).sub(amounts[i]);
+      amounts[i] = IERC20(tokens[i]).balanceOf(address(this)).sub(prevBalances[i]);
     }
 
     uint256 outputTokenBalanceBefore = usdc.balanceOf(address(this));
@@ -397,7 +398,12 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
       IVault(tokens[i]).withdraw(amounts[i]);
       uint256 lpTokenAmount = IERC20(vc.lpToken).balanceOf(address(this)).sub(lpTokenBalanceBefore);
       if (vc.depositorType == 2) {
-        ICurveZapDepositor(vc.depositor).remove_liquidity_one_coin(vc.lpToken, lpTokenAmount, int8(vc.depositorIndex), 1);
+        ICurveZapDepositor(vc.depositor).remove_liquidity_one_coin(
+          vc.lpToken,
+          lpTokenAmount,
+          int8(vc.depositorIndex),
+          1
+        );
       } else {
         ICurveDepositor(vc.depositor).remove_liquidity_one_coin(lpTokenAmount, int8(vc.depositorIndex), 1);
       }
