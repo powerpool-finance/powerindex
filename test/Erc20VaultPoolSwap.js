@@ -183,17 +183,20 @@ describe('Erc20VaultPoolSwap', () => {
       const vaultPoolOut = await vaultPoolSwap.calcVaultPoolOutByUsdc(pool.address, danUsdcSwap, true);
       await expectRevert(vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, '0', {from: dan}), 'NULL_INPUT');
       await expectRevert(vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, danUsdcSwap, {from: alice}), 'ERC20');
+      for (let i = 0; i < tokens.length; i++) {
+        await tokens[i].transfer(vaultPoolSwap.address, ether(1000));
+      }
       await vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, danUsdcSwap, {from: dan});
       const danPoolBalance = await pool.balanceOf(dan);
       assertEqualWithAccuracy(vaultPoolOut, danPoolBalance, ether('0.0000011'));
 
       for (let i = 0; i < tokens.length; i++) {
         assertEqualWithAccuracy(await tokens[i].balanceOf(vaultPoolSwap.address), ether([
-          '0.009495032126027295',
-          '0.000001000000000018',
-          '0.15767685969318884',
-          '1.2679124215749662',
-          '0.009121499191673045'
+          '1000.009495032126027295',
+          '1000.000001000000000018',
+          '1000.15767685969318884',
+          '1001.2679124215749662',
+          '1000.009121499191673045'
         ][i]), ether('0.002'));
       }
 
@@ -207,11 +210,11 @@ describe('Erc20VaultPoolSwap', () => {
 
       for (let i = 0; i < tokens.length; i++) {
         assertEqualWithAccuracy(await tokens[i].balanceOf(vaultPoolSwap.address), ether([
-          '0.009495032126027295',
-          '0.000001000000000018',
-          '0.15767685969318884',
-          '1.2679124215749662',
-          '0.009121499191673045'
+          '1000.009495032126027295',
+          '1000.000001000000000018',
+          '1000.15767685969318884',
+          '1001.2679124215749662',
+          '1000.009121499191673045'
         ][i]), ether('0.002'));
       }
 
@@ -222,11 +225,11 @@ describe('Erc20VaultPoolSwap', () => {
 
       for (let i = 0; i < tokens.length; i++) {
         assertEqualWithAccuracy(await tokens[i].balanceOf(permanentVotingPower), ether([
-          '0.009495032126027295',
-          '0.000001000000000018',
-          '0.15767685969318884',
-          '1.2679124215749662',
-          '0.009121499191673045'
+          '1000.009495032126027295',
+          '1000.000001000000000018',
+          '1000.15767685969318884',
+          '1001.2679124215749662',
+          '1000.009121499191673045'
         ][i]), ether('0.002'));
         assert.equal(await tokens[i].balanceOf(vaultPoolSwap.address), '0')
       }
