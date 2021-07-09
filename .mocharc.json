@@ -4,5 +4,5 @@
   "extension": ["js"],
   "recursive": true,
   "require": ["hardhat/register"],
-  "timeout": 50000
+  "timeout": 90000
 }

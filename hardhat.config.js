@@ -45,7 +45,8 @@ const testAccounts = [];
 for (let i = 0; i < 20; i++) {
   testAccounts.push({
     privateKey: ethers.Wallet.createRandom()._signingKey().privateKey,
-    balance: '1000000000000000000000000000',
+    // 1e12 * 1e18
+    balance: '1000000000000000000000000000000',
   });
 }
 
