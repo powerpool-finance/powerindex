@@ -3,7 +3,7 @@ require('@nomiclabs/hardhat-truffle5');
 const fs = require('fs');
 
 task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').setAction(async (__, {ethers, network}) => {
-  const {impersonateAccount, forkContractUpgrade, fromEther, mwei, fromMwei, callContract, increaseTime} = require('../test/helpers');
+  const {impersonateAccount, fromEther, mwei, fromMwei, callContract, increaseTime} = require('../test/helpers');
   const IndicesSupplyRedeemZap = artifacts.require('IndicesSupplyRedeemZap');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
   const Erc20VaultPoolSwap = await artifacts.require('Erc20VaultPoolSwap');
@@ -16,9 +16,9 @@ task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').set
   const roundPeriod = 3600;
   const admin = '0xb258302c3f209491d604165549079680708581cc';
   const usdcAddress = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
-  const proxyAdminAddr = '0x7696f9208f9e195ba31e6f4B2D07B6462C8C42bb';
+  // const proxyAdminAddr = '0x7696f9208f9e195ba31e6f4B2D07B6462C8C42bb';
   const poolAddress = '0x9ba60ba98413a60db4c651d4afe5c937bbd8044b';
-  const powerPokeAddress = '0x04D7aA22ef7181eE3142F5063e026Af1BbBE5B96';
+  // const powerPokeAddress = '0x04D7aA22ef7181eE3142F5063e026Af1BbBE5B96';
   const curveRegistry = '0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5';
   const zapAddress = '0x85c6d6b0cd1383cc85e8e36c09d0815daf36b9e9';
 

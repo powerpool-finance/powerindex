@@ -1,6 +1,7 @@
 require('@nomiclabs/hardhat-truffle5');
 
 const configByTokenAddress = require('./config/ylaPool');
+const fs = require('fs');
 
 task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind Strategy').setAction(async (__, {ethers, network}) => {
   const {impersonateAccount, gwei, fromEther, ethUsed, deployProxied, callContract, forkContractUpgrade} = require('../test/helpers');
@@ -146,10 +147,6 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   await erc20VaultPoolSwap.updatePools([poolAddress]);
 
   await zap.setPoolsSwapContracts([poolAddress], [erc20VaultPoolSwap.address]);
-
-  await increaseTime(roundPeriod + 1);
-
-  return;
 
   const BONUS_NUMERATOR = '7610350076';
   const BONUS_DENUMERATOR = '10000000000000000';
