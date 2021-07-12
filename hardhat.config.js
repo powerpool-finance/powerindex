@@ -7,6 +7,7 @@ require('hardhat-gas-reporter');
 require('./tasks/fetchPoolsData');
 require('./tasks/fetchVaultsData');
 require('./tasks/fetchVaultsData3');
+require('./tasks/fetchVaultsData4');
 require('./tasks/deployVestedLpMining');
 require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
@@ -119,7 +120,7 @@ const config = {
     settings: {
       optimizer: {
         enabled: !!process.env.ETHERSCAN_KEY || process.env.COMPILE_TARGET === 'release',
-        runs: 1,
+        runs: 200,
       },
     },
     version: '0.6.12',

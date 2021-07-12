@@ -1299,8 +1299,8 @@ describe('CVPMaker test', () => {
 
           // >>> Amounts IN
           assert.equal(await cvpMaker.estimateSwapAmountIn(usdc.address), mwei('6706.892170'));
-          assert.equal(await cvpMaker.estimateExternalStrategyIn(ycrvVault.address, strategy4.address), ether('5868.530648749999999999'));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648749999999999'));
+          assert.equal(await cvpMaker.estimateExternalStrategyIn(ycrvVault.address, strategy4.address), ether('5868.530648400000000000'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648400000000000'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
           assert.equal(await ycrvVault.balanceOf(cvpMaker.address), ether(6000));
@@ -1308,8 +1308,8 @@ describe('CVPMaker test', () => {
           await cvpMaker.mockSwap(ycrvVault.address);
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
-          const expectedBPoolLeftover = (BigInt(ether(6000)) - BigInt(ether('5868.530648749999999999'))).toString();
-          assert.equal(expectedBPoolLeftover, ether('131.469351250000000001'));
+          const expectedBPoolLeftover = (BigInt(ether(6000)) - BigInt(ether('5868.530648400000000000'))).toString();
+          assert.equal(expectedBPoolLeftover, ether('131.469351600000000000'));
           assert.equal(await ycrvVault.balanceOf(cvpMaker.address), expectedBPoolLeftover);
         })
 
@@ -1317,7 +1317,7 @@ describe('CVPMaker test', () => {
           await ycrvVault.transfer(cvpMaker.address, ether(5500));
           assert.equal(await ycrvVault.balanceOf(cvpMaker.address), ether('5500'));
 
-          assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648749999999999'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648400000000000'));
 
           await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'INSUFFICIENT_VAULT_AMOUNT_IN');
         });
@@ -1325,7 +1325,7 @@ describe('CVPMaker test', () => {
         it('should revert if the balance is 0', async () => {
           assert.equal(await ycrvVault.balanceOf(cvpMaker.address), ether(0));
 
-          assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648749999999999'));
+          assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648400000000000'));
 
           await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'INSUFFICIENT_VAULT_AMOUNT_IN');
         });
