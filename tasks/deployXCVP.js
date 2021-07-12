@@ -27,12 +27,13 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
   const ylaAddress = '0x9ba60ba98413a60db4c651d4afe5c937bbd8044b';
   const cvpAddress = '0x38e4adb44ef08f22f5b5b76a8f0c2d0dcbe7dca1';
   const usdcAddress = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
-  const sushi = '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2';
-  const aave = '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9';
+  const sushiAddress = '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2';
+  const aaveAddress = '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9';
   const yfiAddress = '0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e';
-  const snx = '0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f';
-  const piSushi = '0xf3505383b740af8c241f1cf6659619a9c38d0281';
+  const snxAddress = '0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f';
+  const piSushiAddress = '0xf3505383b740af8c241f1cf6659619a9c38d0281';
   const uniswapRouterAddress = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
+  const sushiRouterAddress = '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f';
   const powerPokeAddress = '0x04D7aA22ef7181eE3142F5063e026Af1BbBE5B96';
   const wethAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
   const vaultPoolSwapAddress = '0xE9bBE77490Ec85fE7d2B2DcA5FA94403Fa3C254C';
@@ -48,7 +49,7 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
     }
   );
 
-  await cvpMaker.setCustomPath(sushi, '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f', [sushi, wethAddress], sendOptions);
+  await cvpMaker.setCustomPath(sushiAddress, sushiRouterAddress, [sushiAddress, wethAddress], sendOptions);
 
   const vaultStrategy = await CVPMakerStrategy4.new(usdcAddress, vaultPoolSwapAddress, ether('1.05'), sendOptions);
   const ylaPool = await PowerIndexPool.at(ylaAddress);
@@ -63,11 +64,11 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
   await cvpMaker.syncStrategy2Tokens(assyAddress, sendOptions);
   await pIteration.forEachSeries(await callContract(assyPool, 'getCurrentTokens'), async token => {
     await cvpMaker.setCustomStrategy(token, '3', sendOptions);
-    if (token.toLowerCase() === piSushi.toLowerCase()) {
-      return cvpMaker.setCustomStrategy3Config(token, yetiAddress, zeroAddress, sushi, sendOptions);
+    if (token.toLowerCase() === piSushiAddress.toLowerCase()) {
+      return cvpMaker.setCustomStrategy3Config(token, yetiAddress, zeroAddress, sushiAddress, sendOptions);
     } else if(token.toLowerCase() === yfiAddress.toLowerCase()) {
       return cvpMaker.setCustomStrategy3Config(token, yetiAddress, zeroAddress, zeroAddress, sendOptions);
-    } else if(token.toLowerCase() === snx.toLowerCase() || token.toLowerCase() === aave.toLowerCase()) {
+    } else if(token.toLowerCase() === snxAddress.toLowerCase() || token.toLowerCase() === aaveAddress.toLowerCase()) {
       return cvpMaker.setCustomStrategy3Config(token, piptAddress, zeroAddress, zeroAddress, sendOptions);
     }
   });
@@ -88,16 +89,19 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
   await pvp.withdraw([
     assyAddress,
     cvpAddress,
-    yfiAddress
+    yfiAddress,
+    piSushiAddress
   ], [
     await callContract(assyPool, 'balanceOf', [pvp.address]),
     await callContract(cvp, 'balanceOf', [pvp.address]),
-    await callContract(await IERC20.at(yfiAddress), 'balanceOf', [pvp.address])
+    await callContract(await IERC20.at(yfiAddress), 'balanceOf', [pvp.address]),
+    await callContract(await IERC20.at(piSushiAddress), 'balanceOf', [pvp.address])
   ], cvpMaker.address, {from: admin});
 
+  console.log('cvp balance before', fromEther(await callContract(cvp, 'balanceOf', [cvpMaker.address])))
   console.log('assy balance before', fromEther(await callContract(assyPool, 'balanceOf', [cvpMaker.address])))
   console.log('yfi balance before', fromEther(await callContract(await IERC20.at(yfiAddress), 'balanceOf', [cvpMaker.address])))
-  console.log('cvp balance before', fromEther(await callContract(cvp, 'balanceOf', [cvpMaker.address])))
+  console.log('piSushiAddress balance before', fromEther(await callContract(await IERC20.at(piSushiAddress), 'balanceOf', [cvpMaker.address])))
 
   const BONUS_NUMERATOR = '7610350076';
   const BONUS_DENUMERATOR = '10000000000000000';
@@ -139,6 +143,7 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
   console.log('assy balance after', fromEther(await callContract(assyPool, 'balanceOf', [cvpMaker.address])))
   console.log('yfi balance after', fromEther(await callContract(await IERC20.at(yfiAddress), 'balanceOf', [cvpMaker.address])))
   console.log('cvp balance after', fromEther(await callContract(cvp, 'balanceOf', [cvpMaker.address])))
+  console.log('piSushiAddress balance before', fromEther(await callContract(await IERC20.at(piSushiAddress), 'balanceOf', [cvpMaker.address])))
 });
 
 function callContract(contract, method, args = []) {
