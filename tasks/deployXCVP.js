@@ -36,7 +36,7 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
   const sushiRouterAddress = '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f';
   const powerPokeAddress = '0x04D7aA22ef7181eE3142F5063e026Af1BbBE5B96';
   const wethAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
-  const vaultPoolSwapAddress = '0x85CEBe75758a38CDfF4d3F5081Cfc7CebCB15bc1';
+  const vaultPoolSwapAddress = '0x482308830F8945dC360023FaF12c9615509AE51f';
 
   const xcvp = await xCVP.new(cvpAddress, sendOptions);
   const cvpMaker = await deployProxied(
@@ -73,6 +73,26 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
     }
   });
 
+  const yetiPool = await PowerIndexPool.at(yetiAddress);
+  await cvpMaker.setCustomStrategy(yetiAddress, '1', sendOptions);
+  await pIteration.forEachSeries(await callContract(yetiPool, 'getCurrentTokens'), async token => {
+    if ((await callContract(cvpMaker, 'customStrategies', [token])).toString() !== '0') {
+      return;
+    }
+    await cvpMaker.setCustomStrategy(token, '3', sendOptions);
+    return cvpMaker.setCustomStrategy3Config(token, yetiAddress, zeroAddress, zeroAddress, sendOptions);
+  });
+
+  const piptPool = await PowerIndexPool.at(piptAddress);
+  await cvpMaker.setCustomStrategy(piptAddress, '1', sendOptions);
+  await pIteration.forEachSeries(await callContract(piptPool, 'getCurrentTokens'), async token => {
+    if ((await callContract(cvpMaker, 'customStrategies', [token])).toString() !== '0') {
+      return;
+    }
+    await cvpMaker.setCustomStrategy(token, '3', sendOptions);
+    return cvpMaker.setCustomStrategy3Config(token, piptAddress, zeroAddress, zeroAddress, sendOptions);
+  });
+
   if (network.name !== 'mainnetfork') {
     return;
   }
@@ -90,12 +110,18 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
     assyAddress,
     cvpAddress,
     yfiAddress,
-    piSushiAddress
+    piSushiAddress,
+    piptAddress,
+    yetiAddress,
+    aaveAddress,
   ], [
     await callContract(assyPool, 'balanceOf', [pvp.address]),
     await callContract(cvp, 'balanceOf', [pvp.address]),
     await callContract(await IERC20.at(yfiAddress), 'balanceOf', [pvp.address]),
-    await callContract(await IERC20.at(piSushiAddress), 'balanceOf', [pvp.address])
+    await callContract(await IERC20.at(piSushiAddress), 'balanceOf', [pvp.address]),
+    await callContract(piptPool, 'balanceOf', [pvp.address]),
+    await callContract(yetiPool, 'balanceOf', [pvp.address]),
+    await callContract(await IERC20.at(aaveAddress), 'balanceOf', [pvp.address]),
   ], cvpMaker.address, {from: admin});
 
   console.log('cvp balance before', fromEther(await callContract(cvp, 'balanceOf', [cvpMaker.address])))
@@ -103,6 +129,9 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
   console.log('yfi balance before', fromEther(await callContract(await IERC20.at(yfiAddress), 'balanceOf', [cvpMaker.address])))
   console.log('piSushiAddress balance before', fromEther(await callContract(await IERC20.at(piSushiAddress), 'balanceOf', [cvpMaker.address])))
   console.log('sushi balance before', fromEther(await callContract(await IERC20.at(sushiAddress), 'balanceOf', [cvpMaker.address])))
+  console.log('pipt balance before', fromEther(await callContract(piptPool, 'balanceOf', [cvpMaker.address])))
+  console.log('yeti balance before', fromEther(await callContract(yetiPool, 'balanceOf', [cvpMaker.address])))
+  console.log('aave balance before', fromEther(await callContract(await IERC20.at(aaveAddress), 'balanceOf', [cvpMaker.address])))
 
   const BONUS_NUMERATOR = '7610350076';
   const BONUS_DENUMERATOR = '10000000000000000';
@@ -146,11 +175,29 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
   await cvpMaker.swapFromReporter('1', piSushiAddress, powerPokeOpts, {from: pokerReporter});
   console.log('cvp balance 4', fromEther(await callContract(cvp, 'balanceOf', [xcvp.address])));
 
+  await increaseTime(MAX_REPORT_INTERVAL);
+
+  await cvpMaker.swapFromReporter('1', piptAddress, powerPokeOpts, {from: pokerReporter});
+  console.log('cvp balance 5', fromEther(await callContract(cvp, 'balanceOf', [xcvp.address])));
+
+  await increaseTime(MAX_REPORT_INTERVAL);
+
+  await cvpMaker.swapFromReporter('1', yetiAddress, powerPokeOpts, {from: pokerReporter});
+  console.log('cvp balance 6', fromEther(await callContract(cvp, 'balanceOf', [xcvp.address])));
+
+  await increaseTime(MAX_REPORT_INTERVAL);
+
+  await cvpMaker.swapFromReporter('1', aaveAddress, powerPokeOpts, {from: pokerReporter});
+  console.log('cvp balance 7', fromEther(await callContract(cvp, 'balanceOf', [xcvp.address])));
+
   console.log('assy balance after', fromEther(await callContract(assyPool, 'balanceOf', [cvpMaker.address])))
   console.log('yfi balance after', fromEther(await callContract(await IERC20.at(yfiAddress), 'balanceOf', [cvpMaker.address])))
   console.log('cvp balance after', fromEther(await callContract(cvp, 'balanceOf', [cvpMaker.address])))
   console.log('piSushiAddress balance after', fromEther(await callContract(await IERC20.at(piSushiAddress), 'balanceOf', [cvpMaker.address])))
   console.log('sushi balance after', fromEther(await callContract(await IERC20.at(sushiAddress), 'balanceOf', [cvpMaker.address])))
+  console.log('pipt balance after', fromEther(await callContract(piptPool, 'balanceOf', [cvpMaker.address])))
+  console.log('yeti balance after', fromEther(await callContract(yetiPool, 'balanceOf', [cvpMaker.address])))
+  console.log('aave balance after', fromEther(await callContract(await IERC20.at(aaveAddress), 'balanceOf', [cvpMaker.address])))
 });
 
 function callContract(contract, method, args = []) {
