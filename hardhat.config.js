@@ -27,6 +27,7 @@ require('./tasks/deployMainnetInstantRebindStrategy');
 require('./tasks/testVestedLpMiningProxy');
 require('./tasks/testVestedLpMiningPool');
 require('./tasks/deployIndicesSupplyRedeemZap');
+require('./tasks/deployXCVP');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
@@ -91,8 +92,10 @@ const config = {
       url: 'http://127.0.0.1:8545/',
       gasPrice: 48 * 10 ** 9,
       // accounts: getAccounts('mainnet'),
-      gasMultiplier: 2,
+      gasMultiplier: 1.2,
       timeout: 2000000,
+      blockGasLimit: 20000000,
+      allowUnlimitedContractSize: true,
     },
     local: {
       url: 'http://127.0.0.1:8545',

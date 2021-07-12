@@ -31,6 +31,8 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     uint256 xcvpCvpAfter
   );
   /// @notice The event emitted when the owner updates cvpAmountOut value
+  event SetPoolRestrictions(address poolRestrictions);
+  /// @notice The event emitted when the owner updates cvpAmountOut value
   event SetCvpAmountOut(uint256 cvpAmountOut);
   /// @notice The event emitted when the owner updates a token custom uni-like path
   event SetCustomPath(address indexed token_, address router_, address[] path);
@@ -62,16 +64,20 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     address cvp_,
     address xcvp_,
     address weth_,
-    address uniswapRouter_,
-    address restrictions_
-  ) public CVPMakerViewer(cvp_, xcvp_, weth_, uniswapRouter_, restrictions_) {}
+    address uniswapRouter_
+  ) public CVPMakerViewer(cvp_, xcvp_, weth_, uniswapRouter_) {}
 
   receive() external payable {}
 
-  function initialize(address powerPoke_, uint256 cvpAmountOut_) external initializer {
+  function initialize(
+    address powerPoke_,
+    address restrictions_,
+    uint256 cvpAmountOut_
+  ) external initializer {
     require(cvpAmountOut_ > 0, "CVP_AMOUNT_OUT_0");
 
     powerPoke = IPowerPoke(powerPoke_);
+    restrictions = IPoolRestrictions(restrictions_);
     cvpAmountOut = cvpAmountOut_;
 
     emit SetPowerPoke(powerPoke_);
@@ -388,6 +394,11 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   }
 
   /*** OWNER METHODS ***/
+
+  function setPoolRestrictions(address restrictions_) external onlyOwner {
+    restrictions = IPoolRestrictions(restrictions_);
+    emit SetPoolRestrictions(restrictions_);
+  }
 
   function setCvpAmountOut(uint256 cvpAmountOut_) external onlyOwner {
     require(cvpAmountOut_ > 0, "CVP_AMOUNT_OUT_0");

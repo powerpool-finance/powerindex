@@ -26,6 +26,7 @@ task('deploy-indices-supply-redeem-zap', 'Deploy Indices Supply Redeem Zap').set
   // console.log('zapImplementation.address', zapImplementation.address);
 
   const erc20VaultPoolSwap = await Erc20VaultPoolSwap.new(usdcAddress);
+  console.log('erc20VaultPoolSwap.address', erc20VaultPoolSwap.address);
 
   const vd = JSON.parse(fs.readFileSync('data/vaultsData4.json'));
   await erc20VaultPoolSwap.setVaultConfigs(

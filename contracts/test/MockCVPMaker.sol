@@ -10,9 +10,8 @@ contract MockCVPMaker is CVPMakerLens, CVPMaker {
     address cvp_,
     address xcvp_,
     address weth_,
-    address uniswapRouter_,
-    address restrictions_
-  ) public CVPMaker(cvp_, xcvp_, weth_, uniswapRouter_, restrictions_) {}
+    address uniswapRouter_
+  ) public CVPMaker(cvp_, xcvp_, weth_, uniswapRouter_) {}
 
   function mockSwap(address token_) external {
     _swap(token_);
