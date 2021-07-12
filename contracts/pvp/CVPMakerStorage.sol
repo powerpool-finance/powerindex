@@ -13,7 +13,7 @@ contract CVPMakerStorage is OwnableUpgradeSafe {
 
   uint256 public lastReporterPokeFrom;
 
-  IPoolRestrictions internal _restrictions;
+  IPoolRestrictions public restrictions;
 
   // token => router
   mapping(address => address) public routers;

@@ -29,14 +29,12 @@ contract CVPMakerViewer is ICVPMakerViewer, CVPMakerStorage {
     address cvp_,
     address xcvp_,
     address weth_,
-    address uniswapRouter_,
-    address restrictions_
+    address uniswapRouter_
   ) public {
     cvp = cvp_;
     xcvp = xcvp_;
     weth = weth_;
     uniswapRouter = uniswapRouter_;
-    _restrictions = IPoolRestrictions(_restrictions);
   }
 
   function _wethCVPPath() internal view returns (address[] memory) {
@@ -114,7 +112,7 @@ contract CVPMakerViewer is ICVPMakerViewer, CVPMakerStorage {
     override
     returns (uint256 tokenAmountGross)
   {
-    if (address(_restrictions) != address(0) && _restrictions.isWithoutFee(address(this))) {
+    if (address(restrictions) != address(0) && restrictions.isWithoutFee(address(this))) {
       return (tokenAmountNet_);
     }
     uint256 adjustedIn = bsub(BONE, communityFee_);
