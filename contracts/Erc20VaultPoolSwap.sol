@@ -192,7 +192,6 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
   function calcVaultOutByUsdc(address _token, uint256 _usdcIn) public view returns (uint256 amountOut) {
     VaultConfig storage vc = vaultConfig[_token];
-    uint256 lpByUsdcPrice = ICurvePoolRegistry(vc.curvePoolRegistry).get_virtual_price_from_lp_token(vc.lpToken);
     uint256 vaultByLpPrice = IVault(_token).pricePerShare();
     return calcDepositorTokenAmount(vc, _usdcIn, true).mul(1e30).div(vaultByLpPrice);
   }
