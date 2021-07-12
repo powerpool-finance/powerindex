@@ -36,13 +36,13 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
   const sushiRouterAddress = '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f';
   const powerPokeAddress = '0x04D7aA22ef7181eE3142F5063e026Af1BbBE5B96';
   const wethAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
-  const vaultPoolSwapAddress = '0xE9bBE77490Ec85fE7d2B2DcA5FA94403Fa3C254C';
+  const vaultPoolSwapAddress = '0x85CEBe75758a38CDfF4d3F5081Cfc7CebCB15bc1';
 
   const xcvp = await xCVP.new(cvpAddress, sendOptions);
   const cvpMaker = await deployProxied(
     CVPMaker,
     [cvpAddress, xcvp.address, wethAddress, uniswapRouterAddress],
-    [powerPokeAddress, zeroAddress, ether(10000)],
+    [powerPokeAddress, zeroAddress, ether(10)],
     {
       proxyAdmin: proxyAdminAddr,
       implementation: ''
@@ -102,6 +102,7 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
   console.log('assy balance before', fromEther(await callContract(assyPool, 'balanceOf', [cvpMaker.address])))
   console.log('yfi balance before', fromEther(await callContract(await IERC20.at(yfiAddress), 'balanceOf', [cvpMaker.address])))
   console.log('piSushiAddress balance before', fromEther(await callContract(await IERC20.at(piSushiAddress), 'balanceOf', [cvpMaker.address])))
+  console.log('sushi balance before', fromEther(await callContract(await IERC20.at(sushiAddress), 'balanceOf', [cvpMaker.address])))
 
   const BONUS_NUMERATOR = '7610350076';
   const BONUS_DENUMERATOR = '10000000000000000';
@@ -140,10 +141,16 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
   await cvpMaker.swapFromReporter('1', yfiAddress, powerPokeOpts, {from: pokerReporter});
   console.log('cvp balance 3', fromEther(await callContract(cvp, 'balanceOf', [xcvp.address])));
 
+  await increaseTime(MAX_REPORT_INTERVAL);
+
+  await cvpMaker.swapFromReporter('1', piSushiAddress, powerPokeOpts, {from: pokerReporter});
+  console.log('cvp balance 4', fromEther(await callContract(cvp, 'balanceOf', [xcvp.address])));
+
   console.log('assy balance after', fromEther(await callContract(assyPool, 'balanceOf', [cvpMaker.address])))
   console.log('yfi balance after', fromEther(await callContract(await IERC20.at(yfiAddress), 'balanceOf', [cvpMaker.address])))
   console.log('cvp balance after', fromEther(await callContract(cvp, 'balanceOf', [cvpMaker.address])))
-  console.log('piSushiAddress balance before', fromEther(await callContract(await IERC20.at(piSushiAddress), 'balanceOf', [cvpMaker.address])))
+  console.log('piSushiAddress balance after', fromEther(await callContract(await IERC20.at(piSushiAddress), 'balanceOf', [cvpMaker.address])))
+  console.log('sushi balance after', fromEther(await callContract(await IERC20.at(sushiAddress), 'balanceOf', [cvpMaker.address])))
 });
 
 function callContract(contract, method, args = []) {
