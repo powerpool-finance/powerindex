@@ -353,7 +353,6 @@ describe('PancakeMasterChefRouter Tests', () => {
       await masterChef.massUpdatePools();
       await time.increase(time.duration.days(8));
       await masterChef.massUpdatePools();
-      const latest = await latestBlockNumber();
       assert.equal(await myToken.balanceOf(piMyToken.address), ether(2000));
       assert.equal(await myRouter.getUnderlyingStaked(), ether(8000));
       assert.equal(await myRouter.getPendingRewards(), ether('47.996454152000000000'));
