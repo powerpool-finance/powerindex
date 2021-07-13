@@ -228,9 +228,18 @@ const { BN } = web3.utils;
 
 const increaseTime = buildEndpoint('evm_increaseTime');
 
-async function latestBlock () {
+async function latestBlockTimestamp () {
   const block = await web3.eth.getBlock('latest');
-  return new BN(block.timestamp);
+  return block.timestamp;
+}
+
+async function latestBlockNumber () {
+  const block = await web3.eth.getBlock('latest');
+  return block.number;
+}
+
+async function latestBlock () {
+  return await web3.eth.getBlock('latest');
 }
 
 async function increaseTimeTo (target) {
@@ -238,7 +247,7 @@ async function increaseTimeTo (target) {
     target = new BN(target);
   }
 
-  const now = (await latestBlock());
+  const now = new BN(await latestBlockTimestamp());
 
   if (target.lt(now)) throw Error(`Cannot increase current time (${now}) to a moment in the past (${target})`);
   const diff = target.sub(now);
@@ -405,6 +414,9 @@ module.exports = {
   artifactFromBytecode,
   toEvmBytes32,
   advanceBlocks,
+  latestBlock,
+  latestBlockNumber,
+  latestBlockTimestamp,
   splitPayload,
   fetchLogs,
   ether,

@@ -40,6 +40,11 @@ function buildSushiRouterConfig(SUSHI) {
   return { SUSHI };
 }
 
+// PANCAKE MASTER CHEF
+function buildPancakeMasterChefRouterConfig(cake) {
+  return { cake };
+}
+
 
 const BasicConfig = {
   poolRestrictions: 'address',
@@ -121,6 +126,7 @@ module.exports = {
   buildBasicRouterConfig,
   buildAaveRouterConfig,
   buildSushiRouterConfig,
+  buildPancakeMasterChefRouterConfig,
   buildAaveAssetConfigInput,
   buildBasicRouterArgs,
   buildYearnRouterArgs,
