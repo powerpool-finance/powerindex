@@ -44,9 +44,8 @@ abstract contract CVPMakerLens is CVPMakerViewer {
       return estimateCustomStrategyIn(token_, customStrategyId);
     }
 
-    address externalStrategy = externalStrategies[token_];
-    if (externalStrategy != address(0)) {
-      return estimateExternalStrategyIn(token_, externalStrategy);
+    if (externalStrategiesConfig[token_].strategy != address(0)) {
+      return estimateExternalStrategyIn(token_);
     }
 
     return estimateUniLikeStrategyIn(token_);
@@ -119,8 +118,16 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     }
   }
 
-  function estimateExternalStrategyIn(address token_, address strategy_) public view returns (uint256) {
-    return ICVPMakerStrategy(strategy_).estimateIn(address(this), token_, externalStrategyConfig[token_]);
+  function estimateExternalStrategyIn(address token_) public view returns (uint256) {
+    ExternalStrategiesConfig storage strategyConfig = externalStrategiesConfig[token_];
+    if (strategyConfig.maxAmountIn) {
+      return IERC20(token_).balanceOf(address(this));
+    }
+    return ICVPMakerStrategy(strategyConfig.strategy).estimateIn(
+      token_,
+      estimateUniLikeStrategyIn(ICVPMakerStrategy(strategyConfig.strategy).getTokenOut()),
+      strategyConfig.config
+    );
   }
 
   function estimateCustomStrategyOut(address token_, uint256 strategyId_) public view returns (uint256) {

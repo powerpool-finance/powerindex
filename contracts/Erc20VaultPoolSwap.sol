@@ -190,7 +190,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
   /* ==========  View Functions  ========== */
 
-  function calcVaultOutByUsdc(address _token, uint256 _usdcIn) public view returns (uint256 amountOut) {
+  function calcVaultOutByUsdc(address _token, uint256 _usdcIn) public override view returns (uint256 amountOut) {
     VaultConfig storage vc = vaultConfig[_token];
     uint256 lpByUsdcPrice = ICurvePoolRegistry(vc.curvePoolRegistry).get_virtual_price_from_lp_token(vc.lpToken);
     uint256 vaultByLpPrice = IVault(_token).pricePerShare();
@@ -238,7 +238,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     address _pool,
     uint256 _usdcIn,
     bool _withFee
-  ) external view returns (uint256 amountOut) {
+  ) external override view returns (uint256 amountOut) {
     uint256 len = poolTokens[_pool].length;
     PowerIndexPoolInterface p = PowerIndexPoolInterface(_pool);
     uint256 piptTotalSupply = p.totalSupply();
@@ -267,6 +267,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   function calcUsdcOutByVault(address _vaultTokenIn, uint256 _vaultAmountIn)
     public
     view
+    override
     returns (uint256 usdcAmountOut)
   {
     VaultConfig storage vc = vaultConfig[_vaultTokenIn];
@@ -279,7 +280,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     address _pool,
     uint256 _ppolIn,
     bool _withFee
-  ) external view returns (uint256 amountOut) {
+  ) external view override returns (uint256 amountOut) {
     uint256 len = poolTokens[_pool].length;
     PowerIndexPoolInterface p = PowerIndexPoolInterface(_pool);
 

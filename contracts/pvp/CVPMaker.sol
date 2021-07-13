@@ -39,7 +39,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   /// @notice The event emitted when the owner assigns a custom strategy for the token
   event SetCustomStrategy(address indexed token, uint256 strategyId);
   /// @notice The event emitted when the owner configures an external strategy for the token
-  event SetExternalStrategy(address indexed token_, address indexed strategy);
+  event SetExternalStrategy(address indexed token_, address indexed strategy, bool maxAmountIn);
 
   modifier onlyEOA() {
     require(msg.sender == tx.origin, "NOT_EOA");
@@ -155,9 +155,8 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
         return;
       }
 
-      address externalStrategy = externalStrategies[token_];
-      if (externalStrategy != address(0)) {
-        amountIn = _executeExternalStrategy(token_, externalStrategy);
+      if (externalStrategiesConfig[token_].strategy != address(0)) {
+        amountIn = _executeExternalStrategy(token_);
         swapType = 4;
         return;
       }
@@ -240,12 +239,30 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     return amounts[0];
   }
 
-  function _executeExternalStrategy(address token_, address externalStrategy_) internal returns (uint256 amountIn) {
+  function _executeExternalStrategy(address token_) internal returns (uint256 amountIn) {
+    ExternalStrategiesConfig storage config = externalStrategiesConfig[token_];
     address executeUniLikeFrom;
-    (amountIn, executeUniLikeFrom) = ICVPMakerStrategy(externalStrategy_).executeStrategy(
-      token_,
-      externalStrategyConfig[token_]
-    );
+    if (config.maxAmountIn) {
+      amountIn = IERC20(token_).balanceOf(address(this));
+      uint256 strategyAmountOut = ICVPMakerStrategy(config.strategy).estimateOut(token_, amountIn, config.config);
+      uint256 resultCvpOut = estimateUniLikeStrategyOut(
+        ICVPMakerStrategy(config.strategy).getTokenOut(),
+        strategyAmountOut
+      );
+      require(resultCvpOut > cvpAmountOut);
+
+      (executeUniLikeFrom) = ICVPMakerStrategy(config.strategy).executeStrategyByAmountIn(
+        token_,
+        amountIn,
+        externalStrategiesConfig[token_].config
+      );
+    } else {
+      (amountIn, executeUniLikeFrom) = ICVPMakerStrategy(config.strategy).executeStrategyByAmountOut(
+        token_,
+        estimateUniLikeStrategyIn(ICVPMakerStrategy(config.strategy).getTokenOut()),
+        externalStrategiesConfig[token_].config
+      );
+    }
 
     if (executeUniLikeFrom != address(0)) {
       _executeUniLikeStrategy(executeUniLikeFrom);
@@ -406,17 +423,19 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     emit SetCvpAmountOut(cvpAmountOut_);
   }
 
-  function setCustomStrategy(address token_, uint256 strategyId_) external onlyOwner {
+  function setCustomStrategy(address token_, uint256 strategyId_) public onlyOwner {
     customStrategies[token_] = strategyId_;
     emit SetCustomStrategy(token_, strategyId_);
   }
 
   function setCustomStrategy1Config(address bPoolToken_, address bPoolWrapper_) external onlyOwner {
     strategy1Config[bPoolToken_].bPoolWrapper = bPoolWrapper_;
+    setCustomStrategy(bPoolToken_, 1);
   }
 
   function setCustomStrategy2Config(address bPoolToken, address bPoolWrapper_) external onlyOwner {
     strategy2Config[bPoolToken].bPoolWrapper = bPoolWrapper_;
+    setCustomStrategy(bPoolToken, 2);
   }
 
   function setCustomStrategy3Config(
@@ -426,24 +445,25 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     address underlying_
   ) external onlyOwner {
     strategy3Config[token_] = Strategy3Config(bPool_, bPoolWrapper_, underlying_);
+    setCustomStrategy(token_, 3);
   }
 
   function setExternalStrategy(
     address token_,
     address strategy_,
+    bool maxAmountIn_,
     bytes memory config_
   ) external onlyOwner {
-    address prevStrategy = externalStrategies[token_];
+    address prevStrategy = externalStrategiesConfig[token_].strategy;
     if (prevStrategy != address(0)) {
       IERC20(token_).safeApprove(prevStrategy, uint256(0));
     }
 
-    externalStrategies[token_] = strategy_;
-    externalStrategyConfig[token_] = config_;
+    externalStrategiesConfig[token_] = ExternalStrategiesConfig(strategy_, maxAmountIn_, config_);
 
     IERC20(token_).safeApprove(strategy_, uint256(-1));
 
-    emit SetExternalStrategy(token_, strategy_);
+    emit SetExternalStrategy(token_, strategy_, maxAmountIn_);
   }
 
   function setCustomPath(

@@ -3,13 +3,33 @@
 pragma solidity 0.6.12;
 
 interface ICVPMakerStrategy {
-  function executeStrategy(address token, bytes memory config)
+  function executeStrategyByAmountOut(
+    address poolTokenIn_,
+    uint256 tokenOutAmount_,
+    bytes memory config_
+  )
     external
-    returns (uint256 amountIn, address executeUniLikeFrom);
+    returns (uint256 poolTokenInAmount, address executeUniLikeFrom);
+
+  function executeStrategyByAmountIn(
+    address poolTokenIn_,
+    uint256 tokenInAmount_,
+    bytes memory config_
+  )
+    external
+    returns (address executeUniLikeFrom);
 
   function estimateIn(
-    address cvpMaker,
-    address vaultTokenIn,
-    bytes memory config
+    address tokenIn_,
+    uint256 tokenOutAmount_,
+    bytes memory
   ) external view returns (uint256 amountIn);
+
+  function estimateOut(
+    address poolTokenIn_,
+    uint256 tokenInAmount_,
+    bytes memory
+  ) external view returns (uint256);
+
+  function getTokenOut() external view returns (address);
 }

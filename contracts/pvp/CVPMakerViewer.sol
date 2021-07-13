@@ -44,6 +44,13 @@ contract CVPMakerViewer is ICVPMakerViewer, CVPMakerStorage {
     return path;
   }
 
+  function _wethTokenPath(address _token) internal view returns (address[] memory) {
+    address[] memory path = new address[](2);
+    path[0] = _token;
+    path[1] = weth;
+    return path;
+  }
+
   function getRouter(address token_) public view override returns (address) {
     address router = routers[token_];
 
@@ -81,6 +88,11 @@ contract CVPMakerViewer is ICVPMakerViewer, CVPMakerStorage {
     return results[0];
   }
 
+  function estimateEthStrategyOut(address tokenIn_, uint256 _amountIn) public view override returns (uint256) {
+    uint256[] memory results = IUniswapV2Router02(uniswapRouter).getAmountsOut(_amountIn, _wethTokenPath(tokenIn_));
+    return results[0];
+  }
+
   /**
    * @notice Estimates how much token_ need to swap for cvpAmountOut
    * @param token_ The token to swap for CVP
@@ -96,6 +108,20 @@ contract CVPMakerViewer is ICVPMakerViewer, CVPMakerStorage {
     } else {
       uint256 wethToSwap = estimateEthStrategyIn();
       uint256[] memory results = IUniswapV2Router02(router).getAmountsIn(wethToSwap, path);
+      return results[0];
+    }
+  }
+
+  function estimateUniLikeStrategyOut(address token_, uint256 amountIn_) public view override returns (uint256) {
+    address router = getRouter(token_);
+    address[] memory path = getPath(token_);
+
+    if (router == uniswapRouter) {
+      uint256[] memory results = IUniswapV2Router02(router).getAmountsOut(amountIn_, path);
+      return results[0];
+    } else {
+      uint256 wethToSwap = estimateEthStrategyOut(token_, amountIn_);
+      uint256[] memory results = IUniswapV2Router02(router).getAmountsOut(wethToSwap, path);
       return results[0];
     }
   }

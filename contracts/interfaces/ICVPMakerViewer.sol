@@ -13,7 +13,11 @@ interface ICVPMakerViewer {
 
   function estimateEthStrategyIn() external view returns (uint256);
 
+  function estimateEthStrategyOut(address tokenIn_, uint256 _amountIn) external view returns (uint256);
+
   function estimateUniLikeStrategyIn(address token_) external view returns (uint256);
+
+  function estimateUniLikeStrategyOut(address token_, uint256 amountIn_) external view returns (uint256);
 
   /*** CUSTOM STRATEGIES OUT ***/
 
