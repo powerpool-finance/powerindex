@@ -249,7 +249,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
         ICVPMakerStrategy(config.strategy).getTokenOut(),
         strategyAmountOut
       );
-      require(resultCvpOut > cvpAmountOut);
+      require(resultCvpOut >= cvpAmountOut, "INSUFFICIENT_CVP_AMOUNT_OUT");
 
       (executeUniLikeFrom) = ICVPMakerStrategy(config.strategy).executeStrategyByAmountIn(
         token_,

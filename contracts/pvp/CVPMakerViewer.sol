@@ -118,11 +118,11 @@ contract CVPMakerViewer is ICVPMakerViewer, CVPMakerStorage {
 
     if (router == uniswapRouter) {
       uint256[] memory results = IUniswapV2Router02(router).getAmountsOut(amountIn_, path);
-      return results[0];
+      return results[2];
     } else {
       uint256 wethToSwap = estimateEthStrategyOut(token_, amountIn_);
       uint256[] memory results = IUniswapV2Router02(router).getAmountsOut(wethToSwap, path);
-      return results[0];
+      return results[2];
     }
   }
 
