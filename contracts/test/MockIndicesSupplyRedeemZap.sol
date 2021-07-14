@@ -16,4 +16,9 @@ contract MockIndicesSupplyRedeemZap is IndicesSupplyRedeemZap {
   function mockClaimPokeFromReporter(bytes32 _roundKey, address[] memory _claimForList) external {
     _claimPoke(_roundKey, _claimForList, false);
   }
+
+  function _getMinMaxReportInterval() internal view override returns (uint256 min, uint256 max) {
+    min = 0;
+    max = 0;
+  }
 }

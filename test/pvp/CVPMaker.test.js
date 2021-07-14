@@ -1224,6 +1224,7 @@ describe.only('CVPMaker test', () => {
       let ycrvVault;
       let zapStrategy;
       let bpool;
+      let zap;
 
       beforeEach(async () => {
         const virtualPrice = ether('1.2');
@@ -1290,7 +1291,7 @@ describe.only('CVPMaker test', () => {
           [ether(6.25), ether(6.25), ether(6.25), ether(6.25)],
         );
 
-        const zap = await MockIndicesSupplyRedeemZap.new(usdc.address, zeroAddress);
+        zap = await MockIndicesSupplyRedeemZap.new(usdc.address, zeroAddress);
         await zap.initialize('0');
         await zap.setPools([bpool.address], ['2']);
         await zap.setPoolsSwapContracts([bpool.address], [vaultSwap.address]);
@@ -1298,7 +1299,7 @@ describe.only('CVPMaker test', () => {
 
         zapStrategy = await CVPMakerZapStrategy.new(usdc.address, zap.address, ether('1.05'));
 
-        await zap.setIgnoreOnlyEOA(zapStrategy.address, true);
+        await zap.setIgnoreOnlyEOA(cvpMaker.address, true);
 
         await cvpMaker.setExternalStrategy(bpool.address, zapStrategy.address, true, '0x', {from: owner});
         await cvpMaker.setCvpAmountOut(ether(100), {from: owner});
@@ -1315,8 +1316,22 @@ describe.only('CVPMaker test', () => {
         assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
         assert.equal(await bpool.balanceOf(cvpMaker.address), ether(100));
 
-        await cvpMaker.mockSwap(bpool.address);
+        const res = await cvpMaker.mockSwap(bpool.address);
+        const logInitRound = MockIndicesSupplyRedeemZap.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'InitRound')[0];
+        assert.equal(logInitRound.args.inputToken, bpool.address);
+        assert.equal(logInitRound.args.pool, bpool.address);
+        assert.equal(logInitRound.args.outputToken, usdc.address);
 
+        const depositEvent = MockIndicesSupplyRedeemZap.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'Deposit')[0];
+        assert.equal(depositEvent.args.pool, bpool.address);
+        assert.equal(depositEvent.args.user, cvpMaker.address);
+        assert.equal(depositEvent.args.inputToken, bpool.address);
+        assert.equal(depositEvent.args.inputAmount, ether(100));
+
+        await zap.mockSupplyAndRedeemPokeFromReporter([logInitRound.args.key]);
+        await zap.mockClaimPokeFromReporter(logInitRound.args.key, [cvpMaker.address]);
+
+        assert.equal(await usdc.balanceOf(cvpMaker.address), mwei(446.399999));
         assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
         const expectedBPoolLeftover = (BigInt(ether(6000)) - BigInt(ether('5868.530648400000000000'))).toString();
         assert.equal(expectedBPoolLeftover, ether('131.469351600000000000'));

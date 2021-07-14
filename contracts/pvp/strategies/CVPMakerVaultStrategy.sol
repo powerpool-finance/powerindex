@@ -40,18 +40,24 @@ contract CVPMakerVaultStrategy is ICVPMakerStrategy {
    * @return vaultInAmount amount of vaultTokenIn_
    * @return executeUniLikeFrom always USDC
    */
-  function executeStrategyByAmountOut(
+  function getExecuteDataByAmountOut(
     address vaultTokenIn_,
     uint256 tokenOutAmount_,
     bytes memory config_
   )
     external
     override
-    returns (uint256 vaultInAmount, address executeUniLikeFrom)
+    returns (
+      uint256 vaultInAmount,
+      address executeUniLikeFrom,
+      bytes memory executeData,
+      address executeContract
+    )
   {
     vaultInAmount = estimateIn(vaultTokenIn_, tokenOutAmount_, config_);
-    _executeStrategyByAmountIn(vaultTokenIn_, vaultInAmount);
     executeUniLikeFrom = tokenOut;
+    executeData = _executeStrategyByAmountIn(vaultTokenIn_, vaultInAmount);
+    executeContract = address(vaultSwap);
   }
 
   /**
@@ -62,23 +68,29 @@ contract CVPMakerVaultStrategy is ICVPMakerStrategy {
    * @param config_ config
    * @return executeUniLikeFrom always USDC
    */
-  function executeStrategyByAmountIn(
+  function getExecuteDataByAmountIn(
     address vaultTokenIn_,
     uint256 tokenInAmount_,
     bytes memory config_
   )
     external
     override
-    returns (address executeUniLikeFrom)
+    returns (
+      address executeUniLikeFrom,
+      bytes memory executeData,
+      address executeContract
+    )
   {
-    _executeStrategyByAmountIn(vaultTokenIn_, tokenInAmount_);
     executeUniLikeFrom = tokenOut;
+    executeData = _executeStrategyByAmountIn(vaultTokenIn_, tokenInAmount_);
+    executeContract = address(vaultSwap);
   }
 
-  function _executeStrategyByAmountIn(address vaultTokenIn_, uint256 vaultTokenInAmount_) internal returns(uint256 usdcOut) {
-    IERC20(vaultTokenIn_).safeTransferFrom(msg.sender, address(this), vaultTokenInAmount_);
-    IERC20(vaultTokenIn_).approve(address(vaultSwap), vaultTokenInAmount_);
-    usdcOut = vaultSwap.swapVaultToUSDC(address(this), msg.sender, vaultTokenIn_, vaultTokenInAmount_);
+  function _executeStrategyByAmountIn(address vaultTokenIn_, uint256 vaultTokenInAmount_) internal returns (bytes memory) {
+    return abi.encodePacked(
+      IErc20VaultPoolSwap(0).swapVaultToUSDC.selector,
+      abi.encode(address(this), msg.sender, vaultTokenIn_, vaultTokenInAmount_)
+    );
   }
 
   /**

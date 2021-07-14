@@ -600,7 +600,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     powerPoke.reward(_reporterId, _gasStart.sub(gasleft()), _compensationPlan, _rewardOpts);
   }
 
-  function _getMinMaxReportInterval() internal view returns (uint256 min, uint256 max) {
+  function _getMinMaxReportInterval() internal view virtual returns (uint256 min, uint256 max) {
     (min, max) = powerPoke.getMinMaxReportIntervals(address(this));
     min = min == 1 ? 0 : min;
   }

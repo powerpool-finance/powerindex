@@ -13,6 +13,7 @@ import "../interfaces/ICVPMakerStrategy.sol";
 import "../powerindex-router/PowerIndexWrapper.sol";
 import "./CVPMakerStorage.sol";
 import "./CVPMakerViewer.sol";
+import "hardhat/console.sol";
 
 contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   using SafeMath for uint256;
@@ -242,6 +243,9 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   function _executeExternalStrategy(address token_) internal returns (uint256 amountIn) {
     ExternalStrategiesConfig storage config = externalStrategiesConfig[token_];
     address executeUniLikeFrom;
+    address executeContract;
+    bytes memory executeData;
+
     if (config.maxAmountIn) {
       amountIn = IERC20(token_).balanceOf(address(this));
       uint256 strategyAmountOut = ICVPMakerStrategy(config.strategy).estimateOut(token_, amountIn, config.config);
@@ -251,18 +255,22 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
       );
       require(resultCvpOut >= cvpAmountOut, "INSUFFICIENT_CVP_AMOUNT_OUT");
 
-      (executeUniLikeFrom) = ICVPMakerStrategy(config.strategy).executeStrategyByAmountIn(
+      (executeUniLikeFrom, executeData, executeContract) = ICVPMakerStrategy(config.strategy).getExecuteDataByAmountIn(
         token_,
         amountIn,
         externalStrategiesConfig[token_].config
       );
     } else {
-      (amountIn, executeUniLikeFrom) = ICVPMakerStrategy(config.strategy).executeStrategyByAmountOut(
+      (amountIn, executeUniLikeFrom, executeData, executeContract) = ICVPMakerStrategy(config.strategy).getExecuteDataByAmountOut(
         token_,
         estimateUniLikeStrategyIn(ICVPMakerStrategy(config.strategy).getTokenOut()),
         externalStrategiesConfig[token_].config
       );
     }
+
+    IERC20(token_).approve(executeContract, amountIn);
+    (bool success, bytes memory data) = executeContract.call(executeData);
+    require(success, "NOT_SUCCESS");
 
     if (executeUniLikeFrom != address(0)) {
       _executeUniLikeStrategy(executeUniLikeFrom);

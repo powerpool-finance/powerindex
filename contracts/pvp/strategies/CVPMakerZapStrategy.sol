@@ -41,17 +41,18 @@ contract CVPMakerZapStrategy is ICVPMakerStrategy {
    * @return poolTokenInAmount amount of vaultTokenIn_
    * @return executeUniLikeFrom always USDC
    */
-  function executeStrategyByAmountOut(
+  function getExecuteDataByAmountOut(
     address poolTokenIn_,
     uint256 tokenOutAmount_,
     bytes memory config_
   )
     external
     override
-    returns (uint256 poolTokenInAmount, address executeUniLikeFrom)
+    returns (uint256 poolTokenInAmount, address executeUniLikeFrom, bytes memory executeData, address executeContract)
   {
     poolTokenInAmount = estimateIn(poolTokenIn_, tokenOutAmount_, config_);
-    _executeStrategyByAmountIn(poolTokenIn_, poolTokenInAmount);
+    executeData = _executeStrategyByAmountIn(poolTokenIn_, poolTokenInAmount);
+    executeContract = address(zap);
   }
 
   /**
@@ -62,22 +63,24 @@ contract CVPMakerZapStrategy is ICVPMakerStrategy {
    * @param config_ config
    * @return executeUniLikeFrom always USDC
    */
-  function executeStrategyByAmountIn(
+  function getExecuteDataByAmountIn(
     address poolTokenIn_,
     uint256 poolTokenInAmount_,
     bytes memory config_
   )
     external
     override
-    returns (address executeUniLikeFrom)
+    returns (address executeUniLikeFrom, bytes memory executeData, address executeContract)
   {
-    _executeStrategyByAmountIn(poolTokenIn_, poolTokenInAmount_);
+    executeData = _executeStrategyByAmountIn(poolTokenIn_, poolTokenInAmount_);
+    executeContract = address(zap);
   }
 
-  function _executeStrategyByAmountIn(address poolTokenIn_, uint256 poolTokenInAmount_) internal {
-    IERC20(poolTokenIn_).safeTransferFrom(msg.sender, address(this), poolTokenInAmount_);
-    IERC20(poolTokenIn_).approve(address(zap), poolTokenInAmount_);
-    zap.depositPoolToken(poolTokenIn_, tokenOut, poolTokenInAmount_);
+  function _executeStrategyByAmountIn(address poolTokenIn_, uint256 poolTokenInAmount_) internal returns (bytes memory) {
+    return abi.encodePacked(
+      IIndiciesSupplyRedeemZap(0).depositPoolToken.selector,
+      abi.encode(poolTokenIn_, tokenOut, poolTokenInAmount_)
+    );
   }
 
   /**

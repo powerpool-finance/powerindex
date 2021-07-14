@@ -3,21 +3,30 @@
 pragma solidity 0.6.12;
 
 interface ICVPMakerStrategy {
-  function executeStrategyByAmountOut(
+  function getExecuteDataByAmountOut(
     address poolTokenIn_,
     uint256 tokenOutAmount_,
     bytes memory config_
   )
     external
-    returns (uint256 poolTokenInAmount, address executeUniLikeFrom);
+    returns (
+      uint256 poolTokenInAmount,
+      address executeUniLikeFrom,
+      bytes memory executeData,
+      address executeContract
+    );
 
-  function executeStrategyByAmountIn(
+  function getExecuteDataByAmountIn(
     address poolTokenIn_,
     uint256 tokenInAmount_,
     bytes memory config_
   )
     external
-    returns (address executeUniLikeFrom);
+    returns (
+      address executeUniLikeFrom,
+      bytes memory executeData,
+      address executeContract
+    );
 
   function estimateIn(
     address tokenIn_,
