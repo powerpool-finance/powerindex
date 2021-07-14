@@ -86,11 +86,15 @@ contract CVPMakerVaultStrategy is ICVPMakerStrategy {
     executeContract = address(vaultSwap);
   }
 
-  function _executeStrategyByAmountIn(address vaultTokenIn_, uint256 vaultTokenInAmount_) internal returns (bytes memory) {
-    return abi.encodePacked(
-      IErc20VaultPoolSwap(0).swapVaultToUSDC.selector,
-      abi.encode(address(this), msg.sender, vaultTokenIn_, vaultTokenInAmount_)
-    );
+  function _executeStrategyByAmountIn(address vaultTokenIn_, uint256 vaultTokenInAmount_)
+    internal
+    returns (bytes memory)
+  {
+    return
+      abi.encodePacked(
+        IErc20VaultPoolSwap(0).swapVaultToUSDC.selector,
+        abi.encode(address(this), msg.sender, vaultTokenIn_, vaultTokenInAmount_)
+      );
   }
 
   /**

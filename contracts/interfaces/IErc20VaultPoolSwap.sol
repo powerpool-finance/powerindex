@@ -31,7 +31,7 @@ interface IErc20VaultPoolSwap {
   ) external view returns (uint256 amountOut);
 
   function calcUsdcOutByVault(address _vaultTokenIn, uint256 _vaultAmountIn)
-  external
+    external
     view
     returns (uint256 usdcAmountOut);
 

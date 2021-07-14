@@ -123,11 +123,12 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     if (strategyConfig.maxAmountIn) {
       return IERC20(token_).balanceOf(address(this));
     }
-    return ICVPMakerStrategy(strategyConfig.strategy).estimateIn(
-      token_,
-      estimateUniLikeStrategyIn(ICVPMakerStrategy(strategyConfig.strategy).getTokenOut()),
-      strategyConfig.config
-    );
+    return
+      ICVPMakerStrategy(strategyConfig.strategy).estimateIn(
+        token_,
+        estimateUniLikeStrategyIn(ICVPMakerStrategy(strategyConfig.strategy).getTokenOut()),
+        strategyConfig.config
+      );
   }
 
   function estimateCustomStrategyOut(address token_, uint256 strategyId_) public view returns (uint256) {

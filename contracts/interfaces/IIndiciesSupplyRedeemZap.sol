@@ -3,7 +3,7 @@
 pragma solidity 0.6.12;
 
 interface IIndiciesSupplyRedeemZap {
-  function poolSwapContract(address) view external returns(address);
+  function poolSwapContract(address) external view returns (address);
 
   function depositErc20(
     address _pool,

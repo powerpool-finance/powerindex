@@ -58,7 +58,7 @@ function mwei(val) {
   return web3.utils.toWei(val.toString(), 'mwei').toString();
 }
 
-describe.only('CVPMaker test', () => {
+describe('CVPMaker test', () => {
   let deployer, owner, cvpMakerClientOwner, alice, bob, charlie, reporter, slasher, stub;
   let cvp;
   let weth;
@@ -1220,7 +1220,7 @@ describe.only('CVPMaker test', () => {
       });
     });
 
-    describe('strategy4 token swap at a pool containing CVP', () => {
+    describe('vaults pool token swap to USDC and then to CVP', () => {
       let ycrvVault;
       let zapStrategy;
       let bpool;
@@ -1305,8 +1305,9 @@ describe.only('CVPMaker test', () => {
         await cvpMaker.setCvpAmountOut(ether(100), {from: owner});
       });
 
-      it.only('should unwrap if there is enough assets', async () => {
+      it('should unwrap if there is enough assets', async () => {
         await bpool.transfer(cvpMaker.address, ether(100));
+        assert.equal(await usdc.balanceOf(cvpMaker.address), '0');
 
         // >>> Amounts IN
         assert.equal(await cvpMaker.estimateSwapAmountIn(usdc.address), mwei('335.342482'));
@@ -1316,7 +1317,7 @@ describe.only('CVPMaker test', () => {
         assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
         assert.equal(await bpool.balanceOf(cvpMaker.address), ether(100));
 
-        const res = await cvpMaker.mockSwap(bpool.address);
+        let res = await cvpMaker.mockSwap(bpool.address);
         const logInitRound = MockIndicesSupplyRedeemZap.decodeLogs(res.receipt.rawLogs).filter(l => l.event === 'InitRound')[0];
         assert.equal(logInitRound.args.inputToken, bpool.address);
         assert.equal(logInitRound.args.pool, bpool.address);
@@ -1332,10 +1333,12 @@ describe.only('CVPMaker test', () => {
         await zap.mockClaimPokeFromReporter(logInitRound.args.key, [cvpMaker.address]);
 
         assert.equal(await usdc.balanceOf(cvpMaker.address), mwei(446.399999));
-        assert.equal(await cvp.balanceOf(xCvp.address), ether(2000));
-        const expectedBPoolLeftover = (BigInt(ether(6000)) - BigInt(ether('5868.530648400000000000'))).toString();
-        assert.equal(expectedBPoolLeftover, ether('131.469351600000000000'));
-        assert.equal(await ycrvVault.balanceOf(cvpMaker.address), expectedBPoolLeftover);
+        assert.equal(await cvp.balanceOf(xCvp.address), '0');
+
+        await cvpMaker.mockSwap(usdc.address);
+
+        assert.equal(await usdc.balanceOf(cvpMaker.address), mwei(111.057517));
+        assert.equal(await cvp.balanceOf(xCvp.address), ether(100));
       })
     });
 

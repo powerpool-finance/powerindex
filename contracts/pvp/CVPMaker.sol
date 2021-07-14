@@ -169,6 +169,11 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     uint256 cvpAfter = IERC20(cvp).balanceOf(xcvp);
     require(cvpAfter >= cvpBefore.add((cvpAmountOut_ * 99) / 100), "LESS_THAN_CVP_AMOUNT_OUT");
 
+    console.log("swapType", swapType);
+    console.log("amountIn", amountIn);
+    console.log("cvpAmountOut_", cvpAmountOut_);
+    console.log("cvpBefore", cvpBefore);
+    console.log("cvpAfter", cvpAfter);
     emit Swap(msg.sender, token_, swapType, amountIn, cvpAmountOut_, cvpBefore, cvpAfter);
   }
 
@@ -249,10 +254,8 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     if (config.maxAmountIn) {
       amountIn = IERC20(token_).balanceOf(address(this));
       uint256 strategyAmountOut = ICVPMakerStrategy(config.strategy).estimateOut(token_, amountIn, config.config);
-      uint256 resultCvpOut = estimateUniLikeStrategyOut(
-        ICVPMakerStrategy(config.strategy).getTokenOut(),
-        strategyAmountOut
-      );
+      uint256 resultCvpOut =
+        estimateUniLikeStrategyOut(ICVPMakerStrategy(config.strategy).getTokenOut(), strategyAmountOut);
       require(resultCvpOut >= cvpAmountOut, "INSUFFICIENT_CVP_AMOUNT_OUT");
 
       (executeUniLikeFrom, executeData, executeContract) = ICVPMakerStrategy(config.strategy).getExecuteDataByAmountIn(
@@ -261,7 +264,8 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
         externalStrategiesConfig[token_].config
       );
     } else {
-      (amountIn, executeUniLikeFrom, executeData, executeContract) = ICVPMakerStrategy(config.strategy).getExecuteDataByAmountOut(
+      (amountIn, executeUniLikeFrom, executeData, executeContract) = ICVPMakerStrategy(config.strategy)
+        .getExecuteDataByAmountOut(
         token_,
         estimateUniLikeStrategyIn(ICVPMakerStrategy(config.strategy).getTokenOut()),
         externalStrategiesConfig[token_].config
