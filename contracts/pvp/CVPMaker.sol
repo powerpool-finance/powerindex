@@ -13,7 +13,6 @@ import "../interfaces/ICVPMakerStrategy.sol";
 import "../powerindex-router/PowerIndexWrapper.sol";
 import "./CVPMakerStorage.sol";
 import "./CVPMakerViewer.sol";
-import "hardhat/console.sol";
 
 contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   using SafeMath for uint256;
@@ -169,11 +168,6 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     uint256 cvpAfter = IERC20(cvp).balanceOf(xcvp);
     require(cvpAfter >= cvpBefore.add((cvpAmountOut_ * 99) / 100), "LESS_THAN_CVP_AMOUNT_OUT");
 
-    console.log("swapType", swapType);
-    console.log("amountIn", amountIn);
-    console.log("cvpAmountOut_", cvpAmountOut_);
-    console.log("cvpBefore", cvpBefore);
-    console.log("cvpAfter", cvpAfter);
     emit Swap(msg.sender, token_, swapType, amountIn, cvpAmountOut_, cvpBefore, cvpAfter);
   }
 

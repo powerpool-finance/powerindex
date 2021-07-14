@@ -93,7 +93,7 @@ contract CVPMakerVaultStrategy is ICVPMakerStrategy {
     return
       abi.encodePacked(
         IErc20VaultPoolSwap(0).swapVaultToUSDC.selector,
-        abi.encode(address(this), msg.sender, vaultTokenIn_, vaultTokenInAmount_)
+        abi.encode(msg.sender, msg.sender, vaultTokenIn_, vaultTokenInAmount_)
       );
   }
 
