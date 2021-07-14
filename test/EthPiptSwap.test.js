@@ -782,6 +782,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
 
       const ethToSwap = ether('600').toString(10);
       const slippage = ether('0.05');
+      const maxDiff = ether('0.02');
 
       const {ethFee: ethInFee, ethAfterFee: ethInAfterFee} = await ethPiptSwap.calcEthFee(ethToSwap);
 
@@ -803,7 +804,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         tokenAmountFee: poolOutFee,
       } = await pool.calcAmountWithCommunityFee(swapEthToPiptInputs.poolOut, communityJoinFee, ethPiptSwap.address);
 
-      let res = await ethPiptSwap.swapEthToPipt(slippage, {from: bob, value: ethToSwap, gasPrice});
+      let res = await ethPiptSwap.swapEthToPipt(slippage, swapEthToPiptInputs.poolOut, maxDiff, {from: bob, value: ethToSwap, gasPrice});
 
       let weiUsed = res.receipt.gasUsed * gasPrice;
       console.log('        swapEthToPipt gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
