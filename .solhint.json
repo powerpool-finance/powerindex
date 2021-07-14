@@ -11,6 +11,13 @@
     "prettier/prettier": "error",
     "avoid-low-level-calls": "off",
     "no-empty-blocks": "off",
+    "contract-name-camelcase": "off",
+    "avoid-tx-origin": "off",
+    "event-name-camelcase": "off",
+    "var-name-mixedcase": "off",
+    "func-name-mixedcase": "off",
+    "no-inline-assembly": "off",
+    "const-name-snakecase": "off",
     "reason-string": ["warn", { "maxLength": 64 }]
   }
 }

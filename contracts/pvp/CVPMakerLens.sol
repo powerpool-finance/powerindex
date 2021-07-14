@@ -231,15 +231,12 @@ abstract contract CVPMakerLens is CVPMakerViewer {
    */
   function estimateStrategy3In(address underlyingOrPiToken_) public view returns (uint256) {
     Strategy3Config storage config = strategy3Config[underlyingOrPiToken_];
-    bool wrappedMode = false;
 
     BPoolInterface bPool = BPoolInterface(config.bPool);
     BPoolInterface bPoolWrapper = config.bPoolWrapper != address(0) ? BPoolInterface(config.bPoolWrapper) : bPool;
 
     (uint256 communitySwapFee, , , ) = bPool.getCommunityFee();
     uint256 amountOutGross = calcBPoolGrossAmount(cvpAmountOut, communitySwapFee);
-
-    address tokenIn = underlyingOrPiToken_;
 
     uint256 amountIn =
       bPoolGetSwapAmountIn({
