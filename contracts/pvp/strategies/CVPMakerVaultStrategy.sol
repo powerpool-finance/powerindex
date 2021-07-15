@@ -46,6 +46,7 @@ contract CVPMakerVaultStrategy is ICVPMakerStrategy {
     bytes memory config_
   )
     external
+    view
     override
     returns (
       uint256 vaultInAmount,
@@ -56,7 +57,7 @@ contract CVPMakerVaultStrategy is ICVPMakerStrategy {
   {
     vaultInAmount = estimateIn(vaultTokenIn_, tokenOutAmount_, config_);
     executeUniLikeFrom = tokenOut;
-    executeData = _executeStrategyByAmountIn(vaultTokenIn_, vaultInAmount);
+    executeData = _getExecuteDataByAmountIn(vaultTokenIn_, vaultInAmount);
     executeContract = address(vaultSwap);
   }
 
@@ -74,6 +75,7 @@ contract CVPMakerVaultStrategy is ICVPMakerStrategy {
     bytes memory config_
   )
     external
+    view
     override
     returns (
       address executeUniLikeFrom,
@@ -82,12 +84,13 @@ contract CVPMakerVaultStrategy is ICVPMakerStrategy {
     )
   {
     executeUniLikeFrom = tokenOut;
-    executeData = _executeStrategyByAmountIn(vaultTokenIn_, tokenInAmount_);
+    executeData = _getExecuteDataByAmountIn(vaultTokenIn_, tokenInAmount_);
     executeContract = address(vaultSwap);
   }
 
-  function _executeStrategyByAmountIn(address vaultTokenIn_, uint256 vaultTokenInAmount_)
+  function _getExecuteDataByAmountIn(address vaultTokenIn_, uint256 vaultTokenInAmount_)
     internal
+    view
     returns (bytes memory)
   {
     return

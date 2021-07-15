@@ -47,6 +47,7 @@ contract CVPMakerZapStrategy is ICVPMakerStrategy {
     bytes memory config_
   )
     external
+    view
     override
     returns (
       uint256 poolTokenInAmount,
@@ -56,7 +57,7 @@ contract CVPMakerZapStrategy is ICVPMakerStrategy {
     )
   {
     poolTokenInAmount = estimateIn(poolTokenIn_, tokenOutAmount_, config_);
-    executeData = _executeStrategyByAmountIn(poolTokenIn_, poolTokenInAmount);
+    executeData = _getExecuteDataByAmountIn(poolTokenIn_, poolTokenInAmount);
     executeContract = address(zap);
   }
 
@@ -74,6 +75,7 @@ contract CVPMakerZapStrategy is ICVPMakerStrategy {
     bytes memory config_
   )
     external
+    view
     override
     returns (
       address executeUniLikeFrom,
@@ -81,12 +83,13 @@ contract CVPMakerZapStrategy is ICVPMakerStrategy {
       address executeContract
     )
   {
-    executeData = _executeStrategyByAmountIn(poolTokenIn_, poolTokenInAmount_);
+    executeData = _getExecuteDataByAmountIn(poolTokenIn_, poolTokenInAmount_);
     executeContract = address(zap);
   }
 
-  function _executeStrategyByAmountIn(address poolTokenIn_, uint256 poolTokenInAmount_)
+  function _getExecuteDataByAmountIn(address poolTokenIn_, uint256 poolTokenInAmount_)
     internal
+    view
     returns (bytes memory)
   {
     return

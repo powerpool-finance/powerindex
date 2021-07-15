@@ -9,6 +9,7 @@ interface ICVPMakerStrategy {
     bytes memory config_
   )
     external
+    view
     returns (
       uint256 poolTokenInAmount,
       address executeUniLikeFrom,
@@ -22,6 +23,7 @@ interface ICVPMakerStrategy {
     bytes memory config_
   )
     external
+    view
     returns (
       address executeUniLikeFrom,
       bytes memory executeData,
