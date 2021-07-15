@@ -10,9 +10,9 @@ import "../interfaces/ICVPMakerViewer.sol";
 contract CVPMakerViewer is ICVPMakerViewer, CVPMakerStorage {
   using SafeMath for uint256;
 
-  address internal constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-  uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
-  uint256 internal constant BONE = 10**18;
+  address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+  uint256 public constant COMPENSATION_PLAN_1_ID = 1;
+  uint256 public constant BONE = 10**18;
 
   // 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
   address public immutable uniswapRouter;
@@ -37,7 +37,7 @@ contract CVPMakerViewer is ICVPMakerViewer, CVPMakerStorage {
     uniswapRouter = uniswapRouter_;
   }
 
-  function _wethCVPPath() internal view returns (address[] memory) {
+  function wethCVPPath() public view returns (address[] memory) {
     address[] memory path = new address[](2);
     path[0] = weth;
     path[1] = cvp;
@@ -81,10 +81,54 @@ contract CVPMakerViewer is ICVPMakerViewer, CVPMakerStorage {
     return path;
   }
 
+  function getStrategy1Config(address token_) external view returns (address bPoolWrapper) {
+    Strategy1Config memory strategy = strategy1Config[token_];
+    return (strategy.bPoolWrapper);
+  }
+
+  function getStrategy2Config(address token_) external view returns (address bPoolWrapper, uint256 nextIndex) {
+    Strategy2Config storage strategy = strategy2Config[token_];
+    return (strategy.bPoolWrapper, strategy.nextIndex);
+  }
+
+  function getStrategy2Tokens(address token_) external view returns (address[] memory) {
+    return strategy2Config[token_].tokens;
+  }
+
+  function getStrategy3Config(address token_)
+    external
+    view
+    returns (
+      address bPool,
+      address bPoolWrapper,
+      address underlying
+    )
+  {
+    Strategy3Config storage strategy = strategy3Config[token_];
+    return (strategy.bPool, strategy.bPoolWrapper, strategy.underlying);
+  }
+
+  function getExternalStrategyConfig(address token_)
+    external
+    view
+    returns (
+      address strategy,
+      bool maxAmountIn,
+      bytes memory config
+    )
+  {
+    ExternalStrategiesConfig memory strategy = externalStrategiesConfig[token_];
+    return (strategy.strategy, strategy.maxAmountIn, strategy.config);
+  }
+
+  function getCustomPaths(address token_) public view returns (address[] memory) {
+    return customPaths[token_];
+  }
+
   /*** ESTIMATIONS ***/
 
   function estimateEthStrategyIn() public view override returns (uint256) {
-    uint256[] memory results = IUniswapV2Router02(uniswapRouter).getAmountsIn(cvpAmountOut, _wethCVPPath());
+    uint256[] memory results = IUniswapV2Router02(uniswapRouter).getAmountsIn(cvpAmountOut, wethCVPPath());
     return results[0];
   }
 

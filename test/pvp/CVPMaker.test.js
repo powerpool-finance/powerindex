@@ -7,6 +7,7 @@ const MockProxyCall = artifacts.require('MockProxyCall');
 const MockERC20 = artifacts.require('MockERC20');
 const xCVP = artifacts.require('xCVP');
 const MockCVPMaker = artifacts.require('MockCVPMaker');
+const CVPMakerLens = artifacts.require('CVPMakerLens');
 const MockWETH = artifacts.require('MockWETH');
 const MockFastGasOracle = artifacts.require('MockFastGasOracle');
 const MockStaking = artifacts.require('MockStaking');
@@ -37,6 +38,7 @@ WrappedPiErc20.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
 xCVP.numberFormat = 'String';
 MockCVPMaker.numberFormat = 'String';
+CVPMakerLens.numberFormat = 'String';
 PowerPoke.numberFormat = 'String';
 UniswapV2Router022.numberFormat = 'String';
 PowerIndexPool.numberFormat = 'String';
@@ -64,6 +66,7 @@ describe('CVPMaker test', () => {
   let weth;
   let xCvp;
   let cvpMaker;
+  let cvpMakerLens;
   let uniswapFactory;
   let uniswapRouter;
   let sushiFactory;
@@ -171,6 +174,8 @@ describe('CVPMaker test', () => {
     );
     await cvpMaker.initialize(powerPoke.address, constants.ZERO_ADDRESS, ether(2000));
     await cvpMaker.transferOwnership(owner);
+
+    cvpMakerLens = await CVPMakerLens.new(cvpMaker.address);
 
     // DAI-ETH: 1993.998011983982051969
     // CVP-ETH: 598.19940359519461559
@@ -399,8 +404,8 @@ describe('CVPMaker test', () => {
         it('should send CVP directly to the xCVP', async () => {
           await cvp.transfer(xCvp.address, ether(725));
           await cvp.transfer(cvpMaker.address, ether(5000));
-          assert.equal(await cvpMaker.estimateCvpAmountOut(cvp.address), ether(5000));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(cvp.address), ether(2000));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(cvp.address), ether(5000));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(cvp.address), ether(2000));
 
           assert.equal(await cvp.balanceOf(cvpMaker.address), ether(5000));
           assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
@@ -423,8 +428,8 @@ describe('CVPMaker test', () => {
           await dai.transfer(cvpMaker.address, ether(8000));
           await cvp.transfer(xCvp.address, ether(725));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(dai.address), ether('2385.602600975004141233'));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(dai.address), ether('6706.892169261616443894'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(dai.address), ether('2385.602600975004141233'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(dai.address), ether('6706.892169261616443894'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
           assert.equal(await dai.balanceOf(cvpMaker.address), ether(8000));
@@ -452,9 +457,9 @@ describe('CVPMaker test', () => {
           await weth.deposit({ value: ether(4) });
           await weth.transfer(cvpMaker.address, ether(4));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(weth.address), ether('2392.790457551655283998'));
-          assert.equal(await cvpMaker.estimateEthStrategyOut(weth.address), ether('2392.790457551655283998'));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(weth.address), ether('3.343374568186039725'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(weth.address), ether('2392.790457551655283998'));
+          assert.equal(await cvpMakerLens.estimateEthStrategyOut(weth.address), ether('2392.790457551655283998'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(weth.address), ether('3.343374568186039725'));
           assert.equal(await cvpMaker.estimateEthStrategyIn(), ether('3.343374568186039725'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(725));
@@ -480,9 +485,9 @@ describe('CVPMaker test', () => {
           await cvp.transfer(xCvp.address, ether(725));
           await web3.eth.sendTransaction({ from: alice, to: cvpMaker.address, value: ether(4) });
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(ETH), ether('2392.790457551655283998'));
-          assert.equal(await cvpMaker.estimateEthStrategyOut(ETH), ether('2392.790457551655283998'));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(ETH), ether('3.343374568186039725'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(ETH), ether('2392.790457551655283998'));
+          assert.equal(await cvpMakerLens.estimateEthStrategyOut(ETH), ether('2392.790457551655283998'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(ETH), ether('3.343374568186039725'));
           assert.equal(await cvpMaker.estimateEthStrategyIn(), ether('3.343374568186039725'));
 
           assert.equal(await web3.eth.getBalance(cvpMaker.address), ether(4));
@@ -513,7 +518,7 @@ describe('CVPMaker test', () => {
           await cvp.transfer(cvpMaker.address, ether('1999.999'));
           assert.equal(await cvp.balanceOf(cvpMaker.address), ether('1999.999'));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(cvp.address), ether('1999.999'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(cvp.address), ether('1999.999'));
           await expectRevert(cvpMaker.mockSwap(cvp.address), 'ERC20: transfer amount exceeds balance');
         });
 
@@ -522,8 +527,8 @@ describe('CVPMaker test', () => {
           await dai.transfer(cvpMaker.address, insufficientAmount);
           assert.equal(await dai.balanceOf(cvpMaker.address), insufficientAmount);
 
-          assert.equal(await cvpMaker.estimateSwapAmountIn(dai.address), ether('6706.892169261616443894'));
-          assert.equal(await cvpMaker.estimateCvpAmountOut(dai.address), ether('1999.733956269714881646'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(dai.address), ether('6706.892169261616443894'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(dai.address), ether('1999.733956269714881646'));
 
           await expectRevert(cvpMaker.mockSwap(dai.address), 'TRANSFER_FROM_FAILED');
         });
@@ -533,9 +538,9 @@ describe('CVPMaker test', () => {
           await weth.transfer(cvpMaker.address, ether('3.3'));
 
           assert.equal(await weth.balanceOf(cvpMaker.address), ether('3.3'));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(weth.address), ether('3.343374568186039725'));
-          assert.equal(await cvpMaker.estimateEthStrategyOut(weth.address), ether('1974.053505166562651492'));
-          assert.equal(await cvpMaker.estimateCvpAmountOut(weth.address), ether('1974.053505166562651492'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(weth.address), ether('3.343374568186039725'));
+          assert.equal(await cvpMakerLens.estimateEthStrategyOut(weth.address), ether('1974.053505166562651492'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(weth.address), ether('1974.053505166562651492'));
 
           await expectRevert(cvpMaker.mockSwap(weth.address), 'TRANSFER_FROM_FAILED');
         });
@@ -546,9 +551,9 @@ describe('CVPMaker test', () => {
           assert.equal(await web3.eth.getBalance(cvpMaker.address), ether('3.3'));
           assert.equal(await weth.balanceOf(cvpMaker.address), ether(0));
 
-          assert.equal(await cvpMaker.estimateSwapAmountIn(ETH), ether('3.343374568186039725'));
-          assert.equal(await cvpMaker.estimateEthStrategyOut(ETH), ether('1974.053505166562651492'));
-          assert.equal(await cvpMaker.estimateCvpAmountOut(ETH), ether('1974.053505166562651492'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(ETH), ether('3.343374568186039725'));
+          assert.equal(await cvpMakerLens.estimateEthStrategyOut(ETH), ether('1974.053505166562651492'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(ETH), ether('1974.053505166562651492'));
 
           await expectRevert(cvpMaker.mockSwap(ETH), 'TRANSFER_FROM_FAILED');
         });
@@ -557,30 +562,30 @@ describe('CVPMaker test', () => {
       describe('with 0 balance', () => {
         it('should revert if CVP balance is 0', async () => {
           assert.equal(await cvp.balanceOf(cvpMaker.address), ether(0));
-          assert.equal(await cvpMaker.estimateCvpAmountOut(cvp.address), ether(0));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(cvp.address), ether(0));
           await expectRevert(cvpMaker.mockSwap(cvp.address), 'ERC20: transfer amount exceeds balance');
         });
 
         it('should revert if non-CVP balance is 0', async () => {
           assert.equal(await dai.balanceOf(cvpMaker.address), ether(0));
-          assert.equal(await cvpMaker.estimateEthStrategyOut(dai.address), ether(0));
-          assert.equal(await cvpMaker.estimateCvpAmountOut(dai.address), ether(0));
+          assert.equal(await cvpMakerLens.estimateEthStrategyOut(dai.address), ether(0));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(dai.address), ether(0));
           await expectRevert(cvpMaker.mockSwap(dai.address), 'TRANSFER_FROM_FAILED');
         });
 
         it('should revert if both ETH and WETH balances are 0 for ETH', async () => {
           assert.equal(await web3.eth.getBalance(cvpMaker.address), ether(0));
           assert.equal(await weth.balanceOf(cvpMaker.address), ether(0));
-          assert.equal(await cvpMaker.estimateEthStrategyOut(ETH), ether(0));
-          assert.equal(await cvpMaker.estimateCvpAmountOut(ETH), ether(0));
+          assert.equal(await cvpMakerLens.estimateEthStrategyOut(ETH), ether(0));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(ETH), ether(0));
 
           await expectRevert(cvpMaker.mockSwap(ETH), 'ETH_BALANCE_IS_0');
         });
 
         it('should revert if  WETH balance is 0 for ETH', async () => {
           assert.equal(await weth.balanceOf(cvpMaker.address), ether(0));
-          assert.equal(await cvpMaker.estimateEthStrategyOut(weth.address), ether(0));
-          assert.equal(await cvpMaker.estimateCvpAmountOut(weth.address), ether(0));
+          assert.equal(await cvpMakerLens.estimateEthStrategyOut(weth.address), ether(0));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(weth.address), ether(0));
 
           await expectRevert(cvpMaker.mockSwap(weth.address), 'TRANSFER_FROM_FAILED');
         });
@@ -639,8 +644,8 @@ describe('CVPMaker test', () => {
           );
 
           // OUTs
-          assert.equal(await cvpMaker.estimateCvpAmountOut(uni.address), ether('3704.671561101249231727'));
-          assert.equal(await cvpMaker.estimateUniLikeStrategyOut(uni.address), ether('3704.671561101249231727'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(uni.address), ether('3704.671561101249231727'));
+          assert.equal(await cvpMakerLens.estimateUniLikeStrategyOut(uni.address), ether('3704.671561101249231727'));
           assert.equal(
             (
               await uniswapRouter.getAmountsOut(ether(500), [
@@ -677,7 +682,7 @@ describe('CVPMaker test', () => {
           await uni.transfer(cvpMaker.address, ether(269));
           assert.equal(await uni.balanceOf(cvpMaker.address), ether(269));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(uni.address), ether('1993.245157172728270489'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(uni.address), ether('1993.245157172728270489'));
           assert.equal(await cvpMaker.estimateUniLikeStrategyIn(uni.address), ether('269.911675708212223606'));
 
           await expectRevert(cvpMaker.mockSwap(uni.address), 'TRANSFER_FROM_FAILED');
@@ -686,7 +691,7 @@ describe('CVPMaker test', () => {
         it('should revert if the balance is 0', async () => {
           assert.equal(await uni.balanceOf(cvpMaker.address), ether(0));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(uni.address), ether(0));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(uni.address), ether(0));
           assert.equal(await cvpMaker.estimateUniLikeStrategyIn(uni.address), ether('269.911675708212223606'));
 
           await expectRevert(cvpMaker.mockSwap(uni.address), 'TRANSFER_FROM_FAILED');
@@ -712,7 +717,7 @@ describe('CVPMaker test', () => {
 
         it('should use a custom non-Uniswap path if the one is set', async () => {
           await sushi.transfer(cvpMaker.address, ether(600));
-          assert.equal(await cvpMaker.estimateCvpAmountOut(sushi.address), ether('2385.602600975004141233'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(sushi.address), ether('2385.602600975004141233'));
 
           // INs
           assert.equal(await cvpMaker.estimateEthStrategyIn(), ether('3.343374568186039725'));
@@ -723,8 +728,8 @@ describe('CVPMaker test', () => {
           );
 
           // OUTs
-          assert.equal(await cvpMaker.estimateCvpAmountOut(sushi.address), ether('2385.602600975004141233'));
-          assert.equal(await cvpMaker.estimateUniLikeStrategyOut(sushi.address), ether('2385.602600975004141233'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(sushi.address), ether('2385.602600975004141233'));
+          assert.equal(await cvpMakerLens.estimateUniLikeStrategyOut(sushi.address), ether('2385.602600975004141233'));
           assert.equal(
             (await sushiRouter.getAmountsOut(ether('503.016912694621233293'), [sushi.address, weth.address]))[1],
             ether('3.343374568186039725'),
@@ -753,7 +758,7 @@ describe('CVPMaker test', () => {
           await sushi.transfer(cvpMaker.address, ether(503));
           assert.equal(await sushi.balanceOf(cvpMaker.address), ether(503));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(sushi.address), ether('1999.932755415266269483'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(sushi.address), ether('1999.932755415266269483'));
           assert.equal(await cvpMaker.estimateUniLikeStrategyIn(sushi.address), ether('503.016912694621233293'));
 
           await expectRevert(cvpMaker.mockSwap(sushi.address), 'TransferHelper: TRANSFER_FROM_FAILED');
@@ -762,7 +767,7 @@ describe('CVPMaker test', () => {
         it('should revert if the balance is 0', async () => {
           assert.equal(await sushi.balanceOf(cvpMaker.address), ether(0));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(sushi.address), ether(0));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(sushi.address), ether(0));
           assert.equal(await cvpMaker.estimateUniLikeStrategyIn(sushi.address), ether('503.016912694621233293'));
 
           await expectRevert(cvpMaker.mockSwap(sushi.address), 'TransferHelper: TRANSFER_FROM_FAILED');
@@ -790,14 +795,14 @@ describe('CVPMaker test', () => {
 
           // In
           assert.equal(
-            await cvpMaker.bPoolGetExitAmountIn(bpool.address, bpool.address, cvp.address, ether(2000)),
+            await cvpMakerLens.bPoolGetExitAmountIn(bpool.address, bpool.address, cvp.address, ether(2000)),
             ether('0.0040325832859546'),
           );
-          assert.equal(await cvpMaker.estimateStrategy1In(bpool.address), ether('0.0040325832859546'));
+          assert.equal(await cvpMakerLens.estimateStrategy1In(bpool.address), ether('0.0040325832859546'));
 
           // Out
-          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, bpool.address, cvp.address, ether(5)), ether('2244093.1'));
-          assert.equal(await cvpMaker.estimateStrategy1Out(bpool.address), ether('2244093.1'));
+          assert.equal(await cvpMakerLens.bPoolGetExitAmountOut(bpool.address, bpool.address, cvp.address, ether(5)), ether('2244093.1'));
+          assert.equal(await cvpMakerLens.estimateStrategy1Out(bpool.address), ether('2244093.1'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
           assert.equal(await bpool.balanceOf(cvpMaker.address), ether(5));
@@ -820,14 +825,14 @@ describe('CVPMaker test', () => {
 
           // In
           assert.equal(
-            await cvpMaker.bPoolGetExitAmountIn(bpool.address, poolWrapper.address, cvp.address, ether(2000)),
+            await cvpMakerLens.bPoolGetExitAmountIn(bpool.address, poolWrapper.address, cvp.address, ether(2000)),
             ether('0.004032583285954601'),
           );
-          assert.equal(await cvpMaker.estimateStrategy1In(bpool.address), ether('0.004032583285954601'));
+          assert.equal(await cvpMakerLens.estimateStrategy1In(bpool.address), ether('0.004032583285954601'));
 
           // Out
-          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, poolWrapper.address, cvp.address, ether(5)), ether('2244093.099999999999999990'));
-          assert.equal(await cvpMaker.estimateStrategy1Out(bpool.address), ether('2244093.099999999999999990'));
+          assert.equal(await cvpMakerLens.bPoolGetExitAmountOut(bpool.address, poolWrapper.address, cvp.address, ether(5)), ether('2244093.099999999999999990'));
+          assert.equal(await cvpMakerLens.estimateStrategy1Out(bpool.address), ether('2244093.099999999999999990'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
           assert.equal(await bpool.balanceOf(cvpMaker.address), ether(5));
@@ -842,8 +847,8 @@ describe('CVPMaker test', () => {
           await bpool.transfer(cvpMaker.address, ether('0.00403'));
           assert.equal(await bpool.balanceOf(cvpMaker.address), ether('0.00403'));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('1998.718896764590400000'));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.004032583285954600'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(bpool.address), ether('1998.718896764590400000'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(bpool.address), ether('0.004032583285954600'));
 
           await expectRevert(cvpMaker.mockSwap(bpool.address), 'LIMIT_IN');
         });
@@ -851,8 +856,8 @@ describe('CVPMaker test', () => {
         it('should revert if the balance is 0', async () => {
           assert.equal(await bpool.balanceOf(cvpMaker.address), ether(0));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether(0));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.004032583285954600'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(bpool.address), ether(0));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(bpool.address), ether('0.004032583285954600'));
 
           await expectRevert(cvpMaker.mockSwap(bpool.address), 'LIMIT_IN');
         });
@@ -899,8 +904,8 @@ describe('CVPMaker test', () => {
             sushi.address,
             snx.address,
           ]);
-          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), ether(0));
-          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), aave.address);
+          assert.equal(await cvpMakerLens.getStrategy2NextIndex(bpool.address), ether(0));
+          assert.equal(await cvpMakerLens.getStrategy2NextTokenToExit(bpool.address), aave.address);
 
           // >>> Amounts IN
           // Out CVP / In (AAVE w/o fee)
@@ -910,26 +915,26 @@ describe('CVPMaker test', () => {
           );
           // Out AAVE / In (bPool)
           assert.equal(
-            await cvpMaker.bPoolGetExitAmountIn(bpool.address, bpool.address, aave.address, ether('18.029280024896818398')),
+            await cvpMakerLens.bPoolGetExitAmountIn(bpool.address, bpool.address, aave.address, ether('18.029280024896818398')),
             ether('0.0725058031454588'),
           );
           // Out CVP / In (bPool)
-          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.0725058031454588'));
+          assert.equal(await cvpMakerLens.estimateStrategy2In(bpool.address), ether('0.0725058031454588'));
           // Out CVP / In (bPool)
-          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.0725058031454588'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(bpool.address), ether('0.0725058031454588'));
 
           // >>> Amounts OUT
           // In bPool / Out (AAVE)
-          assert.equal(await cvpMaker.bPoolGetExitAmountOut(bpool.address, bpool.address, aave.address, ether(10)), ether('2363.125'));
+          assert.equal(await cvpMakerLens.bPoolGetExitAmountOut(bpool.address, bpool.address, aave.address, ether(10)), ether('2363.125'));
           // In AAVE / Out (CVP)
           assert.equal(
             (await uniswapRouter.getAmountsOut(ether('23.63125'), [aave.address, weth.address, cvp.address]))[2],
             ether('2818.734497440659813346'),
           );
           // In bPool / Out (CVP)
-          assert.equal(await cvpMaker.estimateStrategy2Out(bpool.address), ether('261915.564701491379018883'));
+          assert.equal(await cvpMakerLens.estimateStrategy2Out(bpool.address), ether('261915.564701491379018883'));
           // In bPool / Out (CVP)
-          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('261915.564701491379018883'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(bpool.address), ether('261915.564701491379018883'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
           assert.equal(await bpool.balanceOf(cvpMaker.address), ether(10));
@@ -979,8 +984,8 @@ describe('CVPMaker test', () => {
           assert.equal(tokens[0], piSUSHI.address);
           assert.equal(tokens[1], piAAVE.address);
           assert.equal(tokens[2], piSNX.address);
-          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), ether(0));
-          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), piSUSHI.address);
+          assert.equal(await cvpMakerLens.getStrategy2NextIndex(bpool.address), ether(0));
+          assert.equal(await cvpMakerLens.getStrategy2NextTokenToExit(bpool.address), piSUSHI.address);
 
           // >>> Amounts IN
           // Out CVP / In WETH
@@ -995,17 +1000,17 @@ describe('CVPMaker test', () => {
           );
           // Out piSUSHI / In (bPool w/o fee)
           assert.equal(
-            await cvpMaker.bPoolGetExitAmountIn(bpool.address, poolWrapper.address, piSUSHI.address, ether('503.016912694621233293')),
+            await cvpMakerLens.bPoolGetExitAmountIn(bpool.address, poolWrapper.address, piSUSHI.address, ether('503.016912694621233293')),
             ether('0.076051883797598301'),
           );
           // Out CVP / In (bPool)
-          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.081781687070504901'));
+          assert.equal(await cvpMakerLens.estimateStrategy2In(bpool.address), ether('0.081781687070504901'));
           // Out CVP / In (bPool)
-          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.081781687070504901'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(bpool.address), ether('0.081781687070504901'));
 
           // >>> Amounts OUT
           // In bPool / Out (AAVE)
-          assert.equal(await cvpMaker.bPoolGetExitAmountOut(
+          assert.equal(await cvpMakerLens.bPoolGetExitAmountOut(
             bpool.address, poolWrapper.address, piAAVE.address, ether(10)),
             ether('2363.124999999999999990')
           );
@@ -1015,9 +1020,9 @@ describe('CVPMaker test', () => {
             ether('2818.734497440659813346'),
           );
           // In bPool / Out (CVP)
-          assert.equal(await cvpMaker.estimateStrategy2Out(bpool.address), ether('217330.717104796911649766'));
+          assert.equal(await cvpMakerLens.estimateStrategy2Out(bpool.address), ether('217330.717104796911649766'));
           // In bPool / Out (CVP)
-          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('217330.717104796911649766'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(bpool.address), ether('217330.717104796911649766'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
           assert.equal(await bpool.balanceOf(cvpMaker.address), ether(10));
@@ -1039,54 +1044,54 @@ describe('CVPMaker test', () => {
           await bpool.transfer(cvpMaker.address, ether(100));
 
           // initial swap
-          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.0725058031454588'));
-          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), ether(0));
-          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), aave.address);
+          assert.equal(await cvpMakerLens.estimateStrategy2In(bpool.address), ether('0.0725058031454588'));
+          assert.equal(await cvpMakerLens.getStrategy2NextIndex(bpool.address), ether(0));
+          assert.equal(await cvpMakerLens.getStrategy2NextTokenToExit(bpool.address), aave.address);
           await cvpMaker.mockSwap(bpool.address);
 
           // second swap
-          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.081722936763776726'));
-          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '1');
-          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), sushi.address);
+          assert.equal(await cvpMakerLens.estimateStrategy2In(bpool.address), ether('0.081722936763776726'));
+          assert.equal(await cvpMakerLens.getStrategy2NextIndex(bpool.address), '1');
+          assert.equal(await cvpMakerLens.getStrategy2NextTokenToExit(bpool.address), sushi.address);
           await cvpMaker.mockSwap(bpool.address);
 
           // third swap
-          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.072693329380864298'));
-          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '2');
-          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), snx.address);
+          assert.equal(await cvpMakerLens.estimateStrategy2In(bpool.address), ether('0.072693329380864298'));
+          assert.equal(await cvpMakerLens.getStrategy2NextIndex(bpool.address), '2');
+          assert.equal(await cvpMakerLens.getStrategy2NextTokenToExit(bpool.address), snx.address);
           await cvpMaker.mockSwap(bpool.address);
 
           // fourth swap
-          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.072447738033226438'));
-          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '0');
-          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), aave.address);
+          assert.equal(await cvpMakerLens.estimateStrategy2In(bpool.address), ether('0.072447738033226438'));
+          assert.equal(await cvpMakerLens.getStrategy2NextIndex(bpool.address), '0');
+          assert.equal(await cvpMakerLens.getStrategy2NextTokenToExit(bpool.address), aave.address);
           await cvpMaker.mockSwap(bpool.address);
 
           // fifth swap
-          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.081760909948550247'));
-          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '1');
-          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), sushi.address);
+          assert.equal(await cvpMakerLens.estimateStrategy2In(bpool.address), ether('0.081760909948550247'));
+          assert.equal(await cvpMakerLens.getStrategy2NextIndex(bpool.address), '1');
+          assert.equal(await cvpMakerLens.getStrategy2NextTokenToExit(bpool.address), sushi.address);
           await cvpMaker.mockSwap(bpool.address);
 
           // expected the sixth swap, but unbind instead
-          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.072792940476284364'));
-          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '2');
-          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), snx.address);
+          assert.equal(await cvpMakerLens.estimateStrategy2In(bpool.address), ether('0.072792940476284364'));
+          assert.equal(await cvpMakerLens.getStrategy2NextIndex(bpool.address), '2');
+          assert.equal(await cvpMakerLens.getStrategy2NextTokenToExit(bpool.address), snx.address);
           await bpool.unbind(snx.address);
           await cvpMaker.syncStrategy2Tokens(bpool.address, { from: alice });
-          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.090430495162160678'));
-          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '0');
-          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), aave.address);
+          assert.equal(await cvpMakerLens.estimateStrategy2In(bpool.address), ether('0.090430495162160678'));
+          assert.equal(await cvpMakerLens.getStrategy2NextIndex(bpool.address), '0');
+          assert.equal(await cvpMakerLens.getStrategy2NextTokenToExit(bpool.address), aave.address);
           await cvpMaker.mockSwap(bpool.address);
 
-          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.102216584492803626'));
-          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '1');
-          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), sushi.address);
+          assert.equal(await cvpMakerLens.estimateStrategy2In(bpool.address), ether('0.102216584492803626'));
+          assert.equal(await cvpMakerLens.getStrategy2NextIndex(bpool.address), '1');
+          assert.equal(await cvpMakerLens.getStrategy2NextTokenToExit(bpool.address), sushi.address);
           await cvpMaker.mockSwap(bpool.address);
 
-          assert.equal(await cvpMaker.estimateStrategy2In(bpool.address), ether('0.090388216833249222'));
-          assert.equal(await cvpMaker.getStrategy2NextIndex(bpool.address), '0');
-          assert.equal(await cvpMaker.getStrategy2NextTokenToExit(bpool.address), aave.address);
+          assert.equal(await cvpMakerLens.estimateStrategy2In(bpool.address), ether('0.090388216833249222'));
+          assert.equal(await cvpMakerLens.getStrategy2NextIndex(bpool.address), '0');
+          assert.equal(await cvpMakerLens.getStrategy2NextTokenToExit(bpool.address), aave.address);
         });
 
         it('should revert if the balance is not enough', async () => {
@@ -1094,8 +1099,8 @@ describe('CVPMaker test', () => {
           await bpool.transfer(cvpMaker.address, ether('0.072'));
           assert.equal(await bpool.balanceOf(cvpMaker.address), ether('0.072'));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether('1986.053043590001535860'));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.0725058031454588'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(bpool.address), ether('1986.053043590001535860'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(bpool.address), ether('0.0725058031454588'));
 
           await expectRevert(cvpMaker.mockSwap(bpool.address), 'LIMIT_IN');
         });
@@ -1104,8 +1109,8 @@ describe('CVPMaker test', () => {
           await cvpMaker.syncStrategy2Tokens(bpool.address, { from: alice });
           assert.equal(await bpool.balanceOf(cvpMaker.address), ether(0));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(bpool.address), ether(0));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('0.0725058031454588'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(bpool.address), ether(0));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(bpool.address), ether('0.0725058031454588'));
 
           await expectRevert(cvpMaker.mockSwap(bpool.address), 'LIMIT_IN');
         });
@@ -1136,12 +1141,12 @@ describe('CVPMaker test', () => {
           await mkr.transfer(cvpMaker.address, ether(16));
 
           // >>> Amounts IN
-          assert.equal(await cvpMaker.estimateStrategy3In(mkr.address), ether('5.328284134427424242'));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(mkr.address), ether('5.328284134427424242'));
+          assert.equal(await cvpMakerLens.estimateStrategy3In(mkr.address), ether('5.328284134427424242'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(mkr.address), ether('5.328284134427424242'));
 
           // >>> Amounts OUT
-          assert.equal(await cvpMaker.estimateStrategy3Out(mkr.address), ether('5978.8154354782954375'));
-          assert.equal(await cvpMaker.estimateCvpAmountOut(mkr.address), ether('5978.8154354782954375'));
+          assert.equal(await cvpMakerLens.estimateStrategy3Out(mkr.address), ether('5978.8154354782954375'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(mkr.address), ether('5978.8154354782954375'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
           assert.equal(await mkr.balanceOf(cvpMaker.address), ether(16));
@@ -1179,12 +1184,12 @@ describe('CVPMaker test', () => {
           assert.equal(await bpool.isBound(piMKR.address), true);
 
           // >>> Estimate piMKR In
-          assert.equal(await cvpMaker.estimateStrategy3In(piMKR.address), ether('5.356461205471461388'));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(piMKR.address), ether('5.356461205471461388'));
+          assert.equal(await cvpMakerLens.estimateStrategy3In(piMKR.address), ether('5.356461205471461388'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(piMKR.address), ether('5.356461205471461388'));
 
           // >>> Estimate CVP Out
-          assert.equal(await cvpMaker.estimateStrategy3Out(piMKR.address), ether('6010.219527361525312491'));
-          assert.equal(await cvpMaker.estimateCvpAmountOut(piMKR.address), ether('6010.219527361525312491'));
+          assert.equal(await cvpMakerLens.estimateStrategy3Out(piMKR.address), ether('6010.219527361525312491'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(piMKR.address), ether('6010.219527361525312491'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
           assert.equal(await mkr.balanceOf(cvpMaker.address), ether(9));
@@ -1203,8 +1208,8 @@ describe('CVPMaker test', () => {
           await mkr.transfer(cvpMaker.address, ether('5.3'));
           assert.equal(await mkr.balanceOf(cvpMaker.address), ether('5.3'));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(mkr.address), ether('1989.407104249429312500'));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(mkr.address), ether('5.328284134427424242'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(mkr.address), ether('1989.407104249429312500'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(mkr.address), ether('5.328284134427424242'));
 
           await expectRevert(cvpMaker.mockSwap(mkr.address), 'LIMIT_IN');
         });
@@ -1212,8 +1217,8 @@ describe('CVPMaker test', () => {
         it('should revert if the balance is 0', async () => {
           assert.equal(await mkr.balanceOf(cvpMaker.address), ether(0));
 
-          assert.equal(await cvpMaker.estimateCvpAmountOut(mkr.address), ether(0));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(mkr.address), ether('5.328284134427424242'));
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(mkr.address), ether(0));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(mkr.address), ether('5.328284134427424242'));
 
           await expectRevert(cvpMaker.mockSwap(mkr.address), 'LIMIT_IN');
         });
@@ -1310,9 +1315,9 @@ describe('CVPMaker test', () => {
         assert.equal(await usdc.balanceOf(cvpMaker.address), '0');
 
         // >>> Amounts IN
-        assert.equal(await cvpMaker.estimateSwapAmountIn(usdc.address), mwei('335.342482'));
-        assert.equal(await cvpMaker.estimateExternalStrategyIn(bpool.address), ether('100'));
-        assert.equal(await cvpMaker.estimateSwapAmountIn(bpool.address), ether('100'));
+        assert.equal(await cvpMakerLens.estimateSwapAmountIn(usdc.address), mwei('335.342482'));
+        assert.equal(await cvpMakerLens.estimateExternalStrategyIn(bpool.address), ether('100'));
+        assert.equal(await cvpMakerLens.estimateSwapAmountIn(bpool.address), ether('100'));
 
         assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
         assert.equal(await bpool.balanceOf(cvpMaker.address), ether(100));
@@ -1339,6 +1344,20 @@ describe('CVPMaker test', () => {
 
         assert.equal(await usdc.balanceOf(cvpMaker.address), mwei(111.057517));
         assert.equal(await cvp.balanceOf(xCvp.address), ether(100));
+      });
+
+      it('should revert if there is not enough assets', async () => {
+        await bpool.transfer(cvpMaker.address, ether(50));
+
+        // >>> Amounts IN
+        assert.equal(await cvpMakerLens.estimateSwapAmountIn(usdc.address), mwei('335.342482'));
+        assert.equal(await cvpMakerLens.estimateExternalStrategyIn(bpool.address), ether('50'));
+        assert.equal(await cvpMakerLens.estimateSwapAmountIn(bpool.address), ether('50'));
+
+        assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
+        assert.equal(await bpool.balanceOf(cvpMaker.address), ether(50));
+
+        await expectRevert(cvpMaker.mockSwap(bpool.address), 'INSUFFICIENT_CVP_AMOUNT_OUT');
       })
     });
 
@@ -1410,9 +1429,9 @@ describe('CVPMaker test', () => {
           await ycrvVault.transfer(cvpMaker.address, ether(6000));
 
           // >>> Amounts IN
-          assert.equal(await cvpMaker.estimateSwapAmountIn(usdc.address), mwei('6706.892170'));
-          assert.equal(await cvpMaker.estimateExternalStrategyIn(ycrvVault.address), ether('5868.530648400000000000'));
-          assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648400000000000'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(usdc.address), mwei('6706.892170'));
+          assert.equal(await cvpMakerLens.estimateExternalStrategyIn(ycrvVault.address), ether('5868.530648400000000000'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648400000000000'));
 
           assert.equal(await cvp.balanceOf(xCvp.address), ether(0));
           assert.equal(await ycrvVault.balanceOf(cvpMaker.address), ether(6000));
@@ -1429,7 +1448,7 @@ describe('CVPMaker test', () => {
           await ycrvVault.transfer(cvpMaker.address, ether(5500));
           assert.equal(await ycrvVault.balanceOf(cvpMaker.address), ether('5500'));
 
-          assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648400000000000'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648400000000000'));
 
           await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'NOT_SUCCESS');
         });
@@ -1437,7 +1456,7 @@ describe('CVPMaker test', () => {
         it('should revert if the balance is 0', async () => {
           assert.equal(await ycrvVault.balanceOf(cvpMaker.address), ether(0));
 
-          assert.equal(await cvpMaker.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648400000000000'));
+          assert.equal(await cvpMakerLens.estimateSwapAmountIn(ycrvVault.address), ether('5868.530648400000000000'));
 
           await expectRevert(cvpMaker.mockSwap(ycrvVault.address), 'NOT_SUCCESS');
         });
