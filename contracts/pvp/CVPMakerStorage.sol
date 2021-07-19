@@ -13,7 +13,7 @@ contract CVPMakerStorage is OwnableUpgradeSafe {
 
   uint256 public lastReporterPokeFrom;
 
-  IPoolRestrictions internal _restrictions;
+  IPoolRestrictions public restrictions;
 
   // token => router
   mapping(address => address) public routers;
@@ -24,8 +24,14 @@ contract CVPMakerStorage is OwnableUpgradeSafe {
   // token => strategyId
   mapping(address => uint256) public customStrategies;
 
-  // token => strategyId
-  mapping(address => address) public externalStrategies;
+  struct ExternalStrategiesConfig {
+    address strategy;
+    bool maxAmountIn;
+    bytes config;
+  }
+
+  // token => strategyAddress
+  mapping(address => ExternalStrategiesConfig) public externalStrategiesConfig;
 
   struct Strategy1Config {
     address bPoolWrapper;
@@ -43,11 +49,16 @@ contract CVPMakerStorage is OwnableUpgradeSafe {
     address underlying;
   }
 
+  struct Strategy4Config {
+    address zap;
+    address outputToken;
+  }
+
   mapping(address => Strategy1Config) public strategy1Config;
 
   mapping(address => Strategy2Config) public strategy2Config;
 
   mapping(address => Strategy3Config) public strategy3Config;
 
-  mapping(address => bytes) public externalStrategyConfig;
+  mapping(address => Strategy4Config) public strategy4Config;
 }

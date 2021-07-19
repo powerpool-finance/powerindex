@@ -6,64 +6,69 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../interfaces/IUniswapV2Router02.sol";
 import "../interfaces/BPoolInterface.sol";
 import "../interfaces/ICVPMakerStrategy.sol";
-import "./CVPMakerViewer.sol";
 import "../powerindex-router/PowerIndexWrapper.sol";
+import "./CVPMaker.sol";
 
-abstract contract CVPMakerLens is CVPMakerViewer {
-  function getStrategy2NextIndex(address token_) external view returns (uint256) {
-    return strategy2Config[token_].nextIndex;
+contract CVPMakerLens {
+  CVPMaker public cvpMaker;
+
+  constructor(address payable _cvpMaker) public {
+    cvpMaker = CVPMaker(_cvpMaker);
+  }
+
+  function getStrategy2NextIndex(address token_) external view returns (uint256 nextIndex) {
+    (, nextIndex) = cvpMaker.getStrategy2Config(token_);
   }
 
   function getStrategy2NextTokenToExit(address token_) external view returns (address) {
-    require(strategy2Config[token_].tokens.length > 0, "TOKENS_NOT_CONFIGURED");
-    return strategy2Config[token_].tokens[strategy2Config[token_].nextIndex];
-  }
-
-  function getStrategy2Tokens(address token_) external view returns (address[] memory) {
-    return strategy2Config[token_].tokens;
+    (, uint256 nextIndex) = cvpMaker.getStrategy2Config(token_);
+    address[] memory tokens = cvpMaker.getStrategy2Tokens(token_);
+    require(tokens.length > 0, "TOKENS_NOT_CONFIGURED");
+    return tokens[nextIndex];
   }
 
   function getUniLikeRouterAndPath(address token_) external view returns (address router, address[] memory path) {
-    return (routers[token_], customPaths[token_]);
+    return (cvpMaker.routers(token_), cvpMaker.getCustomPaths(token_));
   }
 
   /*** ESTIMATIONS ***/
 
   // How much token_s you need in order to convert them to cvpAmountOut right away
   function estimateSwapAmountIn(address token_) external view returns (uint256) {
-    if (token_ == cvp) {
-      return cvpAmountOut;
+    if (token_ == cvpMaker.cvp()) {
+      return cvpMaker.cvpAmountOut();
     }
 
-    if (token_ == weth || token_ == ETH) {
-      return estimateEthStrategyIn();
+    if (token_ == cvpMaker.weth() || token_ == cvpMaker.ETH()) {
+      return cvpMaker.estimateEthStrategyIn();
     }
 
-    uint256 customStrategyId = customStrategies[token_];
+    uint256 customStrategyId = cvpMaker.customStrategies(token_);
     if (customStrategyId > 0) {
       return estimateCustomStrategyIn(token_, customStrategyId);
     }
 
-    address externalStrategy = externalStrategies[token_];
-    if (externalStrategy != address(0)) {
-      return estimateExternalStrategyIn(token_, externalStrategy);
+    (address strategy, , ) = cvpMaker.getExternalStrategyConfig(token_);
+    if (strategy != address(0)) {
+      return estimateExternalStrategyIn(token_);
     }
 
-    return estimateUniLikeStrategyIn(token_);
+    return cvpMaker.estimateUniLikeStrategyIn(token_);
   }
 
   // How much CVP can be returned by swapping all the token_ balance
   // Does not support estimations for the external strategies
   function estimateCvpAmountOut(address token_) external view returns (uint256) {
+    address cvp = cvpMaker.cvp();
     if (token_ == cvp) {
-      return IERC20(cvp).balanceOf(address(this));
+      return IERC20(cvp).balanceOf(address(cvpMaker));
     }
 
-    if (token_ == weth || token_ == ETH) {
+    if (token_ == cvpMaker.weth() || token_ == cvpMaker.ETH()) {
       return estimateEthStrategyOut(token_);
     }
 
-    uint256 customStrategyId = customStrategies[token_];
+    uint256 customStrategyId = cvpMaker.customStrategies(token_);
     if (customStrategyId > 0) {
       return estimateCustomStrategyOut(token_, customStrategyId);
     } else {
@@ -72,7 +77,8 @@ abstract contract CVPMakerLens is CVPMakerViewer {
   }
 
   function estimateEthStrategyOut(address token_) public view returns (uint256) {
-    uint256 balanceIn = token_ == weth ? IERC20(weth).balanceOf(address(this)) : address(this).balance;
+    address weth = cvpMaker.weth();
+    uint256 balanceIn = token_ == weth ? IERC20(weth).balanceOf(address(cvpMaker)) : address(cvpMaker).balance;
     if (balanceIn == 0) {
       return 0;
     }
@@ -80,13 +86,12 @@ abstract contract CVPMakerLens is CVPMakerViewer {
   }
 
   function _estimateEthStrategyOut(uint256 _balanceIn) internal view returns (uint256) {
-    uint256[] memory results = IUniswapV2Router02(uniswapRouter).getAmountsOut(_balanceIn, _wethCVPPath());
-    return results[1];
+    return IUniswapV2Router02(cvpMaker.uniswapRouter()).getAmountsOut(_balanceIn, cvpMaker.wethCVPPath())[1];
   }
 
   // How many CVP can get for the current token_ balance
   function estimateUniLikeStrategyOut(address token_) public view returns (uint256) {
-    uint256 balance = IERC20(token_).balanceOf(address(this));
+    uint256 balance = IERC20(token_).balanceOf(address(cvpMaker));
     return _estimateUniLikeStrategyOut(token_, balance);
   }
 
@@ -95,10 +100,10 @@ abstract contract CVPMakerLens is CVPMakerViewer {
       return 0;
     }
 
-    address router = getRouter(token_);
-    address[] memory path = getPath(token_);
+    address router = cvpMaker.getRouter(token_);
+    address[] memory path = cvpMaker.getPath(token_);
     uint256[] memory results = IUniswapV2Router02(router).getAmountsOut(balance_, path);
-    if (router == uniswapRouter) {
+    if (router == cvpMaker.uniswapRouter()) {
       return results[results.length - 1];
     } else {
       return _estimateEthStrategyOut(results[results.length - 1]);
@@ -119,8 +124,17 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     }
   }
 
-  function estimateExternalStrategyIn(address token_, address strategy_) public view returns (uint256) {
-    return ICVPMakerStrategy(strategy_).estimateIn(address(this), token_, externalStrategyConfig[token_]);
+  function estimateExternalStrategyIn(address token_) public view returns (uint256) {
+    (address strategy, bool maxAmountIn, bytes memory config) = cvpMaker.getExternalStrategyConfig(token_);
+    if (maxAmountIn) {
+      return IERC20(token_).balanceOf(address(cvpMaker));
+    }
+    return
+      ICVPMakerStrategy(strategy).estimateIn(
+        token_,
+        cvpMaker.estimateUniLikeStrategyIn(ICVPMakerStrategy(strategy).getTokenOut()),
+        config
+      );
   }
 
   function estimateCustomStrategyOut(address token_, uint256 strategyId_) public view returns (uint256) {
@@ -137,51 +151,52 @@ abstract contract CVPMakerLens is CVPMakerViewer {
 
   // Hom many bPool tokens to burn to get the current cvpAmountOut
   function estimateStrategy1In(address bPoolToken_) public view returns (uint256) {
-    Strategy1Config memory config = strategy1Config[bPoolToken_];
+    address bPoolWrapper = cvpMaker.getStrategy1Config(bPoolToken_);
     return
       bPoolGetExitAmountIn({
         bPool_: bPoolToken_,
-        bPoolWrapper_: config.bPoolWrapper != address(0) ? config.bPoolWrapper : bPoolToken_,
-        tokenOut_: cvp,
-        amountOut_: cvpAmountOut
+        bPoolWrapper_: bPoolWrapper != address(0) ? bPoolWrapper : bPoolToken_,
+        tokenOut_: cvpMaker.cvp(),
+        amountOut_: cvpMaker.cvpAmountOut()
       });
   }
 
   // Hom many CVP tokens will be received in the case of burning all the available bPool tokens
   function estimateStrategy1Out(address bPoolToken_) public view returns (uint256) {
-    Strategy1Config memory config = strategy1Config[bPoolToken_];
+    address bPoolWrapper = cvpMaker.getStrategy1Config(bPoolToken_);
     return
       bPoolGetExitAmountOut({
         bPool_: bPoolToken_,
-        bPoolWrapper_: config.bPoolWrapper != address(0) ? config.bPoolWrapper : bPoolToken_,
-        tokenOut_: cvp,
-        amountIn_: IERC20(bPoolToken_).balanceOf(address(this))
+        bPoolWrapper_: bPoolWrapper != address(0) ? bPoolWrapper : bPoolToken_,
+        tokenOut_: cvpMaker.cvp(),
+        amountIn_: IERC20(bPoolToken_).balanceOf(address(cvpMaker))
       });
   }
 
   // Hom many bPool tokens to burn to get the current cvpAmountOut by swapping the exitToken token with
   // the corresponding uniLike path
   function estimateStrategy2In(address bPoolToken_) public view returns (uint256) {
-    require(strategy2Config[bPoolToken_].tokens.length > 0, "TOKENS_NOT_CONFIGURED");
-    Strategy2Config storage config = strategy2Config[bPoolToken_];
-    address underlyingOrPiToExit = config.tokens[config.nextIndex];
+    address[] memory tokens = cvpMaker.getStrategy2Tokens(bPoolToken_);
+    require(tokens.length > 0, "TOKENS_NOT_CONFIGURED");
+    (address bPoolWrapper, uint256 nextIndex) = cvpMaker.getStrategy2Config(bPoolToken_);
+    address underlyingOrPiToExit = tokens[nextIndex];
     address underlyingToken = underlyingOrPiToExit;
 
-    if (config.bPoolWrapper != address(0)) {
-      address underlyingCandidate = PowerIndexWrapper(config.bPoolWrapper).underlyingByPiToken(underlyingOrPiToExit);
+    if (bPoolWrapper != address(0)) {
+      address underlyingCandidate = PowerIndexWrapper(bPoolWrapper).underlyingByPiToken(underlyingOrPiToExit);
       if (underlyingCandidate != address(0)) {
         underlyingToken = underlyingCandidate;
       }
     }
-    uint256 uniLikeAmountIn = estimateUniLikeStrategyIn(underlyingToken);
+    uint256 uniLikeAmountIn = cvpMaker.estimateUniLikeStrategyIn(underlyingToken);
 
     (, , uint256 communityExitFee, ) = BPoolInterface(bPoolToken_).getCommunityFee();
-    uint256 amountOutGross = calcBPoolGrossAmount(uniLikeAmountIn, communityExitFee);
+    uint256 amountOutGross = cvpMaker.calcBPoolGrossAmount(uniLikeAmountIn, communityExitFee);
 
     return
       bPoolGetExitAmountIn({
         bPool_: bPoolToken_,
-        bPoolWrapper_: config.bPoolWrapper != address(0) ? config.bPoolWrapper : bPoolToken_,
+        bPoolWrapper_: bPoolWrapper != address(0) ? bPoolWrapper : bPoolToken_,
         tokenOut_: underlyingOrPiToExit,
         amountOut_: amountOutGross
       });
@@ -190,13 +205,14 @@ abstract contract CVPMakerLens is CVPMakerViewer {
   // Hom many CVP tokens can be returned by exiting with the all bPool balance and swapping the exit amount
   // with uniLike strategy
   function estimateStrategy2Out(address bPoolToken_) public view returns (uint256) {
-    require(strategy2Config[bPoolToken_].tokens.length > 0, "TOKENS_NOT_CONFIGURED");
-    Strategy2Config storage config = strategy2Config[bPoolToken_];
-    address tokenToExit = config.tokens[config.nextIndex];
+    address[] memory tokens = cvpMaker.getStrategy2Tokens(bPoolToken_);
+    require(tokens.length > 0, "TOKENS_NOT_CONFIGURED");
+    (address bPoolWrapper, uint256 nextIndex) = cvpMaker.getStrategy2Config(bPoolToken_);
+    address tokenToExit = tokens[nextIndex];
     address tokenToEstimate = tokenToExit;
 
-    if (config.bPoolWrapper != address(0)) {
-      address underlyingCandidate = PowerIndexWrapper(config.bPoolWrapper).underlyingByPiToken(tokenToExit);
+    if (bPoolWrapper != address(0)) {
+      address underlyingCandidate = PowerIndexWrapper(bPoolWrapper).underlyingByPiToken(tokenToExit);
       if (underlyingCandidate != address(0)) {
         tokenToEstimate = underlyingCandidate;
       }
@@ -205,13 +221,13 @@ abstract contract CVPMakerLens is CVPMakerViewer {
     uint256 tokenAmountOut =
       bPoolGetExitAmountOut({
         bPool_: bPoolToken_,
-        bPoolWrapper_: config.bPoolWrapper != address(0) ? config.bPoolWrapper : bPoolToken_,
+        bPoolWrapper_: bPoolWrapper != address(0) ? bPoolWrapper : bPoolToken_,
         tokenOut_: tokenToExit,
-        amountIn_: IERC20(bPoolToken_).balanceOf(address(this))
+        amountIn_: IERC20(bPoolToken_).balanceOf(address(cvpMaker))
       });
     (, , uint256 communityExitFee, ) = BPoolInterface(bPoolToken_).getCommunityFee();
     (uint256 amountOutWithFee, ) =
-      BPoolInterface(bPoolToken_).calcAmountWithCommunityFee(tokenAmountOut, communityExitFee, address(this));
+      BPoolInterface(bPoolToken_).calcAmountWithCommunityFee(tokenAmountOut, communityExitFee, address(cvpMaker));
     return _estimateUniLikeStrategyOut(tokenToEstimate, amountOutWithFee);
   }
 
@@ -222,27 +238,25 @@ abstract contract CVPMakerLens is CVPMakerViewer {
    * @return amountIn in the given tokens
    */
   function estimateStrategy3In(address underlyingOrPiToken_) public view returns (uint256) {
-    Strategy3Config storage config = strategy3Config[underlyingOrPiToken_];
-    bool wrappedMode = false;
+    (address bPoolAddress, address bPoolWrapperAddress, address underlying) =
+      cvpMaker.getStrategy3Config(underlyingOrPiToken_);
 
-    BPoolInterface bPool = BPoolInterface(config.bPool);
-    BPoolInterface bPoolWrapper = config.bPoolWrapper != address(0) ? BPoolInterface(config.bPoolWrapper) : bPool;
+    BPoolInterface bPool = BPoolInterface(bPoolAddress);
+    BPoolInterface bPoolWrapper = bPoolWrapperAddress != address(0) ? BPoolInterface(bPoolWrapperAddress) : bPool;
 
     (uint256 communitySwapFee, , , ) = bPool.getCommunityFee();
-    uint256 amountOutGross = calcBPoolGrossAmount(cvpAmountOut, communitySwapFee);
-
-    address tokenIn = underlyingOrPiToken_;
+    uint256 amountOutGross = cvpMaker.calcBPoolGrossAmount(cvpMaker.cvpAmountOut(), communitySwapFee);
 
     uint256 amountIn =
       bPoolGetSwapAmountIn({
         bPool_: address(bPool),
         bPoolWrapper_: address(bPoolWrapper),
         tokenIn_: underlyingOrPiToken_,
-        tokenOut_: cvp,
+        tokenOut_: cvpMaker.cvp(),
         amountOut_: amountOutGross
       });
 
-    if (config.underlying != address(0)) {
+    if (underlying != address(0)) {
       return WrappedPiErc20Interface(underlyingOrPiToken_).getUnderlyingEquivalentForPi(amountIn);
     } else {
       return amountIn;
@@ -255,20 +269,21 @@ abstract contract CVPMakerLens is CVPMakerViewer {
    * @return amountOut The estimated amount of CVP tokens
    */
   function estimateStrategy3Out(address underlyingOrPiToken_) public view returns (uint256) {
-    Strategy3Config storage config = strategy3Config[underlyingOrPiToken_];
+    (address bPoolAddress, address bPoolWrapperAddress, address underlying) =
+      cvpMaker.getStrategy3Config(underlyingOrPiToken_);
     address tokenIn = underlyingOrPiToken_;
     uint256 balance;
 
-    BPoolInterface bPool = BPoolInterface(config.bPool);
-    BPoolInterface bPoolWrapper = config.bPoolWrapper != address(0) ? BPoolInterface(config.bPoolWrapper) : bPool;
+    BPoolInterface bPool = BPoolInterface(bPoolAddress);
+    BPoolInterface bPoolWrapper = bPoolWrapperAddress != address(0) ? BPoolInterface(bPoolWrapperAddress) : bPool;
 
-    if (config.underlying != address(0)) {
-      tokenIn = config.underlying;
+    if (underlying != address(0)) {
+      tokenIn = underlying;
       balance = WrappedPiErc20Interface(underlyingOrPiToken_).getUnderlyingEquivalentForPi(
-        IERC20(underlyingOrPiToken_).balanceOf(address(this))
+        IERC20(underlyingOrPiToken_).balanceOf(address(cvpMaker))
       );
     } else {
-      balance = IERC20(underlyingOrPiToken_).balanceOf(address(this));
+      balance = IERC20(underlyingOrPiToken_).balanceOf(address(cvpMaker));
     }
 
     uint256 amountOutNet =
@@ -276,13 +291,13 @@ abstract contract CVPMakerLens is CVPMakerViewer {
         bPool_: address(bPool),
         bPoolWrapper_: address(bPoolWrapper),
         tokenIn_: underlyingOrPiToken_,
-        tokenOut_: cvp,
+        tokenOut_: cvpMaker.cvp(),
         amountIn_: balance
       });
 
-    (uint256 communitySwapFee, , , ) = BPoolInterface(config.bPool).getCommunityFee();
+    (uint256 communitySwapFee, , , ) = BPoolInterface(bPool).getCommunityFee();
     (uint256 amountOutGross, ) =
-      BPoolInterface(config.bPool).calcAmountWithCommunityFee(amountOutNet, communitySwapFee, address(this));
+      BPoolInterface(bPool).calcAmountWithCommunityFee(amountOutNet, communitySwapFee, address(cvpMaker));
     return amountOutGross;
   }
 
