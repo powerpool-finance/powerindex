@@ -7,6 +7,7 @@ require('hardhat-gas-reporter');
 require('./tasks/fetchPoolsData');
 require('./tasks/fetchVaultsData');
 require('./tasks/fetchVaultsData3');
+require('./tasks/fetchVaultsData4');
 require('./tasks/deployVestedLpMining');
 require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
@@ -27,6 +28,7 @@ require('./tasks/testVestedLpMiningProxy');
 require('./tasks/testVestedLpMiningPool');
 require('./tasks/deployIndicesSupplyRedeemZap');
 require('./tasks/deployMainnetSDEFI');
+require('./tasks/deployXCVP');
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
@@ -45,7 +47,8 @@ const testAccounts = [];
 for (let i = 0; i < 20; i++) {
   testAccounts.push({
     privateKey: ethers.Wallet.createRandom()._signingKey().privateKey,
-    balance: '1000000000000000000000000000',
+    // 1e12 * 1e18
+    balance: '1000000000000000000000000000000',
   });
 }
 
@@ -90,8 +93,10 @@ const config = {
       url: 'http://127.0.0.1:8545/',
       gasPrice: 48 * 10 ** 9,
       // accounts: getAccounts('mainnet'),
-      gasMultiplier: 1.1,
+      gasMultiplier: 1.2,
       timeout: 2000000,
+      blockGasLimit: 20000000,
+      allowUnlimitedContractSize: true,
     },
     local: {
       url: 'http://127.0.0.1:8545',
@@ -119,7 +124,7 @@ const config = {
     settings: {
       optimizer: {
         enabled: !!process.env.ETHERSCAN_KEY || process.env.COMPILE_TARGET === 'release',
-        runs: 1,
+        runs: 200,
       },
     },
     version: '0.6.12',
