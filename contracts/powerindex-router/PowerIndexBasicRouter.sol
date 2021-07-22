@@ -170,7 +170,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     require(forceRebalance || lastRebalancedAt + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
     require(status != ReserveStatus.EQUILIBRIUM, "RESERVE_STATUS_EQUILIBRIUM");
     _rebalancePoke(status, diff);
-    _postPoke(_claimAndDistributeRewards);
+    _postPoke(status, _claimAndDistributeRewards);
   }
 
   function pokeFromSlasher(
@@ -183,20 +183,20 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     require(forceRebalance || lastRebalancedAt + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
     require(status != ReserveStatus.EQUILIBRIUM, "RESERVE_STATUS_EQUILIBRIUM");
     _rebalancePoke(status, diff);
-    _postPoke(_claimAndDistributeRewards);
+    _postPoke(status, _claimAndDistributeRewards);
   }
 
   function poke(bool _claimAndDistributeRewards) external onlyEOA {
     (ReserveStatus status, uint256 diff, ) = getReserveStatus(_getUnderlyingStaked(), 0);
     _rebalancePoke(status, diff);
-    _postPoke(_claimAndDistributeRewards);
+    _postPoke(status, _claimAndDistributeRewards);
   }
 
-  function _postPoke(bool _claimAndDistributeRewards) internal {
+  function _postPoke(ReserveStatus reserveStatus, bool _claimAndDistributeRewards) internal {
     lastRebalancedAt = block.timestamp;
 
     if (_claimAndDistributeRewards && lastClaimRewardsAt + claimRewardsInterval < block.timestamp) {
-      _claimRewards();
+      _claimRewards(reserveStatus);
       _distributeRewards();
       lastClaimRewardsAt = block.timestamp;
     }
@@ -206,7 +206,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     // need to redefine in implementation
   }
 
-  function _claimRewards() internal virtual {
+  function _claimRewards(ReserveStatus reserveStatus) internal virtual {
     // need to redefine in implementation
   }
 

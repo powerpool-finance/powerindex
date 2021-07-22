@@ -66,7 +66,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     usdcYfiSwapPath = _yearnConfig.usdcYfiSwapPath;
   }
 
-  function _claimRewards() internal override {
+  function _claimRewards(ReserveStatus) internal override {
     // Step #1. Claim yCrv reward from YFI governance pool
     _callVoting(YearnGovernanceInterface(0).getReward.selector, "");
 

@@ -56,7 +56,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     _callVoting(IAaveGovernanceV2(0).submitVote.selector, abi.encode(_proposalId, _support));
   }
 
-  function _claimRewards() internal override {
+  function _claimRewards(ReserveStatus) internal override {
     uint256 rewardsPending = IStakedAave(staking).getTotalRewardsBalance(address(piToken));
     require(rewardsPending > 0, "NOTHING_TO_CLAIM");
 

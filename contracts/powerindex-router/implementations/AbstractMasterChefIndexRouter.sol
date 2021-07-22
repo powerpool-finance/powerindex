@@ -7,8 +7,8 @@ import "../../interfaces/sushi/IMasterChefV1.sol";
 import "../PowerIndexBasicRouter.sol";
 
 abstract contract AbstractMasterChefIndexRouter is PowerIndexBasicRouter {
-  event Stake(address indexed sender, uint256 amount);
-  event Redeem(address indexed sender, uint256 amount);
+  event Stake(address indexed sender, uint256 amount, uint256 rewardReceived);
+  event Redeem(address indexed sender, uint256 amount, uint256 rewardReceived);
   event IgnoreDueMissingStaking();
   event ClaimRewards(address indexed sender, uint256 earned);
   event DistributeRewards(
@@ -28,20 +28,13 @@ abstract contract AbstractMasterChefIndexRouter is PowerIndexBasicRouter {
 
   /*** PERMISSIONLESS REWARD CLAIMING AND DISTRIBUTION ***/
 
-  /**
-   * @notice Withdraws the extra staked TOKEN as a reward and transfers it to the router
-   */
-  function _claimRewards() internal override {
-    // Step #1. Claim TOKEN reward from MasterChef governance pool
-    uint256 piTokenBalanceBefore = TOKEN.balanceOf(address(piToken));
-    _rewards();
-    uint256 earned = TOKEN.balanceOf(address(piToken)).sub(piTokenBalanceBefore);
-    require(earned > 0, "NOTHING_EARNED");
-
-    // Step #2. Transfer yCrv reward to the router
-    piToken.callExternal(address(TOKEN), TOKEN.transfer.selector, abi.encode(address(this), earned), 0);
-
-    emit ClaimRewards(msg.sender, earned);
+  function _claimRewards(ReserveStatus status) internal override {
+    if (status == ReserveStatus.EQUILIBRIUM) {
+      uint256 pendingReward = TOKEN.balanceOf(address(this));
+      _stake(0);
+    }
+    // Otherwise the rewards are distributed each time deposit/withdraw methods are called,
+    // so no additional actions required.
   }
 
   /**
@@ -90,9 +83,31 @@ abstract contract AbstractMasterChefIndexRouter is PowerIndexBasicRouter {
 
   /*** INTERNALS ***/
 
-  function _rewards() internal virtual;
+  function _stake(uint256 _amount) internal {
+    uint256 tokenBefore = TOKEN.balanceOf(address(piToken));
 
-  function _stake(uint256 _amount) internal virtual;
+    piToken.approveUnderlying(staking, _amount);
 
-  function _redeem(uint256 _amount) internal virtual;
+    _stakeImpl(_amount);
+
+    uint256 receivedReward = TOKEN.balanceOf(address(piToken)).sub(tokenBefore.sub(_amount));
+    piToken.callExternal(address(TOKEN), IERC20.transfer.selector, abi.encode(address(this), receivedReward), 0);
+
+    emit Stake(msg.sender, _amount, receivedReward);
+  }
+
+  function _redeem(uint256 _amount) internal {
+    uint256 tokenBefore = TOKEN.balanceOf(address(piToken));
+
+    _redeemImpl(_amount);
+
+    uint256 receivedReward = TOKEN.balanceOf(address(piToken)).sub(tokenBefore).sub(_amount);
+    piToken.callExternal(address(TOKEN), IERC20.transfer.selector, abi.encode(address(this), receivedReward), 0);
+
+    emit Redeem(msg.sender, _amount, receivedReward);
+  }
+
+  function _stakeImpl(uint256 _amount) internal virtual;
+
+  function _redeemImpl(uint256 _amount) internal virtual;
 }

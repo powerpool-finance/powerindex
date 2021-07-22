@@ -37,28 +37,15 @@ contract MasterChefPowerIndexRouter is AbstractMasterChefIndexRouter {
     if (staking == address(0)) {
       return 0;
     }
-    (uint256 amount, ) = IMasterChefV1(staking).userInfo(MASTER_CHEF_PID, address(piToken));
+    (uint256 amount, ) = IMasterChefV1(staking).userInfo(0, address(piToken));
     return amount;
   }
 
-  function _rewards() internal override {
-    _callStaking(IMasterChefV1.deposit.selector, abi.encode(MASTER_CHEF_PID, 0));
+  function _stakeImpl(uint256 _amount) internal override {
+    _callStaking(IMasterChefV1.deposit.selector, abi.encode(address(TOKEN), _amount));
   }
 
-  function _stake(uint256 _amount) internal override {
-    require(_amount > 0, "CANT_STAKE_0");
-
-    piToken.approveUnderlying(staking, _amount);
-    _callStaking(IMasterChefV1.deposit.selector, abi.encode(MASTER_CHEF_PID, _amount));
-
-    emit Stake(msg.sender, _amount);
-  }
-
-  function _redeem(uint256 _amount) internal override {
-    require(_amount > 0, "CANT_REDEEM_0");
-
-    _callStaking(IMasterChefV1.withdraw.selector, abi.encode(MASTER_CHEF_PID, _amount));
-
-    emit Redeem(msg.sender, _amount);
+  function _redeemImpl(uint256 _amount) internal override {
+    _callStaking(IMasterChefV1.withdraw.selector, abi.encode(address(TOKEN), _amount));
   }
 }

@@ -44,7 +44,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
   /**
    * @notice Withdraws the extra staked SUSHI as a reward and transfers it to the router
    */
-  function _claimRewards() internal override {
+  function _claimRewards(ReserveStatus) internal override {
     uint256 rewardsPending = getPendingRewards();
     require(rewardsPending > 0, "NOTHING_TO_CLAIM");
 

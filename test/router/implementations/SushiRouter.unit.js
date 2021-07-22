@@ -118,7 +118,7 @@ describe('SushiRouter Tests', () => {
           assert.equal(await sushi.balanceOf(xSushi.address), ether(47000));
         });
 
-        it('should deny staking 0', async () => {
+        it('should deny redeeming 0', async () => {
           await expectRevert(sushiRouter.redeem(ether(0), { from: piGov }), 'CANT_REDEEM_0');
         });
 

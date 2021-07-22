@@ -38,24 +38,11 @@ contract PancakeMasterChefIndexRouter is AbstractMasterChefIndexRouter {
     return amount;
   }
 
-  function _rewards() internal override {
-    _callStaking(IPancakeMasterChef.leaveStaking.selector, abi.encode(0));
-  }
-
-  function _stake(uint256 _amount) internal override {
-    require(_amount > 0, "CANT_STAKE_0");
-
-    piToken.approveUnderlying(staking, _amount);
+  function _stakeImpl(uint256 _amount) internal override {
     _callStaking(IPancakeMasterChef.enterStaking.selector, abi.encode(_amount));
-
-    emit Stake(msg.sender, _amount);
   }
 
-  function _redeem(uint256 _amount) internal override {
-    require(_amount > 0, "CANT_REDEEM_0");
-
+  function _redeemImpl(uint256 _amount) internal override {
     _callStaking(IPancakeMasterChef.leaveStaking.selector, abi.encode(_amount));
-
-    emit Redeem(msg.sender, _amount);
   }
 }

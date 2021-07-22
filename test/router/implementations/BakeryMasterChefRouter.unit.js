@@ -1,58 +1,66 @@
 const { time, constants, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 const { ether, artifactFromBytecode, latestBlockNumber } = require('../../helpers');
-const { buildBasicRouterConfig, buildPancakeMasterChefRouterConfig } = require('../../helpers/builders');
+const { buildBasicRouterConfig, buildBakeryChefRouterConfig } = require('../../helpers/builders');
 const assert = require('chai').assert;
-const MockERC20 = artifacts.require('MockERC20');
-const PancakeMasterChefIndexRouter = artifacts.require('PancakeMasterChefIndexRouter');
+const BakeryChefPowerIndexRouter = artifacts.require('BakeryChefPowerIndexRouter');
 const WrappedPiErc20 = artifacts.require('WrappedPiErc20');
 const PoolRestrictions = artifacts.require('PoolRestrictions');
-const MockPancakeMasterChef = artifacts.require('MockPancakeMasterChef');
+const MockBakeryMasterChef = artifacts.require('MockBakeryMasterChef');
 const MockGulpingBPool = artifacts.require('MockGulpingBPool');
 const MockPoke = artifacts.require('MockPoke');
 
-const PancakeMasterChef = artifactFromBytecode('bsc/PancakeMasterChef');
-const PancakeSyrupPool = artifactFromBytecode('bsc/PancakeSyrupPool');
+const BakeryMasterChef = artifactFromBytecode('bsc/BakeryMasterChef');
+const BakeryToken = artifactFromBytecode('bsc/BakeryToken');
 
-MockERC20.numberFormat = 'String';
-PancakeMasterChefIndexRouter.numberFormat = 'String';
+BakeryChefPowerIndexRouter.numberFormat = 'String';
 WrappedPiErc20.numberFormat = 'String';
 
-const { web3 } = MockERC20;
+const { web3 } = WrappedPiErc20;
 
-describe('PancakeMasterChefRouter Tests', () => {
+describe('BakeryMasterChefRouter Tests', () => {
   let deployer, bob, alice, piGov, stub, pvp, pool1, pool2;
 
   before(async function() {
     [deployer, bob, alice, piGov, stub, pvp, pool1, pool2] = await web3.eth.getAccounts();
   });
 
-  let cake, syrupPool, masterChef, poolRestrictions, piMyToken, myRouter, poke;
+  let bake, bakeryChef, poolRestrictions, piMyToken, myRouter, poke;
 
   beforeEach(async function() {
-    // bsc: 0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82
-    cake = await MockERC20.new('PancakeSwap Token', 'Cake', '18', ether('10000000'));
-    // bsc: 0x009cf7bc57584b7998236eff51b98a168dcea9b0
-    syrupPool = await PancakeSyrupPool.new(cake.address);
-    // bsc: 0x73feaa1ee314f8c655e354234017be2193c9e24e
-    masterChef = await PancakeMasterChef.new(
-      cake.address,
-      syrupPool.address,
+    // bsc: 0xe02df9e3e622debdd69fb838bb799e3f168902c5
+    bake = await BakeryToken.new('BakeryToken', 'BAKE');
+
+    // bsc: 0x20ec291bb8459b6145317e7126532ce7ece5056f
+    bakeryChef = await BakeryMasterChef.new(
+      bake.address,
+      // devAddress
       deployer,
-      ether(40),
+      // bakeStartBlock - BAKE tokens created first block
+      ether(400),
+      // startBlock
       await latestBlockNumber(),
+      // bonusEndBlock
+      (await latestBlockNumber()) + 1000,
+      // bonusBeforeBulkBlockSize
+      300,
+      // bonusBeforeCommonDifference
+      ether(10),
+      // bonusEndCommonDifference
+      ether(10),
     );
+    await bake.mintTo(deployer, ether('10000000'));
 
     poolRestrictions = await PoolRestrictions.new();
-    piMyToken = await WrappedPiErc20.new(cake.address, stub, 'Wrapped My Staking Token', 'piMST');
+    piMyToken = await WrappedPiErc20.new(bake.address, stub, 'Wrapped My Staking Token', 'piMST');
 
     poke = await MockPoke.new(true);
-    myRouter = await PancakeMasterChefIndexRouter.new(
+    myRouter = await BakeryChefPowerIndexRouter.new(
       piMyToken.address,
       buildBasicRouterConfig(
         poolRestrictions.address,
         poke.address,
         constants.ZERO_ADDRESS,
-        masterChef.address,
+        bakeryChef.address,
         ether('0.2'),
         ether('0.02'),
         '0',
@@ -60,13 +68,13 @@ describe('PancakeMasterChefRouter Tests', () => {
         ether('0.15'),
         [pool1, pool2],
       ),
-      buildPancakeMasterChefRouterConfig(cake.address),
+      buildBakeryChefRouterConfig(bake.address),
     );
 
-    await syrupPool.transferOwnership(masterChef.address);
     await piMyToken.changeRouter(myRouter.address, { from: stub });
-    await masterChef.add(20306, cake.address, false);
+    await bakeryChef.add(20306, bake.address, false);
     await myRouter.transferOwnership(piGov);
+    await bake.transferOwnership(bakeryChef.address);
 
     assert.equal(await myRouter.owner(), piGov);
   });
@@ -78,15 +86,15 @@ describe('PancakeMasterChefRouter Tests', () => {
 
     describe('stake()/redeem()', () => {
       beforeEach(async () => {
-        await cake.transfer(alice, ether('10000'));
-        await cake.approve(piMyToken.address, ether('10000'), { from: alice });
+        await bake.transfer(alice, ether('10000'));
+        await bake.approve(piMyToken.address, ether('10000'), { from: alice });
         await piMyToken.deposit(ether('10000'), { from: alice });
 
         await myRouter.poke(false);
 
-        assert.equal(await cake.balanceOf(piMyToken.address), ether(2000));
-        assert.equal(await cake.balanceOf(masterChef.address), ether(8000));
-        assert.equal((await masterChef.userInfo(0, piMyToken.address)).amount, ether(8000));
+        assert.equal(await bake.balanceOf(piMyToken.address), ether(2000));
+        assert.equal(await bake.balanceOf(bakeryChef.address), ether(8000));
+        assert.equal((await bakeryChef.poolUserInfoMap(bake.address, piMyToken.address)).amount, ether(8000));
       });
 
       describe('stake()', () => {
@@ -96,9 +104,9 @@ describe('PancakeMasterChefRouter Tests', () => {
             sender: piGov,
             amount: ether(2000),
           });
-          assert.equal(await cake.balanceOf(piMyToken.address), ether(0));
-          assert.equal(await cake.balanceOf(masterChef.address), ether(10000));
-          const userInfo = await masterChef.userInfo(0, piMyToken.address);
+          assert.equal(await bake.balanceOf(piMyToken.address), ether(0));
+          assert.equal(await bake.balanceOf(bakeryChef.address), ether(10000));
+          const userInfo = await bakeryChef.poolUserInfoMap(bake.address, piMyToken.address);
           assert.equal(userInfo.amount, ether(10000));
         });
 
@@ -114,8 +122,8 @@ describe('PancakeMasterChefRouter Tests', () => {
             sender: piGov,
             amount: ether(3000),
           });
-          assert.equal(await cake.balanceOf(piMyToken.address), ether(5000));
-          const userInfo = await masterChef.userInfo(0, piMyToken.address);
+          assert.equal(await bake.balanceOf(piMyToken.address), ether(5000));
+          const userInfo = await bakeryChef.poolUserInfoMap(bake.address, piMyToken.address);
           assert.equal(userInfo.amount, ether(5000));
         });
 
@@ -164,32 +172,32 @@ describe('PancakeMasterChefRouter Tests', () => {
   describe('reserve management', () => {
     beforeEach(async () => {
       // alice
-      await cake.transfer(alice, ether('20000'));
-      await cake.approve(piMyToken.address, ether('10000'), { from: alice });
+      await bake.transfer(alice, ether('20000'));
+      await bake.approve(piMyToken.address, ether('10000'), { from: alice });
       await piMyToken.deposit(ether('10000'), { from: alice });
 
       // bob
-      await cake.transfer(bob, ether('42000'));
-      await cake.approve(masterChef.address, ether('42000'), { from: bob });
-      await masterChef.enterStaking(ether('42000'), { from: bob });
+      await bake.transfer(bob, ether('42000'));
+      await bake.approve(bakeryChef.address, ether('42000'), { from: bob });
+      await bakeryChef.deposit(bake.address, ether('42000'), { from: bob });
 
       await myRouter.poke(false);
 
-      assert.equal(await cake.balanceOf(masterChef.address), ether(50000));
-      assert.equal(await cake.balanceOf(piMyToken.address), ether(2000));
+      assert.equal(await bake.balanceOf(bakeryChef.address), ether(50400));
+      assert.equal(await bake.balanceOf(piMyToken.address), ether(2000));
     });
 
     it('should increase reserve on deposit', async () => {
       assert.equal(await piMyToken.balanceOf(alice), ether(10000));
-      await cake.approve(piMyToken.address, ether(1000), { from: alice });
+      await bake.approve(piMyToken.address, ether(1000), { from: alice });
       await piMyToken.deposit(ether(1000), { from: alice });
       await myRouter.poke(false);
 
       assert.equal(await piMyToken.balanceOf(alice), ether(11000));
-      assert.equal(await cake.balanceOf(masterChef.address), ether(50800));
-      assert.equal(await cake.balanceOf(piMyToken.address), ether(2200));
+      assert.equal(await bake.balanceOf(bakeryChef.address), ether('52209.523809528000000000'));
+      assert.equal(await bake.balanceOf(piMyToken.address), ether(2200));
       assert.equal(await myRouter.getUnderlyingStaked(), ether(8800));
-      assert.equal((await masterChef.userInfo(0, piMyToken.address)).amount, ether(8800));
+      assert.equal((await bakeryChef.poolUserInfoMap(bake.address, piMyToken.address)).amount, ether(8800));
     });
 
     it('should decrease reserve on withdrawal', async () => {
@@ -199,18 +207,18 @@ describe('PancakeMasterChefRouter Tests', () => {
       await myRouter.poke(false);
 
       assert.equal(await piMyToken.balanceOf(alice), ether(9000));
-      assert.equal(await cake.balanceOf(masterChef.address), ether(49200));
-      assert.equal(await cake.balanceOf(piMyToken.address), ether(1800));
+      assert.equal(await bake.balanceOf(bakeryChef.address), ether('50273.015873016000000000'));
+      assert.equal(await bake.balanceOf(piMyToken.address), ether(1800));
       assert.equal(await myRouter.getUnderlyingStaked(), ether(7200));
-      assert.equal((await masterChef.userInfo(0, piMyToken.address)).amount, ether(7200));
+      assert.equal((await bakeryChef.poolUserInfoMap(bake.address, piMyToken.address)).amount, ether(7200));
     });
 
     it('should ignore rebalancing if the staking address is 0', async () => {
       await myRouter.redeem(ether(8000), { from: piGov });
-      await myRouter.setVotingAndStaking(masterChef.address, constants.ZERO_ADDRESS, { from: piGov });
+      await myRouter.setVotingAndStaking(bakeryChef.address, constants.ZERO_ADDRESS, { from: piGov });
 
-      assert.equal(await cake.balanceOf(masterChef.address), ether(42000));
-      assert.equal(await cake.balanceOf(piMyToken.address), ether(10000));
+      assert.equal(await bake.balanceOf(bakeryChef.address), ether('42736.507936512000000000'));
+      assert.equal(await bake.balanceOf(piMyToken.address), ether(10000));
       assert.equal(await piMyToken.balanceOf(alice), ether(10000));
       assert.equal(await piMyToken.totalSupply(), ether(10000));
       await piMyToken.withdraw(ether(1000), { from: alice });
@@ -226,7 +234,7 @@ describe('PancakeMasterChefRouter Tests', () => {
       it('should DO rebalance by pokeFromReporter if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(61));
 
-        await cake.approve(piMyToken.address, ether(1000), { from: alice });
+        await bake.approve(piMyToken.address, ether(1000), { from: alice });
         await piMyToken.deposit(ether(1000), { from: alice });
         await expectRevert(myRouter.pokeFromSlasher(0, false, '0x'), 'MAX_INTERVAL_NOT_REACHED');
       });
@@ -234,13 +242,13 @@ describe('PancakeMasterChefRouter Tests', () => {
       it('should DO rebalance by pokeFromSlasher if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(121));
 
-        await cake.approve(piMyToken.address, ether(1000), { from: alice });
+        await bake.approve(piMyToken.address, ether(1000), { from: alice });
         await piMyToken.deposit(ether(1000), { from: alice });
         await myRouter.pokeFromSlasher(0, false, '0x');
 
-        assert.equal(await cake.balanceOf(masterChef.address), ether(50800));
-        assert.equal((await masterChef.userInfo(0, piMyToken.address)).amount, ether(8800));
-        assert.equal(await cake.balanceOf(piMyToken.address), ether(2200));
+        assert.equal(await bake.balanceOf(bakeryChef.address), ether('53219.047619048000000000'));
+        assert.equal((await bakeryChef.poolUserInfoMap(bake.address, piMyToken.address)).amount, ether(8800));
+        assert.equal(await bake.balanceOf(piMyToken.address), ether(2200));
       });
 
       it('should DO rebalance on withdrawal if the rebalancing interval has passed', async () => {
@@ -249,15 +257,15 @@ describe('PancakeMasterChefRouter Tests', () => {
         await piMyToken.withdraw(ether(1000), { from: alice });
         await myRouter.poke(false);
 
-        assert.equal(await cake.balanceOf(masterChef.address), ether(49200));
-        assert.equal((await masterChef.userInfo(0, piMyToken.address)).amount, ether(7200));
-        assert.equal(await cake.balanceOf(piMyToken.address), ether(1800));
+        assert.equal(await bake.balanceOf(bakeryChef.address), ether('51282.539682544000000000'));
+        assert.equal((await bakeryChef.poolUserInfoMap(bake.address, piMyToken.address)).amount, ether(7200));
+        assert.equal(await bake.balanceOf(piMyToken.address), ether(1800));
       });
 
       it('should NOT rebalance by pokeFromReporter if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(50));
 
-        await cake.approve(piMyToken.address, ether(1000), { from: alice });
+        await bake.approve(piMyToken.address, ether(1000), { from: alice });
         await piMyToken.deposit(ether(1000), { from: alice });
         await expectRevert(myRouter.pokeFromReporter(0, false, '0x'), 'MIN_INTERVAL_NOT_REACHED');
         await expectRevert(myRouter.pokeFromSlasher(0, false, '0x'), 'MAX_INTERVAL_NOT_REACHED');
@@ -266,7 +274,7 @@ describe('PancakeMasterChefRouter Tests', () => {
       it('should NOT rebalance by pokeFromSlasher if the rebalancing interval has passed', async () => {
         await time.increase(time.duration.minutes(70));
 
-        await cake.approve(piMyToken.address, ether(1000), { from: alice });
+        await bake.approve(piMyToken.address, ether(1000), { from: alice });
         await piMyToken.deposit(ether(1000), { from: alice });
         await expectRevert(myRouter.pokeFromSlasher(0, false, '0x'), 'MAX_INTERVAL_NOT_REACHED');
       });
@@ -276,23 +284,23 @@ describe('PancakeMasterChefRouter Tests', () => {
       it('should do nothing when nothing has changed', async () => {
         await myRouter.poke(false, { from: bob });
 
-        assert.equal(await cake.balanceOf(masterChef.address), ether(50000));
-        assert.equal((await masterChef.userInfo(0, piMyToken.address)).amount, ether(8000));
-        assert.equal(await cake.balanceOf(piMyToken.address), ether(2000));
+        assert.equal(await bake.balanceOf(bakeryChef.address), ether(50400));
+        assert.equal((await bakeryChef.poolUserInfoMap(bake.address, piMyToken.address)).amount, ether(8000));
+        assert.equal(await bake.balanceOf(piMyToken.address), ether(2000));
       });
 
       it('should increase reserve if required', async () => {
-        await cake.transfer(piMyToken.address, ether(1000), { from: alice });
+        await bake.transfer(piMyToken.address, ether(1000), { from: alice });
 
-        assert.equal(await cake.balanceOf(masterChef.address), ether(50000));
-        assert.equal((await masterChef.userInfo(0, piMyToken.address)).amount, ether(8000));
-        assert.equal(await cake.balanceOf(piMyToken.address), ether(3000));
+        assert.equal(await bake.balanceOf(bakeryChef.address), ether(50400));
+        assert.equal((await bakeryChef.poolUserInfoMap(bake.address, piMyToken.address)).amount, ether(8000));
+        assert.equal(await bake.balanceOf(piMyToken.address), ether(3000));
 
         await myRouter.poke(false, { from: bob });
 
-        assert.equal(await cake.balanceOf(masterChef.address), ether(50800));
-        assert.equal((await masterChef.userInfo(0, piMyToken.address)).amount, ether(8800));
-        assert.equal(await cake.balanceOf(piMyToken.address), ether(2200));
+        assert.equal(await bake.balanceOf(bakeryChef.address), ether('51873.015873016000000000'));
+        assert.equal((await bakeryChef.poolUserInfoMap(bake.address, piMyToken.address)).amount, ether(8800));
+        assert.equal(await bake.balanceOf(piMyToken.address), ether(2200));
       });
     });
 
@@ -300,16 +308,16 @@ describe('PancakeMasterChefRouter Tests', () => {
       await myRouter.setReserveConfig(ether(0), 0, { from: piGov });
 
       await myRouter.poke(false, { from: bob });
-      assert.equal(await cake.balanceOf(masterChef.address), ether(52000));
-      assert.equal(await cake.balanceOf(piMyToken.address), ether(0));
+      assert.equal(await bake.balanceOf(bakeryChef.address), ether('53073.015873016000000000'));
+      assert.equal(await bake.balanceOf(piMyToken.address), ether(0));
     });
 
     it('should keep all the underlying tokens on piToken with 1 RR', async () => {
       await myRouter.setReserveConfig(ether(1), 0, { from: piGov });
 
       await myRouter.poke(false, { from: bob });
-      assert.equal(await cake.balanceOf(masterChef.address), ether(42000));
-      assert.equal(await cake.balanceOf(piMyToken.address), ether(10000));
+      assert.equal(await bake.balanceOf(bakeryChef.address), ether('43073.015873016000000000'));
+      assert.equal(await bake.balanceOf(piMyToken.address), ether(10000));
     });
   });
 
@@ -323,11 +331,11 @@ describe('PancakeMasterChefRouter Tests', () => {
       poolD = await MockGulpingBPool.new();
       await myRouter.setRewardPools([poolA.address, poolB.address, poolC.address], { from: piGov });
 
-      await poolRestrictions.setVotingAllowedForSenders(masterChef.address, [alice], [true]);
+      await poolRestrictions.setVotingAllowedForSenders(bakeryChef.address, [alice], [true]);
 
-      await cake.transfer(syrupPool.address, ether(12000));
-      await cake.transfer(alice, ether('10000'));
-      await cake.approve(piMyToken.address, ether('10000'), { from: alice });
+      // await bake.transfer(syrupPool.address, ether(12000));
+      await bake.transfer(alice, ether('10000'));
+      await bake.approve(piMyToken.address, ether('10000'), { from: alice });
       await piMyToken.deposit(ether('10000'), { from: alice });
 
       await myRouter.poke(false);
@@ -339,29 +347,26 @@ describe('PancakeMasterChefRouter Tests', () => {
       await piMyToken.transfer(poolB.address, 20, { from: alice });
     });
 
-    it('should allow withdrawing rewards from the masterChef', async () => {
-      await cake.transfer(masterChef.address, ether(2000));
+    it('should allow distribute the accrued rewards', async () => {
+      await bake.transfer(bakeryChef.address, ether(2000));
 
-      await masterChef.massUpdatePools();
-      await time.increase(time.duration.days(8));
-      await masterChef.massUpdatePools();
-      assert.equal(await cake.balanceOf(piMyToken.address), ether(2000));
+      assert.equal(await bake.balanceOf(piMyToken.address), ether(2000));
       assert.equal(await myRouter.getUnderlyingStaked(), ether(8000));
-      assert.equal(await myRouter.getPendingRewards(), ether('47.996454152000000000'));
+      assert.equal(await myRouter.getPendingRewards(), ether(960));
 
       let res = await myRouter.poke(true, { from: bob });
 
       expectEvent(res, 'DistributeRewards', {
         sender: bob,
-        tokenReward: ether('55.995863176000000000'),
-        pvpReward: ether('8.399379476400000000'),
-        poolRewardsUnderlying: ether('47.596483699600000000'),
-        poolRewardsPi: ether('47.596483699600000000'),
+        tokenReward: ether(1280),
+        pvpReward: ether(192),
+        poolRewardsUnderlying: ether(1088),
+        poolRewardsPi: ether(1088),
         pools: [poolA.address, poolB.address, poolC.address],
       });
 
-      assert.equal(await cake.balanceOf(piMyToken.address), ether('2047.596483699600000000'));
-      assert.equal(await cake.balanceOf(myRouter.address), '0');
+      assert.equal(await bake.balanceOf(piMyToken.address), ether(3088));
+      assert.equal(await bake.balanceOf(myRouter.address), '0');
 
       assert.isTrue(parseInt(res.logs[3].args.poolRewardsUnderlying) > 1);
       assert.isTrue(parseInt(res.logs[3].args.poolRewardsPi.length) > 1);
@@ -373,38 +378,42 @@ describe('PancakeMasterChefRouter Tests', () => {
 
       assert.equal(res.logs.length, 4);
       assert.equal(res.logs[1].args.pool, poolA.address);
-      assert.equal(res.logs[1].args.amount, '15865494566533333333');
+      assert.equal(res.logs[1].args.amount, ether('362.666666666666666666'));
       assert.equal(res.logs[2].args.pool, poolB.address);
-      assert.equal(res.logs[2].args.amount, '31730989133066666666');
+      assert.equal(res.logs[2].args.amount, ether('725.333333333333333333'));
 
-      assert.equal(await piMyToken.balanceOf(poolA.address), 15865494566533333343);
-      assert.equal(await piMyToken.balanceOf(poolB.address), 31730989133066666686);
+      assert.equal(await piMyToken.balanceOf(poolA.address), ether('362.666666666666666676'));
+      assert.equal(await piMyToken.balanceOf(poolB.address), ether('725.333333333333333353'));
       assert.equal(await piMyToken.balanceOf(poolC.address), '0');
       assert.equal(await piMyToken.balanceOf(poolD.address), '0');
 
-      assert.equal(await cake.balanceOf(myRouter.address), '0');
-      assert.equal(await cake.balanceOf(myRouter.address), '0');
+      assert.equal(await bake.balanceOf(myRouter.address), '0');
+      assert.equal(await bake.balanceOf(myRouter.address), '0');
     });
 
     it('should revert poke if there is nothing released', async () => {
-      const dishonestChef = await MockPancakeMasterChef.new(cake.address);
+      const dishonestChef = await MockBakeryMasterChef.new(bake.address);
       await myRouter.setReserveConfig(ether(1), 0, { from: piGov });
       await myRouter.poke(false);
       await myRouter.setVotingAndStaking(constants.ZERO_ADDRESS, dishonestChef.address, { from: piGov });
       await myRouter.setReserveConfig(ether('0.2'), 0, { from: piGov });
-      await myRouter.poke(true);
+
+      // there are still some rewards from rebalancing pokes
+      await myRouter.poke(true, { from: alice });
+
+      // and now there are no rewards
       await expectRevert(myRouter.poke(true, { from: alice }), 'NO_PENDING_REWARD');
     });
 
     it('should revert distributing rewards when missing reward pools config', async () => {
       poke = await MockPoke.new(true);
-      const router = await PancakeMasterChefIndexRouter.new(
+      const router = await BakeryChefPowerIndexRouter.new(
         piMyToken.address,
         buildBasicRouterConfig(
           poolRestrictions.address,
           poke.address,
-          masterChef.address,
-          masterChef.address,
+          bakeryChef.address,
+          bakeryChef.address,
           ether('0.2'),
           ether('0.02'),
           '0',
@@ -412,10 +421,10 @@ describe('PancakeMasterChefRouter Tests', () => {
           ether('0.2'),
           [],
         ),
-        buildPancakeMasterChefRouterConfig(cake.address),
-      );
+        buildBakeryChefRouterConfig(bake.address),
+      )
       await myRouter.migrateToNewRouter(piMyToken.address, router.address, [], { from: piGov });
-      await cake.transfer(masterChef.address, ether(2000));
+      await bake.transfer(bakeryChef.address, ether(2000));
       await time.increase(1);
       await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
     });
