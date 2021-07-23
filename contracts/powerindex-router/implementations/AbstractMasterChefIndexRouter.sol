@@ -30,7 +30,6 @@ abstract contract AbstractMasterChefIndexRouter is PowerIndexBasicRouter {
 
   function _claimRewards(ReserveStatus status) internal override {
     if (status == ReserveStatus.EQUILIBRIUM) {
-      uint256 pendingReward = TOKEN.balanceOf(address(this));
       _stake(0);
     }
     // Otherwise the rewards are distributed each time deposit/withdraw methods are called,
