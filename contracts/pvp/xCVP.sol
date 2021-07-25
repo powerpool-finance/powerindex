@@ -16,7 +16,7 @@ contract xCVP is ERC20("Permanent Voting Power Token", "xCVP") {
     cvp = cvp_;
   }
 
-  function enter(uint256 _amount) public {
+  function enter(uint256 _amount) external {
     uint256 totalCVP = cvp.balanceOf(address(this));
     uint256 totalShares = totalSupply();
     if (totalShares == 0 || totalCVP == 0) {
@@ -28,7 +28,7 @@ contract xCVP is ERC20("Permanent Voting Power Token", "xCVP") {
     cvp.safeTransferFrom(msg.sender, address(this), _amount);
   }
 
-  function leave(uint256 _share) public {
+  function leave(uint256 _share) external {
     uint256 totalShares = totalSupply();
     uint256 what = _share.mul(cvp.balanceOf(address(this))).div(totalShares);
     _burn(msg.sender, _share);
