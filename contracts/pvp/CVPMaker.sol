@@ -24,7 +24,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   event Swap(
     address indexed caller,
     address indexed token,
-    uint256 indexed swapType,
+    SwapType indexed swapType,
     uint256 amountIn,
     uint256 amountOut,
     uint256 xcvpCvpBefore,
@@ -40,6 +40,8 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   event SetCustomStrategy(address indexed token, uint256 strategyId);
   /// @notice The event emitted when the owner configures an external strategy for the token
   event SetExternalStrategy(address indexed token_, address indexed strategy, bool maxAmountIn);
+
+  enum SwapType { NULL, CVP, ETH, CUSTOM_STRATEGY, EXTERNAL_STRATEGY, UNI_LIKE_STRATEGY }
 
   modifier onlyEOA() {
     require(msg.sender == tx.origin, "NOT_EOA");
@@ -128,12 +130,12 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     uint256 cvpBefore = IERC20(cvp).balanceOf(xcvp);
     lastReporterPokeFrom = block.timestamp;
     uint256 cvpAmountOut_ = cvpAmountOut;
-    uint256 swapType = 0;
+    SwapType sType;
     uint256 amountIn = 0;
 
     // Just transfer CVPs to xCVP contract
     if (token_ == cvp) {
-      swapType = 1;
+      sType = SwapType.CVP;
       amountIn = IERC20(cvp).balanceOf(address(this));
       IERC20(cvp).transfer(xcvp, amountIn);
       cvpAmountOut_ = amountIn;
@@ -147,27 +149,27 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
       // Use a single pair path to swap WETH -> CVP
       amountIn = _swapWETHToCVP();
-      swapType = 2;
+      sType = SwapType.ETH;
     } else {
       uint256 customStrategyId = customStrategies[token_];
       if (customStrategyId > 0) {
         amountIn = _executeCustomStrategy(token_, customStrategyId);
-        swapType = 3;
+        sType = SwapType.CUSTOM_STRATEGY;
       } else if (externalStrategiesConfig[token_].strategy != address(0)) {
         amountIn = _executeExternalStrategy(token_);
-        swapType = 4;
+        sType = SwapType.EXTERNAL_STRATEGY;
       } else {
         // Use a Uniswap-like strategy
         amountIn = _executeUniLikeStrategy(token_);
-        swapType = 5;
+        sType = SwapType.UNI_LIKE_STRATEGY;
       }
     }
     uint256 cvpAfter = IERC20(cvp).balanceOf(xcvp);
-    if (swapType != 4) {
+    if (sType != SwapType.EXTERNAL_STRATEGY) {
       require(cvpAfter.sub(cvpBefore) >= (cvpAmountOut * 99) / 100, "LESS_THAN_CVP_AMOUNT_OUT");
     }
 
-    emit Swap(msg.sender, token_, swapType, amountIn, cvpAmountOut_, cvpBefore, cvpAfter);
+    emit Swap(msg.sender, token_, sType, amountIn, cvpAmountOut_, cvpBefore, cvpAfter);
   }
 
   function _executeUniLikeStrategy(address token_) internal returns (uint256 amountOut) {
