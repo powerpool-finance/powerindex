@@ -16,23 +16,31 @@ contract xCVP is ERC20("", "") {
     cvp = cvp_;
   }
 
-  function enter(uint256 _amount) external {
+  /**
+   * @notice Deposits CVP token to receive xCVP
+   * @param _amount CVP amount to deposit
+   */
+  function enter(uint256 _amount) external returns (uint256 shareMinted) {
     uint256 totalCVP = cvp.balanceOf(address(this));
     uint256 totalShares = totalSupply();
     if (totalShares == 0 || totalCVP == 0) {
-      _mint(msg.sender, _amount);
+      shareMinted = _amount;
     } else {
-      uint256 what = _amount.mul(totalShares).div(totalCVP);
-      _mint(msg.sender, what);
+      shareMinted = _amount.mul(totalShares).div(totalCVP);
     }
+    _mint(msg.sender, shareMinted);
     cvp.safeTransferFrom(msg.sender, address(this), _amount);
   }
 
-  function leave(uint256 _share) external {
+  /**
+   * @notice Burn xCVP token to withdraw CVP
+   * @param _share xCVP amount to burn
+   */
+  function leave(uint256 _share) external returns (uint256 cvpSent) {
     uint256 totalShares = totalSupply();
-    uint256 what = _share.mul(cvp.balanceOf(address(this))).div(totalShares);
+    cvpSent = _share.mul(cvp.balanceOf(address(this))).div(totalShares);
     _burn(msg.sender, _share);
-    cvp.safeTransfer(msg.sender, what);
+    cvp.safeTransfer(msg.sender, cvpSent);
   }
 
   function name() public view override returns (string memory) {
