@@ -198,7 +198,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
         type(uint256).max,
         path_,
         address(this),
-        block.timestamp + 1800
+        block.timestamp
       );
     IERC20(token_).approve(router_, 0);
     return amounts[0];
@@ -216,7 +216,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
         type(uint256).max,
         path,
         xcvp,
-        block.timestamp + 1800
+        block.timestamp
       );
     IERC20(weth).approve(uniswapRouter, 0);
     return amounts[0];
@@ -234,7 +234,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
         type(uint256).max,
         path_,
         xcvp,
-        block.timestamp + 1800
+        block.timestamp
       );
     IERC20(token_).approve(router_, 0);
     return amounts[0];
