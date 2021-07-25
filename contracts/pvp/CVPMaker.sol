@@ -468,7 +468,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
     externalStrategiesConfig[token_] = ExternalStrategiesConfig(strategy_, maxAmountIn_, config_);
 
-    IERC20(token_).safeApprove(strategy_, uint256(-1));
+    IERC20(token_).safeApprove(strategy_, type(uint256).max);
 
     emit SetExternalStrategy(token_, strategy_, maxAmountIn_);
   }
