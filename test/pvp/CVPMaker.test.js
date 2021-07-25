@@ -415,13 +415,13 @@ describe('CVPMaker test', () => {
             swapType: '1',
             caller: deployer,
             token: cvp.address,
-            amountIn: ether(2000),
-            amountOut: ether(2000),
+            amountIn: ether(5000),
+            amountOut: ether(5000),
             xcvpCvpBefore: ether(725),
-            xcvpCvpAfter: ether(2725),
+            xcvpCvpAfter: ether(5725),
           });
-          assert.equal(await cvp.balanceOf(cvpMaker.address), ether(3000));
-          assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
+          assert.equal(await cvp.balanceOf(cvpMaker.address), ether(0));
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(5725));
         });
 
         it('should swap the token through token->ETH->CVP uniswap pairs', async () => {
@@ -515,11 +515,11 @@ describe('CVPMaker test', () => {
 
       describe('with insufficient balance', () => {
         it('should revert if CVP balance is not enough for a swap', async () => {
-          await cvp.transfer(cvpMaker.address, ether('1999.999'));
-          assert.equal(await cvp.balanceOf(cvpMaker.address), ether('1999.999'));
+          await cvp.transfer(cvpMaker.address, ether('1900'));
+          assert.equal(await cvp.balanceOf(cvpMaker.address), ether('1900'));
 
-          assert.equal(await cvpMakerLens.estimateCvpAmountOut(cvp.address), ether('1999.999'));
-          await expectRevert(cvpMaker.mockSwap(cvp.address), 'ERC20: transfer amount exceeds balance');
+          assert.equal(await cvpMakerLens.estimateCvpAmountOut(cvp.address), ether('1900'));
+          await expectRevert(cvpMaker.mockSwap(cvp.address), 'LESS_THAN_CVP_AMOUNT_OUT');
         });
 
         it('should revert if non-CVP balance is not enough for a swap', async () => {
@@ -563,7 +563,7 @@ describe('CVPMaker test', () => {
         it('should revert if CVP balance is 0', async () => {
           assert.equal(await cvp.balanceOf(cvpMaker.address), ether(0));
           assert.equal(await cvpMakerLens.estimateCvpAmountOut(cvp.address), ether(0));
-          await expectRevert(cvpMaker.mockSwap(cvp.address), 'ERC20: transfer amount exceeds balance');
+          await expectRevert(cvpMaker.mockSwap(cvp.address), 'LESS_THAN_CVP_AMOUNT_OUT');
         });
 
         it('should revert if non-CVP balance is 0', async () => {
@@ -1313,6 +1313,7 @@ describe('CVPMaker test', () => {
       it('should unwrap if there is enough assets', async () => {
         await bpool.transfer(cvpMaker.address, ether(100));
         assert.equal(await usdc.balanceOf(cvpMaker.address), '0');
+        await cvpMaker.setCvpAmountOut(ether(100), {from: owner});
 
         // >>> Amounts IN
         assert.equal(await cvpMakerLens.estimateSwapAmountIn(usdc.address), mwei('335.342482'));
