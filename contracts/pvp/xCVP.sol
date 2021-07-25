@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
-contract xCVP is ERC20("Permanent Voting Power Token", "xCVP") {
+contract xCVP is ERC20("", "") {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
   IERC20 public immutable cvp;
@@ -36,7 +36,7 @@ contract xCVP is ERC20("Permanent Voting Power Token", "xCVP") {
   }
 
   function name() public view override returns (string memory) {
-    return "Permanent Voting Power";
+    return "Permanent Voting Power Token";
   }
 
   function symbol() public view override returns (string memory) {
