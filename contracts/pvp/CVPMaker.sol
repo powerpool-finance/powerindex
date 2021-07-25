@@ -241,7 +241,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   }
 
   function _executeExternalStrategy(address token_) internal returns (uint256 amountIn) {
-    ExternalStrategiesConfig storage config = externalStrategiesConfig[token_];
+    ExternalStrategiesConfig memory config = externalStrategiesConfig[token_];
     address executeUniLikeFrom;
     address executeContract;
     bytes memory executeData;
