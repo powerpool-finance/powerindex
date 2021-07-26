@@ -137,7 +137,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     if (token_ == cvp) {
       sType = SwapType.CVP;
       amountIn = IERC20(cvp).balanceOf(address(this));
-      IERC20(cvp).transfer(xcvp, amountIn);
+      IERC20(cvp).safeTransfer(xcvp, amountIn);
       cvpAmountOut_ = amountIn;
     } else if (token_ == weth || token_ == ETH) {
       // Wrap ETH -> WETH
@@ -313,7 +313,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     amountIn = BPoolInterface(iBPool).exitswapExternAmountOut(cvp, amountOutGross, currentBalance);
     IERC20(bPoolToken_).approve(iBPool, 0);
 
-    IERC20(cvp).transfer(xcvp, cvpAmountOut_);
+    IERC20(cvp).safeTransfer(xcvp, cvpAmountOut_);
   }
 
   /**
@@ -396,7 +396,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
       type(uint64).max
     );
     IERC20(tokenIn).approve(address(bPoolWrapper), 0);
-    IERC20(cvp).transfer(xcvp, cvpAmountOut_);
+    IERC20(cvp).safeTransfer(xcvp, cvpAmountOut_);
   }
 
   /*** PERMISSIONLESS METHODS ***/
