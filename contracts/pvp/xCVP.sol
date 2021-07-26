@@ -19,7 +19,8 @@ contract xCVP is ERC20("", "") {
   /**
    * @notice Deposits CVP token to receive xCVP
    * @param _amount CVP amount to deposit
-   */
+   * @return shareMinted The minted xCVP amount
+  */
   function enter(uint256 _amount) external returns (uint256 shareMinted) {
     uint256 totalCVP = cvp.balanceOf(address(this));
     uint256 totalShares = totalSupply();
@@ -35,6 +36,7 @@ contract xCVP is ERC20("", "") {
   /**
    * @notice Burn xCVP token to withdraw CVP
    * @param _share xCVP amount to burn
+   * @return shareMinted The sent CVP amount
    */
   function leave(uint256 _share) external returns (uint256 cvpSent) {
     uint256 totalShares = totalSupply();
