@@ -256,14 +256,14 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
       (executeUniLikeFrom, executeData, executeContract) = ICVPMakerStrategy(config.strategy).getExecuteDataByAmountIn(
         token_,
         amountIn,
-        externalStrategiesConfig[token_].config
+        config.config
       );
     } else {
       (amountIn, executeUniLikeFrom, executeData, executeContract) = ICVPMakerStrategy(config.strategy)
         .getExecuteDataByAmountOut(
         token_,
         estimateUniLikeStrategyIn(ICVPMakerStrategy(config.strategy).getTokenOut()),
-        externalStrategiesConfig[token_].config
+        config.config
       );
     }
 

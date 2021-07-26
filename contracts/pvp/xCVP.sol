@@ -20,7 +20,7 @@ contract xCVP is ERC20("", "") {
    * @notice Deposits CVP token to receive xCVP
    * @param _amount CVP amount to deposit
    * @return shareMinted The minted xCVP amount
-  */
+   */
   function enter(uint256 _amount) external returns (uint256 shareMinted) {
     uint256 totalCVP = cvp.balanceOf(address(this));
     uint256 totalShares = totalSupply();
