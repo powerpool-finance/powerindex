@@ -36,7 +36,7 @@ contract xCVP is ERC20("", "") {
   /**
    * @notice Burn xCVP token to withdraw CVP
    * @param _share xCVP amount to burn
-   * @return shareMinted The sent CVP amount
+   * @return cvpSent The sent CVP amount
    */
   function leave(uint256 _share) external returns (uint256 cvpSent) {
     uint256 totalShares = totalSupply();
