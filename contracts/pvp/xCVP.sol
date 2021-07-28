@@ -46,7 +46,7 @@ contract xCVP is ERC20("", "") {
   }
 
   function name() public view override returns (string memory) {
-    return "Permanent Voting Power Token";
+    return "Staked Concentrated Voting Power";
   }
 
   function symbol() public view override returns (string memory) {
