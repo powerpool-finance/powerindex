@@ -7,7 +7,7 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
   const PowerIndexPoolController = artifacts.require('PowerIndexPoolController');
   const xCVP = artifacts.require('xCVP');
   const CVPMaker = artifacts.require('CVPMaker');
-  const CVPMakerStrategy4 = artifacts.require('CVPMakerStrategy4');
+  const CVPMakerVaultStrategy = artifacts.require('CVPMakerVaultStrategy');
   const PowerIndexPool = artifacts.require('PowerIndexPool');
   const IERC20 = artifacts.require('BToken');
 
@@ -38,11 +38,13 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
   const wethAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
   const vaultPoolSwapAddress = '0x482308830F8945dC360023FaF12c9615509AE51f';
 
+  const balanceBefore = fromEther(await web3.eth.getBalance(deployer));
+
   const xcvp = await xCVP.new(cvpAddress, sendOptions);
   const cvpMaker = await deployProxied(
     CVPMaker,
     [cvpAddress, xcvp.address, wethAddress, uniswapRouterAddress],
-    [powerPokeAddress, zeroAddress, ether(10)],
+    [powerPokeAddress, zeroAddress, ether(1000)],
     {
       proxyAdmin: proxyAdminAddr,
       implementation: ''
@@ -51,11 +53,11 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
 
   await cvpMaker.setCustomPath(sushiAddress, sushiRouterAddress, [sushiAddress, wethAddress], sendOptions);
 
-  const vaultStrategy = await CVPMakerStrategy4.new(usdcAddress, vaultPoolSwapAddress, ether('1.05'), sendOptions);
+  const vaultStrategy = await CVPMakerVaultStrategy.new(usdcAddress, vaultPoolSwapAddress, ether('1.05'), sendOptions);
   const ylaPool = await PowerIndexPool.at(ylaAddress);
   // await cvpMaker.setCustomStrategy2Config(ylaAddress, zeroAddress, sendOptions);
   await pIteration.forEachSeries(await callContract(ylaPool, 'getCurrentTokens'), async token => {
-    return cvpMaker.setExternalStrategy(token, vaultStrategy.address, '0x', sendOptions);
+    return cvpMaker.setExternalStrategy(token, vaultStrategy.address, true, '0x', sendOptions);
   });
 
   const assyPool = await PowerIndexPool.at(assyAddress);
@@ -92,6 +94,7 @@ task('deploy-xcvp', 'xCVP').setAction(async (__, {ethers, network}) => {
     await cvpMaker.setCustomStrategy(token, '3', sendOptions);
     return cvpMaker.setCustomStrategy3Config(token, piptAddress, zeroAddress, zeroAddress, sendOptions);
   });
+  console.log('ETH spent', balanceBefore - fromEther(await web3.eth.getBalance(deployer)))
 
   if (network.name !== 'mainnetfork') {
     return;
