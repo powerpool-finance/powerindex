@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+pragma solidity ^0.6.0;
+
 interface IAutoFarmStrategy {
   function wantLockedTotal() external view returns (uint256);
 
