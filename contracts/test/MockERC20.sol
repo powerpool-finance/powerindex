@@ -20,12 +20,10 @@ contract MockERC20 is ERC20 {
   }
 
   function mint(address account, uint256 amount) public {
-    require(msg.sender == tx.origin, "MockERC20: mint from non-EOA");
     _mint(account, amount);
   }
 
   function burn(uint256 amount) public {
-    require(msg.sender == tx.origin, "MockERC20: burn from non-EOA");
     _burn(msg.sender, amount);
   }
 }
