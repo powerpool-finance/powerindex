@@ -45,12 +45,18 @@ function buildPancakeMasterChefRouterConfig(cake) {
   return { cake };
 }
 
+// BAKERY
 function buildBakeryChefRouterConfig(token) {
   return { token };
 }
 
 function buildMasterChefRouterConfig(token, masterChefPid) {
   return { token, masterChefPid };
+}
+
+// AUTO
+function buildAutoRouterConfig(AUTO) {
+  return { AUTO };
 }
 
 const BasicConfig = {
@@ -136,6 +142,7 @@ module.exports = {
   buildPancakeMasterChefRouterConfig,
   buildBakeryChefRouterConfig,
   buildMasterChefRouterConfig,
+  buildAutoRouterConfig,
   buildAaveAssetConfigInput,
   buildBasicRouterArgs,
   buildYearnRouterArgs,

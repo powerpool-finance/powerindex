@@ -6,13 +6,21 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MockPancakeMasterChef {
   address token;
+  bool doTransfer;
 
   constructor(address _token) public {
     token = _token;
+    doTransfer = true;
+  }
+
+  function setDoTransfer(bool _doTransfer) external {
+    doTransfer = _doTransfer;
   }
 
   function enterStaking(uint256 _amount) external {
-    IERC20(token).transferFrom(msg.sender, address(42), _amount);
+    if (doTransfer) {
+      IERC20(token).transferFrom(msg.sender, address(42), _amount);
+    }
   }
 
   function leaveStaking(uint256) external {}
