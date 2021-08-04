@@ -290,9 +290,9 @@ describe('CVPMaker test', () => {
         await dai.transfer(cvpMaker.address, ether(20000));
         await cvpMaker.swapFromReporter(1, dai.address, compensationOpts, { from: reporter });
         await expectRevert(cvpMaker.swapFromReporter(1, dai.address, compensationOpts, { from: reporter }), 'MIN_INTERVAL_NOT_REACHED');
-        await time.increase(pokePeriod - 2);
+        await time.increase(pokePeriod - 10);
         await expectRevert(cvpMaker.swapFromReporter(1, dai.address, compensationOpts, { from: reporter }), 'MIN_INTERVAL_NOT_REACHED');
-        await time.increase(3);
+        await time.increase(11);
         await cvpMaker.swapFromReporter(1, dai.address, compensationOpts, { from: reporter });
       })
 
@@ -415,13 +415,13 @@ describe('CVPMaker test', () => {
             swapType: '1',
             caller: deployer,
             token: cvp.address,
-            amountIn: ether(5000),
-            amountOut: ether(5000),
+            amountIn: ether(2000),
+            amountOut: ether(2000),
             xcvpCvpBefore: ether(725),
-            xcvpCvpAfter: ether(5725),
+            xcvpCvpAfter: ether(2725),
           });
-          assert.equal(await cvp.balanceOf(cvpMaker.address), ether(0));
-          assert.equal(await cvp.balanceOf(xCvp.address), ether(5725));
+          assert.equal(await cvp.balanceOf(cvpMaker.address), ether(3000));
+          assert.equal(await cvp.balanceOf(xCvp.address), ether(2725));
         });
 
         it('should swap the token through token->ETH->CVP uniswap pairs', async () => {
@@ -519,7 +519,7 @@ describe('CVPMaker test', () => {
           assert.equal(await cvp.balanceOf(cvpMaker.address), ether('1900'));
 
           assert.equal(await cvpMakerLens.estimateCvpAmountOut(cvp.address), ether('1900'));
-          await expectRevert(cvpMaker.mockSwap(cvp.address), 'LESS_THAN_CVP_AMOUNT_OUT');
+          await expectRevert(cvpMaker.mockSwap(cvp.address), 'transfer amount exceeds balance');
         });
 
         it('should revert if non-CVP balance is not enough for a swap', async () => {
@@ -563,7 +563,7 @@ describe('CVPMaker test', () => {
         it('should revert if CVP balance is 0', async () => {
           assert.equal(await cvp.balanceOf(cvpMaker.address), ether(0));
           assert.equal(await cvpMakerLens.estimateCvpAmountOut(cvp.address), ether(0));
-          await expectRevert(cvpMaker.mockSwap(cvp.address), 'LESS_THAN_CVP_AMOUNT_OUT');
+          await expectRevert(cvpMaker.mockSwap(cvp.address), 'transfer amount exceeds balance');
         });
 
         it('should revert if non-CVP balance is 0', async () => {

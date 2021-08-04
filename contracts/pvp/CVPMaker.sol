@@ -136,9 +136,8 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     // Just transfer CVPs to xCVP contract
     if (token_ == cvp) {
       sType = SwapType.CVP;
-      amountIn = IERC20(cvp).balanceOf(address(this));
-      IERC20(cvp).safeTransfer(xcvp, amountIn);
-      cvpAmountOut_ = amountIn;
+      amountIn = cvpAmountOut_;
+      IERC20(cvp).safeTransfer(xcvp, cvpAmountOut_);
     } else if (token_ == weth || token_ == ETH) {
       // Wrap ETH -> WETH
       if (token_ == ETH) {
