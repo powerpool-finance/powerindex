@@ -4,6 +4,7 @@
 /coverage
 /coverage-remote
 /artifacts
+/flatten
 
 coverage.json
 .idea
