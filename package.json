@@ -7,6 +7,7 @@
     "build": "yarn run compile && yarn run typechain",
     "clean": "hardhat clean",
     "compile": "hardhat compile",
+    "compile-flatten": "rm -rf artifacts && COMPILE_TARGET=release CONTRACT_SOURCE=flatten hardhat compile",
     "compile-release": "COMPILE_TARGET=release hardhat compile",
     "coverage": "hardhat coverage --show-stack-traces --solcoverjs ./.solcover.js --network coverage --temp artifacts --testfiles \"./test/**/*.js\"",
     "lint:sol": "solhint --config ./.solhint.json \"contracts/**/*.sol\"",
@@ -34,7 +35,7 @@
     "prettier-plugin-solidity": "^1.0.0-alpha.60",
     "solhint": "^3.3.2",
     "solhint-plugin-prettier": "^0.0.5",
-    "web3": "1.3.4"
+    "web3": "1.5.1"
   },
   "devDependencies": {
     "@ethersproject/abstract-signer": "^5.0.1",
@@ -46,7 +47,7 @@
     "@openzeppelin/test-helpers": "^0.5.6",
     "@powerpool/hardhat-ganache": "^2.0.0",
     "@truffle/contract": "^4.2.26",
-    "hardhat": "^2.0.3",
+    "hardhat": "2.5.0",
     "hardhat-contract-sizer": "^2.0.0",
     "hardhat-gas-reporter": "^1.0.1",
     "mocha": "^8.0.1",

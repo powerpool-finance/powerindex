@@ -84,8 +84,8 @@ const config = {
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
       accounts: getAccounts('mainnet'),
-      gasPrice: 36 * 10 ** 9,
-      gasMultiplier: 1.2,
+      gasPrice: 43 * 10 ** 9,
+      gasMultiplier: 1.005,
       timeout: 2000000,
     },
     mainnetfork: {
@@ -116,7 +116,7 @@ const config = {
     coverage: './coverage',
     coverageJson: './coverage.json',
     root: './',
-    sources: './contracts',
+    sources: './' + (process.env.CONTRACT_SOURCE || 'contracts'),
     tests: './test',
   },
   solidity: {
