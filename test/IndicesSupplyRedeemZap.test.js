@@ -383,16 +383,14 @@ describe('IndicesSupplyRedeemZap', () => {
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [alice, bob], '0x', {from: reporter}), 'NULL_TO');
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan, carol], '0x', {from: reporter}), 'NULL_TO');
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [], '0x', {from: reporter}), 'L');
-
       assert.equal(await this.indiciesZap.isRoundReadyToExecute(firstRoundEthKey), true);
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], '0x', {from: dan}), 'NOT_HDH');
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], '0x', {from: slasher}), 'NOT_HDH');
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('2', [firstRoundEthKey], '0x', {from: reporter}), 'NOT_HDH');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundEthKey, '0x', '0x', {from: dan}), 'NOT_HDH');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundEthKey, '0x', '0x', {from: slasher}), 'NOT_HDH');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('2', firstRoundEthKey, '0x', '0x', {from: reporter}), 'NOT_HDH');
 
-      res = await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], '0x', {from: reporter});
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], '0x', {from: reporter}), 'TO_NOT_NULL');
+      res = await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundEthKey, '0x', '0x', {from: reporter});
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundEthKey, '0x', '0x', {from: reporter}), 'TO_NOT_NULL');
       const secondRoundEthKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, ETH, pool.address);
       endTime = await web3.eth.getBlock(res.receipt.blockNumber).then(b => (b.timestamp + roundPeriod).toString());
       await expectEvent.inTransaction(res.tx, IndicesSupplyRedeemZap, 'InitRound', {
@@ -482,11 +480,11 @@ describe('IndicesSupplyRedeemZap', () => {
         true
       );
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundEthKey], '0x', {from: dan}), 'INVALID_POKER_KEY');
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundEthKey], '0x', {from: reporter}), 'INVALID_POKER_KEY');
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('1', [firstRoundEthKey], '0x', {from: slasher}), 'INVALID_POKER_KEY');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', firstRoundEthKey, '0x', '0x', {from: dan}), 'INVALID_POKER_KEY');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', firstRoundEthKey, '0x', '0x', {from: reporter}), 'INVALID_POKER_KEY');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('1', firstRoundEthKey, '0x', '0x', {from: slasher}), 'INVALID_POKER_KEY');
 
-      res = await this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundUsdcKey], '0x', {from: slasher});
+      res = await this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', firstRoundUsdcKey, '0x', '0x', {from: slasher});
 
       const thirdRoundUsdcKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, usdc.address, pool.address);
       endTime = await web3.eth.getBlock(res.receipt.blockNumber).then(b => (b.timestamp + roundPeriod).toString());
@@ -592,13 +590,13 @@ describe('IndicesSupplyRedeemZap', () => {
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundPoolUsdcKey, alice), alicePoolBalance);
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundPoolUsdcKey, bob), bobPoolBalance);
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundPoolUsdcKey], '0x', {from: reporter}), 'CUR_ROUND');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundPoolUsdcKey, '0x', '0x', {from: reporter}), 'CUR_ROUND');
 
       await time.increase(roundPeriod);
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundPoolUsdcKey], '0x', {from: slasher}), 'MAX_I');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', firstRoundPoolUsdcKey, '0x', '0x', {from: slasher}), 'MAX_I');
 
-      res = await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundPoolUsdcKey], '0x', {from: reporter});
+      res = await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundPoolUsdcKey, '0x', '0x', {from: reporter});
       const secondRoundPoolUsdcKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, pool.address, usdc.address);
       endTime = await web3.eth.getBlock(res.receipt.blockNumber).then(b => (b.timestamp + roundPeriod).toString());
       await expectEvent.inTransaction(res.tx, IndicesSupplyRedeemZap, 'InitRound', {
@@ -727,7 +725,7 @@ describe('IndicesSupplyRedeemZap', () => {
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [alice, bob], '0x', {from: reporter}), 'NULL_TO');
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan, carol], '0x', {from: reporter}), 'NULL_TO');
 
-      await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundUsdcKey], '0x', {from: reporter});
+      await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundUsdcKey, '0x', '0x', {from: reporter});
       assert.equal(await pool.balanceOf(alice), '0');
       assert.equal(await pool.balanceOf(bob), '0');
 
@@ -753,7 +751,7 @@ describe('IndicesSupplyRedeemZap', () => {
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [alice, bob], '0x', {from: reporter}), 'INPUT_NULL');
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [alice, bob], '0x', {from: reporter}), 'NULL_TO');
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundUsdcKey], '0x', {from: reporter}), 'TO_NOT_NULL');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundUsdcKey, '0x', '0x', {from: reporter}), 'TO_NOT_NULL');
     });
   });
 });

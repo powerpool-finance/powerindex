@@ -483,7 +483,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     );
   }
 
-  function calcPoolOutByTokenAmountIn(Round storage round, uint256 inputAmount) internal view returns (uint256 amountOut) {
+  function calcPoolOutByTokenAmountIn(Round storage round, uint256 inputAmount)
+    internal
+    view
+    returns (uint256 amountOut)
+  {
     PoolType pType = poolType[round.pool];
     if (pType == PoolType.PIPT) {
       IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolSwapContract[round.pool]));
@@ -508,7 +512,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
   }
 
-  function calcTokenAmountOutByPoolIn(Round storage round, uint256 poolAmount) internal view returns (uint256 amountOut) {
+  function calcTokenAmountOutByPoolIn(Round storage round, uint256 poolAmount)
+    internal
+    view
+    returns (uint256 amountOut)
+  {
     PoolType pType = poolType[round.pool];
     if (pType == PoolType.PIPT) {
       IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolSwapContract[round.pool]));
