@@ -130,6 +130,12 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   mapping(address => bool) public ignoreOnlyEOA;
 
+  struct RoundCompensation {
+    uint256 inputAmount;
+    uint256 outputAmount;
+  }
+  mapping(bytes32 => RoundCompensation) public roundCompensation;
+
   modifier onlyReporter(uint256 _reporterId, bytes calldata _rewardOpts) {
     uint256 gasStart = gasleft();
     powerPoke.authorizeReporter(_reporterId, msg.sender);
@@ -238,18 +244,20 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   function supplyAndRedeemPokeFromReporter(
     uint256 _reporterId,
-    bytes32[] memory _roundKeys,
+    bytes32 _roundKey,
+    bytes32 _offsetRoundKey,
     bytes calldata _rewardOpts
   ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
-    _supplyAndRedeemPoke(_roundKeys, false);
+    _supplyAndRedeemPoke(_roundKey, _offsetRoundKey, false);
   }
 
   function supplyAndRedeemPokeFromSlasher(
     uint256 _reporterId,
-    bytes32[] memory _roundKeys,
+    bytes32 _roundKey,
+    bytes32 _offsetRoundKey,
     bytes calldata _rewardOpts
   ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
-    _supplyAndRedeemPoke(_roundKeys, true);
+    _supplyAndRedeemPoke(_roundKey, _offsetRoundKey, true);
   }
 
   function claimPokeFromReporter(
@@ -287,7 +295,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     require(len == _types.length, "L");
     for (uint256 i = 0; i < len; i++) {
       poolType[_pools[i]] = _types[i];
-      _updatePool(_pools[i]);
       emit SetPool(_pools[i], _types[i]);
     }
   }
@@ -309,13 +316,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     for (uint256 i = 0; i < len; i++) {
       tokenCap[_tokens[i]] = _caps[i];
       emit SetTokenCap(_tokens[i], _caps[i]);
-    }
-  }
-
-  function updatePools(address[] memory _pools) external onlyOwner {
-    uint256 len = _pools.length;
-    for (uint256 i = 0; i < len; i++) {
-      _updatePool(_pools[i]);
     }
   }
 
@@ -421,41 +421,113 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     emit Withdraw(roundKey, _pool, msg.sender, _inputToken, _amount);
   }
 
-  function _supplyAndRedeemPoke(bytes32[] memory _roundKeys, bool _bySlasher) internal {
+  function _supplyAndRedeemPoke(
+    bytes32 _roundKey,
+    bytes32 _offsetRoundKey,
+    bool _bySlasher
+  ) internal {
     (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
 
-    uint256 len = _roundKeys.length;
-    require(len > 0, "L");
+    Round storage round = rounds[_roundKey];
 
-    for (uint256 i = 0; i < len; i++) {
-      Round storage round = rounds[_roundKeys[i]];
+    _updateRound(round.pool, round.inputToken, round.outputToken);
+    _checkRoundBeforeExecute(_roundKey, round);
 
-      _updateRound(round.pool, round.inputToken, round.outputToken);
-      _checkRoundBeforeExecute(_roundKeys[i], round);
+    require(round.endTime + minInterval <= block.timestamp, "MIN_I");
+    if (_bySlasher) {
+      require(round.endTime + maxInterval <= block.timestamp, "MAX_I");
+    }
 
-      require(round.endTime + minInterval <= block.timestamp, "MIN_I");
-      if (_bySlasher) {
-        require(round.endTime + maxInterval <= block.timestamp, "MAX_I");
-      }
+    require(round.inputToken == round.pool || round.outputToken == round.pool, "UA");
 
-      require(round.inputToken == round.pool || round.outputToken == round.pool, "UA");
+    if (_offsetRoundKey == bytes32(0)) {
+      uint256 compensationInputAmount = roundCompensation[_roundKey].inputAmount;
+      uint256 compensationOutputAmount = roundCompensation[_roundKey].outputAmount;
 
-      if (round.inputToken == round.pool) {
-        _redeemPool(round, round.totalInputAmount);
+      uint256 inputAmount = round.totalInputAmount.sub(compensationInputAmount);
+      if (inputAmount > 1e5) {
+        if (round.inputToken == round.pool) {
+          _redeemPool(round, inputAmount);
+        } else {
+          _supplyPool(round, inputAmount);
+        }
+        round.totalOutputAmount = round.totalOutputAmount.add(compensationOutputAmount);
       } else {
-        _supplyPool(round, round.totalInputAmount);
+        round.totalOutputAmount = compensationOutputAmount;
       }
+    } else {
+      Round storage offsetRound = rounds[_offsetRoundKey];
+      uint256 tokenAmountOut;
+      if (round.inputToken == round.pool) {
+        require(round.inputToken != round.pool, "OFFSET_ROUND_NOT_MATCH");
+        tokenAmountOut = calcTokenAmountOutByPoolIn(round, round.totalInputAmount);
+      } else {
+        require(round.inputToken == round.pool, "OFFSET_ROUND_NOT_MATCH");
+        tokenAmountOut = calcTokenAmountOutByPoolIn(round, round.totalInputAmount);
+      }
+      require(offsetRound.totalInputAmount >= tokenAmountOut, "OFFSET_AMOUNT_NOT_ENOUGH");
 
-      require(round.totalOutputAmount != 0, "NULL_TO");
+      roundCompensation[_offsetRoundKey] = RoundCompensation(tokenAmountOut, round.totalInputAmount);
+      round.totalOutputAmount = tokenAmountOut;
+    }
 
-      emit SupplyAndRedeemPoke(
-        _roundKeys[i],
-        round.pool,
-        round.inputToken,
-        round.outputToken,
-        round.totalInputAmount,
-        round.totalOutputAmount
-      );
+    require(round.totalOutputAmount != 0, "NULL_TO");
+
+    emit SupplyAndRedeemPoke(
+      _roundKey,
+      round.pool,
+      round.inputToken,
+      round.outputToken,
+      round.totalInputAmount,
+      round.totalOutputAmount
+    );
+  }
+
+  function calcPoolOutByTokenAmountIn(Round storage round, uint256 inputAmount) internal view returns (uint256 amountOut) {
+    PoolType pType = poolType[round.pool];
+    if (pType == PoolType.PIPT) {
+      IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolSwapContract[round.pool]));
+      if (round.inputToken == ETH) {
+        (, , amountOut) = piptSwap.calcSwapEthToPiptInputs(
+          inputAmount,
+          PowerIndexPoolInterface(round.pool).getCurrentTokens(),
+          piptSwap.defaultSlippage()
+        );
+      } else {
+        (, , amountOut) = piptSwap.calcSwapErc20ToPiptInputs(
+          round.inputToken,
+          inputAmount,
+          PowerIndexPoolInterface(round.pool).getCurrentTokens(),
+          piptSwap.defaultSlippage(),
+          true
+        );
+      }
+    } else if (pType == PoolType.VAULT) {
+      IErc20VaultPoolSwap vaultPoolSwap = IErc20VaultPoolSwap(poolSwapContract[round.pool]);
+      amountOut = vaultPoolSwap.calcVaultPoolOutByUsdc(round.pool, inputAmount, true);
+    }
+  }
+
+  function calcTokenAmountOutByPoolIn(Round storage round, uint256 poolAmount) internal view returns (uint256 amountOut) {
+    PoolType pType = poolType[round.pool];
+    if (pType == PoolType.PIPT) {
+      IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolSwapContract[round.pool]));
+      if (round.outputToken == ETH) {
+        (, , amountOut, ) = piptSwap.calcSwapPiptToEthInputs(
+          poolAmount,
+          PowerIndexPoolInterface(round.pool).getCurrentTokens()
+        );
+      } else {
+        (, , amountOut, ) = piptSwap.calcSwapPiptToErc20Inputs(
+          round.outputToken,
+          poolAmount,
+          PowerIndexPoolInterface(round.pool).getCurrentTokens(),
+          true
+        );
+      }
+    } else if (pType == PoolType.VAULT) {
+      IErc20VaultPoolSwap vaultPoolSwap = IErc20VaultPoolSwap(poolSwapContract[round.pool]);
+      amountOut = vaultPoolSwap.calcUsdcOutByPool(round.pool, poolAmount, true);
     }
   }
 
@@ -579,16 +651,6 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
 
     return roundKey;
-  }
-
-  function _updatePool(address _pool) internal {
-    poolTokens[_pool] = PowerIndexPoolInterface(_pool).getCurrentTokens();
-    if (poolType[_pool] == PoolType.VAULT) {
-      uint256 len = poolTokens[_pool].length;
-      for (uint256 i = 0; i < len; i++) {
-        IERC20(poolTokens[_pool][i]).approve(_pool, uint256(-1));
-      }
-    }
   }
 
   function _reward(

@@ -8,8 +8,8 @@ import "../IndicesSupplyRedeemZap.sol";
 contract MockIndicesSupplyRedeemZap is IndicesSupplyRedeemZap {
   constructor(address _usdc, address _powerPoke) public IndicesSupplyRedeemZap(_usdc, _powerPoke) {}
 
-  function mockSupplyAndRedeemPokeFromReporter(bytes32[] memory _roundKeys) external {
-    _supplyAndRedeemPoke(_roundKeys, false);
+  function mockSupplyAndRedeemPokeFromReporter(bytes32 _roundKey, bytes32 _offsetRoundKey) external {
+    _supplyAndRedeemPoke(_roundKey, _offsetRoundKey, false);
   }
 
   function mockClaimPokeFromReporter(bytes32 _roundKey, address[] memory _claimForList) external {
