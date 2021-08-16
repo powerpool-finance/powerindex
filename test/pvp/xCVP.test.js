@@ -25,7 +25,7 @@ describe('xCVP test', () => {
 
   it('should initialize upgradeable xCVP correctly', async () => {
     assert.equal(await xCvp.cvp(), cvp.address);
-    assert.equal(await xCvp.name(), 'Permanent Voting Power');
+    assert.equal(await xCvp.name(), 'Staked Concentrated Voting Power');
     assert.equal(await xCvp.symbol(), 'xCVP');
     assert.equal(await xCvp.decimals(), 18);
   });

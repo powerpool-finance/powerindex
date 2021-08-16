@@ -49,16 +49,9 @@ contract CVPMakerStorage is OwnableUpgradeSafe {
     address underlying;
   }
 
-  struct Strategy4Config {
-    address zap;
-    address outputToken;
-  }
-
   mapping(address => Strategy1Config) public strategy1Config;
 
   mapping(address => Strategy2Config) public strategy2Config;
 
   mapping(address => Strategy3Config) public strategy3Config;
-
-  mapping(address => Strategy4Config) public strategy4Config;
 }

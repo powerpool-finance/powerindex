@@ -24,7 +24,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   event Swap(
     address indexed caller,
     address indexed token,
-    uint256 indexed swapType,
+    SwapType indexed swapType,
     uint256 amountIn,
     uint256 amountOut,
     uint256 xcvpCvpBefore,
@@ -40,6 +40,8 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
   event SetCustomStrategy(address indexed token, uint256 strategyId);
   /// @notice The event emitted when the owner configures an external strategy for the token
   event SetExternalStrategy(address indexed token_, address indexed strategy, bool maxAmountIn);
+
+  enum SwapType { NULL, CVP, ETH, CUSTOM_STRATEGY, EXTERNAL_STRATEGY, UNI_LIKE_STRATEGY }
 
   modifier onlyEOA() {
     require(msg.sender == tx.origin, "NOT_EOA");
@@ -128,14 +130,14 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     uint256 cvpBefore = IERC20(cvp).balanceOf(xcvp);
     lastReporterPokeFrom = block.timestamp;
     uint256 cvpAmountOut_ = cvpAmountOut;
-    uint256 swapType = 0;
+    SwapType sType;
     uint256 amountIn = 0;
 
     // Just transfer CVPs to xCVP contract
     if (token_ == cvp) {
-      swapType = 1;
-      IERC20(cvp).transfer(xcvp, cvpAmountOut_);
+      sType = SwapType.CVP;
       amountIn = cvpAmountOut_;
+      IERC20(cvp).safeTransfer(xcvp, cvpAmountOut_);
     } else if (token_ == weth || token_ == ETH) {
       // Wrap ETH -> WETH
       if (token_ == ETH) {
@@ -146,29 +148,27 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
       // Use a single pair path to swap WETH -> CVP
       amountIn = _swapWETHToCVP();
-      swapType = 2;
+      sType = SwapType.ETH;
     } else {
       uint256 customStrategyId = customStrategies[token_];
       if (customStrategyId > 0) {
         amountIn = _executeCustomStrategy(token_, customStrategyId);
-        swapType = 3;
-        return;
-      }
-
-      if (externalStrategiesConfig[token_].strategy != address(0)) {
+        sType = SwapType.CUSTOM_STRATEGY;
+      } else if (externalStrategiesConfig[token_].strategy != address(0)) {
         amountIn = _executeExternalStrategy(token_);
-        swapType = 4;
-        return;
+        sType = SwapType.EXTERNAL_STRATEGY;
+      } else {
+        // Use a Uniswap-like strategy
+        amountIn = _executeUniLikeStrategy(token_);
+        sType = SwapType.UNI_LIKE_STRATEGY;
       }
-
-      // Use a Uniswap-like strategy
-      amountIn = _executeUniLikeStrategy(token_);
-      swapType = 5;
     }
     uint256 cvpAfter = IERC20(cvp).balanceOf(xcvp);
-    require(cvpAfter >= cvpBefore.add((cvpAmountOut_ * 99) / 100), "LESS_THAN_CVP_AMOUNT_OUT");
+    if (sType != SwapType.EXTERNAL_STRATEGY) {
+      require(cvpAfter.sub(cvpBefore) >= (cvpAmountOut * 99) / 100, "LESS_THAN_CVP_AMOUNT_OUT");
+    }
 
-    emit Swap(msg.sender, token_, swapType, amountIn, cvpAmountOut_, cvpBefore, cvpAfter);
+    emit Swap(msg.sender, token_, sType, amountIn, cvpAmountOut_, cvpBefore, cvpAfter);
   }
 
   function _executeUniLikeStrategy(address token_) internal returns (uint256 amountOut) {
@@ -197,7 +197,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
         type(uint256).max,
         path_,
         address(this),
-        block.timestamp + 1800
+        block.timestamp
       );
     IERC20(token_).approve(router_, 0);
     return amounts[0];
@@ -215,7 +215,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
         type(uint256).max,
         path,
         xcvp,
-        block.timestamp + 1800
+        block.timestamp
       );
     IERC20(weth).approve(uniswapRouter, 0);
     return amounts[0];
@@ -233,14 +233,14 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
         type(uint256).max,
         path_,
         xcvp,
-        block.timestamp + 1800
+        block.timestamp
       );
     IERC20(token_).approve(router_, 0);
     return amounts[0];
   }
 
   function _executeExternalStrategy(address token_) internal returns (uint256 amountIn) {
-    ExternalStrategiesConfig storage config = externalStrategiesConfig[token_];
+    ExternalStrategiesConfig memory config = externalStrategiesConfig[token_];
     address executeUniLikeFrom;
     address executeContract;
     bytes memory executeData;
@@ -255,14 +255,14 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
       (executeUniLikeFrom, executeData, executeContract) = ICVPMakerStrategy(config.strategy).getExecuteDataByAmountIn(
         token_,
         amountIn,
-        externalStrategiesConfig[token_].config
+        config.config
       );
     } else {
       (amountIn, executeUniLikeFrom, executeData, executeContract) = ICVPMakerStrategy(config.strategy)
         .getExecuteDataByAmountOut(
         token_,
         estimateUniLikeStrategyIn(ICVPMakerStrategy(config.strategy).getTokenOut()),
-        externalStrategiesConfig[token_].config
+        config.config
       );
     }
 
@@ -312,7 +312,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
     amountIn = BPoolInterface(iBPool).exitswapExternAmountOut(cvp, amountOutGross, currentBalance);
     IERC20(bPoolToken_).approve(iBPool, 0);
 
-    IERC20(cvp).transfer(xcvp, cvpAmountOut_);
+    IERC20(cvp).safeTransfer(xcvp, cvpAmountOut_);
   }
 
   /**
@@ -395,7 +395,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
       type(uint64).max
     );
     IERC20(tokenIn).approve(address(bPoolWrapper), 0);
-    IERC20(cvp).transfer(xcvp, cvpAmountOut_);
+    IERC20(cvp).safeTransfer(xcvp, cvpAmountOut_);
   }
 
   /*** PERMISSIONLESS METHODS ***/
@@ -467,7 +467,7 @@ contract CVPMaker is OwnableUpgradeSafe, CVPMakerStorage, CVPMakerViewer {
 
     externalStrategiesConfig[token_] = ExternalStrategiesConfig(strategy_, maxAmountIn_, config_);
 
-    IERC20(token_).safeApprove(strategy_, uint256(-1));
+    IERC20(token_).safeApprove(strategy_, type(uint256).max);
 
     emit SetExternalStrategy(token_, strategy_, maxAmountIn_);
   }
