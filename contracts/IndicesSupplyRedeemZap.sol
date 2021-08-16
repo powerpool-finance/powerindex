@@ -459,11 +459,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       Round storage offsetRound = rounds[_offsetRoundKey];
       uint256 tokenAmountOut;
       if (round.inputToken == round.pool) {
-        require(round.inputToken != round.pool, "OFFSET_ROUND_NOT_MATCH");
+        require(offsetRound.inputToken != round.pool, "OFFSET_ROUND_NOT_MATCH");
         tokenAmountOut = calcTokenAmountOutByPoolIn(round, round.totalInputAmount);
       } else {
-        require(round.inputToken == round.pool, "OFFSET_ROUND_NOT_MATCH");
-        tokenAmountOut = calcTokenAmountOutByPoolIn(round, round.totalInputAmount);
+        require(offsetRound.inputToken == round.pool, "OFFSET_ROUND_NOT_MATCH");
+        tokenAmountOut = calcPoolOutByTokenAmountIn(round, round.totalInputAmount);
       }
       require(offsetRound.totalInputAmount >= tokenAmountOut, "OFFSET_AMOUNT_NOT_ENOUGH");
 
