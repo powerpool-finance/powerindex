@@ -59,6 +59,11 @@ function buildAutoRouterConfig(AUTO) {
   return { AUTO };
 }
 
+// VENUS
+function buildVenusRouterConfig(troller, xvs) {
+  return { troller, xvs };
+}
+
 const BasicConfig = {
   poolRestrictions: 'address',
   powerPoke: 'address',
@@ -143,6 +148,7 @@ module.exports = {
   buildBakeryChefRouterConfig,
   buildMasterChefRouterConfig,
   buildAutoRouterConfig,
+  buildVenusRouterConfig,
   buildAaveAssetConfigInput,
   buildBasicRouterArgs,
   buildYearnRouterArgs,

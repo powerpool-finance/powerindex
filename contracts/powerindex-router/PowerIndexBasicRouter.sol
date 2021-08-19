@@ -165,12 +165,13 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     bool _claimAndDistributeRewards,
     bytes calldata _rewardOpts
   ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
+    _beforePoke();
     (uint256 minInterval, ) = _getMinMaxReportInterval();
     (ReserveStatus status, uint256 diff, bool forceRebalance) = getReserveStatus(_getUnderlyingStaked(), 0);
     require(forceRebalance || lastRebalancedAt + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
     require(status != ReserveStatus.EQUILIBRIUM, "RESERVE_STATUS_EQUILIBRIUM");
     _rebalancePoke(status, diff);
-    _postPoke(status, _claimAndDistributeRewards);
+    _afterPoke(status, _claimAndDistributeRewards);
   }
 
   function pokeFromSlasher(
@@ -178,21 +179,27 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     bool _claimAndDistributeRewards,
     bytes calldata _rewardOpts
   ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
+    _beforePoke();
     (, uint256 maxInterval) = _getMinMaxReportInterval();
     (ReserveStatus status, uint256 diff, bool forceRebalance) = getReserveStatus(_getUnderlyingStaked(), 0);
     require(forceRebalance || lastRebalancedAt + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
     require(status != ReserveStatus.EQUILIBRIUM, "RESERVE_STATUS_EQUILIBRIUM");
     _rebalancePoke(status, diff);
-    _postPoke(status, _claimAndDistributeRewards);
+    _afterPoke(status, _claimAndDistributeRewards);
   }
 
   function poke(bool _claimAndDistributeRewards) external onlyEOA {
+    _beforePoke();
     (ReserveStatus status, uint256 diff, ) = getReserveStatus(_getUnderlyingStaked(), 0);
     _rebalancePoke(status, diff);
-    _postPoke(status, _claimAndDistributeRewards);
+    _afterPoke(status, _claimAndDistributeRewards);
   }
 
-  function _postPoke(ReserveStatus reserveStatus, bool _claimAndDistributeRewards) internal {
+  function _beforePoke() internal virtual {
+    require(staking != address(0), "STAKING_IS_NULL");
+  }
+
+  function _afterPoke(ReserveStatus reserveStatus, bool _claimAndDistributeRewards) internal {
     lastRebalancedAt = block.timestamp;
 
     if (_claimAndDistributeRewards && lastClaimRewardsAt + claimRewardsInterval < block.timestamp) {
@@ -214,12 +221,12 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     // need to redefine in implementation
   }
 
-  function _callVoting(bytes4 _sig, bytes memory _data) internal {
-    piToken.callExternal(voting, _sig, _data, 0);
+  function _callVoting(bytes4 _sig, bytes memory _data) internal returns (bytes memory) {
+    return piToken.callExternal(voting, _sig, _data, 0);
   }
 
-  function _callStaking(bytes4 _sig, bytes memory _data) internal {
-    piToken.callExternal(staking, _sig, _data, 0);
+  function _callStaking(bytes4 _sig, bytes memory _data) internal returns (bytes memory) {
+    return piToken.callExternal(staking, _sig, _data, 0);
   }
 
   function _checkVotingSenderAllowed() internal view {

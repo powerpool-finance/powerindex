@@ -126,14 +126,20 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
     bytes4 _signature,
     bytes calldata _args,
     uint256 _value
-  ) external override onlyRouter {
-    _callExternal(_destination, _signature, _args, _value);
+  ) external override onlyRouter returns (bytes memory) {
+    return _callExternal(_destination, _signature, _args, _value);
   }
 
-  function callExternalMultiple(ExternalCallData[] calldata _calls) external override onlyRouter {
+  function callExternalMultiple(ExternalCallData[] calldata _calls)
+    external
+    override
+    onlyRouter
+    returns (bytes[] memory results)
+  {
     uint256 len = _calls.length;
+    results = new bytes[](len);
     for (uint256 i = 0; i < len; i++) {
-      _callExternal(_calls[i].destination, _calls[i].signature, _calls[i].args, _calls[i].value);
+      results[i] = _callExternal(_calls[i].destination, _calls[i].signature, _calls[i].args, _calls[i].value);
     }
   }
 
@@ -146,7 +152,7 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
     bytes4 _signature,
     bytes calldata _args,
     uint256 _value
-  ) internal {
+  ) internal returns (bytes memory) {
     (bool success, bytes memory data) = _destination.call{ value: _value }(abi.encodePacked(_signature, _args));
 
     if (!success) {
@@ -170,5 +176,7 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
     }
 
     emit CallExternal(_destination, _signature, _args, data);
+
+    return data;
   }
 }

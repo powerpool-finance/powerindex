@@ -139,11 +139,15 @@ async function expectExactRevert(promise, expectedMsg) {
 
 /**
  * Creates a truffle contract from bytecode and abi
- * @param name of the contract along with path
- * @returns TruffleContract
+ * @param {string} name of the contract along with path
+ * @param {[{substr: regex, newSubstr: string}]} bytecodeReplacements the list of bytecode replacements
+ * @returns {TruffleContract}
  */
-function artifactFromBytecode(name) {
+function artifactFromBytecode(name, bytecodeReplacements = []) {
   const data = require(`../../assets/${name}.json`);
+  for (let i = 0; i < bytecodeReplacements.length; i++) {
+    data.bytecode = data.bytecode.replace(bytecodeReplacements[i].substr, bytecodeReplacements[i].newSubstr);
+  }
   const contract = TruffleContract(data);
   contract.setProvider(web3.currentProvider);
   contract.defaults(template.class_defaults);
@@ -407,6 +411,39 @@ function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei = '100000000') {
   assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));
 }
 
+async function newCompContract(contract, ...args) {
+  const instance = await contract.new(...args);
+  attachToInstance(instance)
+  return instance;
+}
+
+async function attachCompContract(contract, address) {
+  const instance = await contract.at(address);
+  attachToInstance(instance)
+  return instance;
+}
+
+function attachToInstance(instance) {
+  for (let methodName of Object.keys(instance)) {
+    if (!instance.contract.methods[methodName]) {
+      continue;
+    }
+    const method = instance[methodName];
+    instance[methodName] = async function(...args) {
+      const res = await method(...args);
+      if (typeof res === 'object' && 'logs' in res) {
+        for (let log of res.logs) {
+          if (log.event === 'Failure') {
+            throw new Error(`Comp error: ${log.args.error} info: ${log.args.info}`);
+          }
+        }
+      }
+      return res;
+    }
+  }
+}
+
+
 
 module.exports = {
   deployProxied,
@@ -443,5 +480,7 @@ module.exports = {
   divBN,
   subBN,
   addBN,
-  assertEqualWithAccuracy
+  assertEqualWithAccuracy,
+  newCompContract,
+  attachCompContract,
 }
