@@ -6,8 +6,8 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@powerpool/poweroracle/contracts/interfaces/IPowerPoke.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@powerpool/power-oracle/contracts/interfaces/IPowerPoke.sol";
 import "./interfaces/PowerIndexPoolInterface.sol";
 import "./interfaces/TokenInterface.sol";
 import "./interfaces/IVault.sol";
@@ -40,6 +40,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   event TakeFee(address indexed pool, address indexed token, uint256 amount);
   event ClaimFee(address indexed token, uint256 amount);
 
+  event SetRoundIgnoreOnlyEOA(address msgSender, bool ignore);
   event SetRoundPeriod(uint256 roundPeriod);
   event SetPool(address indexed pool, PoolType pType);
   event SetPiptSwap(address indexed pool, address piptSwap);
@@ -127,6 +128,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   mapping(bytes32 => bytes32) public lastRoundByPartialKey;
 
+  mapping(address => bool) public ignoreOnlyEOA;
+
   modifier onlyReporter(uint256 _reporterId, bytes calldata _rewardOpts) {
     uint256 gasStart = gasleft();
     powerPoke.authorizeReporter(_reporterId, msg.sender);
@@ -142,7 +145,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   }
 
   modifier onlyEOA() {
-    require(tx.origin == msg.sender, "ONLY_EOA");
+    require(tx.origin == msg.sender || ignoreOnlyEOA[msg.sender], "ONLY_EOA");
     _;
   }
 
@@ -268,6 +271,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   }
 
   /* ==========  Owner Functions  ========== */
+
+  function setIgnoreOnlyEOA(address _msgSender, bool _ignore) external onlyOwner {
+    ignoreOnlyEOA[_msgSender] = _ignore;
+    emit SetRoundIgnoreOnlyEOA(_msgSender, _ignore);
+  }
 
   function setRoundPeriod(uint256 _roundPeriod) external onlyOwner {
     roundPeriod = _roundPeriod;
@@ -592,7 +600,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     powerPoke.reward(_reporterId, _gasStart.sub(gasleft()), _compensationPlan, _rewardOpts);
   }
 
-  function _getMinMaxReportInterval() internal view returns (uint256 min, uint256 max) {
+  function _getMinMaxReportInterval() internal view virtual returns (uint256 min, uint256 max) {
     (min, max) = powerPoke.getMinMaxReportIntervals(address(this));
     min = min == 1 ? 0 : min;
   }

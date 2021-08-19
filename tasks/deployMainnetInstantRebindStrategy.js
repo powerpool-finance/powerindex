@@ -1,6 +1,7 @@
 require('@nomiclabs/hardhat-truffle5');
 
 const configByTokenAddress = require('./config/ylaPool');
+const fs = require('fs');
 
 task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind Strategy').setAction(async (__, {ethers, network}) => {
   const {impersonateAccount, gwei, fromEther, ethUsed, deployProxied, callContract, forkContractUpgrade} = require('../test/helpers');
@@ -11,6 +12,8 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   const ICurvePoolRegistry = artifacts.require('ICurvePoolRegistry');
   const PowerPoke = await artifacts.require('PowerPoke');
   const ERC20 = await artifacts.require('@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20');
+  const Erc20VaultPoolSwap = await artifacts.require('Erc20VaultPoolSwap');
+  const IndicesSupplyRedeemZap = artifacts.require('IndicesSupplyRedeemZap');
   const { web3 } = PowerIndexPoolController;
   YearnVaultInstantRebindStrategy.numberFormat = 'String';
   ICurvePoolRegistry.numberFormat = 'String';
@@ -29,27 +32,44 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   const poolControllerAddress = '0xb258302c3f209491d604165549079680708581cc';
   const powerPokeAddress = '0x04D7aA22ef7181eE3142F5063e026Af1BbBE5B96';
   const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
-  const curePoolRegistryAddress = '0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5';
+  const curvePoolRegistryAddress = '0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5';
 
+  const curvePoolRegistry = await ICurvePoolRegistry.at(curvePoolRegistryAddress);
+
+  console.log('getTVLByTokensBalances', await getTVLByTokensBalances([
+    '0xA74d4B67b3368E83797a35382AFB776bAAE4F5C8',
+    '0xf8768814b88281DE4F532a3beEfA5b85B69b9324',
+    '0x5fA5B62c8AF877CB37031e0a3B2f34A78e3C56A6',
+    '0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417',
+    '0x6Ede7F19df5df6EF23bD5B9CeDb651580Bdf56Ca'
+  ], [
+    ether('2912630.724533'),
+    ether('21833.674103'),
+    ether('2387190.259384'),
+    ether('1561732.602546'),
+    ether('1553130.9825912924')
+  ]))
+
+  const balanceBefore = fromEther(await web3.eth.getBalance(deployer));
   const weightStrategy =  await deployProxied(
     YearnVaultInstantRebindStrategy,
     [poolAddress, usdcAddress],
-    [powerPokeAddress, curePoolRegistryAddress, poolControllerAddress, 5000, {
+    [powerPokeAddress, curvePoolRegistryAddress, poolControllerAddress, 5000, {
       minUSDCRemainder: '20',
       useVirtualPriceEstimation: false
     }],
     {
       proxyAdmin: proxyAdminAddr,
       // proxyAdminOwner: admin,
-      implementation: ''
+      implementation: '' //0x60ef52b6d56f59817481935f5b2028cfc23c14d3
     }
   );
-  // const weightStrategy = await YearnVaultInstantRebindStrategy.at('0x1Ba0CbCA5571d9c27CBe266701789c4Ab6D25CcE');
+  // const weightStrategy = await YearnVaultInstantRebindStrategy.at('0xea20d1d24bd9ae0e4ad3982f302d8441ca5e5b99');
   console.log('weightStrategyProxy.address', weightStrategy.address);
   // console.log('weightStrategyImplementation.address', weightStrategy.initialImplementation.address);
 
   const controller = await PowerIndexPoolController.new(poolAddress, zeroAddress, zeroAddress, weightStrategy.address);
-  // const controller = await PowerIndexPoolController.at('0x45dEE342d89d9B9f789908c3b5722F8b78F7F565');
+  // const controller = await PowerIndexPoolController.at('0x750f973f8f2dfe0999321243bf67fa36df7dcb33');
   console.log('controller.address', controller.address);
   await weightStrategy.setPoolController(controller.address);
 
@@ -66,46 +86,43 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
   await weightStrategy.syncPoolTokens();
 
   await weightStrategy.transferOwnership(admin);
+  console.log('ETH spent', balanceBefore - fromEther(await web3.eth.getBalance(deployer)))
 
   if (network.name !== 'mainnetfork') {
     return;
   }
   await impersonateAccount(ethers, admin);
 
-  const curvePoolRegistry = await ICurvePoolRegistry.at(curePoolRegistryAddress);
-
   const pool = await PowerIndexPool.at(poolAddress);
-  await forkContractUpgrade(ethers, admin, proxyAdminAddr, pool.address, await PowerIndexPool.new().then(p => p.address));
-  if(controller.address.toLowerCase() !== await callContract(pool, 'getController').then(c => c.toLowerCase())) {
-    await pool.setController(controller.address, {from: admin});
-  }
-  console.log('controller', await callContract(pool, 'getController'))
+  await forkContractUpgrade(ethers, admin, proxyAdminAddr, weightStrategy.address, '0x53edc5519464559b1c1aad384f188e149c3e36d4');
 
+  if(controller.address.toLowerCase() !== await callContract(pool, 'getController').then(c => c.toLowerCase())) {
+    await pool.setWrapper(zeroAddress, true, {from: admin});
+    await pool.setController(controller.address, {from: admin});
+    const cfg = configByTokenAddress['0x3B96d491f067912D18563d56858Ba7d6EC67a6fa'];
+    await weightStrategy.setVaultConfig(
+      '0x3B96d491f067912D18563d56858Ba7d6EC67a6fa',
+      cfg.depositor,
+      cfg.depositorType || '1',
+      cfg.amountsLength,
+      cfg.usdcIndex,
+      {from: admin}
+    );
+  }
   const [poolTvlBefore] = await getTVL(pool);
   let cpRes = await weightStrategy.changePoolTokens([
-    '0xd6ea40597be05c201845c0bfd2e96a60bacde267', //'0x6ede7f19df5df6ef23bd5b9cedb651580bdf56ca',
-    '0x84e13785b5a27879921d6f685f041421c7f482da', //'0xc4daf3b5e2a9e93861c3fbdd25f1e943b8d87417',
-    '0x2a38b9b0201ca39b17b460ed2f11e4929559071e', //'0x5fa5b62c8af877cb37031e0a3b2f34a78e3c56a6',
-    '0xf8768814b88281de4f532a3beefa5b85b69b9324',
-    '0xa74d4b67b3368e83797a35382afb776baae4f5c8'
+    '0xd6ea40597be05c201845c0bfd2e96a60bacde267', //'0x6Ede7F19df5df6EF23bD5B9CeDb651580Bdf56Ca',
+    '0x84e13785b5a27879921d6f685f041421c7f482da', //'0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417',
+    '0x5fA5B62c8AF877CB37031e0a3B2f34A78e3C56A6',
+    '0x3B96d491f067912D18563d56858Ba7d6EC67a6fa'
   ], {from: admin});
   console.log('res.receipt.gasUsed', cpRes.receipt.gasUsed);
 
   cpRes = await weightStrategy.changePoolTokens([
-    '0xd6ea40597be05c201845c0bfd2e96a60bacde267', //'0x6ede7f19df5df6ef23bd5b9cedb651580bdf56ca',
-    '0xc4daf3b5e2a9e93861c3fbdd25f1e943b8d87417',
-    '0x5fa5b62c8af877cb37031e0a3b2f34a78e3c56a6',
-    '0xf8768814b88281de4f532a3beefa5b85b69b9324',
-    '0xa74d4b67b3368e83797a35382afb776baae4f5c8'
-  ], {from: admin});
-  console.log('res.receipt.gasUsed', cpRes.receipt.gasUsed);
-
-  cpRes = await weightStrategy.changePoolTokens([
-    '0x6ede7f19df5df6ef23bd5b9cedb651580bdf56ca',
-    '0xc4daf3b5e2a9e93861c3fbdd25f1e943b8d87417',
-    '0x5fa5b62c8af877cb37031e0a3b2f34a78e3c56a6',
-    '0xf8768814b88281de4f532a3beefa5b85b69b9324',
-    '0xa74d4b67b3368e83797a35382afb776baae4f5c8'
+    '0x6Ede7F19df5df6EF23bD5B9CeDb651580Bdf56Ca',
+    '0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417',
+    '0x5fA5B62c8AF877CB37031e0a3B2f34A78e3C56A6',
+    '0x3B96d491f067912D18563d56858Ba7d6EC67a6fa',
   ], {from: admin});
   console.log('res.receipt.gasUsed', cpRes.receipt.gasUsed);
 
@@ -113,6 +130,23 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
 
   console.log('poolTvlBefore', poolTvlBefore);
   console.log('poolTvlAfter', poolTvlAfter);
+
+  const zapAddress = '0x85c6d6b0cd1383cc85e8e36c09d0815daf36b9e9';
+  const zap = await IndicesSupplyRedeemZap.at(zapAddress);
+  const erc20VaultPoolSwap = await Erc20VaultPoolSwap.new(usdcAddress);
+
+  const vd = JSON.parse(fs.readFileSync('data/vaultsData.json'));
+  await erc20VaultPoolSwap.setVaultConfigs(
+    vd.map(v => v.address),
+    vd.map(v => v.config.depositor),
+    vd.map(v => v.config.amountsLength),
+    vd.map(v => v.config.usdcIndex),
+    vd.map(v => v.config.lpToken),
+    vd.map(() => curvePoolRegistryAddress),
+  );
+  await erc20VaultPoolSwap.updatePools([poolAddress]);
+
+  await zap.setPoolsSwapContracts([poolAddress], [erc20VaultPoolSwap.address]);
 
   const BONUS_NUMERATOR = '7610350076';
   const BONUS_DENUMERATOR = '10000000000000000';
@@ -168,16 +202,16 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
     return toWei(amount.toString(), 'ether');
   }
 
-  async function getTVL(pool) {
-    /** @type {string[]} */
-    const tokens = await pool.getCurrentTokens();
+  async function getTVLByTokensBalances(tokens, balances, weights) {
     let bpoolEval = 0n;
     let totalEval = 0n;
-    for (let token of tokens) {
+    for (let index = 0; index < tokens.length; index++) {
+      const token = tokens[index];
       const vault = await IVault.at(token);
       // bpool eval
       {
-        const vaultBalance = await vault.balanceOf(pool.address);
+        const vaultBalance = balances[index];
+        console.log('balance', token, fromEther(vaultBalance), 'weight', weights ? fromEther(weights[index]) * 100 : 'unknown');
         const vaultPerShare = await vault.pricePerShare();
         const crvBalance = BigInt(vaultBalance) * BigInt(vaultPerShare) / (10n ** 18n);
         const virtualPrice = await curvePoolRegistry.get_virtual_price_from_lp_token(await vault.token());
@@ -195,6 +229,21 @@ task('deploy-mainnet-instant-rebind-strategy', 'Deploy Mainnet Instant Rebind St
       }
     }
     return [bpoolEval, totalEval];
+  }
+
+  async function getTVL(pool) {
+    /** @type {string[]} */
+    const tokens = await pool.getCurrentTokens();
+    console.log('tokens', tokens);
+
+    const balances = [];
+    const weights = [];
+    for (let token of tokens) {
+      const vault = await IVault.at(token);
+      balances.push(await vault.balanceOf(pool.address));
+      weights.push(await pool.getNormalizedWeight(token).catch(() => '0'));
+    }
+    return getTVLByTokensBalances(tokens, balances, weights);
   }
 
   async function filterPushPullLogs(logs) {

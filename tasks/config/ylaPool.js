@@ -63,6 +63,13 @@ module.exports = {
     depositorType: 2,
     amountsLength: 4,
     usdcIndex: 2,
+  },
+  '0x3B96d491f067912D18563d56858Ba7d6EC67a6fa': {
+    lpToken: '0x4f3e8f405cf5afc05d68142f3783bdfe13811522',
+    depositor: '0x094d12e5b541784701fd8d65f11fc0598fbc6332',
+    depositorType: 1,
+    amountsLength: 4,
+    usdcIndex: 2,
   }
 };
 

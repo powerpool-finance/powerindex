@@ -13,7 +13,4 @@ contracts/interfaces/IUniswapV2Factory.sol
 contracts/interfaces/IUniswapV2Pair.sol
 contracts/interfaces/aave/
 contracts/test/uniswapv2/
-contracts/test/MockWETH.sol
-contracts/test/MockYearnGovernance.sol
-contracts/test/MockYearnVaultV1.sol
-contracts/test/AragonVoting.sol
+contracts/test/

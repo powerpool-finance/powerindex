@@ -1,0 +1,58 @@
+[
+ {
+  "address": "0x3B96d491f067912D18563d56858Ba7d6EC67a6fa",
+  "totalSupply": "199435025153470198016614924",
+  "usdtValue": "202561880498487343529735836",
+  "balancerBalance": "4285572549928113627121509",
+  "usdcToLpRate": "1030555694122059519",
+  "config": {
+   "lpToken": "0x4f3e8f405cf5afc05d68142f3783bdfe13811522",
+   "depositor": "0x094d12e5b541784701fd8d65f11fc0598fbc6332",
+   "depositorType": 1,
+   "amountsLength": 4,
+   "usdcIndex": 2
+  }
+ },
+ {
+  "address": "0x5fA5B62c8AF877CB37031e0a3B2f34A78e3C56A6",
+  "totalSupply": "58875471454151559104958973",
+  "usdtValue": "61019292960892886934660579",
+  "balancerBalance": "1831297104404539207101274",
+  "usdcToLpRate": "1004043458824275749",
+  "config": {
+   "lpToken": "0xed279fdd11ca84beef15af5d39bb4d4bee23f0ca",
+   "depositor": "0xa79828df1850e8a3a3064576f380d90aecdd3359",
+   "depositorType": 2,
+   "amountsLength": 4,
+   "usdcIndex": 2
+  }
+ },
+ {
+  "address": "0x6Ede7F19df5df6EF23bD5B9CeDb651580Bdf56Ca",
+  "totalSupply": "39600233085776512345766367",
+  "usdtValue": "40177885803633509629457994",
+  "balancerBalance": "1140191154693059953955470",
+  "usdcToLpRate": "1002912708600398071",
+  "config": {
+   "lpToken": "0x4807862aa8b2bf68830e4c8dc86d0e9a998e085a",
+   "depositor": "0xa79828df1850e8a3a3064576f380d90aecdd3359",
+   "depositorType": 2,
+   "amountsLength": 4,
+   "usdcIndex": 2
+  }
+ },
+ {
+  "address": "0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417",
+  "totalSupply": "40991857896392880637489416",
+  "usdtValue": "41579753540284319153931898",
+  "balancerBalance": "1178760936854573876663786",
+  "usdcToLpRate": "1004656100443393786",
+  "config": {
+   "lpToken": "0x7eb40e450b9655f4b3cc4259bcc731c63ff55ae6",
+   "depositor": "0x3c8caee4e09296800f8d29a68fa3837e2dae4940",
+   "depositorType": 1,
+   "amountsLength": 4,
+   "usdcIndex": 2
+  }
+ }
+]
