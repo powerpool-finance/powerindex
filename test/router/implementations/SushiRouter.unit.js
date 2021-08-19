@@ -287,7 +287,7 @@ describe('SushiRouter Tests', () => {
 
       await piSushi.withdraw(ether(1000), { from: alice });
 
-      await expectRevert(sushiRouter.poke(false, { from: bob }), 'STACKING_IS_NULL');
+      await expectRevert(sushiRouter.poke(false, { from: bob }), 'STAKING_IS_NULL');
 
       assert.equal(await sushi.balanceOf(xSushi.address), ether(42000));
       assert.equal(await xSushi.balanceOf(piSushi.address), ether(0));

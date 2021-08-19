@@ -349,7 +349,7 @@ describe('YearnRouter Tests', () => {
       assert.equal(await piYfi.balanceOf(alice), ether(10000));
       assert.equal(await piYfi.totalSupply(), ether(10000));
       await piYfi.withdraw(ether(1000), { from: alice });
-      await expectRevert(yfiRouter.poke(false), 'STACKING_IS_NULL');
+      await expectRevert(yfiRouter.poke(false), 'STAKING_IS_NULL');
     });
 
     describe('when interval enabled', () => {

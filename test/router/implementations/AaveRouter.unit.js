@@ -391,7 +391,7 @@ describe('AaveRouter Tests', () => {
       assert.equal(await piAave.balanceOf(alice), ether(10000));
       assert.equal(await piAave.totalSupply(), ether(10000));
 
-      await expectRevert(aaveRouter.poke(false), 'call to a non-contract account');
+      await expectRevert(aaveRouter.poke(false), 'STAKING_IS_NULL');
     });
 
     describe('when interval enabled', () => {
