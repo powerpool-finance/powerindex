@@ -7,6 +7,11 @@ import "../../interfaces/IAutoFarm.sol";
 import "../../interfaces/IAutoFarmStrategy.sol";
 import "../PowerIndexBasicRouter.sol";
 
+/**
+ * Compatible with:
+ * - Auto: https://bscscan.com/address/0x763a05bdb9f8946d8c3fa72d1e0d3f5e68647e5c,
+ *   pending rewards via stakedWantTokens(pid, user)
+ */
 contract AutoPowerIndexRouter is PowerIndexBasicRouter {
   event Stake(address indexed sender, uint256 amount);
   event Redeem(address indexed sender, uint256 amount);

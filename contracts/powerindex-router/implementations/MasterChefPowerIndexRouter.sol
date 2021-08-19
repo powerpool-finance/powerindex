@@ -10,8 +10,6 @@ import "./AbstractMasterChefIndexRouter.sol";
  * Compatible with:
  * - MDEX: https://bscscan.com/address/0x6aee12e5eb987b3be1ba8e621be7c4804925ba68,
  *   pending rewards via pending(pid, user)
- * - Auto: https://bscscan.com/address/0x763a05bdb9f8946d8c3fa72d1e0d3f5e68647e5c,
- *   pending rewards via stakedWantTokens(pid, user)
  */
 contract MasterChefPowerIndexRouter is AbstractMasterChefIndexRouter {
   uint256 internal immutable MASTER_CHEF_PID;
