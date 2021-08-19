@@ -1,5 +1,12 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity 0.6.12;
+
 contract MockPancakeRouter {
-  function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts) {
+  function getAmountsOut(
+    uint256, /*amountIn*/
+    address[] calldata path
+  ) external pure returns (uint256[] memory amounts) {
     amounts = new uint256[](path.length);
   }
 

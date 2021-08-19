@@ -25,7 +25,7 @@ contract MockPancakeMasterChef {
 
   function leaveStaking(uint256) external {}
 
-  function userInfo(uint256, address) external view returns (uint256 amount, uint256 rewardDebt) {
+  function userInfo(uint256, address) external pure returns (uint256 amount, uint256 rewardDebt) {
     return (0, 0);
   }
 }
