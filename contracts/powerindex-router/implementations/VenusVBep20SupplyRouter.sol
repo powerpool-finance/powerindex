@@ -164,7 +164,7 @@ contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
    * @param _tokenAmount The input amount of underlying tokens
    * @return The corresponding amount of vTokens tokens
    */
-  function getVTokenForToken(uint256 _tokenAmount) public view returns (uint256) {
+  function getVTokenForToken(uint256 _tokenAmount) external view returns (uint256) {
     // token / exchangeRate
     return _tokenAmount.mul(1e18) / VBep20Interface(staking).exchangeRateStored();
   }
@@ -218,7 +218,7 @@ contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
     uint256 _underlyingAmount,
     IERC20, /* _underlyingToken */
     uint256 /* _piTotalSupply */
-  ) public view override returns (uint256) {
+  ) external view override returns (uint256) {
     return _underlyingAmount;
   }
 
@@ -234,7 +234,7 @@ contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
     uint256 _piAmount,
     IERC20, /* _underlyingToken */
     uint256 /* _piTotalSupply */
-  ) public view override returns (uint256) {
+  ) external view override returns (uint256) {
     return _piAmount;
   }
 

@@ -31,7 +31,7 @@ contract MasterChefPowerIndexRouter is AbstractMasterChefIndexRouter {
 
   /*** VIEWERS ***/
 
-  function getPendingRewards() public view returns (uint256 amount) {
+  function getPendingRewards() external view returns (uint256 amount) {
     return IMasterChefV1(staking).pending(MASTER_CHEF_PID, address(piToken));
   }
 

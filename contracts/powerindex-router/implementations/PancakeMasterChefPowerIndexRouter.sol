@@ -24,7 +24,7 @@ contract PancakeMasterChefIndexRouter is AbstractMasterChefIndexRouter {
 
   /*** VIEWERS ***/
 
-  function getPendingRewards() public view returns (uint256 amount) {
+  function getPendingRewards() external view returns (uint256 amount) {
     return IPancakeMasterChef(staking).pendingCake(0, address(piToken));
   }
 

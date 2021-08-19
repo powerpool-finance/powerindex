@@ -137,7 +137,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     uint256 _underlyingAmount,
     IERC20, /* _underlyingToken */
     uint256 /* _piTotalSupply */
-  ) public view override returns (uint256) {
+  ) external view override returns (uint256) {
     return _underlyingAmount;
   }
 
@@ -153,7 +153,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     uint256 _piAmount,
     IERC20, /* _underlyingToken */
     uint256 /* _piTotalSupply */
-  ) public view override returns (uint256) {
+  ) external view override returns (uint256) {
     return _piAmount;
   }
 

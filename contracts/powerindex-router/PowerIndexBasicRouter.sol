@@ -116,7 +116,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     emit SetVotingAndStaking(_voting, _staking);
   }
 
-  function setReserveConfig(uint256 _reserveRatio, uint256 _claimRewardsInterval) public virtual override onlyOwner {
+  function setReserveConfig(uint256 _reserveRatio, uint256 _claimRewardsInterval) external virtual override onlyOwner {
     require(_reserveRatio <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
     reserveRatio = _reserveRatio;
     claimRewardsInterval = _claimRewardsInterval;
@@ -286,7 +286,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
    * @dev Getting status and diff of actual staked balance and target reserve balance.
    */
   function getReserveStatusForStakedBalance()
-    public
+    external
     view
     returns (
       ReserveStatus status,
@@ -343,7 +343,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 _underlyingAmount,
     IERC20 _underlyingToken,
     uint256 _piTotalSupply
-  ) public view virtual override returns (uint256) {
+  ) external view virtual override returns (uint256) {
     uint256 underlyingOnPiToken = _underlyingToken.balanceOf(address(piToken));
     return
       getPiEquivalentForUnderlyingPure(
@@ -370,7 +370,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 _piAmount,
     IERC20 _underlyingToken,
     uint256 _piTotalSupply
-  ) public view virtual override returns (uint256) {
+  ) external view virtual override returns (uint256) {
     uint256 underlyingOnPiToken = _underlyingToken.balanceOf(address(piToken));
     return
       getUnderlyingEquivalentForPiPure(
