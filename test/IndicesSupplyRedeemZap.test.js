@@ -655,7 +655,9 @@ describe('IndicesSupplyRedeemZap', () => {
         } else if (v.config.amountsLength === 4) {
           depositor = await MockCurveDepositor4.new(lpToken.address, usdc.address, v.config.usdcIndex, v.usdcToLpRate);
         }
-        await lpToken.transfer(depositor.address, v.totalSupply);
+        await lpToken.transfer(depositor.address, divBN(v.totalSupply, 2));
+        await lpToken.transfer(vault.address, divBN(v.totalSupply, 2));
+        await usdc.transfer(depositor.address, mwei('1000000'));
         await vaultRegistry.set_virtual_price(lpToken.address, v.usdcToLpRate);
 
         vaults.push({
@@ -752,6 +754,178 @@ describe('IndicesSupplyRedeemZap', () => {
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [alice, bob], '0x', {from: reporter}), 'NULL_TO');
 
       await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundUsdcKey, '0x', '0x', {from: reporter}), 'TO_NOT_NULL');
+    });
+
+    describe('Offset rounds', () => {
+      let vaultPoolSwap;
+
+      beforeEach(async () => {
+        vaultPoolSwap = await Erc20VaultPoolSwap.new(usdc.address, {
+          from: minter,
+        });
+        await vaultPoolSwap.setVaultConfigs(
+          vaults.map(v => v.vault.address),
+          vaults.map(v => v.depositor.address),
+          vaults.map(v => v.config.depositorType || 1),
+          vaults.map(v => v.config.amountsLength),
+          vaults.map(v => v.config.usdcIndex),
+          vaults.map(v => v.lpToken.address),
+          vaults.map(() => vaultRegistry.address),
+        );
+        await vaultPoolSwap.updatePools([pool.address]);
+
+        await this.indiciesZap.setPools([pool.address], ['2'], {from: minter});
+        await this.indiciesZap.setPoolsSwapContracts([pool.address], [vaultPoolSwap.address], {from: minter});
+
+        await usdc.transfer(dan, mwei('10000'), {from: minter});
+        await usdc.approve(this.indiciesZap.address, mwei('10000'), {from: dan});
+
+        await pool.transfer(alice, ether('100'), {from: minter});
+      });
+
+      it('should work properly with offset rounds', async () => {
+        let res = await this.indiciesZap.depositErc20(pool.address, usdc.address, mwei('10000'), { from: dan });
+
+        let firstRoundPoolKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, pool.address, usdc.address);
+        let firstRoundUsdcKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, usdc.address, pool.address);
+        assert.notEqual(firstRoundPoolKey, firstRoundUsdcKey);
+
+        await time.increase(roundPeriod / 2);
+
+        await pool.approve(this.indiciesZap.address, ether('100'), {from: alice});
+
+        res = await this.indiciesZap.depositPoolToken(pool.address, usdc.address, ether('100'), { from: alice });
+        firstRoundPoolKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, pool.address, usdc.address);
+
+        let usdcRound = await this.indiciesZap.rounds(firstRoundUsdcKey);
+        assert.equal(usdcRound.totalInputAmount, mwei('10000'));
+
+        let poolRound = await this.indiciesZap.rounds(firstRoundPoolKey);
+        assert.equal(poolRound.totalInputAmount, ether('100'));
+
+        await time.increase(roundPeriod / 2);
+
+        await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundPoolKey, [alice, bob], '0x', {from: reporter}), 'MIN_I');
+        await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan, carol], '0x', {from: reporter}), 'NULL_TO');
+
+        await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundUsdcKey, firstRoundPoolKey, '0x', {from: reporter}), 'OFFSET_ROUND_NOT_READY');
+
+        await time.increase(roundPeriod / 2);
+
+        let offsetRoundCompensation = await this.indiciesZap.roundCompensation(firstRoundPoolKey);
+        assert.equal(offsetRoundCompensation.inputAmount, '0');
+        assert.equal(offsetRoundCompensation.outputAmount, '0');
+        await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundUsdcKey, firstRoundPoolKey, '0x', {from: reporter});
+
+        offsetRoundCompensation = await this.indiciesZap.roundCompensation(firstRoundPoolKey);
+        assert.equal(offsetRoundCompensation.inputAmount, ether('1.019712915129614991'));
+        assert.equal(offsetRoundCompensation.outputAmount, mwei('10000'));
+
+        usdcRound = await this.indiciesZap.rounds(firstRoundUsdcKey);
+        assert.equal(usdcRound.totalInputAmount, mwei('10000'));
+        assert.equal(usdcRound.totalOutputAmount, ether('1.019712915129614991'));
+        usdcRound = await this.indiciesZap.rounds(firstRoundPoolKey);
+        assert.equal(usdcRound.totalOutputAmount, '0');
+
+        res = await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundPoolKey, '0x', '0x', {from: reporter});
+        await expectEvent.inTransaction(res.tx, IndicesSupplyRedeemZap, 'ApplyRoundCompensation', {
+          roundKey: firstRoundPoolKey,
+          pool: pool.address,
+          inputToken: pool.address,
+          outputToken: usdc.address,
+          swapInputAmount: ether('98.980287084870385009'),
+          swapOutputAmount: mwei('982797.772591'),
+          compensationInputAmount: ether('1.019712915129614991'),
+          compensationOutputAmount: mwei('10000'),
+        });
+
+        poolRound = await this.indiciesZap.rounds(firstRoundPoolKey);
+        assert.equal(poolRound.totalInputAmount, ether('100'));
+        assert.equal(poolRound.totalOutputAmount, mwei('992797.772591'));
+
+        await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [alice, bob], '0x', {from: reporter}), 'INPUT_NULL');
+        await this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan], '0x', {from: reporter});
+        await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan, carol], '0x', {from: reporter}), 'OUTPUT_NOT_NULL');
+        assert.equal(await pool.balanceOf(dan), ether('1.019712915129614990'));
+
+        await this.indiciesZap.claimPokeFromReporter('1', firstRoundPoolKey, [alice], '0x', {from: reporter});
+
+        assert.equal(await usdc.balanceOf(alice), mwei('992797.772590'));
+        assert.equal(await usdc.balanceOf(dan), '0');
+
+        assert.equal(await this.indiciesZap.getRoundUserOutput(firstRoundUsdcKey, dan), ether('1.019712915129614991'));
+        assert.equal(await this.indiciesZap.getRoundUserOutput(firstRoundUsdcKey, alice), '0');
+
+        assert.equal(await this.indiciesZap.getRoundUserOutput(firstRoundPoolKey, dan), '0');
+        assert.equal(await this.indiciesZap.getRoundUserOutput(firstRoundPoolKey, alice), mwei('992797.772591'));
+
+        usdcRound = await this.indiciesZap.rounds(firstRoundUsdcKey);
+        assert.equal(usdcRound.totalOutputAmount, ether('1.019712915129614991'));
+        usdcRound = await this.indiciesZap.rounds(firstRoundPoolKey);
+        assert.equal(usdcRound.totalOutputAmount, mwei('992797.772591'));
+
+        await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [alice, bob], '0x', {from: reporter}), 'INPUT_NULL');
+        await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundPoolKey, [alice, bob], '0x', {from: reporter}), 'OUTPUT_NOT_NULL');
+
+        await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan], '0x', {from: reporter}), 'OUTPUT_NOT_NULL');
+        await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [alice], '0x', {from: reporter}), 'INPUT_NULL');
+
+        await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundPoolKey, [dan], '0x', {from: reporter}), 'INPUT_NULL');
+        await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundPoolKey, [alice], '0x', {from: reporter}), 'OUTPUT_NOT_NULL');
+
+        await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundUsdcKey, '0x', '0x', {from: reporter}), 'TO_NOT_NULL');
+      });
+
+      it.only('should work properly without offset rounds', async () => {
+        let res = await this.indiciesZap.depositErc20(pool.address, usdc.address, mwei('10000'), { from: dan });
+        let firstRoundUsdcKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, usdc.address, pool.address);
+
+        await pool.approve(this.indiciesZap.address, ether('100'), {from: alice});
+
+        res = await this.indiciesZap.depositPoolToken(pool.address, usdc.address, ether('100'), { from: alice });
+        let firstRoundPoolKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, pool.address, usdc.address);
+
+        let usdcRound = await this.indiciesZap.rounds(firstRoundUsdcKey);
+        assert.equal(usdcRound.totalInputAmount, mwei('10000'));
+
+        let poolRound = await this.indiciesZap.rounds(firstRoundPoolKey);
+        assert.equal(poolRound.totalInputAmount, ether('100'));
+
+        await time.increase(roundPeriod);
+
+        await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundUsdcKey, '0x', '0x', {from: reporter});
+
+        usdcRound = await this.indiciesZap.rounds(firstRoundUsdcKey);
+        assert.equal(usdcRound.totalInputAmount, mwei('10000'));
+        assert.equal(usdcRound.totalOutputAmount, ether('1.019714028565232510'));
+        usdcRound = await this.indiciesZap.rounds(firstRoundPoolKey);
+        assert.equal(usdcRound.totalOutputAmount, '0');
+
+        await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', firstRoundPoolKey, '0x', '0x', {from: reporter});
+
+        poolRound = await this.indiciesZap.rounds(firstRoundPoolKey);
+        assert.equal(poolRound.totalInputAmount, ether('100'));
+        assert.equal(poolRound.totalOutputAmount, mwei('992922.403834'));
+
+        await this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan], '0x', {from: reporter});
+        assert.equal(await pool.balanceOf(dan), ether('1.019714028565232509'));
+
+        await this.indiciesZap.claimPokeFromReporter('1', firstRoundPoolKey, [alice], '0x', {from: reporter});
+
+        assert.equal(await usdc.balanceOf(alice), mwei('992922.403833'));
+        assert.equal(await usdc.balanceOf(dan), '0');
+
+        assert.equal(await this.indiciesZap.getRoundUserOutput(firstRoundUsdcKey, dan), ether('1.019714028565232510'));
+        assert.equal(await this.indiciesZap.getRoundUserOutput(firstRoundUsdcKey, alice), '0');
+
+        assert.equal(await this.indiciesZap.getRoundUserOutput(firstRoundPoolKey, dan), '0');
+        assert.equal(await this.indiciesZap.getRoundUserOutput(firstRoundPoolKey, alice), mwei('992922.403834'));
+
+        usdcRound = await this.indiciesZap.rounds(firstRoundUsdcKey);
+        assert.equal(usdcRound.totalOutputAmount, ether('1.019714028565232510'));
+        usdcRound = await this.indiciesZap.rounds(firstRoundPoolKey);
+        assert.equal(usdcRound.totalOutputAmount, mwei('992922.403834'));
+      });
     });
   });
 });
