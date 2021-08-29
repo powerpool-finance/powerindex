@@ -62,14 +62,6 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   }
   mapping(address => VaultConfig) public vaultConfig;
 
-  struct VaultCalc {
-    address token;
-    uint256 tokenBalance;
-    uint256 input;
-    uint256 correctInput;
-    uint256 poolAmountOut;
-  }
-
   constructor(address _usdc) public {
     __Ownable_init();
     usdc = IERC20(_usdc);

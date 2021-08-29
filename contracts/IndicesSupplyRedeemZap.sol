@@ -492,23 +492,31 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       require(isRoundReadyToExecute(_offsetRoundKey), "OFFSET_ROUND_NOT_READY");
 
       Round storage offsetRound = rounds[_offsetRoundKey];
-      uint256 tokenAmountOut;
+      uint256 amountOut;
 
       require(offsetRound.inputToken == round.outputToken, "OFFSET_ROUND_NOT_MATCH");
       require(round.inputToken == offsetRound.outputToken, "OFFSET_ROUND_NOT_MATCH");
       require(offsetRound.totalOutputAmount == 0, "OFFSET_ROUND_OUTPUT_NOT_NULL");
 
       if (round.inputToken == round.pool) {
-        tokenAmountOut = calcTokenAmountOutByPoolIn(round, round.totalInputAmount);
+        amountOut = calcTokenAmountOutByPoolIn(round, round.totalInputAmount);
       } else {
-        tokenAmountOut = calcPoolOutByTokenAmountIn(round, round.totalInputAmount);
+        amountOut = calcPoolOutByTokenAmountIn(round, round.totalInputAmount);
       }
-      require(offsetRound.totalInputAmount >= tokenAmountOut, "OFFSET_AMOUNT_NOT_ENOUGH");
+      require(offsetRound.totalInputAmount >= amountOut, "OFFSET_AMOUNT_NOT_ENOUGH");
 
-      roundCompensation[_offsetRoundKey] = RoundCompensation(tokenAmountOut, round.totalInputAmount);
-      round.totalOutputAmount = tokenAmountOut;
+      roundCompensation[_offsetRoundKey] = RoundCompensation(amountOut, round.totalInputAmount);
+      round.totalOutputAmount = amountOut;
 
-      emit ApplyOffsetRound(_roundKey, _offsetRoundKey, round.pool, round.inputToken, round.outputToken, round.totalInputAmount, tokenAmountOut);
+      emit ApplyOffsetRound(
+        _roundKey,
+        _offsetRoundKey,
+        round.pool,
+        round.inputToken,
+        round.outputToken,
+        round.totalInputAmount,
+        amountOut
+      );
     }
 
     require(round.totalOutputAmount != 0, "NULL_TO");
