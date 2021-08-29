@@ -59,6 +59,7 @@ contract CVPMakerZapStrategy is ICVPMakerStrategy {
     poolTokenInAmount = estimateIn(poolTokenIn_, tokenOutAmount_, config_);
     executeData = _getExecuteDataByAmountIn(poolTokenIn_, poolTokenInAmount);
     executeContract = address(zap);
+    executeUniLikeFrom = address(0);
   }
 
   /**
@@ -85,6 +86,7 @@ contract CVPMakerZapStrategy is ICVPMakerStrategy {
   {
     executeData = _getExecuteDataByAmountIn(poolTokenIn_, poolTokenInAmount_);
     executeContract = address(zap);
+    executeUniLikeFrom = address(0);
   }
 
   function _getExecuteDataByAmountIn(address poolTokenIn_, uint256 poolTokenInAmount_)
