@@ -19,7 +19,6 @@ ProxyAdmin.setProvider(template.currentProvider);
 ProxyAdmin.defaults(template.class_defaults);
 
 let proxyAdmin;
-const zeroAddress = '0x0000000000000000000000000000000000000000';
 
 const getCounter = (n => () => n++)(1);
 
