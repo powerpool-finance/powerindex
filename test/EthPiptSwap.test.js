@@ -33,9 +33,9 @@ PowerIndexWrapper.numberFormat = 'String';
 
 const { web3 } = PowerIndexPoolFactory;
 
-const { ether, getTimestamp, subBN, addBN, mulBN, assertEqualWithAccuracy, isBNHigher } = require('./helpers');
+const { ether, mwei, getTimestamp, subBN, addBN, mulBN, assertEqualWithAccuracy, isBNHigher } = require('./helpers');
 
-describe.only('EthPiptSwap and Erc20PiptSwap', () => {
+describe('EthPiptSwap and Erc20PiptSwap', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const swapFee = ether('0.0001');
   const communitySwapFee = ether('0.001');
@@ -663,7 +663,7 @@ describe.only('EthPiptSwap and Erc20PiptSwap', () => {
           const {token: usdToken, pair: usdPair} = tokenBySymbol[erc20TokenSymbol];
 
           const tokenAddress = usdToken.address;
-          const amountToSwap = (100 * 10 ** 6).toString(10);
+          const amountToSwap = (await usdToken.decimals() === '18') ? ether(100) : mwei(100);
           const slippage = ether('0.02');
           const maxDiff = ether('0.04');
 
