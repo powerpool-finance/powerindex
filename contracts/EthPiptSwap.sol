@@ -30,6 +30,7 @@ contract EthPiptSwap is ProgressiveFee {
   mapping(address => mapping(address => address)) public uniswapPairByTargetAndTokenAddress;
   mapping(address => address) public uniswapPairToken0;
   mapping(address => bool) public reApproveTokens;
+  mapping(address => bool) public simplePairs;
   uint256 public defaultSlippage;
   uint256 public defaultDiffPercent;
 
@@ -44,6 +45,7 @@ contract EthPiptSwap is ProgressiveFee {
   event SetTokenSetting(address indexed token, bool indexed reApprove, address indexed uniswapPair);
   event SetDefaultSlippage(uint256 newDefaultSlippage);
   event SetPiptWrapper(address _piptWrapper);
+  event SetSimplePairs(address indexed pair, bool indexed isSimple);
 
   event EthToPiptSwap(
     address indexed user,
@@ -172,6 +174,14 @@ contract EthPiptSwap is ProgressiveFee {
       _setUniswapSettingAndPrepareToken(_pairTargetToken, _tokens[i], _pairs[i]);
       reApproveTokens[_tokens[i]] = _reapprove[i];
       emit SetTokenSetting(_tokens[i], _reapprove[i], _pairs[i]);
+    }
+  }
+
+  function setSimplePairs(address[] memory _pairs, bool _isSimple) external onlyOwner {
+    uint256 len = _pairs.length;
+    for (uint256 i = 0; i < len; i++) {
+      simplePairs[_pairs[i]] = _isSimple;
+      emit SetSimplePairs(_pairs[i], _isSimple);
     }
   }
 
@@ -557,10 +567,16 @@ contract EthPiptSwap is ProgressiveFee {
 
     for (uint256 i = 0; i < len; i++) {
       if (usdOutUniswap[i] == 0) {
-        _swapToken(tokens[i], _uniswapPairFor(address(weth), tokens[i]), tokensOutPipt[i], ethOutUniswap[i]);
+        _swapToken(tokens[i], _uniswapPairFor(address(weth), tokens[i]), tokensOutPipt[i], ethOutUniswap[i], false);
       } else {
-        _swapToken(tokens[i], _uniswapPairFor(address(usdc), tokens[i]), tokensOutPipt[i], usdOutUniswap[i]);
-        _swapToken(address(usdc), _uniswapPairFor(address(weth), address(usdc)), usdOutUniswap[i], ethOutUniswap[i]);
+        _swapToken(tokens[i], _uniswapPairFor(address(usdc), tokens[i]), tokensOutPipt[i], usdOutUniswap[i], false);
+        _swapToken(
+          address(usdc),
+          _uniswapPairFor(address(weth), address(usdc)),
+          usdOutUniswap[i],
+          ethOutUniswap[i],
+          false
+        );
       }
     }
 
@@ -606,33 +622,37 @@ contract EthPiptSwap is ProgressiveFee {
     IUniswapV2Pair tokenPair = _uniswapPairFor(address(_tokenIn), _erc20);
     bool isInverse;
     (amountIn, isInverse) = getAmountInForUniswap(tokenPair, _tokenIn, _erc20Out, true);
-    _tokenIn.safeTransfer(address(tokenPair), amountIn);
-    tokenPair.swap(isInverse ? uint256(0) : _erc20Out, isInverse ? _erc20Out : uint256(0), address(this), new bytes(0));
+    _swapToken(address(_tokenIn), tokenPair, amountIn, _erc20Out, !isInverse);
   }
 
   function _swapWethForTokenOut(address _erc20, uint256 _ethIn) internal returns (uint256 erc20Out) {
     IUniswapV2Pair tokenPair = _uniswapPairFor(address(weth), _erc20);
     bool isInverse;
     (erc20Out, isInverse) = getAmountOutForUniswap(tokenPair, address(weth), _ethIn, false);
-    weth.safeTransfer(address(tokenPair), _ethIn);
-    tokenPair.swap(isInverse ? uint256(0) : erc20Out, isInverse ? erc20Out : uint256(0), address(this), new bytes(0));
+    _swapToken(address(weth), tokenPair, _ethIn, erc20Out, !isInverse);
   }
 
   function _swapTokenForWethOut(address _erc20, uint256 _erc20In) internal returns (uint256 ethOut) {
     IUniswapV2Pair tokenPair = _uniswapPairFor(address(weth), _erc20);
     bool isInverse;
     (ethOut, isInverse) = getAmountOutForUniswap(tokenPair, address(weth), _erc20In, true);
-    IERC20(_erc20).safeTransfer(address(tokenPair), _erc20In);
-    tokenPair.swap(isInverse ? ethOut : uint256(0), isInverse ? uint256(0) : ethOut, address(this), new bytes(0));
+    _swapToken(_erc20, tokenPair, _erc20In, ethOut, isInverse);
   }
 
   function _swapToken(
     address _token,
     IUniswapV2Pair _tokenPair,
     uint256 _amountIn,
-    uint256 _amountOut
+    uint256 _amountOut,
+    bool _isInverse
   ) internal {
     IERC20(_token).safeTransfer(address(_tokenPair), _amountIn);
-    _tokenPair.swap(uint256(0), _amountOut, address(this), new bytes(0));
+    uint256 amount0 = _isInverse ? _amountOut : uint256(0);
+    uint256 amount1 = _isInverse ? uint256(0) : _amountOut;
+    if (simplePairs[address(_tokenPair)]) {
+      _tokenPair.swap(amount0, amount1, address(this));
+    } else {
+      _tokenPair.swap(amount0, amount1, address(this), new bytes(0));
+    }
   }
 }
