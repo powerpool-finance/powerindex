@@ -222,17 +222,6 @@ describe('PowerIndexPool Unit', () => {
     });
   });
 
-  describe('_publicSwap', async () => {
-    it('should be true when built by PoolActions', async () => {
-      assert.equal(await pool.isPublicSwap(), true);
-    });
-
-    it('should deny changing _publicSwap when finalized', async () => {
-      assert.equal(await pool.isFinalized(), true);
-      await expectRevert(pool.setPublicSwap(false, { from: controller }), 'IS_FINALIZED');
-    });
-  });
-
   describe('getNumTokens()', async () => {
     it('should return a number of bound tokens', async () => {
       assert.equal(await pool.getNumTokens(), 2);
@@ -265,15 +254,6 @@ describe('PowerIndexPool Unit', () => {
     it('should return normalized weight of the token', async () => {
       assert.equal(await pool.getNormalizedWeight(this.token1.address), ether('0.5'));
       assert.equal(await pool.getNormalizedWeight(this.token2.address), ether('0.5'));
-    });
-  });
-
-  describe('setPublicSwap()', async () => {
-    it('should allow setting', async () => {
-      const newPool = await PowerIndexPool.new()
-      assert.equal(await newPool.isPublicSwap(), false);
-      await newPool.setPublicSwap(true)
-      assert.equal(await newPool.isPublicSwap(), true);
     });
   });
 

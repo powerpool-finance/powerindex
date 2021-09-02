@@ -76,7 +76,7 @@ interface BPoolInterface is IERC20, BMathInterface {
 
   function getRestrictions() external view returns (address);
 
-  function isPublicSwap() external view returns (bool);
+  function isSwapsDisabled() external view returns (bool);
 
   function isFinalized() external view returns (bool);
 
@@ -97,7 +97,7 @@ interface BPoolInterface is IERC20, BMathInterface {
 
   function setController(address) external;
 
-  function setPublicSwap(bool) external;
+  function setSwapsDisabled(bool) external;
 
   function finalize() external;
 

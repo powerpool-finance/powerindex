@@ -19,7 +19,6 @@ ProxyAdmin.setProvider(template.currentProvider);
 ProxyAdmin.defaults(template.class_defaults);
 
 let proxyAdmin;
-const zeroAddress = '0x0000000000000000000000000000000000000000';
 
 const getCounter = (n => () => n++)(1);
 
@@ -399,6 +398,16 @@ function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei = '100000000') {
   assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));
 }
 
+async function getTimestamp(shift = 0) {
+  const currentTimestamp = (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp;
+  return currentTimestamp + shift;
+}
+
+function isBNHigher(bn1, bn2) {
+  return toBN(bn1.toString(10)).gt(toBN(bn2.toString(10)));
+}
+
+const zeroAddress = '0x0000000000000000000000000000000000000000';
 
 module.exports = {
   deployProxied,
@@ -433,5 +442,7 @@ module.exports = {
   subBN,
   addBN,
   assertEqualWithAccuracy,
+  getTimestamp,
+  isBNHigher,
   zeroAddress
 }

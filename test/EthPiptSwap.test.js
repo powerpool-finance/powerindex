@@ -32,47 +32,8 @@ PowerIndexPool.numberFormat = 'String';
 PowerIndexWrapper.numberFormat = 'String';
 
 const { web3 } = PowerIndexPoolFactory;
-const { toBN } = web3.utils;
 
-function ether(val) {
-  return web3.utils.toWei(val.toString(), 'ether');
-}
-
-async function getTimestamp(shift = 0) {
-  const currentTimestamp = (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp;
-  return currentTimestamp + shift;
-}
-
-function subBN(bn1, bn2) {
-  return toBN(bn1.toString(10))
-    .sub(toBN(bn2.toString(10)))
-    .toString(10);
-}
-function addBN(bn1, bn2) {
-  return toBN(bn1.toString(10))
-    .add(toBN(bn2.toString(10)))
-    .toString(10);
-}
-function divScalarBN(bn1, bn2) {
-  return toBN(bn1.toString(10))
-    .mul(toBN(ether('1').toString(10)))
-    .div(toBN(bn2.toString(10)))
-    .toString(10);
-}
-
-function isBNHigher(bn1, bn2) {
-  return toBN(bn1.toString(10)).gt(toBN(bn2.toString(10)));
-}
-
-function assertEqualWithAccuracy(bn1, bn2, accuracyPercentWei) {
-  bn1 = toBN(bn1.toString(10));
-  bn2 = toBN(bn2.toString(10));
-  const bn1GreaterThenBn2 = bn1.gt(bn2);
-  let diff = bn1GreaterThenBn2 ? bn1.sub(bn2) : bn2.sub(bn1);
-  let diffPercent = divScalarBN(diff, bn1);
-  const lowerThenAccurancy = toBN(diffPercent).lte(toBN(accuracyPercentWei));
-  assert.equal(lowerThenAccurancy, true, 'diffPercent is ' + web3.utils.fromWei(diffPercent, 'ether'));
-}
+const { ether, getTimestamp, subBN, addBN, assertEqualWithAccuracy, isBNHigher } = require('./helpers');
 
 describe('EthPiptSwap and Erc20PiptSwap', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
@@ -184,12 +145,8 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
       for (let i = 0; i < poolsData.length; i++) {
         const token = await MockERC20.new(poolsData[i].tokenSymbol, poolsData[i].tokenSymbol, poolsData[i].tokenDecimals, ether('10000000000'));
 
-        const pair = await this.makeUniswapPair(
-          token,
-          poolsData[i].uniswapPair.tokenReserve,
-          poolsData[i].uniswapPair.ethReserve,
-          poolsData[i].uniswapPair.isReverse,
-        );
+        const uniPair = poolsData[i].uniswapPair;
+        const pair = await this.makeUniswapPair(token, uniPair.tokenReserve, uniPair.ethReserve, uniPair.isReverse);
         tokens.push(token);
         pairs.push(pair);
         bPoolBalances.push(poolsData[i].balancerBalance);
@@ -198,10 +155,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           cvpPair = pair;
         }
 
-        tokenBySymbol[poolsData[i].tokenSymbol] = {
-          token,
-          pair
-        };
+        tokenBySymbol[poolsData[i].tokenSymbol] = { token, pair };
       }
 
       balancerTokens =  tokens.filter((t, i) => poolsData[i].balancerBalance !== '0');
@@ -773,6 +727,99 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           assert.equal(await pool.balanceOf(bob), '0');
         });
       });
+    });
+  });
+
+  describe('Swap with 20 tokens', () => {
+    let cvp, tokens, balancerTokens, pairs, bPoolBalances, pool;
+
+    const tokenBySymbol = {};
+
+    beforeEach(async () => {
+      tokens = [];
+      balancerTokens = [];
+      pairs = [];
+      bPoolBalances = [];
+
+      const pools20Data = poolsData.concat(poolsData).concat(poolsData.slice(0, 4));
+      for (let i = 0; i < pools20Data.length; i++) {
+        const token = await MockERC20.new(pools20Data[i].tokenSymbol, pools20Data[i].tokenSymbol, pools20Data[i].tokenDecimals, ether('10000000000'));
+
+        const uniPair = pools20Data[i].uniswapPair;
+        const pair = await this.makeUniswapPair(token, uniPair.tokenReserve, uniPair.ethReserve, uniPair.isReverse);
+        tokens.push(token);
+        pairs.push(pair);
+        bPoolBalances.push(pools20Data[i].balancerBalance);
+        if (pools20Data[i].tokenSymbol === 'CVP') {
+          cvp = token;
+        }
+
+        tokenBySymbol[pools20Data[i].tokenSymbol] = { token, pair };
+      }
+
+      balancerTokens = tokens.filter((t, i) => pools20Data[i].balancerBalance !== '0');
+
+      pool = await this.makePowerIndexPool(balancerTokens, bPoolBalances.filter(b => b !== '0'));
+
+      await time.increase(12 * 60 * 60);
+    });
+
+    it('swapEthToPipt should work properly', async () => {
+      const ethPiptSwap = await EthPiptSwap.new(this.weth.address, cvp.address, pool.address, zeroAddress, feeManager, {
+        from: minter,
+      });
+
+      await ethPiptSwap.setFees([ether('100'), ether('1')], [ether('0.01'), ether('0.005')], feeReceiver, feeManager, {
+        from: feeManager,
+      });
+
+      await ethPiptSwap.setTokensSettings(
+        tokens.map(t => t.address),
+        pairs.map(p => p.address),
+        pairs.map(() => true),
+        {from: minter},
+      );
+
+      const ethToSwap = ether('600').toString(10);
+      const slippage = ether('0.05');
+      const maxDiff = ether('0.02');
+
+      const {ethFee: ethInFee, ethAfterFee: ethInAfterFee} = await ethPiptSwap.calcEthFee(ethToSwap);
+
+      const swapEthToPiptInputs = await ethPiptSwap.calcSwapEthToPiptInputs(
+        ethInAfterFee,
+        balancerTokens.map(t => t.address),
+        slippage,
+      );
+      const needEthToPoolOut = await ethPiptSwap.calcNeedEthToPoolOut(swapEthToPiptInputs.poolOut, slippage);
+      assertEqualWithAccuracy(needEthToPoolOut, ethToSwap, ether('0.05'))
+      assert.equal(isBNHigher(needEthToPoolOut, ethToSwap), true)
+
+      await this.poolRestrictions.setTotalRestrictions([pool.address], [ether('20000').toString(10)], {from: minter});
+
+      let bobBalanceBefore = await web3.eth.getBalance(bob);
+
+      const {
+        tokenAmountInAfterFee: poolOutAfterFee,
+        tokenAmountFee: poolOutFee,
+      } = await pool.calcAmountWithCommunityFee(swapEthToPiptInputs.poolOut, communityJoinFee, ethPiptSwap.address);
+
+      let res = await ethPiptSwap.swapEthToPipt(slippage, swapEthToPiptInputs.poolOut, maxDiff, {from: bob, value: ethToSwap, gasPrice});
+
+      let weiUsed = res.receipt.gasUsed * gasPrice;
+      console.log('        swapEthToPipt gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
+      let balanceAfterWeiUsed = subBN(bobBalanceBefore, weiUsed);
+      const oddEth = res.receipt.logs.filter(l => l.event === 'OddEth')[0].args;
+      assert.equal(subBN(addBN(balanceAfterWeiUsed, oddEth.amount), ethToSwap), await web3.eth.getBalance(bob));
+      assert.equal(await this.weth.balanceOf(ethPiptSwap.address), ethInFee);
+
+      const swap = res.receipt.logs.filter(l => l.event === 'EthToPiptSwap')[0].args;
+      assert.equal(swap.ethSwapFee, ethInFee);
+      assert.equal(swap.ethInAmount, ethInAfterFee);
+      assert.equal(swap.poolOutAmount, swapEthToPiptInputs.poolOut);
+      assert.equal(swap.poolCommunityFee, poolOutFee);
+
+      assert.equal(poolOutAfterFee, await pool.balanceOf(bob));
     });
   });
 });
