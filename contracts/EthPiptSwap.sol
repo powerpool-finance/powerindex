@@ -22,18 +22,20 @@ contract EthPiptSwap is ProgressiveFee {
   using SafeERC20 for BPoolInterface;
 
   TokenInterface public weth;
+  TokenInterface public usdc;
   TokenInterface public cvp;
   BPoolInterface public pipt;
   PowerIndexWrapperInterface public piptWrapper;
 
-  mapping(address => address) public uniswapEthPairByTokenAddress;
-  mapping(address => address) public uniswapEthPairToken0;
+  mapping(address => mapping(address => address)) public uniswapPairByTargetAndTokenAddress;
+  mapping(address => address) public uniswapPairToken0;
   mapping(address => bool) public reApproveTokens;
   uint256 public defaultSlippage;
   uint256 public defaultDiffPercent;
 
   struct CalculationStruct {
     uint256 tokenAmount;
+    uint256 usdAmount;
     uint256 ethAmount;
     uint256 tokenReserve;
     uint256 ethReserve;
@@ -62,6 +64,7 @@ contract EthPiptSwap is ProgressiveFee {
 
   constructor(
     address _weth,
+    address _usdc,
     address _cvp,
     address _pipt,
     address _piptWrapper,
@@ -69,6 +72,7 @@ contract EthPiptSwap is ProgressiveFee {
   ) public {
     __Ownable_init();
     weth = TokenInterface(_weth);
+    usdc = TokenInterface(_usdc);
     cvp = TokenInterface(_cvp);
     pipt = BPoolInterface(_pipt);
     piptWrapper = PowerIndexWrapperInterface(_piptWrapper);
@@ -106,6 +110,7 @@ contract EthPiptSwap is ProgressiveFee {
   function getMaxDiffPercent(uint256[] memory _ethInUniswap) public view returns (uint256 maxDiffPercent) {
     uint256 len = _ethInUniswap.length;
     uint256 minEthInUniswap = _ethInUniswap[0];
+
     for (uint256 i = 1; i < len; i++) {
       if (_ethInUniswap[i] < minEthInUniswap) {
         minEthInUniswap = _ethInUniswap[i];
@@ -138,13 +143,13 @@ contract EthPiptSwap is ProgressiveFee {
     Address.sendValue(msg.sender, ethOutAmount);
   }
 
-  function convertOddToCvpAndSendToPayout(address[] memory oddTokens) external {
+  function convertOddToCvpAndSendToPayout(address[] memory _oddTokens) external {
     require(msg.sender == tx.origin && !Address.isContract(msg.sender), "CONTRACT_NOT_ALLOWED");
 
-    uint256 len = oddTokens.length;
+    uint256 len = _oddTokens.length;
 
     for (uint256 i = 0; i < len; i++) {
-      _swapTokenForWethOut(oddTokens[i], TokenInterface(oddTokens[i]).balanceOf(address(this)));
+      _swapTokenForWethOut(_oddTokens[i], TokenInterface(_oddTokens[i]).balanceOf(address(this)));
     }
 
     uint256 wethBalance = weth.balanceOf(address(this));
@@ -158,21 +163,30 @@ contract EthPiptSwap is ProgressiveFee {
   function setTokensSettings(
     address[] memory _tokens,
     address[] memory _pairs,
+    address _pairTargetToken,
     bool[] memory _reapprove
   ) external onlyOwner {
     uint256 len = _tokens.length;
     require(len == _pairs.length && len == _reapprove.length, "LENGTHS_NOT_EQUAL");
     for (uint256 i = 0; i < len; i++) {
-      _setUniswapSettingAndPrepareToken(_tokens[i], _pairs[i]);
+      _setUniswapSettingAndPrepareToken(_pairTargetToken, _tokens[i], _pairs[i]);
       reApproveTokens[_tokens[i]] = _reapprove[i];
       emit SetTokenSetting(_tokens[i], _reapprove[i], _pairs[i]);
     }
   }
 
-  function fetchUnswapPairsFromFactory(address _factory, address[] calldata _tokens) external onlyOwner {
+  function fetchUnswapPairsFromFactory(
+    address _factory,
+    address _targetToken,
+    address[] calldata _tokens
+  ) external onlyOwner {
     uint256 len = _tokens.length;
     for (uint256 i = 0; i < len; i++) {
-      _setUniswapSettingAndPrepareToken(_tokens[i], IUniswapV2Factory(_factory).getPair(_tokens[i], address(weth)));
+      _setUniswapSettingAndPrepareToken(
+        _targetToken,
+        _tokens[i],
+        IUniswapV2Factory(_factory).getPair(_tokens[i], _targetToken)
+      );
     }
   }
 
@@ -216,11 +230,34 @@ contract EthPiptSwap is ProgressiveFee {
       for (uint256 i = 0; i < _tokens.length; i++) {
         // token share relatively 1 ether of first token
         calculations[i].tokenAmount = poolRatio.mul(getPiptTokenBalance(_tokens[i])).div(1 ether);
-        calculations[i].ethAmount = getAmountInForUniswapValue(
-          _uniswapPairFor(_tokens[i]),
-          calculations[i].tokenAmount,
-          true
-        );
+
+        address wethAddress = address(weth);
+        address usdcAddress = address(usdc);
+        address wethPairAddress = uniswapPairByTargetAndTokenAddress[wethAddress][_tokens[i]];
+
+        if (wethPairAddress == address(0)) {
+          address usdPairAddress = uniswapPairByTargetAndTokenAddress[usdcAddress][_tokens[i]];
+          calculations[i].usdAmount = getAmountInForUniswapValue(
+            IUniswapV2Pair(usdPairAddress),
+            usdc,
+            calculations[i].tokenAmount,
+            true
+          );
+          calculations[i].ethAmount = getAmountInForUniswapValue(
+            _uniswapPairFor(wethAddress, usdcAddress),
+            weth,
+            calculations[i].usdAmount,
+            true
+          );
+        } else {
+          calculations[i].ethAmount = getAmountInForUniswapValue(
+            IUniswapV2Pair(wethPairAddress),
+            weth,
+            calculations[i].tokenAmount,
+            true
+          );
+        }
+
         totalEthRequired = totalEthRequired.add(calculations[i].ethAmount);
       }
     }
@@ -242,12 +279,14 @@ contract EthPiptSwap is ProgressiveFee {
     returns (
       uint256[] memory tokensOutPipt,
       uint256[] memory ethOutUniswap,
+      uint256[] memory usdOutUniswap,
       uint256 totalEthOut,
       uint256 poolAmountFee
     )
   {
     tokensOutPipt = new uint256[](_tokens.length);
     ethOutUniswap = new uint256[](_tokens.length);
+    usdOutUniswap = new uint256[](_tokens.length);
 
     (, , uint256 communityExitFee, ) = pipt.getCommunityFee();
 
@@ -263,7 +302,32 @@ contract EthPiptSwap is ProgressiveFee {
     totalEthOut = 0;
     for (uint256 i = 0; i < _tokens.length; i++) {
       tokensOutPipt[i] = poolRatio.mul(getPiptTokenBalance(_tokens[i])).div(1 ether);
-      ethOutUniswap[i] = getAmountOutForUniswapValue(_uniswapPairFor(_tokens[i]), tokensOutPipt[i], true);
+      address wethAddress = address(weth);
+      address usdcAddress = address(usdc);
+      address wethPairAddress = uniswapPairByTargetAndTokenAddress[wethAddress][_tokens[i]];
+
+      if (wethPairAddress == address(0)) {
+        address usdPairAddress = uniswapPairByTargetAndTokenAddress[usdcAddress][_tokens[i]];
+        usdOutUniswap[i] = getAmountOutForUniswapValue(
+          IUniswapV2Pair(usdPairAddress),
+          usdcAddress,
+          tokensOutPipt[i],
+          true
+        );
+        ethOutUniswap[i] = getAmountOutForUniswapValue(
+          _uniswapPairFor(wethAddress, usdcAddress),
+          wethAddress,
+          usdOutUniswap[i],
+          true
+        );
+      } else {
+        ethOutUniswap[i] = getAmountOutForUniswapValue(
+          IUniswapV2Pair(wethPairAddress),
+          wethAddress,
+          tokensOutPipt[i],
+          true
+        );
+      }
       totalEthOut = totalEthOut.add(ethOutUniswap[i]);
     }
   }
@@ -274,28 +338,46 @@ contract EthPiptSwap is ProgressiveFee {
     address[] memory tokens = getPiptTokens();
     uint256 len = tokens.length;
 
-    CalculationStruct[] memory calculations = new CalculationStruct[](len);
     uint256[] memory tokensInPipt = new uint256[](len);
 
     uint256 totalEthSwap = 0;
     for (uint256 i = 0; i < len; i++) {
       tokensInPipt[i] = ratio.mul(getPiptTokenBalance(tokens[i])).div(1 ether);
-      totalEthSwap = getAmountInForUniswapValue(_uniswapPairFor(tokens[i]), tokensInPipt[i], true).add(totalEthSwap);
+
+      address wethAddress = address(weth);
+      address usdcAddress = address(usdc);
+      address wethPairAddress = uniswapPairByTargetAndTokenAddress[wethAddress][tokens[i]];
+
+      if (wethPairAddress == address(0)) {
+        address usdPairAddress = uniswapPairByTargetAndTokenAddress[usdcAddress][tokens[i]];
+        uint256 usdAmount = getAmountInForUniswapValue(IUniswapV2Pair(usdPairAddress), usdc, tokensInPipt[i], true);
+        totalEthSwap = getAmountInForUniswapValue(_uniswapPairFor(wethAddress, usdcAddress), weth, usdAmount, true).add(
+          totalEthSwap
+        );
+      } else {
+        totalEthSwap = getAmountInForUniswapValue(IUniswapV2Pair(wethPairAddress), weth, tokensInPipt[i], true).add(
+          totalEthSwap
+        );
+      }
     }
     return totalEthSwap.add(totalEthSwap.mul(_slippage).div(1 ether));
   }
 
-  function calcEthFee(uint256 ethAmount, uint256 wrapperFee) public view returns (uint256 ethFee, uint256 ethAfterFee) {
-    return calcFee(ethAmount, wrapperFee);
+  function calcEthFee(uint256 _ethAmount, uint256 _wrapperFee)
+    public
+    view
+    returns (uint256 ethFee, uint256 ethAfterFee)
+  {
+    return calcFee(_ethAmount, _wrapperFee);
   }
 
-  function calcEthFee(uint256 ethAmount) external view returns (uint256 ethFee, uint256 ethAfterFee) {
-    (ethFee, ethAfterFee) = calcEthFee(ethAmount, getWrapFee(getPiptTokens()));
+  function calcEthFee(uint256 _ethAmount) external view returns (uint256 ethFee, uint256 ethAfterFee) {
+    (ethFee, ethAfterFee) = calcEthFee(_ethAmount, getWrapFee(getPiptTokens()));
   }
 
-  function getWrapFee(address[] memory tokens) public view returns (uint256 wrapperFee) {
+  function getWrapFee(address[] memory _tokens) public view returns (uint256 wrapperFee) {
     if (address(piptWrapper) != address(0)) {
-      wrapperFee = piptWrapper.calcEthFeeForTokens(tokens);
+      wrapperFee = piptWrapper.calcEthFeeForTokens(_tokens);
     }
   }
 
@@ -307,12 +389,20 @@ contract EthPiptSwap is ProgressiveFee {
     return address(piptWrapper) == address(0) ? pipt.getBalance(_token) : piptWrapper.getBalance(_token);
   }
 
+  function getTokenPairs(address _token) external view returns (address wethPair, address usdPair) {
+    return (
+      uniswapPairByTargetAndTokenAddress[address(weth)][_token],
+      uniswapPairByTargetAndTokenAddress[address(usdc)][_token]
+    );
+  }
+
   function getAmountInForUniswap(
     IUniswapV2Pair _tokenPair,
+    IERC20 _targetToken,
     uint256 _swapAmount,
     bool _isEthIn
   ) public view returns (uint256 amountIn, bool isInverse) {
-    isInverse = uniswapEthPairToken0[address(_tokenPair)] == address(weth);
+    isInverse = uniswapPairToken0[address(_tokenPair)] == address(_targetToken);
     if (_isEthIn ? !isInverse : isInverse) {
       (uint256 ethReserve, uint256 tokenReserve, ) = _tokenPair.getReserves();
       amountIn = UniswapV2Library.getAmountIn(_swapAmount, tokenReserve, ethReserve);
@@ -324,18 +414,20 @@ contract EthPiptSwap is ProgressiveFee {
 
   function getAmountInForUniswapValue(
     IUniswapV2Pair _tokenPair,
+    IERC20 _targetToken,
     uint256 _swapAmount,
     bool _isEthIn
   ) public view returns (uint256 amountIn) {
-    (amountIn, ) = getAmountInForUniswap(_tokenPair, _swapAmount, _isEthIn);
+    (amountIn, ) = getAmountInForUniswap(_tokenPair, _targetToken, _swapAmount, _isEthIn);
   }
 
   function getAmountOutForUniswap(
     IUniswapV2Pair _tokenPair,
+    address _targetToken,
     uint256 _swapAmount,
     bool _isEthOut
   ) public view returns (uint256 amountOut, bool isInverse) {
-    isInverse = uniswapEthPairToken0[address(_tokenPair)] == address(weth);
+    isInverse = uniswapPairToken0[address(_tokenPair)] == _targetToken;
     if (_isEthOut ? isInverse : !isInverse) {
       (uint256 ethReserve, uint256 tokenReserve, ) = _tokenPair.getReserves();
       amountOut = UniswapV2Library.getAmountOut(_swapAmount, tokenReserve, ethReserve);
@@ -347,26 +439,31 @@ contract EthPiptSwap is ProgressiveFee {
 
   function getAmountOutForUniswapValue(
     IUniswapV2Pair _tokenPair,
+    address _targetToken,
     uint256 _swapAmount,
     bool _isEthOut
   ) public view returns (uint256 ethAmount) {
-    (ethAmount, ) = getAmountOutForUniswap(_tokenPair, _swapAmount, _isEthOut);
+    (ethAmount, ) = getAmountOutForUniswap(_tokenPair, _targetToken, _swapAmount, _isEthOut);
   }
 
-  function _setUniswapSettingAndPrepareToken(address _token, address _pair) internal {
-    uniswapEthPairByTokenAddress[_token] = _pair;
-    uniswapEthPairToken0[_pair] = IUniswapV2Pair(_pair).token0();
+  function _setUniswapSettingAndPrepareToken(
+    address _targetToken,
+    address _token,
+    address _pair
+  ) internal {
+    uniswapPairByTargetAndTokenAddress[_targetToken][_token] = _pair;
+    uniswapPairToken0[_pair] = IUniswapV2Pair(_pair).token0();
   }
 
-  function _uniswapPairFor(address token) internal view returns (IUniswapV2Pair) {
-    return IUniswapV2Pair(uniswapEthPairByTokenAddress[token]);
+  function _uniswapPairFor(address _targetToken, address _token) internal view returns (IUniswapV2Pair) {
+    return IUniswapV2Pair(uniswapPairByTargetAndTokenAddress[_targetToken][_token]);
   }
 
   function _swapWethToPiptByPoolOut(
     uint256 _wethAmount,
     uint256 _poolAmountOut,
-    address[] memory tokens,
-    uint256 wrapperFee
+    address[] memory _tokens,
+    uint256 _wrapperFee
   ) internal returns (uint256 poolAmountOutAfterFee, uint256 oddEth) {
     require(_wethAmount > 0, "ETH_REQUIRED");
 
@@ -378,8 +475,8 @@ contract EthPiptSwap is ProgressiveFee {
       }
     }
 
-    (uint256 feeAmount, uint256 swapAmount) = calcEthFee(_wethAmount, wrapperFee);
-    (uint256[] memory tokensInPipt, uint256 totalEthSwap) = _prepareTokensForJoin(tokens, _poolAmountOut);
+    (uint256 feeAmount, uint256 swapAmount) = calcEthFee(_wethAmount, _wrapperFee);
+    (uint256[] memory tokensInPipt, uint256 totalEthSwap) = _prepareTokensForJoin(_tokens, _poolAmountOut);
 
     {
       uint256 poolAmountOutFee;
@@ -393,8 +490,8 @@ contract EthPiptSwap is ProgressiveFee {
       emit EthToPiptSwap(msg.sender, swapAmount, feeAmount, _poolAmountOut, poolAmountOutFee);
     }
 
-    _joinPool(_poolAmountOut, tokensInPipt, wrapperFee);
-    totalEthSwap = totalEthSwap.add(wrapperFee);
+    _joinPool(_poolAmountOut, tokensInPipt, _wrapperFee);
+    totalEthSwap = totalEthSwap.add(_wrapperFee);
     pipt.safeTransfer(msg.sender, poolAmountOutAfterFee);
 
     oddEth = swapAmount.sub(totalEthSwap);
@@ -414,7 +511,21 @@ contract EthPiptSwap is ProgressiveFee {
     uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(100);
     for (uint256 i = 0; i < len; i++) {
       tokensInPipt[i] = ratio.mul(getPiptTokenBalance(_tokens[i])).div(1 ether);
-      totalEthSwap = totalEthSwap.add(_swapWethForTokenIn(_tokens[i], tokensInPipt[i]));
+
+      address wethAddress = address(weth);
+      address usdcAddress = address(usdc);
+      address wethPairAddress = uniswapPairByTargetAndTokenAddress[wethAddress][_tokens[i]];
+
+      if (wethPairAddress == address(0)) {
+        address usdPairAddress = uniswapPairByTargetAndTokenAddress[usdcAddress][_tokens[i]];
+        (uint256 usdAmountIn, ) = getAmountInForUniswap(IUniswapV2Pair(usdPairAddress), usdc, tokensInPipt[i], true);
+
+        uint256 ethAmountIn = _swapForTokenIn(weth, address(usdc), usdAmountIn);
+        _swapForTokenIn(usdc, _tokens[i], tokensInPipt[i]);
+        totalEthSwap = totalEthSwap.add(ethAmountIn);
+      } else {
+        totalEthSwap = totalEthSwap.add(_swapForTokenIn(weth, _tokens[i], tokensInPipt[i]));
+      }
 
       address approveAddress = address(piptWrapper) == address(0) ? address(pipt) : address(piptWrapper);
       if (reApproveTokens[_tokens[i]]) {
@@ -428,8 +539,13 @@ contract EthPiptSwap is ProgressiveFee {
     address[] memory tokens = getPiptTokens();
     uint256 len = tokens.length;
 
-    (uint256[] memory tokensOutPipt, uint256[] memory ethOutUniswap, uint256 totalEthOut, uint256 poolAmountFee) =
-      calcSwapPiptToEthInputs(_poolAmountIn, tokens);
+    (
+      uint256[] memory tokensOutPipt,
+      uint256[] memory ethOutUniswap,
+      uint256[] memory usdOutUniswap,
+      uint256 totalEthOut,
+      uint256 poolAmountFee
+    ) = calcSwapPiptToEthInputs(_poolAmountIn, tokens);
 
     pipt.safeTransferFrom(msg.sender, address(this), _poolAmountIn);
 
@@ -440,9 +556,12 @@ contract EthPiptSwap is ProgressiveFee {
     _exitPool(_poolAmountIn, tokensOutPipt, wrapperFee);
 
     for (uint256 i = 0; i < len; i++) {
-      IUniswapV2Pair tokenPair = _uniswapPairFor(tokens[i]);
-      TokenInterface(tokens[i]).safeTransfer(address(tokenPair), tokensOutPipt[i]);
-      tokenPair.swap(uint256(0), ethOutUniswap[i], address(this), new bytes(0));
+      if (usdOutUniswap[i] == 0) {
+        _swapToken(tokens[i], _uniswapPairFor(address(weth), tokens[i]), tokensOutPipt[i], ethOutUniswap[i]);
+      } else {
+        _swapToken(tokens[i], _uniswapPairFor(address(usdc), tokens[i]), tokensOutPipt[i], usdOutUniswap[i]);
+        _swapToken(address(usdc), _uniswapPairFor(address(weth), address(usdc)), usdOutUniswap[i], ethOutUniswap[i]);
+      }
     }
 
     emit PiptToEthSwap(msg.sender, _poolAmountIn, poolAmountFee, ethOutAmount, ethFeeAmount);
@@ -479,27 +598,41 @@ contract EthPiptSwap is ProgressiveFee {
     }
   }
 
-  function _swapWethForTokenIn(address _erc20, uint256 _erc20Out) internal returns (uint256 ethIn) {
-    IUniswapV2Pair tokenPair = _uniswapPairFor(_erc20);
+  function _swapForTokenIn(
+    IERC20 _tokenIn,
+    address _erc20,
+    uint256 _erc20Out
+  ) internal returns (uint256 amountIn) {
+    IUniswapV2Pair tokenPair = _uniswapPairFor(address(_tokenIn), _erc20);
     bool isInverse;
-    (ethIn, isInverse) = getAmountInForUniswap(tokenPair, _erc20Out, true);
-    weth.safeTransfer(address(tokenPair), ethIn);
+    (amountIn, isInverse) = getAmountInForUniswap(tokenPair, _tokenIn, _erc20Out, true);
+    _tokenIn.safeTransfer(address(tokenPair), amountIn);
     tokenPair.swap(isInverse ? uint256(0) : _erc20Out, isInverse ? _erc20Out : uint256(0), address(this), new bytes(0));
   }
 
   function _swapWethForTokenOut(address _erc20, uint256 _ethIn) internal returns (uint256 erc20Out) {
-    IUniswapV2Pair tokenPair = _uniswapPairFor(_erc20);
+    IUniswapV2Pair tokenPair = _uniswapPairFor(address(weth), _erc20);
     bool isInverse;
-    (erc20Out, isInverse) = getAmountOutForUniswap(tokenPair, _ethIn, false);
+    (erc20Out, isInverse) = getAmountOutForUniswap(tokenPair, address(weth), _ethIn, false);
     weth.safeTransfer(address(tokenPair), _ethIn);
     tokenPair.swap(isInverse ? uint256(0) : erc20Out, isInverse ? erc20Out : uint256(0), address(this), new bytes(0));
   }
 
   function _swapTokenForWethOut(address _erc20, uint256 _erc20In) internal returns (uint256 ethOut) {
-    IUniswapV2Pair tokenPair = _uniswapPairFor(_erc20);
+    IUniswapV2Pair tokenPair = _uniswapPairFor(address(weth), _erc20);
     bool isInverse;
-    (ethOut, isInverse) = getAmountOutForUniswap(tokenPair, _erc20In, true);
+    (ethOut, isInverse) = getAmountOutForUniswap(tokenPair, address(weth), _erc20In, true);
     IERC20(_erc20).safeTransfer(address(tokenPair), _erc20In);
     tokenPair.swap(isInverse ? ethOut : uint256(0), isInverse ? uint256(0) : ethOut, address(this), new bytes(0));
+  }
+
+  function _swapToken(
+    address _token,
+    IUniswapV2Pair _tokenPair,
+    uint256 _amountIn,
+    uint256 _amountOut
+  ) internal {
+    IERC20(_token).safeTransfer(address(_tokenPair), _amountIn);
+    _tokenPair.swap(uint256(0), _amountOut, address(this), new bytes(0));
   }
 }

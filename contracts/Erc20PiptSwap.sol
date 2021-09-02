@@ -34,11 +34,12 @@ contract Erc20PiptSwap is EthPiptSwap {
 
   constructor(
     address _weth,
+    address _usdc,
     address _cvp,
     address _pipt,
     address _piptWrapper,
     address _feeManager
-  ) public EthPiptSwap(_weth, _cvp, _pipt, _piptWrapper, _feeManager) {}
+  ) public EthPiptSwap(_weth, _usdc, _cvp, _pipt, _piptWrapper, _feeManager) {}
 
   function swapErc20ToPipt(
     address _swapToken,
@@ -89,7 +90,8 @@ contract Erc20PiptSwap is EthPiptSwap {
       uint256 poolOut
     )
   {
-    uint256 ethAmount = getAmountOutForUniswapValue(_uniswapPairFor(_swapToken), _swapAmount, true);
+    uint256 ethAmount =
+      getAmountOutForUniswapValue(_uniswapPairFor(address(weth), _swapToken), address(weth), _swapAmount, true);
 
     if (_withFee) {
       (, ethAmount) = calcEthFee(ethAmount, getWrapFee(_tokens));
@@ -104,7 +106,7 @@ contract Erc20PiptSwap is EthPiptSwap {
   ) external view returns (uint256) {
     uint256 resultEth = calcNeedEthToPoolOut(_poolAmountOut, _slippage);
 
-    IUniswapV2Pair tokenPair = _uniswapPairFor(_swapToken);
+    IUniswapV2Pair tokenPair = _uniswapPairFor(address(weth), _swapToken);
     (uint256 token1Reserve, uint256 token2Reserve, ) = tokenPair.getReserves();
     if (tokenPair.token0() == address(weth)) {
       return UniswapV2Library.getAmountIn(resultEth.mul(1003).div(1000), token2Reserve, token1Reserve);
@@ -124,17 +126,27 @@ contract Erc20PiptSwap is EthPiptSwap {
     returns (
       uint256[] memory tokensOutPipt,
       uint256[] memory ethOutUniswap,
+      uint256[] memory usdcOutUniswap,
       uint256 totalErc20Out,
       uint256 poolAmountFee
     )
   {
     uint256 totalEthOut;
 
-    (tokensOutPipt, ethOutUniswap, totalEthOut, poolAmountFee) = calcSwapPiptToEthInputs(_poolAmountIn, _tokens);
+    (tokensOutPipt, ethOutUniswap, usdcOutUniswap, totalEthOut, poolAmountFee) = calcSwapPiptToEthInputs(
+      _poolAmountIn,
+      _tokens
+    );
+
     if (_withFee) {
       (, totalEthOut) = calcEthFee(totalEthOut, getWrapFee(_tokens));
     }
-    totalErc20Out = getAmountOutForUniswapValue(_uniswapPairFor(_swapToken), totalEthOut, false);
+    totalErc20Out = getAmountOutForUniswapValue(
+      _uniswapPairFor(address(weth), _swapToken),
+      address(weth),
+      totalEthOut,
+      false
+    );
   }
 
   function calcErc20Fee(address _swapToken, uint256 _swapAmount)
@@ -147,15 +159,15 @@ contract Erc20PiptSwap is EthPiptSwap {
       uint256 ethAfterFee
     )
   {
-    IUniswapV2Pair tokenPair = _uniswapPairFor(_swapToken);
+    IUniswapV2Pair tokenPair = _uniswapPairFor(address(weth), _swapToken);
 
-    uint256 ethAmount = getAmountOutForUniswapValue(tokenPair, _swapAmount, true);
+    uint256 ethAmount = getAmountOutForUniswapValue(tokenPair, address(weth), _swapAmount, true);
 
     (ethFee, ethAfterFee) = calcEthFee(ethAmount, getWrapFee(getPiptTokens()));
 
     if (ethFee != 0) {
-      erc20Fee = getAmountOutForUniswapValue(tokenPair, ethFee, false);
+      erc20Fee = getAmountOutForUniswapValue(tokenPair, address(weth), ethFee, false);
     }
-    erc20AfterFee = getAmountOutForUniswapValue(tokenPair, ethAfterFee, false);
+    erc20AfterFee = getAmountOutForUniswapValue(tokenPair, address(weth), ethAfterFee, false);
   }
 }
