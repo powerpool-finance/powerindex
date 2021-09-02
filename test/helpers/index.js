@@ -1,6 +1,6 @@
 const { ether: rEther } = require('@openzeppelin/test-helpers');
 const TruffleContract = require('@nomiclabs/truffle-contract');
-const template = artifacts.require('Migrations');
+const template = artifacts.require('BPool');
 const { promisify } = require('util');
 const { assert } = require('chai');
 const { web3 } = template;
@@ -127,7 +127,7 @@ async function expectExactRevert(promise, expectedMsg) {
     if (error.message !== expectedMsg && error.message !== coverageTailoredError) {
       assert.equal(
         error.message,
-        `VM Exception while processing transaction: revert ${expectedMsg}`,
+        `VM Exception while processing transaction: reverted with reason string '${expectedMsg}'`,
         'Wrong kind of exception received',
       );
     }

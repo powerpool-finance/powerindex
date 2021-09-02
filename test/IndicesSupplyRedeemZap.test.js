@@ -197,16 +197,17 @@ describe('IndicesSupplyRedeemZap', () => {
       const aliceEthToSwap = ether(10);
       const bobEthToSwap = ether(20);
 
-      const danUsdcToSwap = mwei(5000);
-      const carolUsdcToSwap = mwei(10000);
-      const usdcTokenCap = mwei(11000);
+      const danUsdcToSwap = ether(5000);
+      const carolUsdcToSwap = ether(10000);
+      const usdcTokenCap = ether(11000);
 
-      const erc20PiptSwap = await Erc20PiptSwap.new(this.weth.address, cvp.address, pool.address, zeroAddress, feeManager, {
+      const erc20PiptSwap = await Erc20PiptSwap.new(this.weth.address, usdc.address, cvp.address, pool.address, zeroAddress, feeManager, {
         from: minter,
       });
 
       await erc20PiptSwap.fetchUnswapPairsFromFactory(
         this.uniswapFactory.address,
+        this.weth.address,
         tokens.map(t => t.address),
         { from: minter },
       );
@@ -214,6 +215,7 @@ describe('IndicesSupplyRedeemZap', () => {
       await erc20PiptSwap.setTokensSettings(
         tokens.map(t => t.address),
         pairs.map(p => p.address),
+        this.weth.address,
         pairs.map(() => true),
         { from: minter },
       );
