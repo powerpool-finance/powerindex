@@ -127,7 +127,7 @@ async function expectExactRevert(promise, expectedMsg) {
     if (error.message !== expectedMsg && error.message !== coverageTailoredError) {
       assert.equal(
         error.message,
-        `VM Exception while processing transaction: reverted with reason string '${expectedMsg}'`,
+        `VM Exception while processing transaction: revert ${expectedMsg}`,
         'Wrong kind of exception received',
       );
     }

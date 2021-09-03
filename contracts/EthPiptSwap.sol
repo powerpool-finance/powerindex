@@ -567,15 +567,30 @@ contract EthPiptSwap is ProgressiveFee {
 
     for (uint256 i = 0; i < len; i++) {
       if (usdOutUniswap[i] == 0) {
-        _swapToken(tokens[i], _uniswapPairFor(address(weth), tokens[i]), tokensOutPipt[i], ethOutUniswap[i], false);
+        IUniswapV2Pair wethPair = _uniswapPairFor(address(weth), tokens[i]);
+        _swapToken(
+          tokens[i],
+          wethPair,
+          tokensOutPipt[i],
+          ethOutUniswap[i],
+          uniswapPairToken0[address(wethPair)] == address(weth)
+        );
       } else {
-        _swapToken(tokens[i], _uniswapPairFor(address(usdc), tokens[i]), tokensOutPipt[i], usdOutUniswap[i], false);
+        IUniswapV2Pair usdcPair = _uniswapPairFor(address(usdc), tokens[i]);
+        _swapToken(
+          tokens[i],
+          usdcPair,
+          tokensOutPipt[i],
+          usdOutUniswap[i],
+          uniswapPairToken0[address(usdcPair)] == address(usdc)
+        );
+        IUniswapV2Pair wethPair = _uniswapPairFor(address(weth), address(usdc));
         _swapToken(
           address(usdc),
-          _uniswapPairFor(address(weth), address(usdc)),
+          wethPair,
           usdOutUniswap[i],
           ethOutUniswap[i],
-          false
+          uniswapPairToken0[address(wethPair)] == address(weth)
         );
       }
     }
