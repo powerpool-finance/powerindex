@@ -107,11 +107,12 @@ contract Erc20PiptSwap is EthPiptSwap {
     uint256 resultEth = calcNeedEthToPoolOut(_poolAmountOut, _slippage);
 
     IUniswapV2Pair tokenPair = _uniswapPairFor(address(weth), _swapToken);
+    uint256 fee = getPairSwapFee(tokenPair);
     (uint256 token1Reserve, uint256 token2Reserve, ) = tokenPair.getReserves();
     if (tokenPair.token0() == address(weth)) {
-      return UniswapV2Library.getAmountIn(resultEth.mul(1003).div(1000), token2Reserve, token1Reserve);
+      return UniswapV2Library.getAmountIn(resultEth.mul(1e4 + fee).div(1e4), token2Reserve, token1Reserve);
     } else {
-      return UniswapV2Library.getAmountIn(resultEth.mul(1003).div(1000), token1Reserve, token2Reserve);
+      return UniswapV2Library.getAmountIn(resultEth.mul(1e4 + fee).div(1e4), token1Reserve, token2Reserve);
     }
   }
 

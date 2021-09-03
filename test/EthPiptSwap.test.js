@@ -179,6 +179,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         pairs.map(p => p.address),
         this.weth.address,
         pairs.map(() => true),
+        '0',
         {from: minter},
       );
 
@@ -230,6 +231,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           pairs.map(p => p.address),
           this.weth.address,
           pairs.map(() => true),
+          '0',
           { from: bob },
         ),
         'Ownable: caller is not the owner',
@@ -240,6 +242,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         pairs.map(p => p.address),
         this.weth.address,
         pairs.map(() => true),
+        '0',
         { from: minter },
       );
 
@@ -379,6 +382,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           this.uniswapFactory.address,
           this.weth.address,
           tokens.map(t => t.address),
+          '0',
           { from: bob },
         ), 'Ownable: caller is not the owner');
 
@@ -386,6 +390,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           this.uniswapFactory.address,
           this.weth.address,
           tokens.map(t => t.address),
+          '0',
           { from: minter },
         );
       });
@@ -504,6 +509,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         this.uniswapFactory.address,
         this.weth.address,
         tokens.map(t => t.address),
+        '0',
         { from: minter },
       )
 
@@ -547,6 +553,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           this.uniswapFactory.address,
           this.weth.address,
           tokens.map(t => t.address),
+          '0',
           {from: minter},
         );
 
@@ -810,6 +817,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         pairs.map(p => p.address).slice(0, 19),
         this.weth.address,
         pairs.map(() => true).slice(0, 19),
+        '0',
         {from: minter},
       );
 
@@ -818,6 +826,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
         pairs.map(p => p.address).slice(19, 20),
         usdc.address,
         pairs.map(() => true).slice(19, 20),
+        '0',
         {from: minter},
       );
 

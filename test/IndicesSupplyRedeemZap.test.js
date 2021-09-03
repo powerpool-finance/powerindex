@@ -209,6 +209,7 @@ describe('IndicesSupplyRedeemZap', () => {
         this.uniswapFactory.address,
         this.weth.address,
         tokens.map(t => t.address),
+        '0',
         { from: minter },
       );
 
@@ -217,6 +218,7 @@ describe('IndicesSupplyRedeemZap', () => {
         pairs.map(p => p.address),
         this.weth.address,
         pairs.map(() => true),
+        '0',
         { from: minter },
       );
 

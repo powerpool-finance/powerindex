@@ -31,6 +31,7 @@ contract EthPiptSwap is ProgressiveFee {
   mapping(address => address) public uniswapPairToken0;
   mapping(address => bool) public reApproveTokens;
   mapping(address => bool) public simplePairs;
+  mapping(address => uint256) public customPairsFee;
   uint256 public defaultSlippage;
   uint256 public defaultDiffPercent;
 
@@ -46,6 +47,7 @@ contract EthPiptSwap is ProgressiveFee {
   event SetDefaultSlippage(uint256 newDefaultSlippage);
   event SetPiptWrapper(address _piptWrapper);
   event SetSimplePairs(address indexed pair, bool indexed isSimple);
+  event SetCustomPairFee(address indexed pair, uint256 isSimple);
 
   event EthToPiptSwap(
     address indexed user,
@@ -166,12 +168,13 @@ contract EthPiptSwap is ProgressiveFee {
     address[] memory _tokens,
     address[] memory _pairs,
     address _pairTargetToken,
-    bool[] memory _reapprove
+    bool[] memory _reapprove,
+    uint256 _customPairFee
   ) external onlyOwner {
     uint256 len = _tokens.length;
     require(len == _pairs.length && len == _reapprove.length, "LENGTHS_NOT_EQUAL");
     for (uint256 i = 0; i < len; i++) {
-      _setUniswapSettingAndPrepareToken(_pairTargetToken, _tokens[i], _pairs[i]);
+      _setUniswapSettingAndPrepareToken(_pairTargetToken, _tokens[i], _pairs[i], _customPairFee);
       reApproveTokens[_tokens[i]] = _reapprove[i];
       emit SetTokenSetting(_tokens[i], _reapprove[i], _pairs[i]);
     }
@@ -185,17 +188,27 @@ contract EthPiptSwap is ProgressiveFee {
     }
   }
 
+  function setPairsCustomFee(address[] memory _pairs, uint256 _fee) external onlyOwner {
+    uint256 len = _pairs.length;
+    for (uint256 i = 0; i < len; i++) {
+      customPairsFee[_pairs[i]] = _fee;
+      emit SetCustomPairFee(_pairs[i], _fee);
+    }
+  }
+
   function fetchUnswapPairsFromFactory(
     address _factory,
     address _targetToken,
-    address[] calldata _tokens
+    address[] calldata _tokens,
+    uint256 _customPairFee
   ) external onlyOwner {
     uint256 len = _tokens.length;
     for (uint256 i = 0; i < len; i++) {
       _setUniswapSettingAndPrepareToken(
         _targetToken,
         _tokens[i],
-        IUniswapV2Factory(_factory).getPair(_tokens[i], _targetToken)
+        IUniswapV2Factory(_factory).getPair(_tokens[i], _targetToken),
+        _customPairFee
       );
     }
   }
@@ -391,6 +404,13 @@ contract EthPiptSwap is ProgressiveFee {
     }
   }
 
+  function getPairSwapFee(IUniswapV2Pair _tokenPair) public view returns (uint256 fee) {
+    fee = customPairsFee[address(_tokenPair)];
+    if (fee == 0) {
+      fee = 30;
+    }
+  }
+
   function getPiptTokens() public view returns (address[] memory) {
     return address(piptWrapper) == address(0) ? pipt.getCurrentTokens() : piptWrapper.getCurrentTokens();
   }
@@ -438,12 +458,13 @@ contract EthPiptSwap is ProgressiveFee {
     bool _isEthOut
   ) public view returns (uint256 amountOut, bool isInverse) {
     isInverse = uniswapPairToken0[address(_tokenPair)] == _targetToken;
+    uint256 fee = getPairSwapFee(_tokenPair);
     if (_isEthOut ? isInverse : !isInverse) {
       (uint256 ethReserve, uint256 tokenReserve, ) = _tokenPair.getReserves();
-      amountOut = UniswapV2Library.getAmountOut(_swapAmount, tokenReserve, ethReserve);
+      amountOut = UniswapV2Library.getAmountOut(_swapAmount, tokenReserve, ethReserve, fee);
     } else {
       (uint256 tokenReserve, uint256 ethReserve, ) = _tokenPair.getReserves();
-      amountOut = UniswapV2Library.getAmountOut(_swapAmount, tokenReserve, ethReserve);
+      amountOut = UniswapV2Library.getAmountOut(_swapAmount, tokenReserve, ethReserve, fee);
     }
   }
 
@@ -459,10 +480,14 @@ contract EthPiptSwap is ProgressiveFee {
   function _setUniswapSettingAndPrepareToken(
     address _targetToken,
     address _token,
-    address _pair
+    address _pair,
+    uint256 _customPairFee
   ) internal {
     uniswapPairByTargetAndTokenAddress[_targetToken][_token] = _pair;
     uniswapPairToken0[_pair] = IUniswapV2Pair(_pair).token0();
+    if (customPairsFee[_pair] != _customPairFee) {
+      customPairsFee[_pair] = _customPairFee;
+    }
   }
 
   function _uniswapPairFor(address _targetToken, address _token) internal view returns (IUniswapV2Pair) {
