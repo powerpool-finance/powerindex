@@ -1,6 +1,6 @@
 const { ether: rEther } = require('@openzeppelin/test-helpers');
 const TruffleContract = require('@nomiclabs/truffle-contract');
-const template = artifacts.require('Migrations');
+const template = artifacts.require('BPool');
 const { promisify } = require('util');
 const { assert } = require('chai');
 const { web3 } = template;

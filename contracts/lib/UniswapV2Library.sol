@@ -40,20 +40,30 @@ library UniswapV2Library {
 
   // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
   function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) internal pure returns (uint amountOut) {
-    require(amountIn > 0, 'UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT');
-    require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
-    uint amountInWithFee = amountIn.mul(997);
-    uint numerator = amountInWithFee.mul(reserveOut);
-    uint denominator = reserveIn.mul(1000).add(amountInWithFee);
-    amountOut = numerator / denominator;
+    return getAmountOut(amountIn, reserveIn, reserveOut, 30);
   }
 
   // given an output amount of an asset and pair reserves, returns a required input amount of the other asset
   function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) internal pure returns (uint amountIn) {
+    return getAmountIn(amountOut, reserveIn, reserveOut, 30);
+  }
+
+  // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
+  function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut, uint fee) internal pure returns (uint amountOut) {
+    require(amountIn > 0, 'UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT');
+    require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
+    uint amountInWithFee = amountIn.mul(1e4 - fee);
+    uint numerator = amountInWithFee.mul(reserveOut);
+    uint denominator = reserveIn.mul(1e4).add(amountInWithFee);
+    amountOut = numerator / denominator;
+  }
+
+  // given an output amount of an asset and pair reserves, returns a required input amount of the other asset
+  function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut, uint fee) internal pure returns (uint amountIn) {
     require(amountOut > 0, 'UniswapV2Library: INSUFFICIENT_OUTPUT_AMOUNT');
     require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
-    uint numerator = reserveIn.mul(amountOut).mul(1000);
-    uint denominator = reserveOut.sub(amountOut).mul(997);
+    uint numerator = reserveIn.mul(amountOut).mul(1e4);
+    uint denominator = reserveOut.sub(amountOut).mul(1e4 - fee);
     amountIn = (numerator / denominator).add(1);
   }
 
