@@ -586,9 +586,9 @@ contract EthPiptSwap is ProgressiveFee {
 
     uint256 wrapperFee = getWrapFee(tokens);
 
-    (uint256 ethFeeAmount, uint256 ethOutAmount) = calcEthFee(totalEthOut, wrapperFee);
-
     _exitPool(_poolAmountIn, tokensOutPipt, wrapperFee);
+
+    totalEthOut = 0;
 
     for (uint256 i = 0; i < len; i++) {
       if (usdOutUniswap[i] == 0) {
@@ -600,6 +600,7 @@ contract EthPiptSwap is ProgressiveFee {
           ethOutUniswap[i],
           uniswapPairToken0[address(wethPair)] == address(weth)
         );
+        totalEthOut = totalEthOut.add(ethOutUniswap[i]);
       } else {
         IUniswapV2Pair usdcPair = _uniswapPairFor(address(usdc), tokens[i]);
         _swapToken(
@@ -609,7 +610,9 @@ contract EthPiptSwap is ProgressiveFee {
           usdOutUniswap[i],
           uniswapPairToken0[address(usdcPair)] == address(usdc)
         );
+
         IUniswapV2Pair wethPair = _uniswapPairFor(address(weth), address(usdc));
+        ethOutUniswap[i] = getAmountOutForUniswapValue(wethPair, address(weth), usdOutUniswap[i], true);
         _swapToken(
           address(usdc),
           wethPair,
@@ -617,8 +620,12 @@ contract EthPiptSwap is ProgressiveFee {
           ethOutUniswap[i],
           uniswapPairToken0[address(wethPair)] == address(weth)
         );
+
+        totalEthOut = totalEthOut.add(ethOutUniswap[i]);
       }
     }
+
+    (uint256 ethFeeAmount, uint256 ethOutAmount) = calcEthFee(totalEthOut, wrapperFee);
 
     emit PiptToEthSwap(msg.sender, _poolAmountIn, poolAmountFee, ethOutAmount, ethFeeAmount);
 
