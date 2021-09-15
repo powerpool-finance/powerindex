@@ -46,6 +46,7 @@ describe('SushiRouter Stories', () => {
         xSushi.address,
         ether('0.2'),
         ether('0.02'),
+        ether('0.3'),
         '0',
         pvp,
         ether('0.15'),
@@ -211,7 +212,7 @@ describe('SushiRouter Stories', () => {
 
     ///////////////////////////////////////////
     // Step #8. Bob router withdrawal 100 SUSHI
-    await sushiRouter.setReserveConfig(ether('0.4'), '0', {from: piGov})
+    await sushiRouter.setReserveConfig(ether('0.4'), ether('0.1'), ether('0.5'),'0', {from: piGov})
     await sushiRouter.poke(false);
 
     assert.equal(await sushi.balanceOf(piSushi.address), '173999999999999999999');
@@ -221,7 +222,7 @@ describe('SushiRouter Stories', () => {
     await piSushi.approve(piSushi.address, ether(100), { from: bob });
     await piSushi.withdraw(ether(100), { from: bob });
 
-    await sushiRouter.setReserveConfig(ether('0.2'), '0', {from: piGov})
+    await sushiRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.5'), '0', {from: piGov})
     await sushiRouter.poke(false);
 
     // assertions
@@ -295,12 +296,12 @@ describe('SushiRouter Stories', () => {
     // Step #11. Alice router withdrawal 185 SUSHI
     await pool.transfer(piSushi.address, alice, ether(1));
 
-    await sushiRouter.setReserveConfig(ether('0.8'), '0', {from: piGov})
+    await sushiRouter.setReserveConfig(ether('0.8'), ether('0.1'), ether('0.9'), '0', {from: piGov})
     await sushiRouter.poke(false);
 
     await piSushi.withdraw(ether(185), { from: alice });
 
-    await sushiRouter.setReserveConfig(ether('0.2'), '0', {from: piGov})
+    await sushiRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.5'), '0', {from: piGov})
     await sushiRouter.poke(false);
 
     // assertions
@@ -345,7 +346,7 @@ describe('SushiRouter Stories', () => {
 
     //////////////////////////////////////////////////////////////////////////////////
     // Step #13. Bob router withdrawal 150 SUSHI - 5 wei
-    await sushiRouter.setReserveConfig(ether('1'), '0', {from: piGov})
+    await sushiRouter.setReserveConfig(ether(1), ether('0.5'), ether(1), '0', {from: piGov})
     await sushiRouter.poke(false);
 
     await piSushi.withdraw('149999999999999999995', { from: bob });

@@ -144,6 +144,7 @@ describe('AaveRouter Tests', () => {
           stakedAave.address,
           ether('0.2'),
           ether('0.02'),
+          ether('0.3'),
           '0',
           pvp,
           ether('0.2'),
@@ -175,6 +176,7 @@ describe('AaveRouter Tests', () => {
           stakedAave.address,
           ether('0.2'),
           ether('0.02'),
+          ether('0.3'),
           '172801',
           pvp,
           ether('0.2'),
@@ -189,9 +191,11 @@ describe('AaveRouter Tests', () => {
     describe('owner methods', async () => {
       describe('setReserveConfig()', () => {
         it('should allow the owner setting a reserve config', async () => {
-          const res = await aaveRouter.setReserveConfig(ether('0.2'), 3600, { from: piGov });
+          const res = await aaveRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.5'), 3600, { from: piGov });
           expectEvent(res, 'SetReserveConfig', {
             ratio: ether('0.2'),
+            ratioLowerBound: ether('0.1'),
+            ratioUpperBound: ether('0.5'),
             claimRewardsInterval: '3600'
           });
           assert.equal(await aaveRouter.reserveRatio(), ether('0.2'))
@@ -199,11 +203,11 @@ describe('AaveRouter Tests', () => {
         });
 
         it('should deny setting a reserve ratio greater or equal 100%', async () => {
-          await expectRevert(aaveRouter.setReserveConfig(ether('1.01'), 0, { from: piGov }), 'RR_GREATER_THAN_100_PCT');
+          await expectRevert(aaveRouter.setReserveConfig(ether('1.01'), ether('0.3'), ether('1.01'), 0, { from: piGov }), 'UPPER_RR_GREATER_THAN_100_PCT');
         });
 
         it('should deny non-owner setting reserve config', async () => {
-          await expectRevert(aaveRouter.setReserveConfig(ether('0.2'), 3600, { from: alice }), 'Ownable: caller is not the owner');
+          await expectRevert(aaveRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.3'), 3600, { from: alice }), 'Ownable: caller is not the owner');
         });
       });
 
@@ -405,7 +409,7 @@ describe('AaveRouter Tests', () => {
         assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
         assert.equal(await aave.balanceOf(piAave.address), ether(2000));
 
-        await aaveRouter.setReserveConfig(ether('0.2'), time.duration.hours(1), { from: piGov });
+        await aaveRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.5'), time.duration.hours(1), { from: piGov });
       });
 
       it('should DO rebalance on deposit if the rebalancing interval has passed', async () => {
@@ -618,6 +622,7 @@ describe('AaveRouter Tests', () => {
             stakedAave.address,
             ether('0.2'),
             ether('0.02'),
+            ether('0.3'),
             '0',
             pvp,
             ether('0.2'),
@@ -645,6 +650,7 @@ describe('AaveRouter Tests', () => {
             stakedAave.address,
             ether('0.2'),
             ether('0.02'),
+            ether('0.3'),
             '0',
             pvp,
             0,

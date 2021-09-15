@@ -111,6 +111,7 @@ describe('AutoRouter Tests', () => {
         autoFarm.address,
         ether('0.2'),
         ether('0.02'),
+        ether('0.3'),
         '0',
         pvp,
         ether('0.15'),
@@ -379,7 +380,7 @@ describe('AutoRouter Tests', () => {
     describe('when interval enabled', () => {
       beforeEach(async () => {
         await time.increase(time.duration.weeks(1));
-        await autoRouter.setReserveConfig(ether('0.2'), time.duration.hours(1), { from: piGov });
+        await autoRouter.setReserveConfig(ether('0.2'), ether('0.01'), ether('0.9'), time.duration.hours(1), { from: piGov });
         await poke.setMinMaxReportIntervals(time.duration.hours(1), time.duration.hours(2));
         await autoRouter.poke(false, { from: bob });
       });
@@ -468,7 +469,7 @@ describe('AutoRouter Tests', () => {
     });
 
     it('should stake all the underlying tokens with 0 RR', async () => {
-      await autoRouter.setReserveConfig(ether(0), 0, { from: piGov });
+      await autoRouter.setReserveConfig(ether(0), ether('0'), ether('0.5'), 0, { from: piGov });
 
       await autoRouter.poke(false, { from: bob });
       assert.equal(await auto.balanceOf(autoStrategy.address), ether(52000));
@@ -476,7 +477,7 @@ describe('AutoRouter Tests', () => {
     })
 
     it('should keep all the underlying tokens on piToken with 1 RR', async () => {
-      await autoRouter.setReserveConfig(ether(1), 0, { from: piGov });
+      await autoRouter.setReserveConfig(ether(1), ether('0'), ether(1), 0, { from: piGov });
       await time.increase(time.duration.weeks(1));
 
       await autoRouter.poke(false, { from: bob });
@@ -572,11 +573,11 @@ describe('AutoRouter Tests', () => {
 
     it('should revert poke if there is nothing released', async () => {
       const scammyChef = await MockAutoMasterChef.new(auto.address, ether(8320));
-      await autoRouter.setReserveConfig(ether(1), 0, { from: piGov });
+      await autoRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
       await time.increase(time.duration.weeks(1));
       await autoRouter.poke(false);
       await autoRouter.setVotingAndStaking(constants.ZERO_ADDRESS, scammyChef.address, { from: piGov });
-      await autoRouter.setReserveConfig(ether('0.2'), 0, { from: piGov });
+      await autoRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.3'), 0, { from: piGov });
       await autoRouter.poke(false);
       await auto.transfer(scammyChef.address, ether(1000));
       await expectRevert(autoRouter.poke(true, { from: alice }), 'NOTHING_RELEASED');
@@ -593,6 +594,7 @@ describe('AutoRouter Tests', () => {
           autoFarm.address,
           ether('0.2'),
           ether('0.02'),
+          ether('0.3'),
           '0',
           pvp,
           ether('0.2'),

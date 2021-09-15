@@ -128,6 +128,7 @@ describe('VenusRouter Tests', () => {
         vUsdc.address,
         ether('0.2'),
         ether('0.02'),
+        ether('0.3'),
         '0',
         pvp,
         ether('0.15'),
@@ -408,7 +409,7 @@ describe('VenusRouter Tests', () => {
 
     describe('when interval enabled', () => {
       beforeEach(async () => {
-        await venusRouter.setReserveConfig(ether('0.2'), time.duration.hours(1), { from: piGov });
+        await venusRouter.setReserveConfig(ether('0.2'), ether('0.02'), ether('0.3'), time.duration.hours(1), { from: piGov });
         await poke.setMinMaxReportIntervals(time.duration.hours(1), time.duration.hours(2));
         await venusRouter.poke(false, { from: bob });
       });
@@ -497,7 +498,7 @@ describe('VenusRouter Tests', () => {
     });
 
     it('should stake all the underlying tokens with 0 RR', async () => {
-      await venusRouter.setReserveConfig(ether(0), 0, { from: piGov });
+      await venusRouter.setReserveConfig(ether(0), ether(0), ether(1), 0, { from: piGov });
 
       await venusRouter.poke(false, { from: bob });
       assert.equal(await usdc.balanceOf(vUsdc.address), ether(52000));
@@ -505,7 +506,7 @@ describe('VenusRouter Tests', () => {
     });
 
     it('should keep all the underlying tokens on piToken with 1 RR', async () => {
-      await venusRouter.setReserveConfig(ether(1), 0, { from: piGov });
+      await venusRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
 
       await venusRouter.poke(false, { from: bob });
       assert.equal(await usdc.balanceOf(vUsdc.address), ether(42000));
@@ -669,6 +670,7 @@ describe('VenusRouter Tests', () => {
           vUsdc.address,
           ether('0.2'),
           ether('0.02'),
+          ether('0.2'),
           '0',
           pvp,
           ether('0.2'),

@@ -46,6 +46,7 @@ describe('SushiRouter Tests', () => {
         xSushi.address,
         ether('0.2'),
         ether('0.02'),
+        ether('0.3'),
         '0',
         pvp,
         ether('0.15'),
@@ -296,7 +297,7 @@ describe('SushiRouter Tests', () => {
 
     describe('when interval enabled', () => {
       beforeEach(async () => {
-        await sushiRouter.setReserveConfig(ether('0.2'), time.duration.hours(1), { from: piGov });
+        await sushiRouter.setReserveConfig(ether('0.2'), ether('0.02'), ether('0.3'), time.duration.hours(1), { from: piGov });
         await poke.setMinMaxReportIntervals(time.duration.hours(1), time.duration.hours(2));
         await sushiRouter.poke(false, { from: bob });
       });
@@ -338,17 +339,47 @@ describe('SushiRouter Tests', () => {
         await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
       });
 
-      it('should rebalance if the rebalancing interval not passed but reserveRatioToForceRebalance has reached', async () => {
-        await time.increase(time.duration.minutes(59));
+      describe('when the rebalancing interval hasnt passed yet', async () => {
+        beforeEach(async () => {
+          await time.increase(time.duration.minutes(59));
+          assert.equal(await sushiRouter.getReserveStatusForStakedBalance().then(s => s.forceRebalance), false);
+        });
 
-        assert.equal(await sushiRouter.getReserveStatusForStakedBalance().then(s => s.forceRebalance), false);
-        await piSushi.withdraw(ether(2000), { from: alice });
-        assert.equal(await sushiRouter.getReserveStatusForStakedBalance().then(s => s.forceRebalance), true);
-        await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
+        it('should allow rabalancing if reserveRatioLowerBound has reached', async () => {
+          await piSushi.withdraw(ether(1900), { from: alice });
 
-        assert.equal(await sushi.balanceOf(xSushi.address), ether(48400));
-        assert.equal(await xSushi.balanceOf(piSushi.address), ether(6400));
-        assert.equal(await sushi.balanceOf(piSushi.address), ether(1600));
+          assert.equal(await sushiRouter.getReserveStatusForStakedBalance().then(s => s.forceRebalance), true);
+          await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
+
+          assert.equal(await sushi.balanceOf(xSushi.address), ether(48480));
+          assert.equal(await xSushi.balanceOf(piSushi.address), ether(6480));
+          assert.equal(await sushi.balanceOf(piSushi.address), ether(1620));
+        });
+
+        it('should not rebalance if the current RR is slightly higher than lowerBound', async () => {
+          await piSushi.withdraw(ether(1800), { from: alice });
+          assert.equal(await sushiRouter.getReserveStatusForStakedBalance().then(s => s.forceRebalance), false);
+          await expectRevert(sushiRouter.pokeFromReporter('0', false, '0x', { from: bob }), 'MIN_INTERVAL_NOT_REACHED');
+        });
+
+        it('should not rebalance if the current RR is slightly lower than upperBound', async () => {
+          await sushi.approve(piSushi.address, ether(1400), { from: alice });
+          await piSushi.deposit(ether(1400), { from: alice });
+          assert.equal(await sushiRouter.getReserveStatusForStakedBalance().then(s => s.forceRebalance), false);
+          await expectRevert(sushiRouter.pokeFromReporter('0', false, '0x', { from: bob }), 'MIN_INTERVAL_NOT_REACHED');
+        });
+
+        it('should allow rabalancing if reserveRatioLowerBound has reached', async () => {
+          await sushi.approve(piSushi.address, ether(1500), { from: alice });
+          await piSushi.deposit(ether(1500), { from: alice });
+
+          assert.equal(await sushiRouter.getReserveStatusForStakedBalance().then(s => s.forceRebalance), true);
+          await sushiRouter.pokeFromReporter('0', false, '0x', { from: bob });
+
+          assert.equal(await sushi.balanceOf(xSushi.address), ether(51200));
+          assert.equal(await xSushi.balanceOf(piSushi.address), ether(9200));
+          assert.equal(await sushi.balanceOf(piSushi.address), ether(2300));
+        });
       });
     });
 
@@ -385,7 +416,7 @@ describe('SushiRouter Tests', () => {
     });
 
     it('should stake all the underlying tokens with 0 RR', async () => {
-      await sushiRouter.setReserveConfig(ether(0), 0, { from: piGov });
+      await sushiRouter.setReserveConfig(ether(0), ether(0), ether(1), 0, { from: piGov });
 
       await sushiRouter.poke(false, { from: bob });
       assert.equal(await sushi.balanceOf(xSushi.address), ether(52000));
@@ -393,7 +424,7 @@ describe('SushiRouter Tests', () => {
     })
 
     it('should keep all the underlying tokens on piToken with 1 RR', async () => {
-      await sushiRouter.setReserveConfig(ether(1), 0, { from: piGov });
+      await sushiRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
 
       await sushiRouter.poke(false, { from: bob });
       assert.equal(await sushi.balanceOf(xSushi.address), ether(42000));
@@ -486,10 +517,10 @@ describe('SushiRouter Tests', () => {
 
     it('should revert poke if there is nothing released', async () => {
       const scammyBar = await MockSushiBar.new(sushi.address);
-      await sushiRouter.setReserveConfig(ether(1), 0, { from: piGov });
+      await sushiRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
       await sushiRouter.poke(false);
       await sushiRouter.setVotingAndStaking(constants.ZERO_ADDRESS, scammyBar.address, { from: piGov });
-      await sushiRouter.setReserveConfig(ether('0.2'), 0, { from: piGov });
+      await sushiRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.2'), 0, { from: piGov });
       await sushiRouter.poke(false);
       await sushi.transfer(scammyBar.address, ether(1000));
       await expectRevert(sushiRouter.poke(true, { from: alice }), 'NOTHING_RELEASED');
@@ -506,6 +537,7 @@ describe('SushiRouter Tests', () => {
           xSushi.address,
           ether('0.2'),
           ether('0.02'),
+          ether('0.3'),
           '0',
           pvp,
           ether('0.2'),

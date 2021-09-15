@@ -63,6 +63,7 @@ describe('BakeryMasterChefRouter Tests', () => {
         bakeryChef.address,
         ether('0.2'),
         ether('0.02'),
+        ether('0.3'),
         '0',
         pvp,
         ether('0.15'),
@@ -227,7 +228,7 @@ describe('BakeryMasterChefRouter Tests', () => {
 
     describe('when interval enabled', () => {
       beforeEach(async () => {
-        await myRouter.setReserveConfig(ether('0.2'), time.duration.hours(1), { from: piGov });
+        await myRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.3'), time.duration.hours(1), { from: piGov });
         await poke.setMinMaxReportIntervals(time.duration.hours(1), time.duration.hours(2), { from: piGov });
       });
 
@@ -305,7 +306,7 @@ describe('BakeryMasterChefRouter Tests', () => {
     });
 
     it('should stake all the underlying tokens with 0 RR', async () => {
-      await myRouter.setReserveConfig(ether(0), 0, { from: piGov });
+      await myRouter.setReserveConfig(ether(0), ether(0), ether(1), 0, { from: piGov });
 
       await myRouter.poke(false, { from: bob });
       assert.equal(await bake.balanceOf(bakeryChef.address), ether('53073.015873016000000000'));
@@ -313,7 +314,7 @@ describe('BakeryMasterChefRouter Tests', () => {
     });
 
     it('should keep all the underlying tokens on piToken with 1 RR', async () => {
-      await myRouter.setReserveConfig(ether(1), 0, { from: piGov });
+      await myRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
 
       await myRouter.poke(false, { from: bob });
       assert.equal(await bake.balanceOf(bakeryChef.address), ether('43073.015873016000000000'));
@@ -393,10 +394,10 @@ describe('BakeryMasterChefRouter Tests', () => {
 
     it('should revert poke if there is nothing released', async () => {
       const dishonestChef = await MockBakeryMasterChef.new(bake.address);
-      await myRouter.setReserveConfig(ether(1), 0, { from: piGov });
+      await myRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
       await myRouter.poke(false);
       await myRouter.setVotingAndStaking(constants.ZERO_ADDRESS, dishonestChef.address, { from: piGov });
-      await myRouter.setReserveConfig(ether('0.2'), 0, { from: piGov });
+      await myRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.3'), 0, { from: piGov });
 
       // there are still some rewards from rebalancing pokes
       await myRouter.poke(true, { from: alice });
@@ -416,6 +417,7 @@ describe('BakeryMasterChefRouter Tests', () => {
           bakeryChef.address,
           ether('0.2'),
           ether('0.02'),
+          ether('0.3'),
           '0',
           pvp,
           ether('0.2'),

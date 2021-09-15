@@ -63,6 +63,7 @@ describe('AaveRouter Stories', () => {
         stakedAave.address,
         ether('0.2'),
         ether('0.02'),
+        ether('0.3'),
         '0',
         stub,
         ether('0.2'),

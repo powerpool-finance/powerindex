@@ -76,6 +76,7 @@ describe('YearnRouter Tests', () => {
         yearnGovernance.address,
         ether('0.2'),
         ether('0.02'),
+        ether('0.3'),
         '0',
         pvp,
         ether('0.15'),
@@ -354,7 +355,7 @@ describe('YearnRouter Tests', () => {
 
     describe('when interval enabled', () => {
       beforeEach(async () => {
-        await yfiRouter.setReserveConfig(ether('0.2'), time.duration.hours(1), { from: piGov });
+        await yfiRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.3'), time.duration.hours(1), { from: piGov });
         await poke.setMinMaxReportIntervals(time.duration.hours(1), time.duration.hours(2), { from: piGov });
       });
 
@@ -451,7 +452,7 @@ describe('YearnRouter Tests', () => {
     });
 
     it('should stake all the underlying tokens with 0 RR', async () => {
-      await yfiRouter.setReserveConfig(ether(0), 0, { from: piGov });
+      await yfiRouter.setReserveConfig(ether(0), ether(0), ether(1), 0, { from: piGov });
 
       await yfiRouter.poke(false, { from: bob });
       assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(52000));
@@ -459,7 +460,7 @@ describe('YearnRouter Tests', () => {
     })
 
     it('should keep all the underlying tokens on piToken with 1 RR', async () => {
-      await yfiRouter.setReserveConfig(ether(1), 0, { from: piGov });
+      await yfiRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
 
       await yfiRouter.poke(false, { from: bob });
       assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(42000));
@@ -621,6 +622,7 @@ describe('YearnRouter Tests', () => {
           yearnGovernance.address,
           ether('0.2'),
           ether('0.02'),
+          ether('0.2'),
           '0',
           pvp,
           ether('0.2'),
@@ -652,6 +654,7 @@ describe('YearnRouter Tests', () => {
           yearnGovernance.address,
           ether('0.2'),
           ether('0.02'),
+          ether('0.3'),
           '0',
           pvp,
           ether('0.2'),

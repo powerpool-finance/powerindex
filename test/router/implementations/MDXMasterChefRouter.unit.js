@@ -51,6 +51,7 @@ describe('MDXMasterChefRouter Tests', () => {
         boardRoomMDX.address,
         ether('0.2'),
         ether('0.02'),
+        ether('0.3'),
         '0',
         pvp,
         ether('0.15'),
@@ -222,7 +223,7 @@ describe('MDXMasterChefRouter Tests', () => {
 
     describe('when interval enabled', () => {
       beforeEach(async () => {
-        await myRouter.setReserveConfig(ether('0.2'), time.duration.hours(1), { from: piGov });
+        await myRouter.setReserveConfig(ether('0.2'), ether('0.02'), ether('0.3'), time.duration.hours(1), { from: piGov });
         await poke.setMinMaxReportIntervals(time.duration.hours(1), time.duration.hours(2), { from: piGov });
       });
 
@@ -300,7 +301,7 @@ describe('MDXMasterChefRouter Tests', () => {
     });
 
     it('should stake all the underlying tokens with 0 RR', async () => {
-      await myRouter.setReserveConfig(ether(0), 0, { from: piGov });
+      await myRouter.setReserveConfig(ether(0), ether(0), ether(1), 0, { from: piGov });
 
       await myRouter.poke(false, { from: bob });
       assert.equal(await mdx.balanceOf(boardRoomMDX.address), ether('570396.160000000000000000'));
@@ -308,7 +309,7 @@ describe('MDXMasterChefRouter Tests', () => {
     });
 
     it('should keep all the underlying tokens on piToken with 1 RR', async () => {
-      await myRouter.setReserveConfig(ether(1), 0, { from: piGov });
+      await myRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
 
       await myRouter.poke(false, { from: bob });
       assert.equal(await mdx.balanceOf(boardRoomMDX.address), ether('560396.160000000000000000'));
@@ -388,10 +389,10 @@ describe('MDXMasterChefRouter Tests', () => {
 
     it('should revert poke if there is nothing released', async () => {
       const dishonestChef = await MockGeneralMasterChef.new(mdx.address);
-      await myRouter.setReserveConfig(ether(1), 0, { from: piGov });
+      await myRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
       await myRouter.poke(false);
       await myRouter.setVotingAndStaking(constants.ZERO_ADDRESS, dishonestChef.address, { from: piGov });
-      await myRouter.setReserveConfig(ether('0.2'), 0, { from: piGov });
+      await myRouter.setReserveConfig(ether('0.2'), ether(0), ether(1), 0, { from: piGov });
 
       // there are still some rewards from rebalancing pokes
       await myRouter.poke(true, { from: alice });
@@ -411,6 +412,7 @@ describe('MDXMasterChefRouter Tests', () => {
           boardRoomMDX.address,
           ether('0.2'),
           ether('0.02'),
+          ether('0.3'),
           '0',
           pvp,
           ether('0.2'),
