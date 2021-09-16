@@ -519,6 +519,7 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           ether(0),
           '0',
           '0',
+          '0',
           feeReceiver,
           ether(0),
           []

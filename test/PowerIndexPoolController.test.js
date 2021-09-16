@@ -67,7 +67,7 @@ async function getTimestamp(shift = 0) {
   return currentTimestamp + shift;
 }
 
-describe('PowerIndexPoolController', () => {
+describe.only('PowerIndexPoolController', () => {
   const zeroAddress = '0x0000000000000000000000000000000000000000';
   const name = 'My Pool';
   const symbol = 'MP';
@@ -103,6 +103,7 @@ describe('PowerIndexPoolController', () => {
       '0',
       '0',
       '0',
+      '0',
       stub,
       ether(0),
       []
@@ -114,7 +115,8 @@ describe('PowerIndexPoolController', () => {
         voting: 'address',
         staking: 'address',
         reserveRatio: 'uint256',
-        reserveRatioToForceRebalance: 'uint256',
+        reserveRatioUpperBound: 'uint256',
+        reserveRatioLowerBound: 'uint256',
         claimRewardsInterval: 'uint256',
         pvp: 'address',
         pvpFee: 'uint256',
