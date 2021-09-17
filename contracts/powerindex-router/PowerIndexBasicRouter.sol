@@ -203,13 +203,6 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     _afterPoke(status, _claimAndDistributeRewards);
   }
 
-  function poke(bool _claimAndDistributeRewards) external onlyEOA {
-    _beforePoke();
-    (ReserveStatus status, uint256 diff, ) = getReserveStatus(_getUnderlyingStaked(), 0);
-    _rebalancePoke(status, diff);
-    _afterPoke(status, _claimAndDistributeRewards);
-  }
-
   function _beforePoke() internal virtual {
     require(staking != address(0), "STAKING_IS_NULL");
   }
