@@ -184,8 +184,9 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     (uint256 minInterval, ) = _getMinMaxReportInterval();
     (ReserveStatus status, uint256 diff, bool forceRebalance) = getReserveStatus(_getUnderlyingStaked(), 0);
     require(forceRebalance || lastRebalancedAt + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
-    require(status != ReserveStatus.EQUILIBRIUM, "RESERVE_STATUS_EQUILIBRIUM");
-    _rebalancePoke(status, diff);
+    if (status != ReserveStatus.EQUILIBRIUM) {
+      _rebalancePoke(status, diff);
+    }
     _afterPoke(status, _claimAndDistributeRewards);
   }
 
@@ -198,8 +199,9 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     (, uint256 maxInterval) = _getMinMaxReportInterval();
     (ReserveStatus status, uint256 diff, bool forceRebalance) = getReserveStatus(_getUnderlyingStaked(), 0);
     require(forceRebalance || lastRebalancedAt + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
-    require(status != ReserveStatus.EQUILIBRIUM, "RESERVE_STATUS_EQUILIBRIUM");
-    _rebalancePoke(status, diff);
+    if (status != ReserveStatus.EQUILIBRIUM) {
+      _rebalancePoke(status, diff);
+    }
     _afterPoke(status, _claimAndDistributeRewards);
   }
 
