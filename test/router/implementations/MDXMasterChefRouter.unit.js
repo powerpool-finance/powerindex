@@ -17,6 +17,8 @@ WrappedPiErc20.numberFormat = 'String';
 
 const { web3 } = WrappedPiErc20;
 
+const REPORTER_ID = 42;
+
 describe('MDXMasterChefRouter Tests', () => {
   let deployer, bob, alice, piGov, stub, pvp, pool1, pool2;
 
@@ -85,7 +87,7 @@ describe('MDXMasterChefRouter Tests', () => {
         await mdx.approve(piMdx.address, ether('10000'), { from: alice });
         await piMdx.deposit(ether('10000'), { from: alice });
 
-        await myRouter.poke(false);
+        await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await mdx.balanceOf(piMdx.address), ether(2000));
         assert.equal(await mdx.balanceOf(boardRoomMDX.address), ether(526400));
@@ -177,7 +179,7 @@ describe('MDXMasterChefRouter Tests', () => {
 
       await boardRoomMDX.deposit(0, ether('42000'), { from: bob });
 
-      await myRouter.poke(false);
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await mdx.balanceOf(boardRoomMDX.address), ether(518400 + 50000));
       assert.equal(await mdx.balanceOf(piMdx.address), ether(2000));
@@ -187,7 +189,7 @@ describe('MDXMasterChefRouter Tests', () => {
       assert.equal(await piMdx.balanceOf(alice), ether(10000));
       await mdx.approve(piMdx.address, ether(1000), { from: alice });
       await piMdx.deposit(ether(1000), { from: alice });
-      await myRouter.poke(false);
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await piMdx.balanceOf(alice), ether(11000));
       assert.equal(await mdx.balanceOf(boardRoomMDX.address), ether('569194.240000000000000000'));
@@ -200,7 +202,7 @@ describe('MDXMasterChefRouter Tests', () => {
       assert.equal(await piMdx.balanceOf(alice), ether(10000));
 
       await piMdx.withdraw(ether(1000), { from: alice });
-      await myRouter.poke(false);
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await piMdx.balanceOf(alice), ether(9000));
       assert.equal(await mdx.balanceOf(boardRoomMDX.address), ether('567596.160000000000000000'));
@@ -218,7 +220,7 @@ describe('MDXMasterChefRouter Tests', () => {
       assert.equal(await piMdx.balanceOf(alice), ether(10000));
       assert.equal(await piMdx.totalSupply(), ether(10000));
       await piMdx.withdraw(ether(1000), { from: alice });
-      await expectRevert(myRouter.poke(false), 'STAKING_IS_NULL');
+      await expectRevert(myRouter.pokeFromReporter(REPORTER_ID, false, '0x'), 'STAKING_IS_NULL');
     });
 
     describe('when interval enabled', () => {
@@ -251,7 +253,7 @@ describe('MDXMasterChefRouter Tests', () => {
         await time.increase(time.duration.minutes(61));
 
         await piMdx.withdraw(ether(1000), { from: alice });
-        await myRouter.poke(false);
+        await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await mdx.balanceOf(boardRoomMDX.address), ether('567590.400000000000000000'));
         assert.equal((await boardRoomMDX.userInfo(0, piMdx.address)).amount, ether(7200));
@@ -278,7 +280,7 @@ describe('MDXMasterChefRouter Tests', () => {
 
     describe('on poke', async () => {
       it('should do nothing when nothing has changed', async () => {
-        await myRouter.poke(false, { from: bob });
+        await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await mdx.balanceOf(boardRoomMDX.address), ether(568400));
         assert.equal((await boardRoomMDX.userInfo(0, piMdx.address)).amount, ether(8000));
@@ -292,7 +294,7 @@ describe('MDXMasterChefRouter Tests', () => {
         assert.equal((await boardRoomMDX.userInfo(0, piMdx.address)).amount, ether(8000));
         assert.equal(await mdx.balanceOf(piMdx.address), ether(3000));
 
-        await myRouter.poke(false, { from: bob });
+        await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await mdx.balanceOf(boardRoomMDX.address), ether('569196.160000000000000000'));
         assert.equal((await boardRoomMDX.userInfo(0, piMdx.address)).amount, ether(8800));
@@ -303,7 +305,7 @@ describe('MDXMasterChefRouter Tests', () => {
     it('should stake all the underlying tokens with 0 RR', async () => {
       await myRouter.setReserveConfig(ether(0), ether(0), ether(1), 0, { from: piGov });
 
-      await myRouter.poke(false, { from: bob });
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       assert.equal(await mdx.balanceOf(boardRoomMDX.address), ether('570396.160000000000000000'));
       assert.equal(await mdx.balanceOf(piMdx.address), ether(0));
     });
@@ -311,7 +313,7 @@ describe('MDXMasterChefRouter Tests', () => {
     it('should keep all the underlying tokens on piToken with 1 RR', async () => {
       await myRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
 
-      await myRouter.poke(false, { from: bob });
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       assert.equal(await mdx.balanceOf(boardRoomMDX.address), ether('560396.160000000000000000'));
       assert.equal(await mdx.balanceOf(piMdx.address), ether(10000));
     });
@@ -334,7 +336,7 @@ describe('MDXMasterChefRouter Tests', () => {
       await mdx.approve(piMdx.address, ether('10000'), { from: alice });
       await piMdx.deposit(ether('10000'), { from: alice });
 
-      await myRouter.poke(false);
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await piMdx.totalSupply(), ether('10000'));
       assert.equal(await piMdx.balanceOf(alice), ether('10000'));
@@ -350,7 +352,7 @@ describe('MDXMasterChefRouter Tests', () => {
       assert.equal(await myRouter.getUnderlyingStaked(), ether(8000));
       assert.equal(await myRouter.getPendingRewards(), ether(36));
 
-      let res = await myRouter.poke(true, { from: bob });
+      let res = await myRouter.pokeFromReporter(REPORTER_ID, true, '0x', { from: bob });
 
       expectEvent(res, 'DistributeRewards', {
         sender: bob,
@@ -390,15 +392,15 @@ describe('MDXMasterChefRouter Tests', () => {
     it('should revert poke if there is nothing released', async () => {
       const dishonestChef = await MockGeneralMasterChef.new(mdx.address);
       await myRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
-      await myRouter.poke(false);
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       await myRouter.setVotingAndStaking(constants.ZERO_ADDRESS, dishonestChef.address, { from: piGov });
       await myRouter.setReserveConfig(ether('0.2'), ether(0), ether(1), 0, { from: piGov });
 
       // there are still some rewards from rebalancing pokes
-      await myRouter.poke(true, { from: alice });
+      await myRouter.pokeFromReporter(REPORTER_ID, true, '0x');
 
       // and now there are no rewards
-      await expectRevert(myRouter.poke(true, { from: alice }), 'NO_PENDING_REWARD');
+      await expectRevert(myRouter.pokeFromReporter(REPORTER_ID, true, '0x'), 'NO_PENDING_REWARD');
     });
 
     it('should revert distributing rewards when missing reward pools config', async () => {
@@ -423,7 +425,7 @@ describe('MDXMasterChefRouter Tests', () => {
       await myRouter.migrateToNewRouter(piMdx.address, router.address, [], { from: piGov });
       await mdx.transfer(boardRoomMDX.address, ether(2000));
       await time.increase(1);
-      await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
+      await expectRevert(router.pokeFromReporter(REPORTER_ID, true, '0x'), 'MISSING_REWARD_POOLS');
     });
   });
 });

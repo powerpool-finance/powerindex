@@ -25,6 +25,8 @@ const DEAD = '0x000000000000000000000000000000000000dead';
 
 const { web3 } = MockERC20;
 
+const REPORTER_ID = 42;
+
 describe('AutoRouter Tests', () => {
   let autoOwner, bob, alice, piGov, stub, pvp, pool1, pool2;
 
@@ -145,7 +147,7 @@ describe('AutoRouter Tests', () => {
         await auto.approve(piAuto.address, ether('10000'), { from: alice });
         await piAuto.deposit(ether('10000'), { from: alice });
 
-        await autoRouter.poke(false);
+        await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await auto.balanceOf(piAuto.address), ether(2000));
         assert.equal(await auto.balanceOf(autoStrategy.address), ether(50000));
@@ -260,7 +262,7 @@ describe('AutoRouter Tests', () => {
       await auto.approve(piAuto.address, ether(10000), { from: alice });
       await piAuto.deposit(ether(10000), { from: alice });
 
-      await autoRouter.poke(false);
+      await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await auto.balanceOf(autoStrategy.address), ether(50000));
       assert.equal(await auto.balanceOf(piAuto.address), ether(2000));
@@ -272,7 +274,7 @@ describe('AutoRouter Tests', () => {
         await auto.approve(piAuto.address, ether(1000), { from: alice });
         await piAuto.deposit(ether(1000), { from: alice });
 
-        await autoRouter.poke(false, { from: bob });
+        await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x', { from: bob });
 
         assert.equal(await piAuto.balanceOf(alice), ether(11000));
         assert.equal(await auto.balanceOf(autoStrategy.address), ether(50800));
@@ -286,7 +288,7 @@ describe('AutoRouter Tests', () => {
         await time.increase(time.duration.weeks(1));
         await piAuto.withdraw(ether(1000), { from: alice });
 
-        await autoRouter.poke(false, { from: bob });
+        await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x', { from: bob });
 
         assert.equal(await piAuto.balanceOf(alice), ether(9000));
         assert.equal(await auto.balanceOf(autoStrategy.address), ether(49200));
@@ -327,7 +329,7 @@ describe('AutoRouter Tests', () => {
         await auto.approve(piAuto.address, ether(1000), { from: alice });
         await piAuto.deposit(ether(1000), { from: alice });
 
-        await autoRouter.poke(false, { from: bob });
+        await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x', { from: bob });
 
         assert.equal(await piAuto.balanceOf(alice), ether(11000));
         assert.equal(await auto.balanceOf(autoStrategy.address), ether(80800));
@@ -344,7 +346,7 @@ describe('AutoRouter Tests', () => {
         await time.increase(time.duration.weeks(1));
         await piAuto.withdraw(ether(1000), { from: alice });
 
-        await autoRouter.poke(false, { from: bob });
+        await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x', { from: bob });
 
         assert.equal(await piAuto.balanceOf(alice), ether(9000));
         assert.equal(await auto.balanceOf(autoStrategy.address), ether(79200));
@@ -370,7 +372,7 @@ describe('AutoRouter Tests', () => {
 
       await piAuto.withdraw(ether(1000), { from: alice });
 
-      await expectRevert(autoRouter.poke(false, { from: bob }), 'STAKING_IS_NULL');
+      await expectRevert(autoRouter.pokeFromReporter(REPORTER_ID, false, '0x', { from: bob }), 'STAKING_IS_NULL');
 
       assert.equal(await auto.balanceOf(autoStrategy.address), ether(42000));
       assert.equal(await autoFarm.stakedWantTokens(0, piAuto.address), ether(0));
@@ -382,7 +384,7 @@ describe('AutoRouter Tests', () => {
         await time.increase(time.duration.weeks(1));
         await autoRouter.setReserveConfig(ether('0.2'), ether('0.01'), ether('0.9'), time.duration.hours(1), { from: piGov });
         await poke.setMinMaxReportIntervals(time.duration.hours(1), time.duration.hours(2));
-        await autoRouter.poke(false, { from: bob });
+        await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x', { from: bob });
       });
 
       it('should DO rebalance on deposit if the rebalancing interval has passed', async () => {
@@ -438,7 +440,7 @@ describe('AutoRouter Tests', () => {
 
     describe('on poke', async () => {
       it('should do nothing when nothing has changed', async () => {
-        await autoRouter.poke(false, { from: bob });
+        await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x', { from: bob });
 
         assert.equal(await auto.balanceOf(autoStrategy.address), ether(50000));
         assert.equal(await autoFarm.stakedWantTokens(0, piAuto.address), ether(8000));
@@ -456,7 +458,7 @@ describe('AutoRouter Tests', () => {
         assert.equal(await autoRouter.getUnderlyingOnAutoFarm(), ether(8000));
         assert.equal(await autoRouter.getPendingRewards(), ether(1000));
 
-        await autoRouter.poke(false, { from: bob });
+        await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x', { from: bob });
 
         assert.equal(await auto.balanceOf(autoStrategy.address), ether(51000));
         assert.equal(await autoFarm.stakedWantTokens(0, piAuto.address), ether(9000));
@@ -471,7 +473,7 @@ describe('AutoRouter Tests', () => {
     it('should stake all the underlying tokens with 0 RR', async () => {
       await autoRouter.setReserveConfig(ether(0), ether('0'), ether('0.5'), 0, { from: piGov });
 
-      await autoRouter.poke(false, { from: bob });
+      await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x', { from: bob });
       assert.equal(await auto.balanceOf(autoStrategy.address), ether(52000));
       assert.equal(await auto.balanceOf(piAuto.address), ether(0));
     })
@@ -480,7 +482,7 @@ describe('AutoRouter Tests', () => {
       await autoRouter.setReserveConfig(ether(1), ether('0'), ether(1), 0, { from: piGov });
       await time.increase(time.duration.weeks(1));
 
-      await autoRouter.poke(false, { from: bob });
+      await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x', { from: bob });
       assert.equal(await auto.balanceOf(autoStrategy.address), ether(42000));
       assert.equal(await auto.balanceOf(piAuto.address), ether(10000));
     })
@@ -502,7 +504,7 @@ describe('AutoRouter Tests', () => {
       await auto.approve(piAuto.address, ether('10000'), { from: alice });
       await piAuto.deposit(ether('10000'), { from: alice });
 
-      await autoRouter.poke(false);
+      await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       await autoStrategy.earn({ from: autoOwner });
 
       assert.equal(await piAuto.totalSupply(), ether('10000'));
@@ -525,7 +527,7 @@ describe('AutoRouter Tests', () => {
       assert.equal(await autoRouter.getPendingRewards(), ether(320));
       assert.equal(await autoRouter.getAutoForShares(ether(320)), ether('332.8'));
 
-      let res = await autoRouter.poke(true, { from: bob });
+      let res = await autoRouter.pokeFromReporter(REPORTER_ID, true, '0x', { from: bob });
       expectEvent(res, 'ClaimRewards', {
         sender: bob,
         expectedAutoReward: ether(320),
@@ -568,19 +570,19 @@ describe('AutoRouter Tests', () => {
     });
 
     it('should revert poke if there is no reward available', async () => {
-      await expectRevert(autoRouter.poke(true, { from: alice }), 'NOTHING_TO_CLAIM');
+      await expectRevert(autoRouter.pokeFromReporter(REPORTER_ID, true, '0x', { from: alice }), 'NOTHING_TO_CLAIM');
     });
 
     it('should revert poke if there is nothing released', async () => {
       const scammyChef = await MockAutoMasterChef.new(auto.address, ether(8320));
       await autoRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
       await time.increase(time.duration.weeks(1));
-      await autoRouter.poke(false);
+      await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       await autoRouter.setVotingAndStaking(constants.ZERO_ADDRESS, scammyChef.address, { from: piGov });
       await autoRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.3'), 0, { from: piGov });
-      await autoRouter.poke(false);
+      await autoRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       await auto.transfer(scammyChef.address, ether(1000));
-      await expectRevert(autoRouter.poke(true, { from: alice }), 'NOTHING_RELEASED');
+      await expectRevert(autoRouter.pokeFromReporter(REPORTER_ID, true, '0x', { from: alice }), 'NOTHING_RELEASED');
     });
 
     it('should revert distributing rewards when missing reward pools config', async () => {
@@ -608,7 +610,7 @@ describe('AutoRouter Tests', () => {
       await auto.transfer(autoStrategy.address, ether(2000));
       await autoStrategy.earn({ from: autoOwner });
       await time.increase(time.duration.weeks(1));
-      await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
+      await expectRevert(router.pokeFromReporter(REPORTER_ID, true, '0x'), 'MISSING_REWARD_POOLS');
     });
   });
 });

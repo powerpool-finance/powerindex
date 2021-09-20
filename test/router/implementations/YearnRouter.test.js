@@ -21,6 +21,8 @@ MockYearnGovernance.numberFormat = 'String';
 
 const { web3 } = MockERC20;
 
+const REPORTER_ID = 42;
+
 async function buildUniswapPair(weth, yfi, usdc, lpTokensTo) {
   const factory = await UniswapV2Factory.new(lpTokensTo);
   const router = await UniswapV2Router02.new(factory.address, weth.address);
@@ -115,7 +117,7 @@ describe('YearnRouter Tests', () => {
       await yfi.transfer(alice, ether('10000'));
       await yfi.approve(piYfi.address, ether('10000'), { from: alice });
       await piYfi.deposit(ether('10000'), { from: alice });
-      await yfiRouter.poke(false);
+      await yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await piYfi.totalSupply(), ether('10000'));
       assert.equal(await piYfi.balanceOf(alice), ether('10000'));
@@ -172,7 +174,7 @@ describe('YearnRouter Tests', () => {
         await yfi.transfer(alice, ether('10000'));
         await yfi.approve(piYfi.address, ether('10000'), { from: alice });
         await piYfi.deposit(ether('10000'), { from: alice });
-        await yfiRouter.poke(false);
+        await yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await yfi.balanceOf(piYfi.address), ether(2000));
         assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(50000));
@@ -308,7 +310,7 @@ describe('YearnRouter Tests', () => {
       await yfi.transfer(alice, ether(100000));
       await yfi.approve(piYfi.address, ether(10000), { from: alice });
       const res = await piYfi.deposit(ether(10000), { from: alice });
-      await yfiRouter.poke(false);
+      await yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       await getResTimestamp(res);
 
       assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(50000));
@@ -319,7 +321,7 @@ describe('YearnRouter Tests', () => {
       assert.equal(await piYfi.balanceOf(alice), ether(10000));
       await yfi.approve(piYfi.address, ether(1000), { from: alice });
       await piYfi.deposit(ether(1000), { from: alice });
-      await yfiRouter.poke(false);
+      await yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await piYfi.balanceOf(alice), ether(11000));
       assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(50800));
@@ -332,7 +334,7 @@ describe('YearnRouter Tests', () => {
       assert.equal(await piYfi.balanceOf(alice), ether(10000));
 
       await piYfi.withdraw(ether(1000), { from: alice });
-      await yfiRouter.poke(false);
+      await yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await piYfi.balanceOf(alice), ether(9000));
       assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(49200));
@@ -350,7 +352,7 @@ describe('YearnRouter Tests', () => {
       assert.equal(await piYfi.balanceOf(alice), ether(10000));
       assert.equal(await piYfi.totalSupply(), ether(10000));
       await piYfi.withdraw(ether(1000), { from: alice });
-      await expectRevert(yfiRouter.poke(false), 'STAKING_IS_NULL');
+      await expectRevert(yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x'), 'STAKING_IS_NULL');
     });
 
     describe('when interval enabled', () => {
@@ -383,7 +385,7 @@ describe('YearnRouter Tests', () => {
         await time.increase(time.duration.minutes(61));
 
         await piYfi.withdraw(ether(1000), { from: alice });
-        await yfiRouter.poke(false);
+        await yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(49200));
         assert.equal(await yearnGovernance.balanceOf(piYfi.address), ether(7200));
@@ -419,7 +421,7 @@ describe('YearnRouter Tests', () => {
 
       it('should not decrease reserve if vote is locked', async () => {
         await piYfi.withdraw(ether(1000), { from: alice });
-        await expectRevert(yfiRouter.poke(false), 'VOTE_LOCK');
+        await expectRevert(yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x'), 'VOTE_LOCK');
       });
 
       it('should revert if there is not enough funds in reserve', async () => {
@@ -429,7 +431,7 @@ describe('YearnRouter Tests', () => {
 
     describe('on poke', async () => {
       it('should do nothing when nothing has changed', async () => {
-        await yfiRouter.poke(false, { from: bob });
+        await yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(50000));
         assert.equal(await yearnGovernance.balanceOf(piYfi.address), ether(8000));
@@ -443,7 +445,7 @@ describe('YearnRouter Tests', () => {
         assert.equal(await yearnGovernance.balanceOf(piYfi.address), ether(8000));
         assert.equal(await yfi.balanceOf(piYfi.address), ether(3000));
 
-        await yfiRouter.poke(false, { from: bob });
+        await yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(50800));
         assert.equal(await yearnGovernance.balanceOf(piYfi.address), ether(8800));
@@ -454,7 +456,7 @@ describe('YearnRouter Tests', () => {
     it('should stake all the underlying tokens with 0 RR', async () => {
       await yfiRouter.setReserveConfig(ether(0), ether(0), ether(1), 0, { from: piGov });
 
-      await yfiRouter.poke(false, { from: bob });
+      await yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(52000));
       assert.equal(await yfi.balanceOf(piYfi.address), ether(0));
     })
@@ -462,7 +464,7 @@ describe('YearnRouter Tests', () => {
     it('should keep all the underlying tokens on piToken with 1 RR', async () => {
       await yfiRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
 
-      await yfiRouter.poke(false, { from: bob });
+      await yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       assert.equal(await yfi.balanceOf(yearnGovernance.address), ether(42000));
       assert.equal(await yfi.balanceOf(piYfi.address), ether(10000));
     })
@@ -490,7 +492,7 @@ describe('YearnRouter Tests', () => {
       await yfi.transfer(alice, ether('10000'));
       await yfi.approve(piYfi.address, ether('10000'), { from: alice });
       await piYfi.deposit(ether('10000'), { from: alice });
-      await yfiRouter.poke(false);
+      await yfiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await piYfi.totalSupply(), ether('10000'));
       assert.equal(await piYfi.balanceOf(alice), ether('10000'));
@@ -508,7 +510,7 @@ describe('YearnRouter Tests', () => {
       await yearnGovernance.notifyRewardAmount(ether(2000), { from: rewardDistributor });
 
       await time.increase(time.duration.days(8));
-      let res = await yfiRouter.poke(true, { from: bob });
+      let res = await yfiRouter.pokeFromReporter(REPORTER_ID, true, '0x', { from: bob });
       expectEvent(res, 'ClaimRewards', {
         sender: bob,
         yCrvAmount: '1999999999999999464000'
@@ -608,7 +610,7 @@ describe('YearnRouter Tests', () => {
     });
 
     it('should revert distribute rewards() if there is no yCrv on the balance', async () => {
-      await expectRevert(yfiRouter.poke(true, { from: bob }), 'NO_YCRV_REWARD_ON_PI');
+      await expectRevert(yfiRouter.pokeFromReporter(REPORTER_ID, true, '0x'), 'NO_YCRV_REWARD_ON_PI');
     });
 
     it('should revert distributing rewards when missing reward pools config', async () => {
@@ -640,7 +642,7 @@ describe('YearnRouter Tests', () => {
       await yfiRouter.migrateToNewRouter(piYfi.address, router.address, [], { from: piGov });
       await yearnGovernance.notifyRewardAmount(ether(2000), { from: rewardDistributor });
       await time.increase(1);
-      await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
+      await expectRevert(router.pokeFromReporter(REPORTER_ID, true, '0x'), 'MISSING_REWARD_POOLS');
     });
 
     it('should revert when missing reward swap path', async () => {
@@ -672,7 +674,7 @@ describe('YearnRouter Tests', () => {
       await yfiRouter.migrateToNewRouter(piYfi.address, router.address, [], { from: piGov });
       await yearnGovernance.notifyRewardAmount(ether(2000), { from: rewardDistributor });
       await time.increase(1);
-      await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_SWAP_PATH');
+      await expectRevert(router.pokeFromReporter(REPORTER_ID, true, '0x'), 'MISSING_REWARD_SWAP_PATH');
     });
   });
 });

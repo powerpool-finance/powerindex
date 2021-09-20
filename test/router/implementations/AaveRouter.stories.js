@@ -21,6 +21,8 @@ const COOLDOWN_STATUS = {
   UNSTAKE_WINDOW: 2,
 };
 
+const REPORTER_ID = 42;
+
 describe('AaveRouter Stories', () => {
   let minter, bob, alice, rewardsVault, emissionManager, stub;
   let aave, stakedAave, piAave, aaveRouter, poolRestrictions;
@@ -89,7 +91,7 @@ describe('AaveRouter Stories', () => {
       // Step #1. Deposit 10K
       await aave.approve(piAave.address, ether(10000), { from: alice });
       await piAave.deposit(ether('10000'), { from: alice });
-      let res = await aaveRouter.poke(false);
+      let res = await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
@@ -113,7 +115,7 @@ describe('AaveRouter Stories', () => {
       //////////////////////////
       // Step #2. Withdraw 0.5K
       await piAave.withdraw(ether(500), { from: alice });
-      res = await aaveRouter.poke(false);
+      res = await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem');
@@ -132,7 +134,7 @@ describe('AaveRouter Stories', () => {
       ///////////////////////////////////////////////////////
       // Step #3. Withdraw 0.5K - waiting for a COOLDOWN ends
       await piAave.withdraw(ether(500), { from: alice });
-      await expectRevert(aaveRouter.poke(false), 'COOLDOWN');
+      await expectRevert(aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x'), 'COOLDOWN');
 
       assert.equal(await aave.balanceOf(piAave.address), ether(1000));
       assert.equal(await stakedAave.balanceOf(piAave.address), ether(8000));
@@ -147,7 +149,7 @@ describe('AaveRouter Stories', () => {
       //////////////////////////////////////////////////////////
       // Step #4. Withdraw 0.5K - while within an UNSTAKE_WINDOW
       await piAave.withdraw(ether(500), { from: alice });
-      res = await aaveRouter.poke(false);
+      res = await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
@@ -162,7 +164,7 @@ describe('AaveRouter Stories', () => {
       //////////////////////////////////////////////////////////
       // Step #5. Withdraw 0.5K - while within an UNSTAKE_WINDOW
       await piAave.withdraw(ether(500), { from: alice });
-      res = await aaveRouter.poke(false);
+      res = await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Stake');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');
@@ -178,7 +180,7 @@ describe('AaveRouter Stories', () => {
       // Step #6. Deposit 3K - while within an UNSTAKE_WINDOW
       await aave.approve(piAave.address, ether(3000), { from: bob });
       await piAave.deposit(ether(3000), { from: bob });
-      res = await aaveRouter.poke(false);
+      res = await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'Redeem');
       await expectEvent.notEmitted.inTransaction(res.tx, AavePowerIndexRouter, 'TriggerCooldown');

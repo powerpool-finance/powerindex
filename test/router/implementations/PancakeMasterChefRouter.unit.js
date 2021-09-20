@@ -19,6 +19,8 @@ WrappedPiErc20.numberFormat = 'String';
 
 const { web3 } = MockERC20;
 
+const REPORTER_ID = 42;
+
 describe('PancakeMasterChefRouter Tests', () => {
   let deployer, bob, alice, piGov, stub, pvp, pool1, pool2;
 
@@ -83,7 +85,7 @@ describe('PancakeMasterChefRouter Tests', () => {
         await cake.approve(piCake.address, ether('10000'), { from: alice });
         await piCake.deposit(ether('10000'), { from: alice });
 
-        await myRouter.poke(false);
+        await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await cake.balanceOf(piCake.address), ether(2000));
         assert.equal(await cake.balanceOf(masterChef.address), ether(8000));
@@ -174,7 +176,7 @@ describe('PancakeMasterChefRouter Tests', () => {
       await cake.approve(masterChef.address, ether('42000'), { from: bob });
       await masterChef.enterStaking(ether('42000'), { from: bob });
 
-      await myRouter.poke(false);
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await cake.balanceOf(masterChef.address), ether(50000));
       assert.equal(await cake.balanceOf(piCake.address), ether(2000));
@@ -184,7 +186,7 @@ describe('PancakeMasterChefRouter Tests', () => {
       assert.equal(await piCake.balanceOf(alice), ether(10000));
       await cake.approve(piCake.address, ether(1000), { from: alice });
       await piCake.deposit(ether(1000), { from: alice });
-      await myRouter.poke(false);
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await piCake.balanceOf(alice), ether(11000));
       assert.equal(await cake.balanceOf(masterChef.address), ether(50800));
@@ -197,7 +199,7 @@ describe('PancakeMasterChefRouter Tests', () => {
       assert.equal(await piCake.balanceOf(alice), ether(10000));
 
       await piCake.withdraw(ether(1000), { from: alice });
-      await myRouter.poke(false);
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await piCake.balanceOf(alice), ether(9000));
       assert.equal(await cake.balanceOf(masterChef.address), ether(49200));
@@ -215,7 +217,7 @@ describe('PancakeMasterChefRouter Tests', () => {
       assert.equal(await piCake.balanceOf(alice), ether(10000));
       assert.equal(await piCake.totalSupply(), ether(10000));
       await piCake.withdraw(ether(1000), { from: alice });
-      await expectRevert(myRouter.poke(false), 'STAKING_IS_NULL');
+      await expectRevert(myRouter.pokeFromReporter(REPORTER_ID, false, '0x'), 'STAKING_IS_NULL');
     });
 
     describe('when interval enabled', () => {
@@ -248,7 +250,7 @@ describe('PancakeMasterChefRouter Tests', () => {
         await time.increase(time.duration.minutes(61));
 
         await piCake.withdraw(ether(1000), { from: alice });
-        await myRouter.poke(false);
+        await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await cake.balanceOf(masterChef.address), ether(49200));
         assert.equal((await masterChef.userInfo(0, piCake.address)).amount, ether(7200));
@@ -275,7 +277,7 @@ describe('PancakeMasterChefRouter Tests', () => {
 
     describe('on poke', async () => {
       it('should do nothing when nothing has changed', async () => {
-        await myRouter.poke(false, { from: bob });
+        await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await cake.balanceOf(masterChef.address), ether(50000));
         assert.equal((await masterChef.userInfo(0, piCake.address)).amount, ether(8000));
@@ -289,7 +291,7 @@ describe('PancakeMasterChefRouter Tests', () => {
         assert.equal((await masterChef.userInfo(0, piCake.address)).amount, ether(8000));
         assert.equal(await cake.balanceOf(piCake.address), ether(3000));
 
-        await myRouter.poke(false, { from: bob });
+        await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await cake.balanceOf(masterChef.address), ether(50800));
         assert.equal((await masterChef.userInfo(0, piCake.address)).amount, ether(8800));
@@ -300,7 +302,7 @@ describe('PancakeMasterChefRouter Tests', () => {
     it('should stake all the underlying tokens with 0 RR', async () => {
       await myRouter.setReserveConfig(ether(0), ether(0), ether(1), 0, { from: piGov });
 
-      await myRouter.poke(false, { from: bob });
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       assert.equal(await cake.balanceOf(masterChef.address), ether(52000));
       assert.equal(await cake.balanceOf(piCake.address), ether(0));
     });
@@ -308,7 +310,7 @@ describe('PancakeMasterChefRouter Tests', () => {
     it('should keep all the underlying tokens on piToken with 1 RR', async () => {
       await myRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
 
-      await myRouter.poke(false, { from: bob });
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       assert.equal(await cake.balanceOf(masterChef.address), ether(42000));
       assert.equal(await cake.balanceOf(piCake.address), ether(10000));
     });
@@ -331,7 +333,7 @@ describe('PancakeMasterChefRouter Tests', () => {
       await cake.approve(piCake.address, ether('10000'), { from: alice });
       await piCake.deposit(ether('10000'), { from: alice });
 
-      await myRouter.poke(false);
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await piCake.totalSupply(), ether('10000'));
       assert.equal(await piCake.balanceOf(alice), ether('10000'));
@@ -350,7 +352,7 @@ describe('PancakeMasterChefRouter Tests', () => {
       assert.equal(await myRouter.getUnderlyingStaked(), ether(8000));
       assert.equal(await myRouter.getPendingRewards(), ether('47.996454152000000000'));
 
-      let res = await myRouter.poke(true, { from: bob });
+      let res = await myRouter.pokeFromReporter(REPORTER_ID, true, '0x', { from: bob });
 
       expectEvent(res, 'DistributeRewards', {
         sender: bob,
@@ -390,11 +392,11 @@ describe('PancakeMasterChefRouter Tests', () => {
     it('should revert poke if there is nothing released', async () => {
       const dishonestChef = await MockPancakeMasterChef.new(cake.address);
       await myRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
-      await myRouter.poke(false);
+      await myRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       await myRouter.setVotingAndStaking(constants.ZERO_ADDRESS, dishonestChef.address, { from: piGov });
       await myRouter.setReserveConfig(ether('0.2'), ether('0.02'), ether('0.3'), 0, { from: piGov });
-      await myRouter.poke(true);
-      await expectRevert(myRouter.poke(true, { from: alice }), 'NO_PENDING_REWARD');
+      await myRouter.pokeFromReporter(REPORTER_ID, true, '0x');
+      await expectRevert(myRouter.pokeFromReporter(REPORTER_ID, true, '0x'), 'NO_PENDING_REWARD');
     });
 
     it('should revert distributing rewards when missing reward pools config', async () => {
@@ -419,7 +421,7 @@ describe('PancakeMasterChefRouter Tests', () => {
       await myRouter.migrateToNewRouter(piCake.address, router.address, [], { from: piGov });
       await cake.transfer(masterChef.address, ether(2000));
       await time.increase(1);
-      await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
+      await expectRevert(router.pokeFromReporter(REPORTER_ID, true, '0x'), 'MISSING_REWARD_POOLS');
     });
   });
 });

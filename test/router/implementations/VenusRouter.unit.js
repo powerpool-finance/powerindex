@@ -24,6 +24,8 @@ const WhitePaperInterestRateModel = artifactFromBytecode('bsc/WhitePaperInterest
 
 const { web3 } = MockERC20;
 
+const REPORTER_ID = 42;
+
 describe('VenusRouter Tests', () => {
   let bob, alice, charlie, venusOwner, piGov, stub, pvp, pool1, pool2;
 
@@ -187,7 +189,7 @@ describe('VenusRouter Tests', () => {
         await usdc.approve(piUsdc.address, ether('10000'), { from: alice });
         await piUsdc.deposit(ether('10000'), { from: alice });
 
-        await venusRouter.poke(false);
+        await venusRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await usdc.balanceOf(piUsdc.address), ether(2000));
         assert.equal(await usdc.balanceOf(vUsdc.address), ether(50000));
@@ -300,7 +302,7 @@ describe('VenusRouter Tests', () => {
       await usdc.approve(piUsdc.address, ether(10000), { from: alice });
       await piUsdc.deposit(ether(10000), { from: alice });
 
-      await venusRouter.poke(false);
+      await venusRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await usdc.balanceOf(vUsdc.address), ether(50000));
       assert.equal(await usdc.balanceOf(piUsdc.address), ether(2000));
@@ -312,7 +314,7 @@ describe('VenusRouter Tests', () => {
         await usdc.approve(piUsdc.address, ether(1000), { from: alice });
         await piUsdc.deposit(ether(1000), { from: alice });
 
-        await venusRouter.poke(false, { from: bob });
+        await venusRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await piUsdc.balanceOf(alice), ether(11000));
         assert.equal(await usdc.balanceOf(vUsdc.address), ether(50800));
@@ -325,7 +327,7 @@ describe('VenusRouter Tests', () => {
 
         await piUsdc.withdraw(ether(1000), { from: alice });
 
-        await venusRouter.poke(false, { from: bob });
+        await venusRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await piUsdc.balanceOf(alice), ether(9000));
         assert.equal(await usdc.balanceOf(vUsdc.address), ether(49200));
@@ -361,7 +363,7 @@ describe('VenusRouter Tests', () => {
         await usdc.approve(piUsdc.address, ether(1000), { from: alice });
         await piUsdc.deposit(ether(1000), { from: alice });
 
-        await venusRouter.poke(false, { from: bob });
+        await venusRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await piUsdc.balanceOf(alice), ether(11000));
         assert.equal(await usdc.balanceOf(vUsdc.address), ether(80800));
@@ -376,7 +378,7 @@ describe('VenusRouter Tests', () => {
       it('should decrease reserve on withdrawal', async () => {
         await piUsdc.withdraw(ether(1000), { from: alice });
 
-        await venusRouter.poke(false, { from: bob });
+        await venusRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await piUsdc.balanceOf(alice), ether(9000));
         assert.equal(await usdc.balanceOf(vUsdc.address), ether(79200));
@@ -400,7 +402,7 @@ describe('VenusRouter Tests', () => {
 
       await piUsdc.withdraw(ether(1000), { from: alice });
 
-      await expectRevert(venusRouter.poke(false, { from: bob }), 'STAKING_IS_NULL');
+      await expectRevert(venusRouter.pokeFromReporter(REPORTER_ID, false, '0x'), 'STAKING_IS_NULL');
 
       assert.equal(await usdc.balanceOf(vUsdc.address), ether(42000));
       assert.equal(await vUsdc.balanceOf(piUsdc.address), ether(0));
@@ -411,7 +413,8 @@ describe('VenusRouter Tests', () => {
       beforeEach(async () => {
         await venusRouter.setReserveConfig(ether('0.2'), ether('0.02'), ether('0.3'), time.duration.hours(1), { from: piGov });
         await poke.setMinMaxReportIntervals(time.duration.hours(1), time.duration.hours(2));
-        await venusRouter.poke(false, { from: bob });
+        await time.increase(time.duration.minutes(61));
+        await venusRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       });
 
       it('should DO rebalance on deposit if the rebalancing interval has passed', async () => {
@@ -467,7 +470,7 @@ describe('VenusRouter Tests', () => {
 
     describe('on poke', async () => {
       it('should do nothing when nothing has changed', async () => {
-        await venusRouter.poke(false, { from: bob });
+        await venusRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await usdc.balanceOf(vUsdc.address), ether(50000));
         assert.equal(await vUsdc.balanceOf(piUsdc.address), ether(8000));
@@ -485,7 +488,7 @@ describe('VenusRouter Tests', () => {
         assert.equal(await venusRouter.getUnderlyingBackedByVToken(), ether(8000));
         assert.equal(await venusRouter.getPendingInterestReward(), addBN(ether(1000), '1'));
 
-        await venusRouter.poke(false, { from: bob });
+        await venusRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await usdc.balanceOf(vUsdc.address), ether(51000));
         assert.equal(await vUsdc.balanceOf(piUsdc.address), ether(9000));
@@ -500,7 +503,7 @@ describe('VenusRouter Tests', () => {
     it('should stake all the underlying tokens with 0 RR', async () => {
       await venusRouter.setReserveConfig(ether(0), ether(0), ether(1), 0, { from: piGov });
 
-      await venusRouter.poke(false, { from: bob });
+      await venusRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       assert.equal(await usdc.balanceOf(vUsdc.address), ether(52000));
       assert.equal(await usdc.balanceOf(piUsdc.address), ether(0));
     });
@@ -508,7 +511,7 @@ describe('VenusRouter Tests', () => {
     it('should keep all the underlying tokens on piToken with 1 RR', async () => {
       await venusRouter.setReserveConfig(ether(1), ether(0), ether(1), 0, { from: piGov });
 
-      await venusRouter.poke(false, { from: bob });
+      await venusRouter.pokeFromReporter(REPORTER_ID, false, '0x');
       assert.equal(await usdc.balanceOf(vUsdc.address), ether(42000));
       assert.equal(await usdc.balanceOf(piUsdc.address), ether(10000));
     });
@@ -530,7 +533,7 @@ describe('VenusRouter Tests', () => {
       await usdc.approve(piUsdc.address, ether('10000'), { from: alice });
       await piUsdc.deposit(ether('10000'), { from: alice });
 
-      await venusRouter.poke(false);
+      await venusRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       assert.equal(await piUsdc.totalSupply(), ether('10000'));
       assert.equal(await piUsdc.balanceOf(alice), ether('10000'));
@@ -554,7 +557,7 @@ describe('VenusRouter Tests', () => {
       assert.equal(await venusRouter.getPendingInterestReward(), addBN(ether(320), '1'));
       assert.equal(await venusRouter.getVTokenForToken(ether(320)), '307692307692307692307');
 
-      let res = await venusRouter.poke(true, { from: bob });
+      let res = await venusRouter.pokeFromReporter(REPORTER_ID, true, '0x', { from: bob });
       expectEvent(res, 'ClaimRewards', {
         sender: bob,
         xvsEarned: ether(0),
@@ -613,7 +616,7 @@ describe('VenusRouter Tests', () => {
       assert.equal(await venusRouter.getPendingInterestReward(), ether(0));
       assert.equal(await venusRouter.getVTokenForToken(ether(320)), ether(320));
 
-      let res = await venusRouter.poke(true, { from: bob });
+      let res = await venusRouter.pokeFromReporter(REPORTER_ID, true, '0x', { from: bob });
       expectEvent(res, 'ClaimRewards', {
         sender: bob,
         xvsEarned: ether(288000),
@@ -656,7 +659,7 @@ describe('VenusRouter Tests', () => {
     });
 
     it('should revert poke if there is no reward available', async () => {
-      await expectRevert(venusRouter.poke(true, { from: alice }), 'NOTHING_TO_DISTRIBUTE');
+      await expectRevert(venusRouter.pokeFromReporter(REPORTER_ID, true, '0x'), 'NOTHING_TO_DISTRIBUTE');
     });
 
     it('should revert distributing rewards when missing reward pools config', async () => {
@@ -683,7 +686,7 @@ describe('VenusRouter Tests', () => {
       });
       await usdc.transfer(vUsdc.address, ether(2000));
       await time.increase(1);
-      await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
+      await expectRevert(router.pokeFromReporter(REPORTER_ID, true, '0x'), 'MISSING_REWARD_POOLS');
     });
   });
 });
