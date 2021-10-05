@@ -12,6 +12,8 @@ import "./AbstractMasterChefIndexRouter.sol";
  * To get pending rewards use IPancakeStaking(0x73feaa1ee314f8c655e354234017be2193c9e24e).pendingCake(0, piToken).
  */
 contract PancakeMasterChefIndexRouter is AbstractMasterChefIndexRouter {
+  uint256 internal constant PANCAKE_POOL_ID = 0;
+
   struct PancakeMasterChefConfig {
     address cake;
   }
@@ -25,7 +27,7 @@ contract PancakeMasterChefIndexRouter is AbstractMasterChefIndexRouter {
   /*** VIEWERS ***/
 
   function getPendingRewards() external view returns (uint256 amount) {
-    return IPancakeMasterChef(staking).pendingCake(0, address(piToken));
+    return IPancakeMasterChef(staking).pendingCake(PANCAKE_POOL_ID, address(piToken));
   }
 
   /*** OVERRIDES ***/
@@ -34,7 +36,7 @@ contract PancakeMasterChefIndexRouter is AbstractMasterChefIndexRouter {
     if (staking == address(0)) {
       return 0;
     }
-    (uint256 amount, ) = IPancakeMasterChef(staking).userInfo(0, address(piToken));
+    (uint256 amount, ) = IPancakeMasterChef(staking).userInfo(PANCAKE_POOL_ID, address(piToken));
     return amount;
   }
 
