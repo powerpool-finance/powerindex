@@ -57,7 +57,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     require(released > 0, "NOTHING_RELEASED");
 
     // Step #2. Transfer the claimed SUSHI to the router
-    piToken.callExternal(address(SUSHI), SUSHI.transfer.selector, abi.encode(address(this), released), 0);
+    _safeTransfer(SUSHI, address(this), released);
 
     emit ClaimRewards(msg.sender, xSushiToBurn, rewardsPending, released);
   }

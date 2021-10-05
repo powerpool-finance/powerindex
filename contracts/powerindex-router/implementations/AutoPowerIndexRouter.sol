@@ -57,7 +57,7 @@ contract AutoPowerIndexRouter is PowerIndexBasicRouter {
     require(released > 0, "NOTHING_RELEASED");
 
     // Step #2. Transfer the claimed AUTO to the router
-    piToken.callExternal(address(AUTO), IERC20.transfer.selector, abi.encode(address(this), released), 0);
+    _safeTransfer(AUTO, address(this), released);
 
     emit ClaimRewards(msg.sender, rewardsPending, released);
   }

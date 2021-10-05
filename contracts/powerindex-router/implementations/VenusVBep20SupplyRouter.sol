@@ -60,7 +60,7 @@ contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
     );
     uint256 xvsEarned = XVS.balanceOf(address(piToken)).sub(xvsBefore);
     if (xvsEarned > 0) {
-      piToken.callExternal(address(XVS), IERC20.transfer.selector, abi.encode(address(this), xvsEarned), 0);
+      _safeTransfer(XVS, address(this), xvsEarned);
     }
 
     // #2. Redeem underlying interest
@@ -74,12 +74,7 @@ contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
     }
 
     if (underlyingEarned > 0) {
-      piToken.callExternal(
-        address(UNDERLYING),
-        IERC20.transfer.selector,
-        abi.encode(address(this), underlyingEarned),
-        0
-      );
+      _safeTransfer(UNDERLYING, address(this), underlyingEarned);
     }
 
     // #3. Emit claim results
@@ -262,7 +257,7 @@ contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
 
     _callCompStaking(VBep20Interface(0).mint.selector, abi.encode(_amount));
     uint256 receivedReward = UNDERLYING.balanceOf(address(piToken)).sub(underlyingBefore.sub(_amount));
-    piToken.callExternal(address(UNDERLYING), IERC20.transfer.selector, abi.encode(address(this), receivedReward), 0);
+    _safeTransfer(UNDERLYING, address(this), receivedReward);
 
     emit Stake(msg.sender, _amount, receivedReward);
   }
@@ -273,7 +268,7 @@ contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
     uint256 underlyingBefore = UNDERLYING.balanceOf(address(piToken));
     _callCompStaking(VBep20Interface(0).redeemUnderlying.selector, abi.encode(_amount));
     uint256 receivedReward = UNDERLYING.balanceOf(address(piToken)).sub(underlyingBefore).sub(_amount);
-    piToken.callExternal(address(UNDERLYING), IERC20.transfer.selector, abi.encode(address(this), receivedReward), 0);
+    _safeTransfer(UNDERLYING, address(this), receivedReward);
 
     emit Redeem(msg.sender, _amount, receivedReward);
   }

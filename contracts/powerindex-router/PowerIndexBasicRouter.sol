@@ -486,6 +486,19 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
       );
   }
 
+  function _safeTransfer(
+    IERC20 _token,
+    address _to,
+    uint256 _value
+  ) internal {
+    bytes memory response = piToken.callExternal(address(_token), IERC20.transfer.selector, abi.encode(_to, _value), 0);
+
+    if (response.length > 0) {
+      // Return data is optional
+      require(abi.decode(response, (bool)), "ERC20 operation did not succeed");
+    }
+  }
+
   function _reward(
     uint256 _reporterId,
     uint256 _gasStart,

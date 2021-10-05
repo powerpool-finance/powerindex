@@ -74,7 +74,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     require(yCrvReward > 0, "NO_YCRV_REWARD_ON_PI");
 
     // Step #2. Transfer yCrv reward to the router
-    piToken.callExternal(address(YCRV), YCRV.transfer.selector, abi.encode(address(this), yCrvReward), 0);
+    _safeTransfer(YCRV, address(this), yCrvReward);
 
     emit ClaimRewards(msg.sender, yCrvReward);
   }
@@ -92,7 +92,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     // Step #2. Transfer yCrv reward to the router
     uint256 yCrvReward = YCRV.balanceOf(address(piToken));
     if (yCrvReward > 0) {
-      piToken.callExternal(address(YCRV), YCRV.transfer.selector, abi.encode(address(this), yCrvReward), 0);
+      _safeTransfer(YCRV, address(this), yCrvReward);
     }
 
     emit Exit(msg.sender, yfiBalanceAfter - yfiBalanceBefore, yCrvReward);

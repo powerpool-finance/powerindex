@@ -90,7 +90,7 @@ abstract contract AbstractMasterChefIndexRouter is PowerIndexBasicRouter {
     _stakeImpl(_amount);
 
     uint256 receivedReward = TOKEN.balanceOf(address(piToken)).sub(tokenBefore.sub(_amount));
-    piToken.callExternal(address(TOKEN), IERC20.transfer.selector, abi.encode(address(this), receivedReward), 0);
+    _safeTransfer(TOKEN, address(this), receivedReward);
 
     emit Stake(msg.sender, _amount, receivedReward);
   }
@@ -101,7 +101,7 @@ abstract contract AbstractMasterChefIndexRouter is PowerIndexBasicRouter {
     _redeemImpl(_amount);
 
     uint256 receivedReward = TOKEN.balanceOf(address(piToken)).sub(tokenBefore).sub(_amount);
-    piToken.callExternal(address(TOKEN), IERC20.transfer.selector, abi.encode(address(this), receivedReward), 0);
+    _safeTransfer(TOKEN, address(this), receivedReward);
 
     emit Redeem(msg.sender, _amount, receivedReward);
   }
