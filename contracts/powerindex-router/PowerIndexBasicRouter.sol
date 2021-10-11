@@ -420,8 +420,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
    * @param _reserveRatioPct The reserve ratio in %, 1 ether == 100 ether
    * @param _leftOnPiToken The amount of origin tokens left on the piToken (WrappedPiErc20) contract
    * @param _stakedBalance The amount of original tokens staked on the staking contract
-   * @param _withdrawAmount The amount to be withdrawn within the current transaction
-   *                        (could be negative in a case of deposit)
+   * @param _withdrawAmount The amount to be withdrawn within the current transaction. Deprecated, pass in 0.
    * @return status The reserve status:
    * * SHORTAGE - There is not enough underlying funds on the wrapper contract to satisfy the reserve ratio,
    *           the diff amount should be redeemed from the staking contract
@@ -466,8 +465,9 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
    * @param _reserveRatioPct % of a reserve ratio, 1 ether == 100%
    * @param _leftOnPiToken The amount of origin tokens left on the piToken (WrappedPiErc20) contract
    * @param _stakedBalance The amount of original tokens staked on the staking contract
-   * @param _withdrawAmount The amount to be withdrawn within the current transaction
-   *                        (could be negative in a case of deposit)
+   * @param _withdrawAmount The amount to be withdrawn within the current transaction. Deprecated, now it is always 0.
+   *        Introduced when the rebalancing logic was triggered by deposit/withdraw actions of piToken. Now this logic
+   *        is triggered by the poke*() methods only.
    * @return expectedReserveAmount The expected reserve amount
    *
    *                           / %reserveRatio * (staked + _leftOnPiToken - withdrawAmount) \
