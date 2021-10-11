@@ -209,7 +209,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     require(staking != address(0), "STAKING_IS_NULL");
   }
 
-  function _afterPoke(ReserveStatus reserveStatus, bool _claimAndDistributeRewards) internal {
+  function _afterPoke(ReserveStatus reserveStatus, bool _claimAndDistributeRewards) internal virtual {
     lastRebalancedAt = block.timestamp;
 
     if (_claimAndDistributeRewards && lastClaimRewardsAt + claimRewardsInterval < block.timestamp) {
