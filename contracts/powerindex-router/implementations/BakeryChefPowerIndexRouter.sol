@@ -3,7 +3,6 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "../../interfaces/sushi/IMasterChefV1.sol";
 import "../../interfaces/IBakeryMasterChef.sol";
 import "./AbstractMasterChefIndexRouter.sol";
 
