@@ -201,7 +201,7 @@ contract AutoPowerIndexRouter is PowerIndexBasicRouter {
     require(_amount > 0, "CANT_STAKE_0");
 
     piToken.approveUnderlying(staking, _amount);
-    _callStaking(IAutoFarm(0).deposit.selector, abi.encode(AUTO_FARM_PID, _amount));
+    _callStaking(IAutoFarm.deposit.selector, abi.encode(AUTO_FARM_PID, _amount));
 
     emit Stake(msg.sender, _amount);
   }
@@ -209,7 +209,7 @@ contract AutoPowerIndexRouter is PowerIndexBasicRouter {
   function _redeem(uint256 _amount) internal {
     require(_amount > 0, "CANT_REDEEM_0");
 
-    _callStaking(IAutoFarm(0).withdraw.selector, abi.encode(AUTO_FARM_PID, _amount));
+    _callStaking(IAutoFarm.withdraw.selector, abi.encode(AUTO_FARM_PID, _amount));
 
     emit Redeem(msg.sender, _amount);
   }

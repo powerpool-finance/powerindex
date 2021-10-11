@@ -68,7 +68,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
 
   function _claimRewards(ReserveStatus) internal override {
     // Step #1. Claim yCrv reward from YFI governance pool
-    _callVoting(YearnGovernanceInterface(0).getReward.selector, "");
+    _callVoting(YearnGovernanceInterface.getReward.selector, "");
 
     uint256 yCrvReward = YCRV.balanceOf(address(piToken));
     require(yCrvReward > 0, "NO_YCRV_REWARD_ON_PI");
@@ -85,7 +85,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     uint256 yfiBalanceBefore = YFI.balanceOf(address(piToken));
 
     // Step #1. Exit (get all the stake back) and claim yCrv reward from YFI governance pool
-    _callVoting(YearnGovernanceInterface(0).exit.selector, "");
+    _callVoting(YearnGovernanceInterface.exit.selector, "");
 
     uint256 yfiBalanceAfter = YFI.balanceOf(address(piToken));
 
@@ -182,22 +182,22 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
 
   function callRegister() external {
     _checkVotingSenderAllowed();
-    _callVoting(YearnGovernanceInterface(0).register.selector, "");
+    _callVoting(YearnGovernanceInterface.register.selector, "");
   }
 
   function callPropose(address _executor, string calldata _hash) external {
     _checkVotingSenderAllowed();
-    _callVoting(YearnGovernanceInterface(0).propose.selector, abi.encode(_executor, _hash));
+    _callVoting(YearnGovernanceInterface.propose.selector, abi.encode(_executor, _hash));
   }
 
   function callVoteFor(uint256 _id) external {
     _checkVotingSenderAllowed();
-    _callVoting(YearnGovernanceInterface(0).voteFor.selector, abi.encode(_id));
+    _callVoting(YearnGovernanceInterface.voteFor.selector, abi.encode(_id));
   }
 
   function callVoteAgainst(uint256 _id) external {
     _checkVotingSenderAllowed();
-    _callVoting(YearnGovernanceInterface(0).voteAgainst.selector, abi.encode(_id));
+    _callVoting(YearnGovernanceInterface.voteAgainst.selector, abi.encode(_id));
   }
 
   /*** OWNER METHODS ***/
@@ -242,7 +242,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     require(_amount > 0, "CANT_STAKE_0");
 
     piToken.approveUnderlying(voting, _amount);
-    _callVoting(YearnGovernanceInterface(0).stake.selector, abi.encode(_amount));
+    _callVoting(YearnGovernanceInterface.stake.selector, abi.encode(_amount));
 
     emit Stake(msg.sender, _amount);
   }
@@ -250,7 +250,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
   function _redeem(uint256 _amount) internal {
     require(_amount > 0, "CANT_REDEEM_0");
 
-    _callVoting(YearnGovernanceInterface(0).withdraw.selector, abi.encode(_amount));
+    _callVoting(YearnGovernanceInterface.withdraw.selector, abi.encode(_amount));
 
     emit Redeem(msg.sender, _amount);
   }

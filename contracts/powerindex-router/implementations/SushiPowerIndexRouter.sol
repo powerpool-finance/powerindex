@@ -210,7 +210,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     require(_sushi > 0, "CANT_STAKE_0");
 
     piToken.approveUnderlying(staking, _sushi);
-    _callStaking(ISushiBar(0).enter.selector, abi.encode(_sushi));
+    _callStaking(ISushiBar.enter.selector, abi.encode(_sushi));
 
     emit Stake(msg.sender, _sushi);
   }
@@ -218,7 +218,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
   function _redeem(uint256 _xSushi) internal {
     require(_xSushi > 0, "CANT_REDEEM_0");
 
-    _callStaking(ISushiBar(0).leave.selector, abi.encode(_xSushi));
+    _callStaking(ISushiBar.leave.selector, abi.encode(_xSushi));
 
     emit Redeem(msg.sender, _xSushi);
   }
