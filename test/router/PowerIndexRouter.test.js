@@ -36,6 +36,7 @@ describe('PowerIndex BasicRouter Test', () => {
       constants.ZERO_ADDRESS,
       ether(0),
       ether(0),
+      ether(0),
       0,
       stub,
       ether(0),
@@ -44,9 +45,9 @@ describe('PowerIndex BasicRouter Test', () => {
   });
 
   describe('initialization', () => {
-    it('should deny initialization with a RR > 100%', async () => {
-      const basicConfig = Object.assign({}, defaultBasicConfig, { reserveRatio: ether('1.01') });
-      await expectRevert(PowerIndexBasicRouter.new(alice, basicConfig), 'RR_GT_HUNDRED_PCT');
+    it('should deny initialization with a RR UPPER BOUND > 100%', async () => {
+      const basicConfig = Object.assign({}, defaultBasicConfig, { reserveRatioUpperBound: ether('1.01') });
+      await expectRevert(PowerIndexBasicRouter.new(alice, basicConfig), 'UPPER_RR_GREATER_THAN_100_PCT');
     });
 
     it('should deny initialization with a pvpFee >= 100%', async () => {
@@ -134,7 +135,7 @@ describe('PowerIndex BasicRouter Test', () => {
 
     describe('setReserveConfig()', () => {
       it('should allow the owner setting a reserve config', async () => {
-        const res = await router.setReserveConfig(ether('0.2'), 3600, { from: piGov });
+        const res = await router.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.3'), 3600, { from: piGov });
         expectEvent(res, 'SetReserveConfig', {
           ratio: ether('0.2'),
           claimRewardsInterval: '3600'
@@ -143,12 +144,20 @@ describe('PowerIndex BasicRouter Test', () => {
         assert.equal(await router.claimRewardsInterval(), 3600)
       });
 
-      it('should deny setting a reserve ratio greater or equal 100%', async () => {
-        await expectRevert(router.setReserveConfig(ether('1.01'), 0, { from: piGov }), 'RR_GREATER_THAN_100_PCT');
+      it('should deny setting a reserve ratio upper bound greater or equal 100%', async () => {
+        await expectRevert(router.setReserveConfig(ether('1.00'), ether('0.1'), ether('1.01'), 0, { from: piGov }), 'RR_GREATER_THAN_100_PCT');
+      });
+
+      it('should deny setting a reserve ratio upper bound lower than rr', async () => {
+        await expectRevert(router.setReserveConfig(ether('1.00'), ether('0.1'), ether('1.01'), 0, { from: piGov }), 'UPPER_RR_GREATER_THAN_100_PCT');
+      });
+
+      it('should deny setting a reserve ratio lower bound higher than rr ', async () => {
+        await expectRevert(router.setReserveConfig(ether('0.99'), ether('1.00'), ether('1.00'), 0, { from: piGov }), 'RR_LT_LOWER_RR');
       });
 
       it('should deny non-owner setting reserve config', async () => {
-        await expectRevert(router.setReserveConfig(ether('0.2'), 3600, { from: alice }), 'Ownable: caller is not the owner');
+        await expectRevert(router.setReserveConfig(ether('0.2'), ether(0), ether(1), 3600, { from: alice }), 'Ownable: caller is not the owner');
       });
     });
   });

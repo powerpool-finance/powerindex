@@ -12,6 +12,8 @@ interface WrappedPiErc20Interface is IERC20 {
 
   function changeRouter(address _newRouter) external;
 
+  function setNoFee(address _for, bool _noFee) external;
+
   function setEthFee(uint256 _newEthFee) external;
 
   function withdrawEthFee(address payable receiver) external;
@@ -29,7 +31,7 @@ interface WrappedPiErc20Interface is IERC20 {
     bytes4 signature,
     bytes calldata args,
     uint256 value
-  ) external;
+  ) external returns (bytes memory);
 
   struct ExternalCallData {
     address destination;
@@ -38,7 +40,7 @@ interface WrappedPiErc20Interface is IERC20 {
     uint256 value;
   }
 
-  function callExternalMultiple(ExternalCallData[] calldata calls) external;
+  function callExternalMultiple(ExternalCallData[] calldata calls) external returns (bytes[] memory);
 
   function getUnderlyingBalance() external view returns (uint256);
 }

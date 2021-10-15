@@ -645,6 +645,7 @@ describe('WeightStrategy', () => {
           constants.ZERO_ADDRESS,
           ether(0),
           ether(0),
+          ether(0),
           '0',
           permanentVotingPower,
           ether(0),

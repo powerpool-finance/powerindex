@@ -17,6 +17,8 @@ SushiBar.numberFormat = 'String';
 
 const { web3 } = MockERC20;
 
+const REPORTER_ID = 42;
+
 describe('SushiRouter Stories', () => {
   let alice, bob, charlie, piGov, stub, pvp;
 
@@ -46,6 +48,7 @@ describe('SushiRouter Stories', () => {
         xSushi.address,
         ether('0.2'),
         ether('0.02'),
+        ether('0.3'),
         '0',
         pvp,
         ether('0.15'),
@@ -97,7 +100,7 @@ describe('SushiRouter Stories', () => {
     await sushi.approve(piSushi.address, ether(125), { from: alice });
     await piSushi.deposit(ether(125), { from: alice });
 
-    await sushiRouter.poke(false);
+    await sushiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
     // assertions
     assert.equal(await piSushi.totalSupply(), ether(125));
@@ -119,7 +122,7 @@ describe('SushiRouter Stories', () => {
     await sushi.approve(piSushi.address, ether(250), { from: bob });
     await piSushi.deposit(ether(250), { from: bob });
 
-    await sushiRouter.poke(false);
+    await sushiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
     // assertions
     assert.equal(await piSushi.totalSupply(), ether(375));
@@ -189,7 +192,7 @@ describe('SushiRouter Stories', () => {
     await sushi.approve(piSushi.address, ether(60), { from: alice });
     await piSushi.deposit(ether(60), { from: alice });
 
-    await sushiRouter.poke(false);
+    await sushiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
     // assertions
     assert.equal(await piSushi.totalSupply(), ether(435));
@@ -211,8 +214,8 @@ describe('SushiRouter Stories', () => {
 
     ///////////////////////////////////////////
     // Step #8. Bob router withdrawal 100 SUSHI
-    await sushiRouter.setReserveConfig(ether('0.4'), '0', {from: piGov})
-    await sushiRouter.poke(false);
+    await sushiRouter.setReserveConfig(ether('0.4'), ether('0.1'), ether('0.5'),'0', {from: piGov})
+    await sushiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
     assert.equal(await sushi.balanceOf(piSushi.address), '173999999999999999999');
     assert.equal(await sushi.balanceOf(xSushi.address), '811000000000000000001');
@@ -221,8 +224,8 @@ describe('SushiRouter Stories', () => {
     await piSushi.approve(piSushi.address, ether(100), { from: bob });
     await piSushi.withdraw(ether(100), { from: bob });
 
-    await sushiRouter.setReserveConfig(ether('0.2'), '0', {from: piGov})
-    await sushiRouter.poke(false);
+    await sushiRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.5'), '0', {from: piGov})
+    await sushiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
     // assertions
     assert.equal(await piSushi.totalSupply(), ether(335));
@@ -247,7 +250,7 @@ describe('SushiRouter Stories', () => {
     assert.equal(await sushiRouter.getSushiForXSushi(await xSushi.balanceOf(piSushi.address)), '332285714285714285712');
 
     await piSushi.transfer(pool.address, ether(1), {from: alice})
-    await sushiRouter.poke(true, { from: charlie });
+    await sushiRouter.pokeFromReporter(REPORTER_ID, true, '0x');
 
     assert.equal(await sushiRouter.getSushiForXSushi(await xSushi.balanceOf(piSushi.address)), '268000000000000000001');
 
@@ -295,13 +298,13 @@ describe('SushiRouter Stories', () => {
     // Step #11. Alice router withdrawal 185 SUSHI
     await pool.transfer(piSushi.address, alice, ether(1));
 
-    await sushiRouter.setReserveConfig(ether('0.8'), '0', {from: piGov})
-    await sushiRouter.poke(false);
+    await sushiRouter.setReserveConfig(ether('0.8'), ether('0.1'), ether('0.9'), '0', {from: piGov})
+    await sushiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
     await piSushi.withdraw(ether(185), { from: alice });
 
-    await sushiRouter.setReserveConfig(ether('0.2'), '0', {from: piGov})
-    await sushiRouter.poke(false);
+    await sushiRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.5'), '0', {from: piGov})
+    await sushiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
     // assertions
     assert.equal(await piSushi.totalSupply(), '204642857142857142855');
@@ -345,8 +348,8 @@ describe('SushiRouter Stories', () => {
 
     //////////////////////////////////////////////////////////////////////////////////
     // Step #13. Bob router withdrawal 150 SUSHI - 5 wei
-    await sushiRouter.setReserveConfig(ether('1'), '0', {from: piGov})
-    await sushiRouter.poke(false);
+    await sushiRouter.setReserveConfig(ether(1), ether('0.5'), ether(1), '0', {from: piGov})
+    await sushiRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
     await piSushi.withdraw('149999999999999999995', { from: bob });
     // await pool.transfer(piSushi.address, alice, ether(1));

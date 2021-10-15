@@ -44,7 +44,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
   /**
    * @notice Withdraws the extra staked SUSHI as a reward and transfers it to the router
    */
-  function _claimRewards() internal override {
+  function _claimRewards(ReserveStatus) internal override {
     uint256 rewardsPending = getPendingRewards();
     require(rewardsPending > 0, "NOTHING_TO_CLAIM");
 
@@ -57,7 +57,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     require(released > 0, "NOTHING_RELEASED");
 
     // Step #2. Transfer the claimed SUSHI to the router
-    piToken.callExternal(address(SUSHI), SUSHI.transfer.selector, abi.encode(address(this), released), 0);
+    _safeTransfer(SUSHI, address(this), released);
 
     emit ClaimRewards(msg.sender, xSushiToBurn, rewardsPending, released);
   }
@@ -137,7 +137,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     uint256 _underlyingAmount,
     IERC20, /* _underlyingToken */
     uint256 /* _piTotalSupply */
-  ) public view override returns (uint256) {
+  ) external view override returns (uint256) {
     return _underlyingAmount;
   }
 
@@ -153,7 +153,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     uint256 _piAmount,
     IERC20, /* _underlyingToken */
     uint256 /* _piTotalSupply */
-  ) public view override returns (uint256) {
+  ) external view override returns (uint256) {
     return _piAmount;
   }
 
@@ -210,7 +210,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     require(_sushi > 0, "CANT_STAKE_0");
 
     piToken.approveUnderlying(staking, _sushi);
-    _callStaking(ISushiBar(0).enter.selector, abi.encode(_sushi));
+    _callStaking(ISushiBar.enter.selector, abi.encode(_sushi));
 
     emit Stake(msg.sender, _sushi);
   }
@@ -218,7 +218,7 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
   function _redeem(uint256 _xSushi) internal {
     require(_xSushi > 0, "CANT_REDEEM_0");
 
-    _callStaking(ISushiBar(0).leave.selector, abi.encode(_xSushi));
+    _callStaking(ISushiBar.leave.selector, abi.encode(_xSushi));
 
     emit Redeem(msg.sender, _xSushi);
   }
