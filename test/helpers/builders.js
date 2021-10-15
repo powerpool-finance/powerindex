@@ -51,6 +51,7 @@ function buildBakeryChefRouterConfig(token) {
   return { token };
 }
 
+// MASTER CHEF
 function buildMasterChefRouterConfig(token, masterChefPid) {
   return { token, masterChefPid };
 }
@@ -58,6 +59,11 @@ function buildMasterChefRouterConfig(token, masterChefPid) {
 // AUTO
 function buildAutoRouterConfig(AUTO) {
   return { AUTO };
+}
+
+// ALPACA
+function buildAlpacaRouterConfig(ALPACA, ibALPACA, masterChefPid) {
+  return { ALPACA, ibALPACA, masterChefPid };
 }
 
 // VENUS
@@ -150,6 +156,7 @@ module.exports = {
   buildBakeryChefRouterConfig,
   buildMasterChefRouterConfig,
   buildAutoRouterConfig,
+  buildAlpacaRouterConfig,
   buildVenusRouterConfig,
   buildAaveAssetConfigInput,
   buildBasicRouterArgs,
