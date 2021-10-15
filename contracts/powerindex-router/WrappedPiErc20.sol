@@ -18,12 +18,14 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
   IERC20 public immutable underlying;
   address public router;
   uint256 public ethFee;
+  mapping(address => bool) public noFeeWhitelist;
 
   event Deposit(address indexed account, uint256 undelyingDeposited, uint256 piMinted);
   event Withdraw(address indexed account, uint256 underlyingWithdrawn, uint256 piBurned);
   event Approve(address indexed to, uint256 amount);
   event ChangeRouter(address indexed newRouter);
   event SetEthFee(uint256 newEthFee);
+  event SetNoFee(address indexed addr, bool noFee);
   event WithdrawEthFee(uint256 value);
   event CallExternal(address indexed destination, bytes4 indexed inputSig, bytes inputData, bytes outputData);
 
@@ -47,7 +49,12 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
    * @param _depositAmount The amount to deposit in underlying tokens
    */
   function deposit(uint256 _depositAmount) external payable override nonReentrant returns (uint256) {
-    require(msg.value >= ethFee, "FEE");
+    if (noFeeWhitelist[msg.sender]) {
+      require(msg.value == 0, "NO_FEE_FOR_WL");
+    } else {
+      require(msg.value >= ethFee, "FEE");
+    }
+
     require(_depositAmount > 0, "ZERO_DEPOSIT");
 
     uint256 mintAmount = getPiEquivalentForUnderlying(_depositAmount);
@@ -68,7 +75,12 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
    * @param _withdrawAmount The amount to withdraw in underlying tokens
    */
   function withdraw(uint256 _withdrawAmount) external payable override nonReentrant returns (uint256) {
-    require(msg.value >= ethFee, "FEE");
+    if (noFeeWhitelist[msg.sender]) {
+      require(msg.value == 0, "NO_FEE_FOR_WL");
+    } else {
+      require(msg.value >= ethFee, "FEE");
+    }
+
     require(_withdrawAmount > 0, "ZERO_WITHDRAWAL");
 
     PowerIndexNaiveRouterInterface(router).piTokenCallback{ value: msg.value }(msg.sender, _withdrawAmount);
@@ -104,6 +116,11 @@ contract WrappedPiErc20 is ERC20, ReentrancyGuard, WrappedPiErc20Interface {
   function changeRouter(address _newRouter) external override onlyRouter {
     router = _newRouter;
     emit ChangeRouter(router);
+  }
+
+  function setNoFee(address _for, bool _noFee) external override onlyRouter {
+    noFeeWhitelist[_for] = _noFee;
+    emit SetNoFee(_for, _noFee);
   }
 
   function setEthFee(uint256 _ethFee) external override onlyRouter {

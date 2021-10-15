@@ -12,6 +12,8 @@ interface WrappedPiErc20Interface is IERC20 {
 
   function changeRouter(address _newRouter) external;
 
+  function setNoFee(address _for, bool _noFee) external;
+
   function setEthFee(uint256 _newEthFee) external;
 
   function withdrawEthFee(address payable receiver) external;

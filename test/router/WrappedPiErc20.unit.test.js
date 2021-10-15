@@ -236,6 +236,27 @@ describe('WrappedPiErc20 Unit Tests', () => {
       assert.equal(await web3.eth.getBalance(router.address), ethFee);
     });
 
+    it('should ignore fee for the whitelisted addresses', async () => {
+      assert.equal(await piYfi.ethFee(), ether(0));
+
+      const ethFee = ether(0.001);
+
+      await router.setPiTokenEthFee(ethFee, { from: owner });
+      await router.setPiTokenNoFee(alice, true, { from: owner });
+
+      assert.equal(await piYfi.ethFee(), ethFee);
+
+      await yfi.approve(piYfi.address, ether(42), { from: alice });
+      await expectRevert(piYfi.deposit(ether(42), { from: alice, value: ethFee }), 'NO_FEE_FOR_WL');
+      const res = await piYfi.deposit(ether(42), { from: alice });
+
+      expectEvent(res, 'Deposit', {
+        account: alice,
+        undelyingDeposited: ether(42),
+        piMinted: ether(42),
+      });
+    });
+
     describe('imbalanced router', () => {
       beforeEach(async () => {
         assert.equal(await yfi.balanceOf(alice), ether(10000));
@@ -385,6 +406,26 @@ describe('WrappedPiErc20 Unit Tests', () => {
         assert.equal(await web3.eth.getBalance(router.address), ethFee);
         assert.equal(await web3.eth.getBalance(piYfi.address), 0);
       });
+
+      it('should ignore fee for the whitelisted addresses', async () => {
+        assert.equal(await piYfi.ethFee(), ether(0));
+
+        const ethFee = ether(0.001);
+
+        await router.setPiTokenEthFee(ethFee, { from: owner });
+        await router.setPiTokenNoFee(alice, true, { from: owner });
+
+        assert.equal(await piYfi.ethFee(), ethFee);
+
+        await expectRevert(piYfi.withdraw(ether(42), { from: alice, value: ethFee }), 'NO_FEE_FOR_WL');
+
+        const res = await piYfi.withdraw(ether(42), { from: alice });
+        expectEvent(res, 'Withdraw', {
+          account: alice,
+          underlyingWithdrawn: ether(42),
+          piBurned: ether(42),
+        });
+      });
     });
 
     describe('imbalanced wrapper', () => {
@@ -512,6 +553,22 @@ describe('WrappedPiErc20 Unit Tests', () => {
     describe('setEthFee', async () => {
       it('should deny calling the method from non-router address', async () => {
         await expectRevert(piYfi.setEthFee(ether(0.1), { from: alice }), 'ONLY_ROUTER');
+      });
+    });
+
+    describe('setNoFee', async () => {
+      it('should allow setting no fee values', async () => {
+        assert.equal(await piYfi.noFeeWhitelist(bob), false);
+        let data = await piYfi.contract.methods.setNoFee(bob, true).encodeABI();
+        await router.execute(piYfi.address, data);
+        assert.equal(await piYfi.noFeeWhitelist(bob), true);
+        data = await piYfi.contract.methods.setNoFee(bob, false).encodeABI();
+        await router.execute(piYfi.address, data);
+        assert.equal(await piYfi.noFeeWhitelist(bob), false);
+      });
+
+      it('should deny calling the method from non-router address', async () => {
+        await expectRevert(piYfi.setNoFee(bob, { from: alice }), 'ONLY_ROUTER');
       });
     });
 

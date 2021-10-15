@@ -155,6 +155,10 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     piToken.setEthFee(_ethFee);
   }
 
+  function setPiTokenNoFee(address _for, bool _noFee) external onlyOwner {
+    piToken.setNoFee(_for, _noFee);
+  }
+
   function withdrawEthFee(address payable _receiver) external onlyOwner {
     piToken.withdrawEthFee(_receiver);
   }
