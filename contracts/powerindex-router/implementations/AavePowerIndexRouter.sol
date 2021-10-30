@@ -65,24 +65,6 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     emit ClaimRewards(msg.sender, rewardsPending);
   }
 
-  function _distributeRewards() internal override {
-    uint256 pendingReward = AAVE.balanceOf(address(this));
-    require(pendingReward > 0, "NO_PENDING_REWARD");
-
-    // Step #1. Distribute pvpReward
-    (uint256 pvpReward, uint256 poolRewardsUnderlying) = _distributeRewardToPvp(pendingReward, AAVE);
-    require(poolRewardsUnderlying > 0, "NO_POOL_REWARDS_UNDERLYING");
-
-    // Step #2. Wrap AAVE into piAAVE
-    AAVE.approve(address(piToken), poolRewardsUnderlying);
-    piToken.deposit(poolRewardsUnderlying);
-
-    // Step #3. Distribute piAAVE over the pools
-    (uint256 poolRewardsPi, address[] memory pools) = _distributePiRemainderToPools(piToken);
-
-    emit DistributeRewards(msg.sender, pendingReward, pvpReward, poolRewardsUnderlying, poolRewardsPi, pools);
-  }
-
   /*** OWNER METHODS ***/
 
   function stake(uint256 _amount) external onlyOwner {
@@ -150,6 +132,11 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   function _getUnderlyingStaked() internal view override returns (uint256) {
     return IERC20(staking).balanceOf(address(piToken));
+  }
+
+  // TODO: ensure is ok
+  function _getUnderlyingReserve() internal view override returns (uint256) {
+    return AAVE.balanceOf(address(piToken));
   }
 
   function _triggerCoolDown() internal {

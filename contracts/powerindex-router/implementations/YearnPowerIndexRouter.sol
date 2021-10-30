@@ -104,9 +104,8 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     _distributeRewards();
   }
 
-  function _distributeRewards() internal override {
-    uint256 poolsLen = rewardPools.length;
-    require(poolsLen > 0, "MISSING_REWARD_POOLS");
+  // TODO: handle
+  function _distributeRewards() internal {
     require(usdcYfiSwapPath.length > 0, "MISSING_REWARD_SWAP_PATH");
 
     uint256 yfiBalanceBefore = YFI.balanceOf(address(this));
@@ -137,7 +136,7 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     require(yfiGain > 0, "NO_YFI_GAIN");
 
     // Step #5. Distribute pvpReward
-    (uint256 pvpReward, uint256 poolRewards) = _distributeRewardToPvp(yfiGain, YFI);
+    (uint256 pvpReward, uint256 poolRewards) = _distributePerformanceFee(YFI, yfiGain);
     require(poolRewards > 0, "NO_POOL_REWARDS");
 
     // Step #6. Wrap gained yfi into piYfi
@@ -145,20 +144,20 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
     piToken.deposit(poolRewards);
 
     // Step #7. Distribute piYfi leftovers over the pools
-    (uint256 piBalanceToDistribute, address[] memory pools) = _distributePiRemainderToPools(piToken);
+//    (uint256 piBalanceToDistribute, address[] memory pools) = _distributePiRemainderToPools(piToken);
 
-    emit DistributeRewards(
-      msg.sender,
-      yCrvReward,
-      usdcConverted,
-      yfiConverted,
-      yfiGain,
-      pvpReward,
-      poolRewards,
-      piBalanceToDistribute,
-      usdcYfiSwapPath,
-      pools
-    );
+//    emit DistributeRewards(
+//      msg.sender,
+//      yCrvReward,
+//      usdcConverted,
+//      yfiConverted,
+//      yfiGain,
+//      pvpReward,
+//      poolRewards,
+//      piBalanceToDistribute,
+//      usdcYfiSwapPath,
+//      pools
+//    );
 
     // NOTICE: it's ok to keep some YFI dust here for the future swaps
   }
@@ -236,6 +235,10 @@ contract YearnPowerIndexRouter is PowerIndexBasicRouter {
 
   function _getUnderlyingStaked() internal view override returns (uint256) {
     return YearnGovernanceInterface(voting).balanceOf(address(piToken));
+  }
+
+  function _getUnderlyingReserve() internal view override returns (uint256) {
+    return YFI.balanceOf(address(piToken));
   }
 
   function _stake(uint256 _amount) internal {

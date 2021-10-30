@@ -12,6 +12,18 @@ contract MockPowerIndexBasicRouter is PowerIndexBasicRouter {
     piRate = 1 ether;
   }
 
+  function _claimRewards(ReserveStatus _reserveStatus) internal override {
+    // do nothing
+  }
+
+  function _rebalancePoke(ReserveStatus reserveStatus, uint256 sushiDiff) internal override {
+    // do nothing
+  }
+
+  function _getUnderlyingReserve() internal view override returns (uint256) {
+    return 0;
+  }
+
   function mockSetRate(uint256 _piRate) public {
     piRate = _piRate;
   }

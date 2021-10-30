@@ -14,6 +14,18 @@ contract MockRouter is PowerIndexBasicRouter {
 
   constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexBasicRouter(_piToken, _basicConfig) {}
 
+  function _claimRewards(ReserveStatus _reserveStatus) internal override {
+    // do nothing
+  }
+
+  function _rebalancePoke(ReserveStatus reserveStatus, uint256 sushiDiff) internal override {
+    // do nothing
+  }
+
+  function _getUnderlyingReserve() internal view override returns (uint256) {
+    return 0;
+  }
+
   function setMockStaking(address _underlying, address _mockStaking) external {
     underlying = _underlying;
     mockStaking = _mockStaking;

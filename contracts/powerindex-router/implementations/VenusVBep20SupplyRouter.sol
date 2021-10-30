@@ -7,19 +7,17 @@ import "../PowerIndexBasicRouter.sol";
 import "../../interfaces/venus/VenusComptrollerInterface.sol";
 import "../../interfaces/venus/VBep20Interface.sol";
 
+/**
+ * @notice PowerIndex Router for Venus protocol.
+ * @dev The router designed to work with XVS token only (XVS == UNDERLYING).
+ *      Can support other tokens as underlying with further modifications.
+ * @dev Venus rewards in XVS token can be either claimed manually by calling `Comptroller.claimVenus()`
+ */
 contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
-  event Stake(address indexed sender, uint256 amount, uint256 rewardReceived);
-  event Redeem(address indexed sender, uint256 amount, uint256 rewardReceived);
+  event Stake(address indexed sender, uint256 amount);
+  event Redeem(address indexed sender, uint256 amount);
   event IgnoreDueMissingStaking();
-  event ClaimRewards(address indexed sender, uint256 xvsEarned, uint256 underlyingEarned);
-  event DistributeUnderlyingReward(
-    address indexed sender,
-    uint256 underlyingReward,
-    uint256 pvpReward,
-    uint256 poolRewardsUnderlying,
-    uint256 poolRewardsPi,
-    address[] pools
-  );
+  event ClaimRewards(address indexed sender, uint256 xvsEarned);
 
   struct VenusConfig {
     address troller;
@@ -31,6 +29,7 @@ contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
   address internal immutable TROLLER;
   IERC20 internal immutable UNDERLYING;
   IERC20 internal immutable XVS;
+  uint256 lastStakedAmount;
 
   constructor(
     address _piToken,
@@ -60,61 +59,10 @@ contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
     );
     uint256 xvsEarned = XVS.balanceOf(address(piToken)).sub(xvsBefore);
     if (xvsEarned > 0) {
-      _safeTransfer(XVS, address(this), xvsEarned);
+      _distributeReward(XVS, xvsEarned);
     }
 
-    // #2. Redeem underlying interest
-    uint256 pendingInterestReward = getPendingInterestReward();
-
-    uint256 underlyingEarned = 0;
-    if (pendingInterestReward > 0) {
-      uint256 underlyingBefore = UNDERLYING.balanceOf(address(piToken));
-      _callCompStaking(VBep20Interface.redeemUnderlying.selector, abi.encode(pendingInterestReward));
-      underlyingEarned = UNDERLYING.balanceOf(address(piToken)).sub(underlyingBefore);
-    }
-
-    if (underlyingEarned > 0) {
-      _safeTransfer(UNDERLYING, address(this), underlyingEarned);
-    }
-
-    // #3. Emit claim results
-    emit ClaimRewards(msg.sender, xvsEarned, underlyingEarned);
-  }
-
-  function _distributeRewards() internal override {
-    uint256 xvsToDistribute = IERC20(XVS).balanceOf(address(this));
-    uint256 underlyingToDistribute = UNDERLYING.balanceOf(address(this));
-    require(xvsToDistribute > 0 || underlyingToDistribute > 0, "NOTHING_TO_DISTRIBUTE");
-
-    if (XVS == UNDERLYING) {
-      _distributeUnderlyingReward(underlyingToDistribute);
-    } else {
-      // WARNING: XVS distribution for the cases with XVS != UNDERLYING is not supported yet
-      // The accrued XVS will remain on this contract
-      _distributeUnderlyingReward(underlyingToDistribute);
-    }
-  }
-
-  function _distributeUnderlyingReward(uint256 _underlyingToDistribute) internal {
-    // Step #1. Distribute pvpReward
-    (uint256 pvpReward, uint256 poolRewardsUnderlying) = _distributeRewardToPvp(_underlyingToDistribute, UNDERLYING);
-    require(poolRewardsUnderlying > 0, "NO_POOL_REWARDS_UNDERLYING");
-
-    // Step #2. Wrap underlying into piToken
-    UNDERLYING.approve(address(piToken), poolRewardsUnderlying);
-    piToken.deposit(poolRewardsUnderlying);
-
-    // Step #3. Distribute piToken over the pools
-    (uint256 poolRewardsPi, address[] memory pools) = _distributePiRemainderToPools(piToken);
-
-    emit DistributeUnderlyingReward(
-      msg.sender,
-      _underlyingToDistribute,
-      pvpReward,
-      poolRewardsUnderlying,
-      poolRewardsPi,
-      pools
-    );
+    emit ClaimRewards(msg.sender, xvsEarned);
   }
 
   /*** OWNER METHODS ***/
@@ -137,11 +85,30 @@ contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
     _redeem(_amount);
   }
 
-  /*** POKE FUNCTION ***/
+  /*** POKE HOOKS ***/
 
-  function _beforePoke() internal override {
-    super._beforePoke();
+  function _beforePoke(bool _willClaimReward) internal override {
+    super._beforePoke(_willClaimReward);
     require(VBep20Interface(staking).accrueInterest() == NO_ERROR_CODE, "V_ERROR");
+
+    uint256 last = lastStakedAmount;
+    if (last > 0) {
+      uint256 current = _getUnderlyingStaked();
+      if (current > last) {
+        uint256 diff = current - last;
+        // ignore the dust
+        if (diff > 100) {
+          _distributePerformanceFee({ _underlying: XVS, _totalReward: diff });
+        }
+      }
+    }
+  }
+
+  function _afterPoke(ReserveStatus reserveStatus, bool _rewardClaimDone) internal override {
+    super._afterPoke(reserveStatus, _rewardClaimDone);
+    if (_rewardClaimDone) {
+      lastStakedAmount = _getUnderlyingStaked();
+    }
   }
 
   function _rebalancePoke(ReserveStatus reserveStatus, uint256 diff) internal override {
@@ -174,12 +141,9 @@ contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
     return _vTokenAmount.mul(VBep20Interface(staking).exchangeRateStored()) / 1e18;
   }
 
-  /**
-   * @notice Get the total amount of UNDERLYING tokens could be released in exchange of the piToken's vToken balance.
-   *         Is comprised of the underlyingStaked and the pendingRewards.
-   * @return The UNDERLYING amount
-   */
-  function getUnderlyingBackedByVToken() public view returns (uint256) {
+  /*** INTERNALS ***/
+
+  function _getUnderlyingStaked() internal view override returns (uint256) {
     if (staking == address(0)) {
       return 0;
     }
@@ -192,85 +156,26 @@ contract VenusVBep20SupplyRouter is PowerIndexBasicRouter {
     return getTokenForVToken(vTokenAtPiToken);
   }
 
-  /**
-   * @notice Get the amount of current pending rewards available at VToken
-   * @dev Does not includes the accrued XVS amount
-   * @dev Uses the last cached value, not the current one
-   * @dev Use with front-end only
-   * @return amount of pending rewards
-   */
-  function getPendingInterestReward() public view returns (uint256 amount) {
-    // return underlyingAtPiToken + underlyingBackedByVToken - piToken.totalSupply()
-    amount = UNDERLYING.balanceOf(address(piToken)).add(getUnderlyingBackedByVToken()).add(1).sub(
-      piToken.totalSupply()
-    );
-    return amount == 1 ? 0 : amount;
-  }
-
-  /*** EQUIVALENT METHODS OVERRIDES ***/
-
-  function getPiEquivalentForUnderlying(
-    uint256 _underlyingAmount,
-    IERC20, /* _underlyingToken */
-    uint256 /* _piTotalSupply */
-  ) external view override returns (uint256) {
-    return _underlyingAmount;
-  }
-
-  function getPiEquivalentForUnderlyingPure(
-    uint256 _underlyingAmount,
-    uint256, /* _totalUnderlyingWrapped */
-    uint256 /* _piTotalSupply */
-  ) public pure override returns (uint256) {
-    return _underlyingAmount;
-  }
-
-  function getUnderlyingEquivalentForPi(
-    uint256 _piAmount,
-    IERC20, /* _underlyingToken */
-    uint256 /* _piTotalSupply */
-  ) external view override returns (uint256) {
-    return _piAmount;
-  }
-
-  function getUnderlyingEquivalentForPiPure(
-    uint256 _piAmount,
-    uint256, /* _totalUnderlyingWrapped */
-    uint256 /* _piTotalSupply */
-  ) public pure override returns (uint256) {
-    return _piAmount;
-  }
-
-  /*** INTERNALS ***/
-
-  function _getUnderlyingStaked() internal view override returns (uint256) {
-    // return piTokenTotalSupply - underlyingAtPiToken
-    return piToken.totalSupply().sub(UNDERLYING.balanceOf(address(piToken)));
+  function _getUnderlyingReserve() internal view override returns (uint256) {
+    return IERC20(UNDERLYING).balanceOf(address(piToken));
   }
 
   function _stake(uint256 _amount) internal {
     require(_amount > 0, "CANT_STAKE_0");
 
-    uint256 underlyingBefore = UNDERLYING.balanceOf(address(piToken));
-
     piToken.approveUnderlying(staking, _amount);
 
     _callCompStaking(VBep20Interface.mint.selector, abi.encode(_amount));
-    uint256 receivedReward = UNDERLYING.balanceOf(address(piToken)).sub(underlyingBefore.sub(_amount));
-    _safeTransfer(UNDERLYING, address(this), receivedReward);
 
-    emit Stake(msg.sender, _amount, receivedReward);
+    emit Stake(msg.sender, _amount);
   }
 
   function _redeem(uint256 _amount) internal {
     require(_amount > 0, "CANT_REDEEM_0");
 
-    uint256 underlyingBefore = UNDERLYING.balanceOf(address(piToken));
     _callCompStaking(VBep20Interface.redeemUnderlying.selector, abi.encode(_amount));
-    uint256 receivedReward = UNDERLYING.balanceOf(address(piToken)).sub(underlyingBefore).sub(_amount);
-    _safeTransfer(UNDERLYING, address(this), receivedReward);
 
-    emit Redeem(msg.sender, _amount, receivedReward);
+    emit Redeem(msg.sender, _amount);
   }
 
   function _callCompStaking(bytes4 _sig, bytes memory _data) internal {

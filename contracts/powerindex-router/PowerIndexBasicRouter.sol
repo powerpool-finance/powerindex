@@ -10,19 +10,29 @@ import "../interfaces/IPoolRestrictions.sol";
 import "../interfaces/PowerIndexBasicRouterInterface.sol";
 import "../interfaces/BPoolInterface.sol";
 import "./PowerIndexNaiveRouter.sol";
+import "hardhat/console.sol";
 
-contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiveRouter {
+
+abstract contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiveRouter {
   using SafeERC20 for IERC20;
 
   uint256 public constant HUNDRED_PCT = 1 ether;
+  uint256 public constant DEGRADATION_COEFFICIENT = 1 ether;
 
   event SetVotingAndStaking(address indexed voting, address indexed staking);
   event SetReserveConfig(uint256 ratio, uint256 ratioLowerBound, uint256 ratioUpperBound, uint256 claimRewardsInterval);
   event SetRebalancingInterval(uint256 rebalancingInterval);
   event IgnoreRebalancing(uint256 blockTimestamp, uint256 lastRebalancedAt, uint256 rebalancingInterval);
   event RewardPool(address indexed pool, uint256 amount);
-  event SetRewardPools(uint256 len, address[] rewardPools);
   event SetPvpFee(uint256 pvpFee);
+  event DistributeReward(
+    address indexed sender,
+    uint256 totalReward,
+    uint256 pvpReward,
+    uint256 piTokenReward,
+    uint256 lockedProfitBefore,
+    uint256 lockedProfitAfter
+  );
 
   enum ReserveStatus { EQUILIBRIUM, SHORTAGE, EXCESS }
 
@@ -37,7 +47,6 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 claimRewardsInterval;
     address pvp;
     uint256 pvpFee;
-    address[] rewardPools;
   }
 
   WrappedPiErc20Interface public immutable piToken;
@@ -55,8 +64,9 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   uint256 public reserveRatioUpperBound;
   // 1 ether == 100%
   uint256 public pvpFee;
-
-  address[] internal rewardPools;
+  uint256 public lastRewardDistribution;
+  uint256 public lockedProfitDegradation;
+  uint256 public lockedProfit;
 
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
 
@@ -104,7 +114,9 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     claimRewardsInterval = _basicConfig.claimRewardsInterval;
     pvp = _basicConfig.pvp;
     pvpFee = _basicConfig.pvpFee;
-    rewardPools = _basicConfig.rewardPools;
+
+    lastRewardDistribution = block.timestamp;
+    lockedProfitDegradation = 46e12;
   }
 
   receive() external payable {}
@@ -136,12 +148,6 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     reserveRatioUpperBound = _reserveRatioUpperBound;
     claimRewardsInterval = _claimRewardsInterval;
     emit SetReserveConfig(_reserveRatio, _reserveRatioLowerBound, _reserveRatioUpperBound, _claimRewardsInterval);
-  }
-
-  function setRewardPools(address[] calldata _rewardPools) external onlyOwner {
-    require(_rewardPools.length > 0, "AT_LEAST_ONE_EXPECTED");
-    rewardPools = _rewardPools;
-    emit SetRewardPools(_rewardPools.length, _rewardPools);
   }
 
   function setPvpFee(uint256 _pvpFee) external onlyOwner {
@@ -184,14 +190,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     bool _claimAndDistributeRewards,
     bytes calldata _rewardOpts
   ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
-    _beforePoke();
-    (uint256 minInterval, ) = _getMinMaxReportInterval();
-    (ReserveStatus status, uint256 diff, bool forceRebalance) = getReserveStatus(_getUnderlyingStaked(), 0);
-    require(forceRebalance || lastRebalancedAt + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
-    if (status != ReserveStatus.EQUILIBRIUM) {
-      _rebalancePoke(status, diff);
-    }
-    _afterPoke(status, _claimAndDistributeRewards);
+    _pokeFrom(_claimAndDistributeRewards, false);
   }
 
   function pokeFromSlasher(
@@ -199,41 +198,57 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     bool _claimAndDistributeRewards,
     bytes calldata _rewardOpts
   ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
-    _beforePoke();
-    (, uint256 maxInterval) = _getMinMaxReportInterval();
+    _pokeFrom(_claimAndDistributeRewards, true);
+  }
+
+  function _pokeFrom(
+    bool _claimAndDistributeRewards,
+    bool _isSlasher
+  ) internal {
+    bool shouldClaim = _claimAndDistributeRewards && lastClaimRewardsAt + claimRewardsInterval < block.timestamp;
+
+    _beforePoke(shouldClaim);
+
+    (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
     (ReserveStatus status, uint256 diff, bool forceRebalance) = getReserveStatus(_getUnderlyingStaked(), 0);
-    require(forceRebalance || lastRebalancedAt + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
+    if (_isSlasher) {
+      require(forceRebalance || lastRebalancedAt + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
+    } else {
+      require(forceRebalance || lastRebalancedAt + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
+    }
     if (status != ReserveStatus.EQUILIBRIUM) {
       _rebalancePoke(status, diff);
     }
-    _afterPoke(status, _claimAndDistributeRewards);
+
+    lastRebalancedAt = block.timestamp;
+
+    if (shouldClaim) {
+      _claimRewards(status);
+      lastClaimRewardsAt = block.timestamp;
+    }
+
+    _afterPoke(status, shouldClaim);
   }
 
-  function _beforePoke() internal virtual {
+  function _beforePoke(bool /*_willClaimReward*/) internal virtual {
     require(staking != address(0), "STAKING_IS_NULL");
   }
 
-  function _afterPoke(ReserveStatus reserveStatus, bool _claimAndDistributeRewards) internal virtual {
-    lastRebalancedAt = block.timestamp;
-
-    if (_claimAndDistributeRewards && lastClaimRewardsAt + claimRewardsInterval < block.timestamp) {
-      _claimRewards(reserveStatus);
-      _distributeRewards();
-      lastClaimRewardsAt = block.timestamp;
-    }
+  function _afterPoke(ReserveStatus reserveStatus, bool _rewardClaimDone) internal virtual {
+    // do nothing
   }
 
-  function _rebalancePoke(ReserveStatus reserveStatus, uint256 sushiDiff) internal virtual {
-    // need to redefine in implementation
-  }
+  function _rebalancePoke(ReserveStatus reserveStatus, uint256 sushiDiff) internal virtual;
 
-  function _claimRewards(ReserveStatus reserveStatus) internal virtual {
-    // need to redefine in implementation
-  }
-
-  function _distributeRewards() internal virtual {
-    // need to redefine in implementation
-  }
+  /**
+   * @notice Explicitly collects the assigned rewards. If a reward token is the same token as underlying, it should
+   *         allocate this reward at piToken. Otherwise, it should transfer it to the router contract for a further
+   *         actions.
+   * @dev This is not the only way the rewards can be claimed. Sometimes they are distributed implicitly while
+   *      interacting with a protocol. For ex. MasterChef distributes rewards on each `deposit()/withdraw()` action
+   *      and there is no use in calling `_claimRewards()` immediately after calling one of these methods.
+   */
+  function _claimRewards(ReserveStatus _reserveStatus) internal virtual;
 
   function _callVoting(bytes4 _sig, bytes memory _data) internal returns (bytes memory) {
     return piToken.callExternal(voting, _sig, _data, 0);
@@ -247,7 +262,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     require(poolRestrictions.isVotingSenderAllowed(voting, msg.sender), "SENDER_NOT_ALLOWED");
   }
 
-  function _distributeRewardToPvp(uint256 _totalReward, IERC20 _underlying)
+  function _distributePerformanceFee(IERC20 _underlying, uint256 _totalReward)
     internal
     returns (uint256 pvpReward, uint256 remainder)
   {
@@ -257,42 +272,40 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     if (pvpFee > 0) {
       pvpReward = _totalReward.mul(pvpFee).div(HUNDRED_PCT);
       remainder = _totalReward.sub(pvpReward);
-      _underlying.safeTransfer(pvp, pvpReward);
+      _safeTransfer(_underlying, pvp, pvpReward);
     } else {
       remainder = _totalReward;
     }
   }
 
-  function _distributePiRemainderToPools(IERC20 _piToken)
-    internal
-    returns (uint256 piBalanceToDistribute, address[] memory pools)
-  {
-    pools = rewardPools;
-    uint256 poolsLen = pools.length;
-    require(poolsLen > 0, "MISSING_REWARD_POOLS");
+  /**
+   * @notice Distributes an underlying token reward received in the same tx earlier.
+   */
+  function _distributeReward(IERC20 _token, uint256 _totalReward) internal {
+    // Step #1. Distribute pvpReward
+    (uint256 pvpReward, uint256 piTokenReward) = _distributePerformanceFee(_token, _totalReward);
+    require(piTokenReward > 0, "NO_POOL_REWARDS_UNDERLYING");
 
-    piBalanceToDistribute = piToken.balanceOf(address(this));
-    require(piBalanceToDistribute > 0, "NO_POOL_REWARDS_PI");
+    // Step #2 Reset lockedProfit
+    uint256 lockedProfitBefore = _calculateLockedProfit();
+    uint256 lockedProfitAfter = lockedProfitBefore.add(piTokenReward);
+    lockedProfit = lockedProfitAfter;
 
-    uint256 totalPiOnPools = 0;
-    for (uint256 i = 0; i < poolsLen; i++) {
-      totalPiOnPools = totalPiOnPools.add(_piToken.balanceOf(pools[i]));
-    }
-    require(totalPiOnPools > 0, "TOTAL_PI_IS_0");
+    lastRewardDistribution = block.timestamp;
 
-    for (uint256 i = 0; i < poolsLen; i++) {
-      address pool = pools[i];
-      uint256 poolPiBalance = piToken.balanceOf(pool);
-      if (poolPiBalance == 0) {
-        continue;
-      }
+    emit DistributeReward(msg.sender, _totalReward, pvpReward, piTokenReward, lockedProfitBefore, lockedProfitAfter);
+  }
 
-      uint256 poolReward = piBalanceToDistribute.mul(poolPiBalance) / totalPiOnPools;
+  function _calculateLockedProfit() internal view returns (uint256) {
+    uint256 lockedFundsRatio = (block.timestamp.sub(lastRewardDistribution)).mul(lockedProfitDegradation);
 
-      piToken.transfer(pool, poolReward);
-
-      BPoolInterface(pool).gulp(address(piToken));
-      emit RewardPool(pool, poolReward);
+    if (lockedFundsRatio < DEGRADATION_COEFFICIENT) {
+      uint256 currentLockedProfit = lockedProfit;
+      return currentLockedProfit.sub(
+                lockedFundsRatio.mul(currentLockedProfit) / DEGRADATION_COEFFICIENT
+      );
+    } else {
+      return 0;
     }
   }
 
@@ -357,12 +370,19 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     return IERC20(staking).balanceOf(address(piToken));
   }
 
+  function _getUnderlyingReserve() internal view virtual returns (uint256);
+
   function getUnderlyingStaked() external view returns (uint256) {
     return _getUnderlyingStaked();
   }
 
-  function getRewardPools() external view returns (address[] memory) {
-    return rewardPools;
+  function getUnderlyingReserve() external view returns (uint256) {
+    return _getUnderlyingReserve();
+  }
+//
+  function getUnderlyingTotal() external view returns (uint256) {
+//    // _getUnderlyingReserve + _getUnderlyingStaked - _calculateLockedProfit
+    return _getUnderlyingReserve().add(_getUnderlyingStaked()).sub(_calculateLockedProfit());
   }
 
   function getPiEquivalentForUnderlying(
@@ -398,6 +418,11 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 _piTotalSupply
   ) external view virtual override returns (uint256) {
     uint256 underlyingOnPiToken = _underlyingToken.balanceOf(address(piToken));
+    console.log("piAmount               ", _piAmount);
+    console.log("underlyingOnPiToken", underlyingOnPiToken);
+    console.log("_getUnderlyingStaked()", _getUnderlyingStaked());
+    console.log("_totalUnderlyingWrapped", underlyingOnPiToken.add(_getUnderlyingStaked()));
+    console.log("_piTotalSupply         ", _piTotalSupply);
     return
       getUnderlyingEquivalentForPiPure(
         _piAmount,

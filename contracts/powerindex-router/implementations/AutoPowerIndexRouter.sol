@@ -62,15 +62,16 @@ contract AutoPowerIndexRouter is PowerIndexBasicRouter {
     emit ClaimRewards(msg.sender, rewardsPending, released);
   }
 
+  // TODO: handle
   /**
    * @notice Wraps the router's AUTOs into piTokens and transfers it to the pools proportionally their AUTO balances
    */
-  function _distributeRewards() internal override {
+  function _distributeRewards() internal {
     uint256 pendingReward = AUTO.balanceOf(address(this));
     require(pendingReward > 0, "NO_PENDING_REWARD");
 
     // Step #1. Distribute pvpReward
-    (uint256 pvpReward, uint256 poolRewardsUnderlying) = _distributeRewardToPvp(pendingReward, AUTO);
+    (uint256 pvpReward, uint256 poolRewardsUnderlying) = _distributePerformanceFee(AUTO, pendingReward);
     require(poolRewardsUnderlying > 0, "NO_POOL_REWARDS_UNDERLYING");
 
     // Step #2. Wrap AUTO into piAUTO
@@ -78,9 +79,9 @@ contract AutoPowerIndexRouter is PowerIndexBasicRouter {
     piToken.deposit(poolRewardsUnderlying);
 
     // Step #3. Distribute piAUTO over the pools
-    (uint256 poolRewardsPi, address[] memory pools) = _distributePiRemainderToPools(piToken);
+//    (uint256 poolRewardsPi, address[] memory pools) = _distributePiRemainderToPools(piToken);
 
-    emit DistributeRewards(msg.sender, pendingReward, pvpReward, poolRewardsUnderlying, poolRewardsPi, pools);
+//    emit DistributeRewards(msg.sender, pendingReward, pvpReward, poolRewardsUnderlying, poolRewardsPi, pools);
   }
 
   /*** VIEWERS ***/
@@ -111,6 +112,10 @@ contract AutoPowerIndexRouter is PowerIndexBasicRouter {
     }
 
     return IAutoFarm(staking).stakedWantTokens(AUTO_FARM_PID, address(piToken));
+  }
+
+  function _getUnderlyingReserve() internal view override returns (uint256) {
+    return AUTO.balanceOf(address(piToken));
   }
 
   /**

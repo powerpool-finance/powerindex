@@ -80,12 +80,13 @@ contract AlpacaRouter is PowerIndexBasicRouter {
     emit ClaimRewards(msg.sender, pendingInterestRewardAlpaca, pendingInterestRewardIbAlpaca, alpacaEarned);
   }
 
-  function _distributeRewards() internal override {
+  // TODO: handle
+  function _distributeRewards() internal {
     uint256 pendingReward = ALPACA.balanceOf(address(this));
     require(pendingReward > 0, "NO_PENDING_REWARD");
 
     // Step #1. Distribute pvpReward
-    (uint256 pvpReward, uint256 poolRewardsUnderlying) = _distributeRewardToPvp(pendingReward, ALPACA);
+    (uint256 pvpReward, uint256 poolRewardsUnderlying) = _distributePerformanceFee(ALPACA, pendingReward);
     require(poolRewardsUnderlying > 0, "NO_POOL_REWARDS_UNDERLYING");
 
     // Step #2. Wrap ALPACA into piALPACA
@@ -93,9 +94,9 @@ contract AlpacaRouter is PowerIndexBasicRouter {
     piToken.deposit(poolRewardsUnderlying);
 
     // Step #3. Distribute piALPACA over the pools
-    (uint256 poolRewardsPi, address[] memory pools) = _distributePiRemainderToPools(piToken);
+//    (uint256 poolRewardsPi, address[] memory pools) = _distributePiRemainderToPools(piToken);
 
-    emit DistributeRewards(msg.sender, pendingReward, pvpReward, poolRewardsUnderlying, poolRewardsPi, pools);
+//    emit DistributeRewards(msg.sender, pendingReward, pvpReward, poolRewardsUnderlying, poolRewardsPi, pools);
   }
 
   /*** OWNER METHODS ***/
@@ -152,6 +153,10 @@ contract AlpacaRouter is PowerIndexBasicRouter {
     }
     (uint256 ibAlpacaStaked, ) = IAlpacaFairLaunch(staking).userInfo(MASTER_CHEF_PID, address(piToken));
     return ibAlpaca2Alpaca(ibAlpacaStaked);
+  }
+
+  function _getUnderlyingReserve() internal view override returns (uint256) {
+    return ALPACA.balanceOf(address(piToken));
   }
 
   function _stake(uint256 _amount) internal {

@@ -62,15 +62,16 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     emit ClaimRewards(msg.sender, xSushiToBurn, rewardsPending, released);
   }
 
+  // TODO: handle
   /**
    * @notice Wraps the router's SUSHIs into piTokens and transfers it to the pools proportionally their SUSHI balances
    */
-  function _distributeRewards() internal override {
+  function _distributeRewards() internal {
     uint256 pendingReward = SUSHI.balanceOf(address(this));
     require(pendingReward > 0, "NO_PENDING_REWARD");
 
     // Step #1. Distribute pvpReward
-    (uint256 pvpReward, uint256 poolRewardsUnderlying) = _distributeRewardToPvp(pendingReward, SUSHI);
+    (uint256 pvpReward, uint256 poolRewardsUnderlying) = _distributePerformanceFee(SUSHI, pendingReward);
     require(poolRewardsUnderlying > 0, "NO_POOL_REWARDS_UNDERLYING");
 
     // Step #2. Wrap SUSHI into piSUSHI
@@ -78,9 +79,9 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
     piToken.deposit(poolRewardsUnderlying);
 
     // Step #3. Distribute piSUSHI over the pools
-    (uint256 poolRewardsPi, address[] memory pools) = _distributePiRemainderToPools(piToken);
+//    (uint256 poolRewardsPi, address[] memory pools) = _distributePiRemainderToPools(piToken);
 
-    emit DistributeRewards(msg.sender, pendingReward, pvpReward, poolRewardsUnderlying, poolRewardsPi, pools);
+//    emit DistributeRewards(msg.sender, pendingReward, pvpReward, poolRewardsUnderlying, poolRewardsPi, pools);
   }
 
   /*** VIEWERS ***/
@@ -203,7 +204,11 @@ contract SushiPowerIndexRouter is PowerIndexBasicRouter {
    */
   function _getUnderlyingStaked() internal view override returns (uint256) {
     // return piTokenTotalSupply - sushiAtPiToken
-    return piToken.totalSupply().sub(SUSHI.balanceOf(address(piToken)));
+    return piToken.totalSupply().sub(_getUnderlyingReserve());
+  }
+
+  function _getUnderlyingReserve() internal view override returns (uint256) {
+    return SUSHI.balanceOf(address(piToken));
   }
 
   function _stake(uint256 _sushi) internal {

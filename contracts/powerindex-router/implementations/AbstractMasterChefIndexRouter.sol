@@ -11,14 +11,6 @@ abstract contract AbstractMasterChefIndexRouter is PowerIndexBasicRouter {
   event Redeem(address indexed sender, uint256 amount, uint256 rewardReceived);
   event IgnoreDueMissingStaking();
   event ClaimRewards(address indexed sender, uint256 earned);
-  event DistributeRewards(
-    address indexed sender,
-    uint256 tokenReward,
-    uint256 pvpReward,
-    uint256 poolRewardsUnderlying,
-    uint256 poolRewardsPi,
-    address[] pools
-  );
 
   IERC20 internal immutable TOKEN;
 
@@ -30,32 +22,15 @@ abstract contract AbstractMasterChefIndexRouter is PowerIndexBasicRouter {
 
   function _claimRewards(ReserveStatus status) internal override {
     if (status == ReserveStatus.EQUILIBRIUM) {
+      uint256 tokenBefore = TOKEN.balanceOf(address(piToken));
       _stake(0);
+      uint256 receivedReward = TOKEN.balanceOf(address(piToken)).sub(tokenBefore);
+      if (receivedReward > 0) {
+        _distributeReward(TOKEN, receivedReward);
+      }
     }
     // Otherwise the rewards are distributed each time deposit/withdraw methods are called,
     // so no additional actions required.
-  }
-
-  /**
-   * @notice Wraps the router's underlying balance into piTokens and transfers them
-   *         to the pools proportionally their token balances
-   */
-  function _distributeRewards() internal override {
-    uint256 pendingReward = TOKEN.balanceOf(address(this));
-    require(pendingReward > 0, "NO_PENDING_REWARD");
-
-    // Step #1. Distribute pvpReward
-    (uint256 pvpReward, uint256 poolRewardsUnderlying) = _distributeRewardToPvp(pendingReward, TOKEN);
-    require(poolRewardsUnderlying > 0, "NO_POOL_REWARDS_UNDERLYING");
-
-    // Step #2. Wrap token into piToken
-    TOKEN.approve(address(piToken), poolRewardsUnderlying);
-    piToken.deposit(poolRewardsUnderlying);
-
-    // Step #3. Distribute piToken over the pools
-    (uint256 poolRewardsPi, address[] memory pools) = _distributePiRemainderToPools(piToken);
-
-    emit DistributeRewards(msg.sender, pendingReward, pvpReward, poolRewardsUnderlying, poolRewardsPi, pools);
   }
 
   /*** OWNER METHODS ***/
@@ -82,6 +57,11 @@ abstract contract AbstractMasterChefIndexRouter is PowerIndexBasicRouter {
 
   /*** INTERNALS ***/
 
+  // TODO: ensure is ok
+  function _getUnderlyingReserve() internal view override returns (uint256) {
+    return TOKEN.balanceOf(address(piToken));
+  }
+
   function _stake(uint256 _amount) internal {
     uint256 tokenBefore = TOKEN.balanceOf(address(piToken));
 
@@ -90,7 +70,8 @@ abstract contract AbstractMasterChefIndexRouter is PowerIndexBasicRouter {
     _stakeImpl(_amount);
 
     uint256 receivedReward = TOKEN.balanceOf(address(piToken)).sub(tokenBefore.sub(_amount));
-    _safeTransfer(TOKEN, address(this), receivedReward);
+
+    _distributeReward(TOKEN, receivedReward);
 
     emit Stake(msg.sender, _amount, receivedReward);
   }
@@ -101,7 +82,8 @@ abstract contract AbstractMasterChefIndexRouter is PowerIndexBasicRouter {
     _redeemImpl(_amount);
 
     uint256 receivedReward = TOKEN.balanceOf(address(piToken)).sub(tokenBefore).sub(_amount);
-    _safeTransfer(TOKEN, address(this), receivedReward);
+
+    _distributeReward(TOKEN, receivedReward);
 
     emit Redeem(msg.sender, _amount, receivedReward);
   }
