@@ -11,7 +11,6 @@ const Reservoir = artifacts.require('Reservoir');
 
 LPMining.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
-VestedLPMining.numberFormat = 'String';
 
 const { web3 } = Reservoir;
 const { toBN } = web3.utils;
