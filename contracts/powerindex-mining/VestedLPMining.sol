@@ -222,6 +222,10 @@ contract VestedLPMining is
     emit SetCvpPerBlock(_cvpPerBlock);
   }
 
+  function setCvpVestingPool(uint256 _cvpVestingPool) public onlyOwner {
+    cvpVestingPool = SafeMath96.fromUint(_cvpVestingPool, "VLPMining: too big _cvpVestingPool");
+  }
+
   /// @inheritdoc IVestedLPMining
   function setCvpVestingPeriodInBlocks(uint256 _cvpVestingPeriodInBlocks) public override onlyOwner {
     cvpVestingPeriodInBlocks = SafeMath32.fromUint(
