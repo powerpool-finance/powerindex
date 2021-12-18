@@ -11,6 +11,7 @@ const Reservoir = artifacts.require('Reservoir');
 
 LPMining.numberFormat = 'String';
 MockERC20.numberFormat = 'String';
+VestedLPMining.numberFormat = 'String';
 
 const { web3 } = Reservoir;
 const { toBN } = web3.utils;
@@ -558,6 +559,32 @@ describe('VestedLPMining', () => {
       await time.advanceBlockTo(this.shiftBlock('929'));
       await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 930
       assert.equal(await this.allCvpOf(bob), '2900');
+    });
+
+    it('cvpVestingPool can be changed by owner', async () => {
+      await time.advanceBlockTo(this.shiftBlock('959'));
+      // 100 per block farming rate starting at block 900
+      this.lpMining = await VestedLPMining.new({ from: minter });
+      await this.lpMining.initialize(this.cvp.address, this.reservoir.address, '100', this.shiftBlock('900'), '100', {
+        from: minter,
+      });
+      await this.prepareReservoir();
+
+      await this.lp.approve(this.lpMining.address, '1000', { from: bob });
+      await time.advanceBlockTo(this.shiftBlock('969'));
+      await this.lpMining.add('100', this.lp.address, '1', true, '0', '0', '0', '0', { from: minter });
+      await this.lpMining.deposit(0, '100', 0, { from: bob });
+      await time.advanceBlockTo(this.shiftBlock('979'));
+      await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 920
+      assert.equal(await this.lpMining.cvpVestingPool(), '826');
+
+      await expectRevert(this.lpMining.setCvpVestingPool('100', { from: alice }), 'Ownable: caller is not the owner');
+      await this.lpMining.setCvpVestingPool('100', { from: minter });
+
+      await time.advanceBlockTo(this.shiftBlock('983'));
+      assert.equal(await this.lpMining.cvpVestingPool(), '100');
+      await this.lpMining.deposit(0, '0', 0, { from: bob }); // block 930
+      assert.equal(await this.lpMining.cvpVestingPool(), '452');
     });
 
     it('cvpVestingPeriodInBlocks can be changed by owner', async () => {
