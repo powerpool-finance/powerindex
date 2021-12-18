@@ -9,38 +9,87 @@ task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async (__, { ne
   const [deployer] = await web3.eth.getAccounts();
   console.log('deployer', deployer);
   const sendOptions = { from: deployer };
-  const admin = '0xb258302c3f209491d604165549079680708581cc';
-  const poolAddress = '0x26607aC599266b21d13c7aCF7942c7701a8b699c';
-  const uniswapFactoryAddress = '0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f';
-  const wethAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
-  const cvpAddress = '0x38e4adb44ef08f22f5b5b76a8f0c2d0dcbe7dca1';
+  const admin = '0x560640c19649FD87ca3c5bAde137f6f1cCB9F0B0';
+  const poolAddress = '0x40e46de174dfb776bb89e04df1c47d8a66855eb3';
+  const uniswapFactoryAddress = '0xca143ce32fe78f1f7019d7d551a6402fc5350c73';
+  const wethAddress = '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c';
+  const busdAddress = '0xe9e7cea3dedca5984780bafc599bd69add087d56';
+  const cvpAddress = '0x5ec3adbdae549dce842e24480eb2434769e22b2e';
 
-  const erc20PiptSwap = await Erc20PiptSwap.new(
-    wethAddress,
-    cvpAddress,
-    poolAddress,
-    admin,
-    sendOptions
-  );
+  const erc20PiptSwap = await Erc20PiptSwap.at('0xe7a0f13BfAC736976f8f1f7C39433E2b59F8bB52');
+  // const erc20PiptSwap = await Erc20PiptSwap.new(
+  //   wethAddress,
+  //   busdAddress,
+  //   cvpAddress,
+  //   poolAddress,
+  //   admin,
+  //   sendOptions
+  // );
   console.log('erc20PiptSwap', erc20PiptSwap.address);
 
   const pool = await PowerIndexPool.at(poolAddress);
 
   const swapCoins = [
-    '0xdAC17F958D2ee523a2206206994597C13D831ec7', //USDT
-    '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', //USDC
-    '0x6B175474E89094C44Da98b954EedeAC495271d0F', //DAI
-    '0x1494CA1F11D487c2bBe4543E90080AeBa4BA3C2b', //DPI
-    '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', //WBTC
-    '0xc944e90c64b2c07662a292be6244bdf05cda44a7', //GRT
+    busdAddress,
   ];
+
   await erc20PiptSwap.fetchUnswapPairsFromFactory(
     uniswapFactoryAddress,
-    (await callContract(pool, 'getCurrentTokens')).concat(swapCoins),
+    wethAddress,
+    [
+      '0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82',
+      '0xcF6BB5389c92Bdda8a3747Ddb454cB7a64626C63',
+      '0xA7f552078dcC247C2684336020c03648500C6d9F',
+      '0xa1faa113cbe53436df28ff0aee54275c13b40975',
+      '0x67ee3cb086f8a16f34bee3ca72fad36f7db929e2',
+      '0x9f589e3eabe42ebc94a44727b3f3531c0c877809',
+    ].concat(swapCoins),
+    '25',
     sendOptions
   );
 
-  await erc20PiptSwap.transferOwnership(admin, sendOptions);
+  await erc20PiptSwap.fetchUnswapPairsFromFactory(
+    uniswapFactoryAddress,
+    busdAddress,
+    [
+      '0x8F0528cE5eF7B51152A59745bEfDD91D97091d2F',
+      '0x762539b45A1dCcE3D36d080F74d1AED37844b878',
+    ],
+    '25',
+    sendOptions
+  );
+
+  await erc20PiptSwap.fetchUnswapPairsFromFactory(
+    '0xbcfccbde45ce874adcb698cc183debcf17952812',
+    wethAddress,
+    ['0xa184088a740c695e156f91f5cc086a06bb78b827'],
+    '20',
+    sendOptions
+  );
+
+  await erc20PiptSwap.fetchUnswapPairsFromFactory(
+    '0x3cd1c46068daea5ebb0d3f55f6915b10648062b8',
+    wethAddress,
+    ['0x9C65AB58d8d978DB963e63f2bfB7121627e3a739'],
+    '30',
+    sendOptions
+  );
+
+  await erc20PiptSwap.fetchUnswapPairsFromFactory(
+    '0x01bf7c66c6bd861915cdaae475042d3c4bae16a7',
+    wethAddress,
+    ['0xE02dF9e3e622DeBdD69fb838bB799E3F168902c5'],
+    '30',
+    sendOptions
+  );
+
+  await erc20PiptSwap.setSimplePairs(
+    ['0xc2eed0f5a0dc28cfa895084bc0a9b8b8279ae492'],
+    true,
+    sendOptions
+  );
+
+  // await erc20PiptSwap.transferOwnership(admin, sendOptions);
 
   if (network.name !== 'mainnetfork') {
     return;
