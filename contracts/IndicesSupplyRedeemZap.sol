@@ -516,6 +516,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
     require(round.totalOutputAmount != 0, "NULL_TO");
 
+    uint256 totalOutputAmountClaimed = round.totalOutputAmountClaimed;
     for (uint256 i = 0; i < len; i++) {
       address _claimFor = _claimForList[i];
       require(round.inputAmount[_claimFor] != 0, "INPUT_NULL");
@@ -524,7 +525,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       uint256 inputShare = round.inputAmount[_claimFor].mul(1 ether).div(round.totalInputAmount);
       uint256 outputAmount = round.totalOutputAmount.mul(inputShare).div(1 ether);
       round.outputAmount[_claimFor] = outputAmount;
-      round.totalOutputAmountClaimed = round.totalOutputAmountClaimed.add(outputAmount).add(10);
+      totalOutputAmountClaimed = totalOutputAmountClaimed.add(outputAmount);
       IERC20(round.outputToken).safeTransfer(_claimFor, outputAmount - 1);
 
       emit ClaimPoke(
@@ -537,6 +538,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         outputAmount
       );
     }
+    round.totalOutputAmountClaimed = totalOutputAmountClaimed;
   }
 
   function _checkRoundBeforeExecute(bytes32 _roundKey, Round storage round) internal {
