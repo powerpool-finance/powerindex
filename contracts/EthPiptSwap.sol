@@ -285,7 +285,8 @@ contract EthPiptSwap is ProgressiveFee {
   }
 
   function calcRatioToJoin(uint256 _poolAmountOut, uint256 _totalSupply) public view returns (uint256) {
-    // add 100 wei to ratio to make tokensInPipt values bigger as well as totalEthSwap to avoid LIMIT_IN errors on joinPool
+    // add 100 wei to ratio to make tokensInPipt values bigger as well as totalEthSwap
+    // to avoid LIMIT_IN errors on joinPool
     return _poolAmountOut.mul(1 ether).div(_totalSupply).add(100);
   }
 

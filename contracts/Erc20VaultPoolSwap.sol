@@ -76,10 +76,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     usdc = IERC20(_usdc);
   }
 
-  function setVaultConfigs(
-    address[] memory _tokens,
-    VaultConfig[] memory _vaultConfigs
-  ) external onlyOwner {
+  function setVaultConfigs(address[] memory _tokens, VaultConfig[] memory _vaultConfigs) external onlyOwner {
     uint256 len = _tokens.length;
     require(len == _vaultConfigs.length, "L");
     for (uint256 i = 0; i < len; i++) {
@@ -284,7 +281,6 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
       amountOut = amountOut.add(calcUsdcOutByVault(t, ratio.mul(bal).div(1 ether)));
     }
   }
-
 
   function getVaultCalcs(address _pool, uint256 totalInputAmount)
     public
