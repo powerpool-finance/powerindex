@@ -78,43 +78,23 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
   function setVaultConfigs(
     address[] memory _tokens,
-    address[] memory _depositors,
-    uint8[] memory _depositorTypes,
-    uint8[] memory _depositorAmountLength,
-    uint8[] memory _depositorIndexes,
-    address[] memory _lpTokens,
-    address[] memory _curvePoolRegistries
+    VaultConfig[] memory _vaultConfigs
   ) external onlyOwner {
     uint256 len = _tokens.length;
-    require(
-      len == _depositors.length &&
-        len == _depositorAmountLength.length &&
-        len == _depositorIndexes.length &&
-        len == _depositorTypes.length &&
-        len == _lpTokens.length &&
-        len == _curvePoolRegistries.length,
-      "L"
-    );
+    require(len == _vaultConfigs.length, "L");
     for (uint256 i = 0; i < len; i++) {
-      vaultConfig[_tokens[i]] = VaultConfig(
-        _depositorAmountLength[i],
-        _depositorIndexes[i],
-        _depositorTypes[i],
-        _depositors[i],
-        _lpTokens[i],
-        _curvePoolRegistries[i]
-      );
+      vaultConfig[_tokens[i]] = _vaultConfigs[i];
 
-      usdc.approve(_depositors[i], uint256(-1));
-      IERC20(_lpTokens[i]).approve(_tokens[i], uint256(-1));
-      IERC20(_lpTokens[i]).approve(_depositors[i], uint256(-1));
+      usdc.approve(_vaultConfigs[i].depositor, uint256(-1));
+      IERC20(_vaultConfigs[i].lpToken).approve(_tokens[i], uint256(-1));
+      IERC20(_vaultConfigs[i].lpToken).approve(_vaultConfigs[i].depositor, uint256(-1));
       emit SetVaultConfig(
         _tokens[i],
-        _depositors[i],
-        _depositorAmountLength[i],
-        _depositorIndexes[i],
-        _lpTokens[i],
-        _curvePoolRegistries[i]
+        _vaultConfigs[i].depositor,
+        _vaultConfigs[i].depositorLength,
+        _vaultConfigs[i].depositorIndex,
+        _vaultConfigs[i].lpToken,
+        _vaultConfigs[i].curvePoolRegistry
       );
     }
   }

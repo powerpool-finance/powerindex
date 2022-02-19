@@ -1276,15 +1276,14 @@ describe('CVPMaker test', () => {
 
           await vaultSwap.setVaultConfigs(
             [ycrvVault.address],
-            [crvDepositor.address],
-            // depositorType
-            [1],
-            // amountsLength
-            [2],
-            // usdcIndex
-            [1],
-            [curvePoolToken.address],
-            [curvePoolRegistry.address]
+            [{
+              depositorLength: 2,
+              depositorIndex: 1,
+              depositorType: 1,
+              depositor: crvDepositor.address,
+              lpToken: curvePoolToken.address,
+              curvePoolRegistry: curvePoolRegistry.address,
+            }],
           );
 
           tokens.push(ycrvVault);
@@ -1411,15 +1410,14 @@ describe('CVPMaker test', () => {
 
           await vaultSwap.setVaultConfigs(
             [ycrvVault.address],
-            [crvDepositor.address],
-            // depositorType
-            [1],
-            // amountsLength
-            [2],
-            // usdcIndex
-            [1],
-            [curvePoolToken.address],
-            [curvePoolRegistry.address]
+            [{
+              depositorLength: 2,
+              depositorIndex: 1,
+              depositorType: 1,
+              depositor: crvDepositor.address,
+              lpToken: curvePoolToken.address,
+              curvePoolRegistry: curvePoolRegistry.address,
+            }],
           );
 
           await usdc.transfer(crvDepositor.address, mwei(1e12));

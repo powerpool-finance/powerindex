@@ -692,12 +692,14 @@ describe('IndicesSupplyRedeemZap', () => {
       });
       await vaultPoolSwap.setVaultConfigs(
         vaults.map(v => v.vault.address),
-        vaults.map(v => v.depositor.address),
-        vaults.map(v => v.config.depositorType || 1),
-        vaults.map(v => v.config.amountsLength),
-        vaults.map(v => v.config.usdcIndex),
-        vaults.map(v => v.lpToken.address),
-        vaults.map(() => vaultRegistry.address),
+        vaults.map(v => ({
+          depositorLength: v.config.amountsLength,
+          depositorIndex: v.config.usdcIndex,
+          depositorType: v.config.depositorType || 1,
+          depositor: v.depositor.address,
+          lpToken: v.lpToken.address,
+          curvePoolRegistry: vaultRegistry.address,
+        })),
       );
       await vaultPoolSwap.updatePools([pool.address]);
 
