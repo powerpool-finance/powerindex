@@ -131,8 +131,12 @@ contract EthPiptSwap is ProgressiveFee {
     return _swapWethToPiptByPoolOut(msg.value, _poolAmountOut, tokens, getWrapFee(tokens));
   }
 
-  function swapPiptToEth(uint256 _poolAmountIn) external payable returns (uint256 ethOutAmount) {
-    ethOutAmount = _swapPiptToWeth(_poolAmountIn);
+  function swapPiptToEth(uint256 _poolAmountIn, uint256 _minEthAmountOut)
+    external
+    payable
+    returns (uint256 ethOutAmount)
+  {
+    ethOutAmount = _swapPiptToWeth(_poolAmountIn, _minEthAmountOut);
 
     weth.withdraw(ethOutAmount);
     Address.sendValue(msg.sender, ethOutAmount);
@@ -424,7 +428,7 @@ contract EthPiptSwap is ProgressiveFee {
     }
   }
 
-  function _swapPiptToWeth(uint256 _poolAmountIn) internal returns (uint256) {
+  function _swapPiptToWeth(uint256 _poolAmountIn, uint256 _minEthAmountOut) internal returns (uint256) {
     address[] memory tokens = getPiptTokens();
     uint256 len = tokens.length;
 
@@ -436,6 +440,7 @@ contract EthPiptSwap is ProgressiveFee {
     uint256 wrapperFee = getWrapFee(tokens);
 
     (uint256 ethFeeAmount, uint256 ethOutAmount) = calcEthFee(totalEthOut, wrapperFee);
+    require(ethOutAmount >= _minEthAmountOut, "MIN_ETH_AMOUNT_OUT");
 
     _exitPool(_poolAmountIn, tokensOutPipt, wrapperFee);
 

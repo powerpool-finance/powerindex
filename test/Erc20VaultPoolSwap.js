@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { mwei, assertEqualWithAccuracy } = require('./helpers');
+const { mwei, assertEqualWithAccuracy, addBN } = require('./helpers');
 
 const { time, expectRevert } = require('@openzeppelin/test-helpers');
 const assert = require('chai').assert;
@@ -181,12 +181,13 @@ describe('Erc20VaultPoolSwap', () => {
       await usdc.approve(vaultPoolSwap.address, danUsdcSwap, {from: dan});
 
       const vaultPoolOut = await vaultPoolSwap.calcVaultPoolOutByUsdc(pool.address, danUsdcSwap, true);
-      await expectRevert(vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, '0', {from: dan}), 'NULL_INPUT');
-      await expectRevert(vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, danUsdcSwap, {from: alice}), 'ERC20');
+      await expectRevert(vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, '0', vaultPoolOut, {from: dan}), 'NULL_INPUT');
+      await expectRevert(vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, danUsdcSwap, vaultPoolOut, {from: alice}), 'ERC20');
       for (let i = 0; i < tokens.length; i++) {
         await tokens[i].transfer(vaultPoolSwap.address, ether(1000));
       }
-      await vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, danUsdcSwap, {from: dan});
+      await expectRevert(vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, danUsdcSwap, addBN(vaultPoolOut, ether('0.0001')), {from: dan}), 'POOL_AMOUNT_OUT_MIN');
+      await vaultPoolSwap.swapErc20ToVaultPool(pool.address, usdc.address, danUsdcSwap, vaultPoolOut, {from: dan});
       const danPoolBalance = await pool.balanceOf(dan);
       assertEqualWithAccuracy(vaultPoolOut, danPoolBalance, ether('0.0000011'));
 
@@ -202,9 +203,10 @@ describe('Erc20VaultPoolSwap', () => {
 
       await pool.approve(vaultPoolSwap.address, danPoolBalance, {from: dan});
       const usdcOut = await vaultPoolSwap.calcUsdcOutByPool(pool.address, danPoolBalance, true);
-      await expectRevert(vaultPoolSwap.swapVaultPoolToErc20(pool.address, '0', usdc.address, {from: dan}), 'NULL_INPUT');
-      await expectRevert(vaultPoolSwap.swapVaultPoolToErc20(pool.address, danPoolBalance, usdc.address, {from: alice}), 'ERR_BTOKEN_BAD_CALLER');
-      await vaultPoolSwap.swapVaultPoolToErc20(pool.address, danPoolBalance, usdc.address, {from: dan});
+      await expectRevert(vaultPoolSwap.swapVaultPoolToErc20(pool.address, '0', usdc.address, usdcOut, {from: dan}), 'NULL_INPUT');
+      await expectRevert(vaultPoolSwap.swapVaultPoolToErc20(pool.address, danPoolBalance, usdc.address, usdcOut, {from: alice}), 'ERR_BTOKEN_BAD_CALLER');
+      await expectRevert(vaultPoolSwap.swapVaultPoolToErc20(pool.address, danPoolBalance, usdc.address, addBN(usdcOut, ether('1')), {from: dan}), 'ERC20_AMOUNT_OUT_MIN');
+      await vaultPoolSwap.swapVaultPoolToErc20(pool.address, danPoolBalance, usdc.address, usdcOut, {from: dan});
       const danUsdcBalance = await usdc.balanceOf(dan);
       assertEqualWithAccuracy(usdcOut, danUsdcBalance, ether('0.002'));
 

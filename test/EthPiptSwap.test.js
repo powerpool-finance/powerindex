@@ -383,8 +383,12 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
 
       await pool.approve(ethPiptSwap.address, poolOutAfterFee, { from: bob });
 
+      await expectRevert(
+        ethPiptSwap.swapPiptToEth(poolOutAfterFee, addBN(ethOutAfterFee, ether('0.1')), { from: bob, gasPrice }),
+        'MIN_ETH_AMOUNT_OUT',
+      );
       bobBalanceBefore = await web3.eth.getBalance(bob);
-      res = await ethPiptSwap.swapPiptToEth(poolOutAfterFee, { from: bob, gasPrice });
+      res = await ethPiptSwap.swapPiptToEth(poolOutAfterFee, ethOutAfterFee, { from: bob, gasPrice });
 
       weiUsed = res.receipt.gasUsed * gasPrice;
       console.log('        swapPiptToEth gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
@@ -522,7 +526,8 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           await pool.approve(erc20PiptSwap.address, poolOutAfterFee, {from: bob});
 
           bobBalanceBefore = await usdToken.balanceOf(bob);
-          res = await erc20PiptSwap.swapPiptToErc20(tokenAddress, poolOutAfterFee, {from: bob, gasPrice});
+          await expectRevert(erc20PiptSwap.swapPiptToErc20(tokenAddress, poolOutAfterFee, addBN(swapPiptToEthInputs.totalErc20Out, ether('1')), {from: bob, gasPrice}), 'MIN_POOL_AMOUNT_OUT')
+          res = await erc20PiptSwap.swapPiptToErc20(tokenAddress, poolOutAfterFee, swapPiptToEthInputs.totalErc20Out, {from: bob, gasPrice});
           weiUsed = res.receipt.gasUsed * gasPrice;
           console.log('          swapErc20ToPipt gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
 
@@ -676,8 +681,9 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
 
         await pool.approve(erc20PiptSwap.address, poolOutAfterFee, {from: bob});
 
+        await expectRevert(erc20PiptSwap.swapPiptToEth(poolOutAfterFee, addBN(ethOutAfterFee, ether('0.1')), {from: bob, value: piTokenTotalEthFee, gasPrice}), 'MIN_ETH_AMOUNT_OUT');
         bobBalanceBefore = await web3.eth.getBalance(bob);
-        res = await erc20PiptSwap.swapPiptToEth(poolOutAfterFee, {from: bob, value: piTokenTotalEthFee, gasPrice});
+        res = await erc20PiptSwap.swapPiptToEth(poolOutAfterFee, ethOutAfterFee, {from: bob, value: piTokenTotalEthFee, gasPrice});
 
         weiUsed = res.receipt.gasUsed * gasPrice;
         console.log('          swapPiptToEth gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
@@ -765,7 +771,8 @@ describe('EthPiptSwap and Erc20PiptSwap', () => {
           await pool.approve(erc20PiptSwap.address, poolOutAfterFee, {from: bob});
 
           bobBalanceBefore = await usdToken.balanceOf(bob);
-          res = await erc20PiptSwap.swapPiptToErc20(tokenAddress, poolOutAfterFee, {from: bob, gasPrice, value: piTokenTotalEthFee});
+          await expectRevert(erc20PiptSwap.swapPiptToErc20(tokenAddress, poolOutAfterFee, addBN(swapPiptToEthInputs.totalErc20Out, ether('1')), {from: bob, gasPrice, value: piTokenTotalEthFee}), 'MIN_ERC20_AMOUNT_OUT')
+          res = await erc20PiptSwap.swapPiptToErc20(tokenAddress, poolOutAfterFee, swapPiptToEthInputs.totalErc20Out, {from: bob, gasPrice, value: piTokenTotalEthFee});
           weiUsed = res.receipt.gasUsed * gasPrice;
           console.log('          swapPiptToErc20 gasUsed', res.receipt.gasUsed, 'ethUsed(100 gwei)', web3.utils.fromWei(weiUsed.toString(), 'ether'));
 

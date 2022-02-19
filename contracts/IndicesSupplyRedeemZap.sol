@@ -67,6 +67,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address indexed inputToken,
     address outputToken,
     uint256 totalInputAmount,
+    uint256 minExpectedOutputAmount,
     uint256 totalOutputAmount
   );
   event ClaimPoke(
@@ -239,17 +240,19 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   function supplyAndRedeemPokeFromReporter(
     uint256 _reporterId,
     bytes32[] memory _roundKeys,
+    uint256[] memory _roundMinExpectedOut,
     bytes calldata _rewardOpts
   ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
-    _supplyAndRedeemPoke(_roundKeys, false);
+    _supplyAndRedeemPoke(_roundKeys, _roundMinExpectedOut, false);
   }
 
   function supplyAndRedeemPokeFromSlasher(
     uint256 _reporterId,
     bytes32[] memory _roundKeys,
+    uint256[] memory _roundMinExpectedOut,
     bytes calldata _rewardOpts
   ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
-    _supplyAndRedeemPoke(_roundKeys, true);
+    _supplyAndRedeemPoke(_roundKeys, _roundMinExpectedOut, true);
   }
 
   function claimPokeFromReporter(
@@ -421,7 +424,11 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     emit Withdraw(roundKey, _pool, msg.sender, _inputToken, _amount);
   }
 
-  function _supplyAndRedeemPoke(bytes32[] memory _roundKeys, bool _bySlasher) internal {
+  function _supplyAndRedeemPoke(
+    bytes32[] memory _roundKeys,
+    uint256[] memory _roundMinExpectedOut,
+    bool _bySlasher
+  ) internal {
     (uint256 minInterval, uint256 maxInterval) = _getMinMaxReportInterval();
 
     uint256 len = _roundKeys.length;
@@ -441,9 +448,9 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
       require(round.inputToken == round.pool || round.outputToken == round.pool, "UA");
 
       if (round.inputToken == round.pool) {
-        _redeemPool(round, round.totalInputAmount);
+        _redeemPool(round, round.totalInputAmount, _roundMinExpectedOut[i]);
       } else {
-        _supplyPool(round, round.totalInputAmount);
+        _supplyPool(round, round.totalInputAmount, _roundMinExpectedOut[i]);
       }
 
       require(round.totalOutputAmount != 0, "NULL_TO");
@@ -454,19 +461,24 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
         round.inputToken,
         round.outputToken,
         round.totalInputAmount,
+        _roundMinExpectedOut[i],
         round.totalOutputAmount
       );
     }
   }
 
-  function _supplyPool(Round storage round, uint256 totalInputAmount) internal {
+  function _supplyPool(
+    Round storage round,
+    uint256 totalInputAmount,
+    uint256 minExpectedAmountOut
+  ) internal {
     PoolType pType = poolType[round.pool];
     if (pType == PoolType.PIPT) {
       IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolSwapContract[round.pool]));
       if (round.inputToken == ETH) {
         (round.totalOutputAmount, ) = piptSwap.swapEthToPipt{ value: totalInputAmount }(
           piptSwap.defaultSlippage(),
-          0,
+          minExpectedAmountOut,
           piptSwap.defaultDiffPercent()
         );
       } else {
@@ -474,28 +486,42 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
           round.inputToken,
           totalInputAmount,
           piptSwap.defaultSlippage(),
-          0,
+          minExpectedAmountOut,
           piptSwap.defaultDiffPercent()
         );
       }
     } else if (pType == PoolType.VAULT) {
       IErc20VaultPoolSwap vaultPoolSwap = IErc20VaultPoolSwap(poolSwapContract[round.pool]);
-      round.totalOutputAmount = vaultPoolSwap.swapErc20ToVaultPool(round.pool, address(usdc), totalInputAmount);
+      round.totalOutputAmount = vaultPoolSwap.swapErc20ToVaultPool(
+        round.pool,
+        address(usdc),
+        totalInputAmount,
+        minExpectedAmountOut
+      );
     }
   }
 
-  function _redeemPool(Round storage round, uint256 totalInputAmount) internal {
+  function _redeemPool(
+    Round storage round,
+    uint256 totalInputAmount,
+    uint256 minExpectedAmountOut
+  ) internal {
     PoolType pType = poolType[round.pool];
     if (pType == PoolType.PIPT) {
       IErc20PiptSwap piptSwap = IErc20PiptSwap(payable(poolSwapContract[round.pool]));
       if (round.inputToken == ETH) {
-        round.totalOutputAmount = piptSwap.swapPiptToEth(totalInputAmount);
+        round.totalOutputAmount = piptSwap.swapPiptToEth(totalInputAmount, minExpectedAmountOut);
       } else {
-        round.totalOutputAmount = piptSwap.swapPiptToErc20(round.outputToken, totalInputAmount);
+        round.totalOutputAmount = piptSwap.swapPiptToErc20(round.outputToken, totalInputAmount, minExpectedAmountOut);
       }
     } else if (pType == PoolType.VAULT) {
       IErc20VaultPoolSwap vaultPoolSwap = IErc20VaultPoolSwap(poolSwapContract[round.pool]);
-      round.totalOutputAmount = vaultPoolSwap.swapVaultPoolToErc20(round.pool, totalInputAmount, address(usdc));
+      round.totalOutputAmount = vaultPoolSwap.swapVaultPoolToErc20(
+        round.pool,
+        totalInputAmount,
+        address(usdc),
+        minExpectedAmountOut
+      );
     }
   }
 

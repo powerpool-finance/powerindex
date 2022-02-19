@@ -21,6 +21,7 @@ import "./interfaces/ICurvePoolRegistry.sol";
 import "./interfaces/IErc20PiptSwap.sol";
 import "./interfaces/IErc20VaultPoolSwap.sol";
 import "./traits/ProgressiveFee.sol";
+import "hardhat/console.sol";
 
 contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   using SafeERC20 for IERC20;
@@ -139,7 +140,8 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   function swapErc20ToVaultPool(
     address _pool,
     address _swapToken,
-    uint256 _swapAmount
+    uint256 _swapAmount,
+    uint256 _poolAmountOutMin
   ) external override returns (uint256 poolAmountOut) {
     require(_swapToken == address(usdc), "ONLY_USDC");
     usdc.safeTransferFrom(msg.sender, address(this), _swapAmount);
@@ -153,6 +155,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     (, uint256 communityFee, , ) = PowerIndexPoolInterface(_pool).getCommunityFee();
     // subtract 1 wei from poolAmountOut to avoid insufficient balance error due to rounding
     poolAmountOut = poolAmountOut.sub(poolAmountOut.mul(communityFee).div(1 ether)).sub(1);
+    require(poolAmountOut >= _poolAmountOutMin, "POOL_AMOUNT_OUT_MIN");
 
     IERC20(_pool).safeTransfer(msg.sender, poolAmountOut);
 
@@ -162,7 +165,8 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   function swapVaultPoolToErc20(
     address _pool,
     uint256 _poolAmountIn,
-    address _swapToken
+    address _swapToken,
+    uint256 _erc20AmountOutMin
   ) external override returns (uint256 erc20Out) {
     require(_swapToken == address(usdc), "ONLY_USDC");
     IERC20(_pool).safeTransferFrom(msg.sender, address(this), _poolAmountIn);
@@ -170,6 +174,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     (, uint256 _poolAmountInWithFee) = calcFee(_poolAmountIn, 0);
 
     erc20Out = _redeemPooledVault(_pool, _poolAmountInWithFee);
+    require(erc20Out >= _erc20AmountOutMin, "ERC20_AMOUNT_OUT_MIN");
 
     usdc.safeTransfer(msg.sender, erc20Out);
 
