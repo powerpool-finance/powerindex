@@ -210,12 +210,7 @@ contract EthPiptSwap is ProgressiveFee {
 
     uint256 totalEthRequired = 0;
     {
-      uint256 piptTotalSupply = pipt.totalSupply();
-      // get pool out for 1 ether as 100% for calculate shares
-      // poolOut by 1 ether first token join = piptTotalSupply.mul(1 ether).div(getPiptTokenBalance(_tokens[0]))
-      // poolRatio = poolOut/totalSupply
-      uint256 poolRatio =
-        piptTotalSupply.mul(1 ether).div(getPiptTokenBalance(_tokens[0])).mul(1 ether).div(piptTotalSupply);
+      uint256 poolRatio = uint256(1e36).div(getPiptTokenBalance(_tokens[0]));
 
       for (uint256 i = 0; i < _tokens.length; i++) {
         // token share relatively 1 ether of first token
