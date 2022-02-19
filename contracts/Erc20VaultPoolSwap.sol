@@ -249,7 +249,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     uint256 piptTotalSupply = p.totalSupply();
 
     (VaultCalc[] memory vc, uint256 restInput, uint256 totalCorrectInput) =
-      getVaultCalcsForSupply(_pool, piptTotalSupply, _usdcIn);
+      _getVaultCalcsForSupply(_pool, piptTotalSupply, _usdcIn);
 
     uint256[] memory tokensInPipt = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
@@ -305,12 +305,25 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     }
   }
 
-  function getVaultCalcsForSupply(
+
+  function getVaultCalcs(address _pool, uint256 totalInputAmount)
+    public
+    view
+    returns (
+      VaultCalc[] memory vc,
+      uint256 restInput,
+      uint256 totalCorrectInput
+    )
+  {
+    return _getVaultCalcsForSupply(_pool, PowerIndexPoolInterface(_pool).totalSupply(), totalInputAmount);
+  }
+
+  function _getVaultCalcsForSupply(
     address _pool,
     uint256 piptTotalSupply,
     uint256 totalInputAmount
   )
-    public
+    internal
     view
     returns (
       VaultCalc[] memory vc,
@@ -356,7 +369,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     uint256 piptTotalSupply = PowerIndexPoolInterface(_pool).totalSupply();
 
     (VaultCalc[] memory vc, uint256 restInput, uint256 totalCorrectInput) =
-      getVaultCalcsForSupply(_pool, piptTotalSupply, _totalInputAmount);
+      _getVaultCalcsForSupply(_pool, piptTotalSupply, _totalInputAmount);
 
     tokensInPipt = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
