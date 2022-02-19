@@ -464,7 +464,7 @@ contract EthPiptSwap is ProgressiveFee {
       pipt.joinPool(_poolAmountOut, _maxAmountsIn);
     } else {
       if (address(this).balance < _wrapperFee) {
-        weth.withdraw(_wrapperFee);
+        weth.withdraw(_wrapperFee.sub(address(this).balance));
       }
       piptWrapper.joinPool{ value: _wrapperFee }(_poolAmountOut, _maxAmountsIn);
     }

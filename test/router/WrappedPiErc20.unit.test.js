@@ -113,12 +113,12 @@ describe('WrappedPiErc20 Unit Tests', () => {
     it('should deny non-router calling the method', async () => {
       const payload = splitPayload(myContract.contract.methods.setAnswer(42).encodeABI());
 
-      await expectExactRevert(
+      await expectRevert(
         piYfi.callExternal(myContract.address, payload.signature, payload.calldata, 0, { from: alice }),
         'Ownable: caller is not the owner',
       );
 
-      await expectExactRevert(
+      await expectRevert(
         piYfi.callExternalMultiple([{
           destination: myContract.address,
           signature: payload.signature,
@@ -131,7 +131,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
     it('should use default revert message for an empty returndata', async () => {
       const data = myContract.contract.methods.revertWithoutString().encodeABI();
-      await expectExactRevert(
+      await expectRevert(
         piYfi.callExternal(myContract.address, data, '0x', 0, { from: alice }),
         'REVERTED_WITH_NO_REASON_STRING',
       );
@@ -139,7 +139,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
     it('should use the response revert message when reverting', async () => {
       const data = myContract.contract.methods.revertWithString().encodeABI();
-      await expectExactRevert(
+      await expectRevert(
         piYfi.callExternal(myContract.address, data, '0x', 0, { from: alice }),
         'some-unique-revert-string',
       );
@@ -147,7 +147,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
     it('should use a long response revert message when reverting', async () => {
       const data = myContract.contract.methods.revertWithLongString().encodeABI();
-      await expectExactRevert(
+      await expectRevert(
         piYfi.callExternal(myContract.address, data, '0x', 0, { from: alice }),
         'some-unique-revert-string-that-is-a-bit-longer-than-a-single-evm-slot',
       );
@@ -155,7 +155,7 @@ describe('WrappedPiErc20 Unit Tests', () => {
 
     it('should use default revert message when getting invalid opcode', async () => {
       const data = myContract.contract.methods.invalidOp().encodeABI();
-      await expectExactRevert(
+      await expectRevert(
         piYfi.callExternal(myContract.address, data, '0x', 0, { from: alice }),
         'REVERTED_WITH_NO_REASON_STRING',
       );

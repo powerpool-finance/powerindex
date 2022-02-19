@@ -1335,7 +1335,7 @@ describe('CVPMaker test', () => {
         assert.equal(depositEvent.args.inputToken, bpool.address);
         assert.equal(depositEvent.args.inputAmount, ether(100));
 
-        await zap.mockSupplyAndRedeemPokeFromReporter([logInitRound.args.key]);
+        await zap.mockSupplyAndRedeemPokeFromReporter([logInitRound.args.key], [0]);
         await zap.mockClaimPokeFromReporter(logInitRound.args.key, [cvpMaker.address]);
 
         assert.equal(await usdc.balanceOf(cvpMaker.address), mwei(446.399999));
