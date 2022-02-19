@@ -382,7 +382,7 @@ contract EthPiptSwap is ProgressiveFee {
       }
     }
 
-    (uint256 feeAmount, uint256 swapAmount) = calcEthFee(_wethAmount, wrapperFee);
+    (uint256 ethFeeAmount, uint256 swapAmount) = calcEthFee(_wethAmount, wrapperFee);
     (uint256[] memory tokensInPipt, uint256 totalEthSwap) = _prepareTokensForJoin(tokens, _poolAmountOut);
 
     {
@@ -394,7 +394,7 @@ contract EthPiptSwap is ProgressiveFee {
         address(this)
       );
 
-      emit EthToPiptSwap(msg.sender, swapAmount, feeAmount, _poolAmountOut, poolAmountOutFee);
+      emit EthToPiptSwap(msg.sender, swapAmount, ethFeeAmount, _poolAmountOut, poolAmountOutFee);
     }
 
     _joinPool(_poolAmountOut, tokensInPipt, wrapperFee);
