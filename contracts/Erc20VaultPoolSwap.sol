@@ -254,10 +254,12 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     uint256[] memory tokensInPipt = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
       uint256 share = vc[i].correctInput.mul(1 ether).div(totalCorrectInput);
+      // subtract 100 wei from input to avoid rounding errors on share calculation
       vc[i].correctInput = vc[i].correctInput.add(restInput.mul(share).div(1 ether)).sub(100);
 
       tokensInPipt[i] = calcVaultOutByUsdc(vc[i].token, vc[i].correctInput);
 
+      // subtract 1e12 wei from tokensInPipt to make expected poolOut smaller to avoid LIMIT_IN error on joinPool
       uint256 poolOutByToken = tokensInPipt[i].sub(1e12).mul(piptTotalSupply).div(vc[i].tokenBalance);
       if (poolOutByToken < amountOut || amountOut == 0) {
         amountOut = poolOutByToken;
@@ -359,12 +361,14 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     tokensInPipt = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
       uint256 share = vc[i].correctInput.mul(1 ether).div(totalCorrectInput);
+      // subtract 100 wei from input to avoid rounding errors on share calculation
       vc[i].correctInput = vc[i].correctInput.add(restInput.mul(share).div(1 ether)).sub(100);
 
       uint256 balanceBefore = IVault(vc[i].token).balanceOf(address(this));
       IVault(vc[i].token).deposit(_addYearnLpTokenLiquidity(vaultConfig[vc[i].token], vc[i].correctInput));
       tokensInPipt[i] = IVault(vc[i].token).balanceOf(address(this)).sub(balanceBefore);
 
+      // subtract 1e12 wei from tokensInPipt to make expected poolOut smaller to avoid LIMIT_IN error on joinPool
       uint256 poolOutByToken = tokensInPipt[i].sub(1e12).mul(piptTotalSupply).div(vc[i].tokenBalance);
       if (poolOutByToken < poolAmountOut || poolAmountOut == 0) {
         poolAmountOut = poolOutByToken;

@@ -273,7 +273,7 @@ contract EthPiptSwap is ProgressiveFee {
   }
 
   function calcNeedEthToPoolOut(uint256 _poolAmountOut, uint256 _slippage) public view returns (uint256) {
-    uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(100);
+    uint256 ratio = calcRatioToJoin(_poolAmountOut, pipt.totalSupply());
 
     address[] memory tokens = getPiptTokens();
     uint256 len = tokens.length;
@@ -287,6 +287,11 @@ contract EthPiptSwap is ProgressiveFee {
       totalEthSwap = getAmountInForUniswapValue(_uniswapPairFor(tokens[i]), tokensInPipt[i], true).add(totalEthSwap);
     }
     return totalEthSwap.add(totalEthSwap.mul(_slippage).div(1 ether));
+  }
+
+  function calcRatioToJoin(uint256 _poolAmountOut, uint256 _totalSupply) public view returns (uint256) {
+    // add 100 wei to ratio to make tokensInPipt values bigger as well as totalEthSwap to avoid LIMIT_IN errors on joinPool
+    return _poolAmountOut.mul(1 ether).div(_totalSupply).add(100);
   }
 
   function calcEthFee(uint256 ethAmount, uint256 wrapperFee) public view returns (uint256 ethFee, uint256 ethAfterFee) {
@@ -415,7 +420,7 @@ contract EthPiptSwap is ProgressiveFee {
   {
     uint256 len = _tokens.length;
     tokensInPipt = new uint256[](len);
-    uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(100);
+    uint256 ratio = calcRatioToJoin(_poolAmountOut, pipt.totalSupply());
     for (uint256 i = 0; i < len; i++) {
       tokensInPipt[i] = ratio.mul(getPiptTokenBalance(_tokens[i])).div(1 ether);
       totalEthSwap = totalEthSwap.add(_swapWethForTokenIn(_tokens[i], tokensInPipt[i]));
