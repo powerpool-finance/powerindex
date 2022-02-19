@@ -151,7 +151,8 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
     PowerIndexPoolInterface(_pool).joinPool(poolAmountOut, tokensInPipt);
     (, uint256 communityFee, , ) = PowerIndexPoolInterface(_pool).getCommunityFee();
-    poolAmountOut = poolAmountOut.sub(poolAmountOut.mul(communityFee).div(1 ether)) - 1;
+    // subtract 1 wei from poolAmountOut to avoid insufficient balance error due to rounding
+    poolAmountOut = poolAmountOut.sub(poolAmountOut.mul(communityFee).div(1 ether)).sub(1);
 
     IERC20(_pool).safeTransfer(msg.sender, poolAmountOut);
 
