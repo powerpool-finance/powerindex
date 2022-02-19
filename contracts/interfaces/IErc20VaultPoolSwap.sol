@@ -6,13 +6,15 @@ interface IErc20VaultPoolSwap {
   function swapErc20ToVaultPool(
     address _pool,
     address _swapToken,
-    uint256 _swapAmount
+    uint256 _swapAmount,
+    uint256 _poolAmountOutMin
   ) external returns (uint256 poolAmountOut);
 
   function swapVaultPoolToErc20(
     address _pool,
     uint256 _poolAmountIn,
-    address _swapToken
+    address _swapToken,
+    uint256 _erc20AmountOutMin
   ) external returns (uint256 erc20Out);
 
   function swapVaultToUSDC(

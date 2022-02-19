@@ -21,6 +21,7 @@ import "./interfaces/ICurvePoolRegistry.sol";
 import "./interfaces/IErc20PiptSwap.sol";
 import "./interfaces/IErc20VaultPoolSwap.sol";
 import "./traits/ProgressiveFee.sol";
+import "hardhat/console.sol";
 
 contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   using SafeERC20 for IERC20;
@@ -75,45 +76,22 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     usdc = IERC20(_usdc);
   }
 
-  function setVaultConfigs(
-    address[] memory _tokens,
-    address[] memory _depositors,
-    uint8[] memory _depositorTypes,
-    uint8[] memory _depositorAmountLength,
-    uint8[] memory _depositorIndexes,
-    address[] memory _lpTokens,
-    address[] memory _curvePoolRegistries
-  ) external onlyOwner {
+  function setVaultConfigs(address[] memory _tokens, VaultConfig[] memory _vaultConfigs) external onlyOwner {
     uint256 len = _tokens.length;
-    require(
-      len == _depositors.length &&
-        len == _depositorAmountLength.length &&
-        len == _depositorIndexes.length &&
-        len == _depositorTypes.length &&
-        len == _lpTokens.length &&
-        len == _curvePoolRegistries.length,
-      "L"
-    );
+    require(len == _vaultConfigs.length, "L");
     for (uint256 i = 0; i < len; i++) {
-      vaultConfig[_tokens[i]] = VaultConfig(
-        _depositorAmountLength[i],
-        _depositorIndexes[i],
-        _depositorTypes[i],
-        _depositors[i],
-        _lpTokens[i],
-        _curvePoolRegistries[i]
-      );
+      vaultConfig[_tokens[i]] = _vaultConfigs[i];
 
-      usdc.approve(_depositors[i], uint256(-1));
-      IERC20(_lpTokens[i]).approve(_tokens[i], uint256(-1));
-      IERC20(_lpTokens[i]).approve(_depositors[i], uint256(-1));
+      usdc.approve(_vaultConfigs[i].depositor, uint256(-1));
+      IERC20(_vaultConfigs[i].lpToken).approve(_tokens[i], uint256(-1));
+      IERC20(_vaultConfigs[i].lpToken).approve(_vaultConfigs[i].depositor, uint256(-1));
       emit SetVaultConfig(
         _tokens[i],
-        _depositors[i],
-        _depositorAmountLength[i],
-        _depositorIndexes[i],
-        _lpTokens[i],
-        _curvePoolRegistries[i]
+        _vaultConfigs[i].depositor,
+        _vaultConfigs[i].depositorLength,
+        _vaultConfigs[i].depositorIndex,
+        _vaultConfigs[i].lpToken,
+        _vaultConfigs[i].curvePoolRegistry
       );
     }
   }
@@ -139,7 +117,8 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   function swapErc20ToVaultPool(
     address _pool,
     address _swapToken,
-    uint256 _swapAmount
+    uint256 _swapAmount,
+    uint256 _poolAmountOutMin
   ) external override returns (uint256 poolAmountOut) {
     require(_swapToken == address(usdc), "ONLY_USDC");
     usdc.safeTransferFrom(msg.sender, address(this), _swapAmount);
@@ -151,7 +130,9 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
 
     PowerIndexPoolInterface(_pool).joinPool(poolAmountOut, tokensInPipt);
     (, uint256 communityFee, , ) = PowerIndexPoolInterface(_pool).getCommunityFee();
-    poolAmountOut = poolAmountOut.sub(poolAmountOut.mul(communityFee).div(1 ether)) - 1;
+    // subtract 1 wei from poolAmountOut to avoid insufficient balance error due to rounding
+    poolAmountOut = poolAmountOut.sub(poolAmountOut.mul(communityFee).div(1 ether)).sub(1);
+    require(poolAmountOut >= _poolAmountOutMin, "POOL_AMOUNT_OUT_MIN");
 
     IERC20(_pool).safeTransfer(msg.sender, poolAmountOut);
 
@@ -161,7 +142,8 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
   function swapVaultPoolToErc20(
     address _pool,
     uint256 _poolAmountIn,
-    address _swapToken
+    address _swapToken,
+    uint256 _erc20AmountOutMin
   ) external override returns (uint256 erc20Out) {
     require(_swapToken == address(usdc), "ONLY_USDC");
     IERC20(_pool).safeTransferFrom(msg.sender, address(this), _poolAmountIn);
@@ -169,6 +151,7 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     (, uint256 _poolAmountInWithFee) = calcFee(_poolAmountIn, 0);
 
     erc20Out = _redeemPooledVault(_pool, _poolAmountInWithFee);
+    require(erc20Out >= _erc20AmountOutMin, "ERC20_AMOUNT_OUT_MIN");
 
     usdc.safeTransfer(msg.sender, erc20Out);
 
@@ -243,15 +226,17 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     uint256 piptTotalSupply = p.totalSupply();
 
     (VaultCalc[] memory vc, uint256 restInput, uint256 totalCorrectInput) =
-      getVaultCalcsForSupply(_pool, piptTotalSupply, _usdcIn);
+      _getVaultCalcsForSupply(_pool, piptTotalSupply, _usdcIn);
 
     uint256[] memory tokensInPipt = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
       uint256 share = vc[i].correctInput.mul(1 ether).div(totalCorrectInput);
+      // subtract 100 wei from input to avoid rounding errors on share calculation
       vc[i].correctInput = vc[i].correctInput.add(restInput.mul(share).div(1 ether)).sub(100);
 
       tokensInPipt[i] = calcVaultOutByUsdc(vc[i].token, vc[i].correctInput);
 
+      // subtract 1e12 wei from tokensInPipt to make expected poolOut smaller to avoid LIMIT_IN error on joinPool
       uint256 poolOutByToken = tokensInPipt[i].sub(1e12).mul(piptTotalSupply).div(vc[i].tokenBalance);
       if (poolOutByToken < amountOut || amountOut == 0) {
         amountOut = poolOutByToken;
@@ -297,12 +282,24 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     }
   }
 
-  function getVaultCalcsForSupply(
+  function getVaultCalcs(address _pool, uint256 totalInputAmount)
+    public
+    view
+    returns (
+      VaultCalc[] memory vc,
+      uint256 restInput,
+      uint256 totalCorrectInput
+    )
+  {
+    return _getVaultCalcsForSupply(_pool, PowerIndexPoolInterface(_pool).totalSupply(), totalInputAmount);
+  }
+
+  function _getVaultCalcsForSupply(
     address _pool,
     uint256 piptTotalSupply,
     uint256 totalInputAmount
   )
-    public
+    internal
     view
     returns (
       VaultCalc[] memory vc,
@@ -348,17 +345,19 @@ contract Erc20VaultPoolSwap is ProgressiveFee, IErc20VaultPoolSwap {
     uint256 piptTotalSupply = PowerIndexPoolInterface(_pool).totalSupply();
 
     (VaultCalc[] memory vc, uint256 restInput, uint256 totalCorrectInput) =
-      getVaultCalcsForSupply(_pool, piptTotalSupply, _totalInputAmount);
+      _getVaultCalcsForSupply(_pool, piptTotalSupply, _totalInputAmount);
 
     tokensInPipt = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
       uint256 share = vc[i].correctInput.mul(1 ether).div(totalCorrectInput);
+      // subtract 100 wei from input to avoid rounding errors on share calculation
       vc[i].correctInput = vc[i].correctInput.add(restInput.mul(share).div(1 ether)).sub(100);
 
       uint256 balanceBefore = IVault(vc[i].token).balanceOf(address(this));
       IVault(vc[i].token).deposit(_addYearnLpTokenLiquidity(vaultConfig[vc[i].token], vc[i].correctInput));
       tokensInPipt[i] = IVault(vc[i].token).balanceOf(address(this)).sub(balanceBefore);
 
+      // subtract 1e12 wei from tokensInPipt to make expected poolOut smaller to avoid LIMIT_IN error on joinPool
       uint256 poolOutByToken = tokensInPipt[i].sub(1e12).mul(piptTotalSupply).div(vc[i].tokenBalance);
       if (poolOutByToken < poolAmountOut || poolAmountOut == 0) {
         poolAmountOut = poolOutByToken;

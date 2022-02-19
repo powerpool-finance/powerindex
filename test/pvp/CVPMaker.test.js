@@ -1276,15 +1276,14 @@ describe('CVPMaker test', () => {
 
           await vaultSwap.setVaultConfigs(
             [ycrvVault.address],
-            [crvDepositor.address],
-            // depositorType
-            [1],
-            // amountsLength
-            [2],
-            // usdcIndex
-            [1],
-            [curvePoolToken.address],
-            [curvePoolRegistry.address]
+            [{
+              depositorLength: 2,
+              depositorIndex: 1,
+              depositorType: 1,
+              depositor: crvDepositor.address,
+              lpToken: curvePoolToken.address,
+              curvePoolRegistry: curvePoolRegistry.address,
+            }],
           );
 
           tokens.push(ycrvVault);
@@ -1335,7 +1334,7 @@ describe('CVPMaker test', () => {
         assert.equal(depositEvent.args.inputToken, bpool.address);
         assert.equal(depositEvent.args.inputAmount, ether(100));
 
-        await zap.mockSupplyAndRedeemPokeFromReporter([logInitRound.args.key]);
+        await zap.mockSupplyAndRedeemPokeFromReporter([logInitRound.args.key], [0]);
         await zap.mockClaimPokeFromReporter(logInitRound.args.key, [cvpMaker.address]);
 
         assert.equal(await usdc.balanceOf(cvpMaker.address), mwei(446.399999));
@@ -1411,15 +1410,14 @@ describe('CVPMaker test', () => {
 
           await vaultSwap.setVaultConfigs(
             [ycrvVault.address],
-            [crvDepositor.address],
-            // depositorType
-            [1],
-            // amountsLength
-            [2],
-            // usdcIndex
-            [1],
-            [curvePoolToken.address],
-            [curvePoolRegistry.address]
+            [{
+              depositorLength: 2,
+              depositorIndex: 1,
+              depositorType: 1,
+              depositor: crvDepositor.address,
+              lpToken: curvePoolToken.address,
+              curvePoolRegistry: curvePoolRegistry.address,
+            }],
           );
 
           await usdc.transfer(crvDepositor.address, mwei(1e12));
