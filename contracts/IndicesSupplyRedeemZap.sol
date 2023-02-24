@@ -130,6 +130,8 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
 
   mapping(address => bool) public ignoreOnlyEOA;
 
+  bool public paused;
+
   modifier onlyReporter(uint256 _reporterId, bytes calldata _rewardOpts) {
     uint256 gasStart = gasleft();
     powerPoke.authorizeReporter(_reporterId, msg.sender);
@@ -157,6 +159,10 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
   function initialize(uint256 _roundPeriod) external initializer {
     __Ownable_init();
     roundPeriod = _roundPeriod;
+  }
+
+  function pause(bool _paused) external onlyOwner {
+    paused = _paused;
   }
 
   receive() external payable {
@@ -232,6 +238,10 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     }
 
     _withdraw(_pool, _pool, _outputToken, _amount);
+  }
+
+  function rescueUserDeposit(address payable _account, bytes32 _roundKey) external onlyOwner {
+    _withdrawFromRound(_account, _roundKey, rounds[_roundKey].inputAmount[_account]);
   }
 
   /* ==========  Poker Functions  ========== */
@@ -381,6 +391,7 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address _outputToken,
     uint256 _amount
   ) internal {
+    require(!paused, "PAUSED");
     require(_amount > 0, "NA");
     bytes32 roundKey = _updateRound(_pool, _inputToken, _outputToken);
 
@@ -403,22 +414,27 @@ contract IndicesSupplyRedeemZap is OwnableUpgradeSafe {
     address _outputToken,
     uint256 _amount
   ) internal {
-    require(_amount > 0, "NA");
     bytes32 roundKey = _updateRound(_pool, _inputToken, _outputToken);
-    Round storage round = rounds[roundKey];
+    _withdrawFromRound(msg.sender, roundKey, _amount);
+  }
 
-    round.inputAmount[msg.sender] = round.inputAmount[msg.sender].sub(_amount);
+  function _withdrawFromRound(address payable _account, bytes32 _roundKey, uint256 _amount) internal {
+    require(_amount > 0, "NA");
+    Round storage round = rounds[_roundKey];
+    require(round.totalOutputAmount == 0, "ROUND_INPUT_SWAPPED");
+
+    round.inputAmount[_account] = round.inputAmount[_account].sub(_amount);
     round.totalInputAmount = round.totalInputAmount.sub(_amount);
 
-    require(round.inputAmount[msg.sender] == 0 || round.inputAmount[msg.sender] > 1e5, "MIN_INPUT");
+    require(round.inputAmount[_account] == 0 || round.inputAmount[_account] > 1e5, "MIN_INPUT");
 
-    if (_inputToken == ETH) {
-      msg.sender.transfer(_amount);
+    if (round.inputToken == ETH) {
+      _account.transfer(_amount);
     } else {
-      IERC20(_inputToken).safeTransfer(msg.sender, _amount);
+      IERC20(round.inputToken).safeTransfer(_account, _amount);
     }
 
-    emit Withdraw(roundKey, _pool, msg.sender, _inputToken, _amount);
+    emit Withdraw(_roundKey, round.pool, _account, round.inputToken, _amount);
   }
 
   function _supplyAndRedeemPoke(bytes32[] memory _roundKeys, bool _bySlasher) internal {

@@ -755,5 +755,51 @@ describe('IndicesSupplyRedeemZap', () => {
 
       await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundUsdcKey], '0x', {from: reporter}), 'TO_NOT_NULL');
     });
+
+    it('should rescue deposits from previous rounds', async () => {
+      const vaultPoolSwap = await Erc20VaultPoolSwap.new(usdc.address, {
+        from: minter,
+      });
+      await vaultPoolSwap.setVaultConfigs(
+        vaults.map(v => v.vault.address),
+        vaults.map(v => v.depositor.address),
+        vaults.map(v => v.config.depositorType || 1),
+        vaults.map(v => v.config.amountsLength),
+        vaults.map(v => v.config.usdcIndex),
+        vaults.map(v => v.lpToken.address),
+        vaults.map(() => vaultRegistry.address),
+      );
+      await vaultPoolSwap.updatePools([pool.address]);
+
+      await this.indiciesZap.setPools([pool.address], ['2'], {from: minter});
+      await this.indiciesZap.setPoolsSwapContracts([pool.address], [vaultPoolSwap.address], {from: minter});
+
+      await usdc.transfer(dan, mwei('2000'), {from: minter});
+      await usdc.approve(this.indiciesZap.address, mwei('2000'), {from: dan});
+
+      let res = await this.indiciesZap.depositErc20(pool.address, usdc.address, mwei('1000'), { from: dan });
+      const firstRoundUsdcKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, usdc.address, pool.address);
+
+      await expectRevert(this.indiciesZap.pause(true, { from: dan }), 'Ownable: caller is not the owner');
+
+      assert.equal(await this.indiciesZap.paused(), false);
+      await this.indiciesZap.pause(true, { from: minter });
+      assert.equal(await this.indiciesZap.paused(), true);
+
+      await expectRevert(this.indiciesZap.depositErc20(pool.address, usdc.address, mwei('1000'), { from: dan }), 'PAUSED');
+
+      let round = await this.indiciesZap.rounds(firstRoundUsdcKey);
+      assert.equal(round.totalInputAmount, mwei('1000'));
+
+      await time.increase(roundPeriod);
+
+      await expectRevert(this.indiciesZap.withdrawErc20(pool.address, usdc.address, mwei('1000'), { from: dan }), 'subtraction overflow');
+
+      await expectRevert(this.indiciesZap.rescueUserDeposit(dan, firstRoundUsdcKey, { from: dan }), 'Ownable: caller is not the owner');
+      await this.indiciesZap.rescueUserDeposit(dan, firstRoundUsdcKey, { from: minter });
+
+      round = await this.indiciesZap.rounds(firstRoundUsdcKey);
+      assert.equal(round.totalInputAmount, '0');
+    });
   });
 });
