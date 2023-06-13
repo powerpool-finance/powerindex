@@ -46,9 +46,9 @@
     "@openzeppelin/test-helpers": "^0.5.6",
     "@powerpool/hardhat-ganache": "^2.0.0",
     "@truffle/contract": "^4.2.26",
-    "hardhat": "^2.0.3",
-    "hardhat-contract-sizer": "^2.0.0",
-    "hardhat-gas-reporter": "^1.0.1",
+    "hardhat": "^2.15.0",
+    "hardhat-contract-sizer": "^2.9.0",
+    "hardhat-gas-reporter": "^1.0.9",
     "mocha": "^8.0.1",
     "solidity-coverage": "^0.7.11",
     "typechain": "^4.0.0"
