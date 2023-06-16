@@ -57,6 +57,7 @@ describe.only('LPMiningLens', () => {
       assert.equal((await this.lp.balanceOf(bob)).valueOf(), '900');
       assert.equal(pools.length, 1);
       assert.equal(pools[0].allocPoint, '100');
+      console.log(pools[0]);
     });
   });
 });
