@@ -11,6 +11,7 @@ require('./tasks/fetchVaultsData4');
 require('./tasks/deployVestedLpMining');
 require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
+require('./tasks/deployVestedLpMiningLens');
 require('./tasks/testMainnetErc20PiptSwap');
 require('./tasks/deployPoolRestrictions');
 require('./tasks/deployMainnetYeti');
@@ -76,6 +77,9 @@ const config = {
       gas: 12000000,
       loggingEnabled: false,
       blockGasLimit: 12000000,
+      forking: {
+        url: 'https://rough-compatible-hill.quiknode.pro/b7052dc47d31d455c2a770377f7db70735924fba/',
+      },
     },
     ganache: {
       url: 'http://127.0.0.1:8945',
@@ -97,6 +101,7 @@ const config = {
       timeout: 2000000,
       blockGasLimit: 20000000,
       allowUnlimitedContractSize: true,
+      loggingEnabled: true,
     },
     local: {
       url: 'http://127.0.0.1:8545',
