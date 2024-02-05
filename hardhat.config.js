@@ -12,6 +12,7 @@ require('./tasks/deployVestedLpMining');
 require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
 require('./tasks/deployVestedLpMiningLens');
+require('./tasks/deployPoolsLens');
 require('./tasks/testMainnetErc20PiptSwap');
 require('./tasks/deployPoolRestrictions');
 require('./tasks/deployMainnetYeti');
@@ -71,14 +72,14 @@ const config = {
   },
   networks: {
     hardhat: {
-      chainId: 31337,
+      chainId: 1,
       accounts: testAccounts,
       allowUnlimitedContractSize: true,
       gas: 12000000,
-      loggingEnabled: false,
+      loggingEnabled: true,
       blockGasLimit: 12000000,
       forking: {
-        url: 'https://rough-compatible-hill.quiknode.pro/b7052dc47d31d455c2a770377f7db70735924fba/',
+        url: 'https://eth.llamarpc.com',
       },
     },
     ganache: {

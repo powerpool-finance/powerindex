@@ -13,7 +13,7 @@ const { web3 } = Reservoir;
 
 VestedLpMiningLens.numberFormat = 'String';
 
-describe.only('LPMiningLens', () => {
+describe('LPMiningLens', () => {
   let alice, bob, carol, minter;
   before(async function () {
     [alice, bob, carol, minter] = await web3.eth.getAccounts();
@@ -37,7 +37,7 @@ describe.only('LPMiningLens', () => {
       await this.lp2.transfer(carol, '1000', { from: minter });
     });
 
-    it.only('pool can be created', async () => {
+    it('pool can be created', async () => {
       this.lpMining = await VestedLpMining.new({ from: minter });
       await this.lpMining.initialize(
         this.cvp.address,

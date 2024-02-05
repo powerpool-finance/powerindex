@@ -9,7 +9,6 @@ task('deploy-vested-lp-mining-lens', 'Deploy lp lens').setAction(async (__, {net
   const [deployer] = await web3.eth.getAccounts();
   console.log('deployer', deployer);
   const sendOptions = { from: deployer };
-  console.log('from is: ', sendOptions);
   const vestedLPMiningLens = await VestedLPMiningLens.new(
     '0xF09232320eBEAC33fae61b24bB8D7CA192E58507',
     '0xdAC17F958D2ee523a2206206994597C13D831ec7',
@@ -38,6 +37,8 @@ task('deploy-vested-lp-mining-lens', 'Deploy lp lens').setAction(async (__, {net
       '0x4a323f52685b160576257c968f679bbec5076f36'
     ]
   );
-  const price = await vestedLPMiningLens.getLpTokenPrice.call('0x26607ac599266b21d13c7acf7942c7701a8b699c', 18);
-  console.log('lp token price is: ', web3.utils.BN(price).toString());
+  // const price = await vestedLPMiningLens.getPools.call('0x26607ac599266b21d13c7acf7942c7701a8b699c', 18);
+  // console.log('lp token price is: ', price.toString());
+  const getPool = await vestedLPMiningLens.getPool.call('0');
+  console.log('pool is: ', getPool);
 });

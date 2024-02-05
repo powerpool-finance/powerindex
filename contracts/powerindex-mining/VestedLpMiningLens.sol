@@ -1,6 +1,7 @@
 pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts-0.8/access/Ownable.sol";
+import "@openzeppelin/contracts-0.8/token/ERC20/IERC20.sol";
 import "hardhat/console.sol";
 
 struct Pool {
@@ -93,11 +94,13 @@ contract VestedLpMiningLens is Ownable {
     uint256 accCvpPerLpt;
     uint256 lpBoostRatioByToken;
     uint256 lpBoostMaxRatioByToken;
+    uint256 lpTokenPrice;
+    uint256 farmingTvl;
     PoolBoost poolBoost;
   }
 
   // get an array of pools
-  function getPools() external view returns (AdvancedPool[] memory) {
+  function getPools() external returns (AdvancedPool[] memory) {
     uint256 poolsLength = mining.poolLength();
     AdvancedPool[] memory pools = new AdvancedPool[](poolsLength);
     for (uint256 i = 0; i < poolsLength; i++) {
@@ -107,9 +110,10 @@ contract VestedLpMiningLens is Ownable {
   }
 
   // get a single pool
-  function getPool(uint256 poolIndex) public view returns (AdvancedPool memory) {
+  function getPool(uint256 poolIndex) public returns (AdvancedPool memory) {
     Pool memory p = mining.pools(poolIndex);
     PoolBoost memory _poolBoost = mining.poolBoostByLp(poolIndex);
+    uint256 _lpTokenPrice = getLpTokenPrice(p.lpToken, 18);
     uint256 _lpBoostRatioByToken = mining.lpBoostRatioByToken(p.lpToken);
     uint256 _lpBoostMaxRatioByToken = mining.lpBoostMaxRatioByToken(p.lpToken);
     return AdvancedPool({
@@ -121,12 +125,14 @@ contract VestedLpMiningLens is Ownable {
       accCvpPerLpt: p.accCvpPerLpt,
       poolBoost: _poolBoost,
       lpBoostRatioByToken: _lpBoostRatioByToken,
-      lpBoostMaxRatioByToken: _lpBoostMaxRatioByToken
+      lpBoostMaxRatioByToken: _lpBoostMaxRatioByToken,
+      lpTokenPrice: _lpTokenPrice,
+      farmingTvl: getFarmingTvl(p.lpToken, _lpTokenPrice)
     });
   }
 
   function getLpTokenPrice(address lpToken, uint256 _decimals) public returns (uint256 result) {
-    if (piptSwapByPool[lpToken] == address(0)) {
+  if (piptSwapByPool[lpToken] == address(0)) {
       address[] memory path;
       address throughToken = tokenSwapThroughToken[lpToken];
       if (throughToken != address(0)) {
@@ -155,9 +161,18 @@ contract VestedLpMiningLens is Ownable {
         }
       }
     } else {
-      result = IPiptSwap(piptSwapByPool[lpToken]).calcNeedErc20ToPoolOut(usdtAddress, 1000000000000000000, 20000000000000000);
+      result = IPiptSwap(piptSwapByPool[lpToken]).calcNeedErc20ToPoolOut(usdtAddress, 1 ether, 0.02 ether);
     }
-    return 0;
+    return result * 10 ** (18 - stableTokenDecimals);
+  }
+
+  function getFarmingTvl(address lpToken, uint256 tokenPrice) public returns(uint256) {
+    uint256 balance = IERC20(lpToken).balanceOf(address(mining));
+    return getTvl(tokenPrice, balance);
+  }
+
+  function getTvl(uint256 tokenPrice, uint256 lpAmount) public returns (uint256) {
+    return tokenPrice * lpAmount / 1 ether;
   }
 
   // set through tokens for certain pools
