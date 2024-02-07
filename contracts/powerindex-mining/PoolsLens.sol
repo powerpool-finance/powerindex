@@ -13,25 +13,25 @@ https://powerpool.finance/
 
 pragma solidity 0.8.11;
 
-  struct Pool {
-    address lpToken; // address of the LP token contract
-    bool votesEnabled; // if the pool is enabled to write votes
-    uint8 poolType; // pool type (1 - Uniswap, 2 - Balancer)
-    uint32 allocPoint; // points assigned to the pool, which affect CVPs distribution between pools
-    uint32 lastUpdateBlock; // latest block when the pool params which follow was updated
-    uint256 accCvpPerLpt; // accumulated distributed CVPs per one deposited LP token, times 1e12
-  }
+struct Pool {
+  address lpToken; // address of the LP token contract
+  bool votesEnabled; // if the pool is enabled to write votes
+  uint8 poolType; // pool type (1 - Uniswap, 2 - Balancer)
+  uint32 allocPoint; // points assigned to the pool, which affect CVPs distribution between pools
+  uint32 lastUpdateBlock; // latest block when the pool params which follow was updated
+  uint256 accCvpPerLpt; // accumulated distributed CVPs per one deposited LP token, times 1e12
+}
 
-  struct LpData {
-    uint256 tvl;
-    uint256 apy;
-  }
+struct LpData {
+  uint256 tvl;
+  uint256 apy;
+}
 
-  struct ReservesStruct {
-    uint112 reserve0;
-    uint112 reserve1;
-    uint32 blockTimestampLast;
-  }
+struct ReservesStruct {
+  uint112 reserve0;
+  uint112 reserve1;
+  uint32 blockTimestampLast;
+}
 
 interface IUniswapV2Router {
   function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts);
