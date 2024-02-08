@@ -66,6 +66,7 @@ const config = {
   gasReporter: {
     currency: 'USD',
     enabled: !!process.env.REPORT_GAS,
+    gasPrice: 56
   },
   mocha: {
     timeout: 70000,

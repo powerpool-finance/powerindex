@@ -15,6 +15,5 @@ task('deploy-pools-lens', 'Deploy pools lens').setAction(async (__, {network}) =
     '0xdAC17F958D2ee523a2206206994597C13D831ec7',
     sendOptions,
   );
-
-  console.log('pools lens address is: ', poolsLens.address);
+  console.log('pools lends deployed address: ', poolsLens.address);
 });
