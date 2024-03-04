@@ -13,6 +13,8 @@ https://powerpool.finance/
 
 pragma solidity 0.8.11;
 
+import "@openzeppelin/contracts-0.8/access/Ownable.sol";
+
 struct Pool {
   address lpToken; // address of the LP token contract
   bool votesEnabled; // if the pool is enabled to write votes
@@ -49,52 +51,71 @@ interface ILpToken {
   function getReserves() external view returns (ReservesStruct calldata);
 }
 
-contract PoolsLens {
+contract PoolsLens is Ownable {
   IVestedLpMining public mining;
   IUniswapV2Router public uniRouter;
 
-  address public usdtAddress;
+  address public stableAddress;
+  address public wethAddress;
+  mapping(address => address[]) public pathByToken;
 
   constructor(
     IVestedLpMining _mining,
     IUniswapV2Router _router,
-    address _usdtAddress
+    address _stableAddress,
+    address _wethAddress
   ) {
     mining = _mining;
     uniRouter = _router;
-    usdtAddress = _usdtAddress;
+    stableAddress = _stableAddress;
+    wethAddress = _wethAddress;
+    pathByToken[wethAddress] = [_wethAddress, _stableAddress];
   }
 
-  // get an array of pools
-  function getPools() internal view returns (Pool[] memory) {
-    uint256 poolsLength = mining.poolLength();
-    Pool[] memory pools = new Pool[](poolsLength);
-    for (uint256 i = 0; i < poolsLength; i++) {
-      pools[i] = mining.pools(i);
-    }
-    return pools;
+  // Get called when wETH address is changed or stable token has changed
+  function setWethAddress(address _wethAddress) public onlyOwner {
+    address[] memory newPath = new address[](2);
+    newPath[0] = _wethAddress;
+    newPath[1] = stableAddress;
+    pathByToken[_wethAddress] = newPath;
+  }
+
+  // Call that in case stable token changed address
+  function changeStable(address _stableAddress) external onlyOwner {
+    stableAddress = _stableAddress;
+    setWethAddress(wethAddress); // rebuild weth token path;
+  }
+
+  // Get called when new token path need to be added. When changing stable, need to be called again!
+  function setTokenPath(address _newToken) external onlyOwner {
+    address[] memory newPath = new address[](3);
+    newPath[0] = _newToken;
+    newPath[1] = pathByToken[wethAddress][0];
+    newPath[2] = pathByToken[wethAddress][1];
+
+    pathByToken[_newToken] = newPath;
+  }
+
+  // just mapping getter for external use
+  function getMappingPath(address _index) external view returns (address[] memory) {
+    return pathByToken[_index];
   }
 
   function getPoolData(uint8 poolId) external view returns (LpData memory) {
-    Pool[] memory pools = getPools();
-    Pool memory pool = pools[poolId];
+    Pool memory pool = mining.pools(poolId);
 
     if (poolId == 0) {
       uint256 stableDecimals = 10 ** 6;
       // tvl calculation
       ReservesStruct memory reserves = ILpToken(pool.lpToken).getReserves();
-      address[] memory cvpPath = new address[](3);
-      cvpPath[0] = 0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1;
-      cvpPath[1] = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-      cvpPath[2] = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-      address[] memory ethPath = new address[](2);
-      ethPath[0] = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-      ethPath[1] = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+      address[] memory cvpPath = pathByToken[0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1];
+      address[] memory ethPath = pathByToken[wethAddress];
 
       uint256 cvpPrice = (uniRouter.getAmountsOut(1 ether, cvpPath)[2]);
       uint256 ethPrice = (uniRouter.getAmountsOut(1 ether, ethPath)[1]);
 
       uint256 tvlInUsd = ((reserves.reserve0 * cvpPrice) + (reserves.reserve1 * ethPrice)) / 1 ether / stableDecimals;
+
       // apy calculation
       uint256 blocksPerYear = 365 * 7100;
       uint256 cvpPerBlock = mining.cvpPerBlock();
