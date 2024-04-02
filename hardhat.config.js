@@ -80,7 +80,7 @@ const config = {
       loggingEnabled: true,
       blockGasLimit: 12000000,
       forking: {
-        url: 'https://eth.llamarpc.com',
+        url: 'https://endpoints.omniatech.io/v1/eth/mainnet/public',
       },
     },
     ganache: {

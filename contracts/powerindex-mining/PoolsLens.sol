@@ -14,6 +14,7 @@ https://powerpool.finance/
 pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts-0.8/access/Ownable.sol";
+import "hardhat/console.sol";
 
 struct Pool {
   address lpToken; // address of the LP token contract
@@ -56,49 +57,56 @@ contract PoolsLens is Ownable {
   IUniswapV2Router public uniRouter;
 
   address public stableAddress;
-  address public wethAddress;
-  mapping(address => address[]) public pathByToken;
+  address immutable public wethAddress;
+  address immutable public cvpAddress;
+  mapping(address => mapping(address => address[])) public exchangePathByTokens;
 
   constructor(
     IVestedLpMining _mining,
     IUniswapV2Router _router,
+    address _wethAddress,
     address _stableAddress,
-    address _wethAddress
+    address _cvpAddress
   ) {
     mining = _mining;
     uniRouter = _router;
-    stableAddress = _stableAddress;
     wethAddress = _wethAddress;
-    pathByToken[wethAddress] = [_wethAddress, _stableAddress];
-  }
-
-  // Get called when wETH address is changed or stable token has changed
-  function setWethAddress(address _wethAddress) public onlyOwner {
-    address[] memory newPath = new address[](2);
-    newPath[0] = _wethAddress;
-    newPath[1] = stableAddress;
-    pathByToken[_wethAddress] = newPath;
-  }
-
-  // Call that in case stable token changed address
-  function changeStable(address _stableAddress) external onlyOwner {
     stableAddress = _stableAddress;
-    setWethAddress(wethAddress); // rebuild weth token path;
+    cvpAddress = _cvpAddress;
+
+    // Set native path
+    address[] memory nativePath = new address[](2);
+    nativePath[0] = _wethAddress;
+    nativePath[1] = _stableAddress;
+    setExchangePath(nativePath);
+
+    // Set cvp path
+    address[] memory cvpPath = new address[](3);
+    cvpPath[0] = _cvpAddress;
+    cvpPath[1] = _wethAddress;
+    cvpPath[2] = _stableAddress;
+    setExchangePath(cvpPath);
   }
 
-  // Get called when new token path need to be added. When changing stable, need to be called again!
-  function setTokenPath(address _newToken) external onlyOwner {
-    address[] memory newPath = new address[](3);
-    newPath[0] = _newToken;
-    newPath[1] = pathByToken[wethAddress][0];
-    newPath[2] = pathByToken[wethAddress][1];
-
-    pathByToken[_newToken] = newPath;
+  // A function to change stable token address
+  function changeStableAddress(address _newAddress) public onlyOwner {
+    stableAddress = _newAddress;
   }
 
-  // just mapping getter for external use
-  function getMappingPath(address _index) external view returns (address[] memory) {
-    return pathByToken[_index];
+  // Setting an exchange path
+  function setExchangePath(address[] memory _exchangePath) public onlyOwner {
+    exchangePathByTokens[_exchangePath[0]][_exchangePath[_exchangePath.length - 1]] = _exchangePath;
+  }
+
+  // Get price by exchangePathByTokens
+  function getAmountsOut(address _tokenFrom, address _tokenTo) public view returns(uint256) {
+    uint256[] memory result = uniRouter.getAmountsOut(1 ether, exchangePathByTokens[_tokenFrom][_tokenTo]);
+    return result[result.length - 1];
+  }
+
+  // just getter for checking mapped addresses. Will be removed on release
+  function getMappingPath(address _start, address _end) external view returns (address[] memory) {
+    return exchangePathByTokens[_start][_end];
   }
 
   function getPoolData(uint8 poolId) external view returns (LpData memory) {
@@ -108,11 +116,8 @@ contract PoolsLens is Ownable {
       uint256 stableDecimals = 10 ** 6;
       // tvl calculation
       ReservesStruct memory reserves = ILpToken(pool.lpToken).getReserves();
-      address[] memory cvpPath = pathByToken[0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1];
-      address[] memory ethPath = pathByToken[wethAddress];
-
-      uint256 cvpPrice = (uniRouter.getAmountsOut(1 ether, cvpPath)[2]);
-      uint256 ethPrice = (uniRouter.getAmountsOut(1 ether, ethPath)[1]);
+      uint256 cvpPrice = getAmountsOut(cvpAddress, stableAddress);
+      uint256 ethPrice = getAmountsOut(wethAddress, stableAddress);
 
       uint256 tvlInUsd = ((reserves.reserve0 * cvpPrice) + (reserves.reserve1 * ethPrice)) / 1 ether / stableDecimals;
 
@@ -122,7 +127,7 @@ contract PoolsLens is Ownable {
       uint256 poolWeight = ((pool.allocPoint * stableDecimals) / mining.totalAllocPoint());
       uint256 apy = (blocksPerYear * cvpPerBlock * poolWeight * cvpPrice / tvlInUsd) / (10 ** (6 * 4));
 
-      // to get whole apy percents you need to do: apy / 10 ** 5
+      // to get whole apy percents you need to do: apy / 10 ** 4
       return LpData({
         tvl: tvlInUsd,
         apy: apy
