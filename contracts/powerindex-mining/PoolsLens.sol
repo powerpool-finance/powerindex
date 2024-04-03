@@ -26,8 +26,10 @@ struct Pool {
 }
 
 struct LpData {
-  uint256 tvl;
-  uint256 apy;
+  uint256 tvlUsd;
+  uint256 apyFinney;
+  uint256 lpTokenPriceFinney;
+  miningUserDataExtendedStruct userInfo;
 }
 
 struct ReservesStruct {
@@ -36,25 +38,48 @@ struct ReservesStruct {
   uint32 blockTimestampLast;
 }
 
+struct miningUserDataStruct {
+  uint32 lastUpdateBlock;
+  uint32 vestingBlock;
+  uint96 pendedCvp;
+  uint96 cvpAdjust;
+  uint256 lptAmount;
+}
+
+  struct miningUserDataExtendedStruct {
+    uint96 pendedCvp;
+    uint256 vestableCvp;
+    uint256 lockedCvp;
+    uint256 lptAmount;
+  }
+
 interface IUniswapV2Router {
   function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts);
 }
 
+interface IInstantUniswap {
+  function currentTokenUsdcPrice(address token) external view returns(uint);
+}
+
 interface IVestedLpMining {
   function pools(uint256 index) external view returns (Pool calldata);
+  function users(uint256 poolId, address userAddress) external view returns (miningUserDataStruct calldata);
   function cvpPerBlock() external view returns (uint96);
   function totalAllocPoint() external view returns (uint256);
+  function vestableCvp(uint256 pId, address user) external view returns (uint256);
 
   function poolLength() external view returns(uint);
 }
 
 interface ILpToken {
   function getReserves() external view returns (ReservesStruct calldata);
+  function totalSupply() external view returns (uint256);
 }
 
 contract PoolsLens is Ownable {
   IVestedLpMining public mining;
   IUniswapV2Router public uniRouter;
+  IInstantUniswap public instantUniswap;
 
   address public stableAddress;
   address immutable public wethAddress;
@@ -64,12 +89,14 @@ contract PoolsLens is Ownable {
   constructor(
     IVestedLpMining _mining,
     IUniswapV2Router _router,
+    IInstantUniswap _instant,
     address _wethAddress,
     address _stableAddress,
     address _cvpAddress
   ) {
     mining = _mining;
     uniRouter = _router;
+    instantUniswap = _instant;
     wethAddress = _wethAddress;
     stableAddress = _stableAddress;
     cvpAddress = _cvpAddress;
@@ -109,33 +136,46 @@ contract PoolsLens is Ownable {
     return exchangePathByTokens[_start][_end];
   }
 
-  function getPoolData(uint8 poolId) external view returns (LpData memory) {
+  function getPoolData(uint8 poolId, address user) external view returns (LpData memory) {
     Pool memory pool = mining.pools(poolId);
+    miningUserDataExtendedStruct memory userInfo;
 
     if (poolId == 0) {
       uint256 stableDecimals = 10 ** 6;
-      // tvl calculation
+
+      // token prices
       ReservesStruct memory reserves = ILpToken(pool.lpToken).getReserves();
       uint256 cvpPrice = getAmountsOut(cvpAddress, stableAddress);
       uint256 ethPrice = getAmountsOut(wethAddress, stableAddress);
 
+      // tvl calc
       uint256 tvlInUsd = ((reserves.reserve0 * cvpPrice) + (reserves.reserve1 * ethPrice)) / 1 ether / stableDecimals;
 
       // apy calculation
-      uint256 blocksPerYear = 365 * 7100;
-      uint256 cvpPerBlock = mining.cvpPerBlock();
       uint256 poolWeight = ((pool.allocPoint * stableDecimals) / mining.totalAllocPoint());
-      uint256 apy = (blocksPerYear * cvpPerBlock * poolWeight * cvpPrice / tvlInUsd) / (10 ** (6 * 4));
+      uint256 apy = ((365 * 7100) * mining.cvpPerBlock() * poolWeight * cvpPrice / tvlInUsd) / (10 ** (6 * 4));
 
-      // to get whole apy percents you need to do: apy / 10 ** 4
+      // user specific data fetch
+      if (user != address(0)) {
+        miningUserDataStruct memory data = mining.users(0, user);
+        userInfo.lptAmount = data.lptAmount;
+        userInfo.pendedCvp = data.pendedCvp;
+        userInfo.vestableCvp = mining.vestableCvp(0, user);
+        userInfo.lockedCvp = userInfo.pendedCvp - userInfo.vestableCvp;
+      }
+
       return LpData({
-        tvl: tvlInUsd,
-        apy: apy
+        tvlUsd: tvlInUsd,
+        apyFinney: apy / 10,
+        lpTokenPriceFinney: (tvlInUsd * 10 ** 21) / ILpToken(pool.lpToken).totalSupply(),
+        userInfo: userInfo
       });
     }
     return LpData({
-      tvl: 0,
-      apy: 0
+      tvlUsd: 0,
+      apyFinney: 0,
+      lpTokenPriceFinney: 0,
+      userInfo: userInfo
     });
   }
 }
