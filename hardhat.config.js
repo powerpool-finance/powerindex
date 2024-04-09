@@ -80,7 +80,7 @@ const config = {
       loggingEnabled: true,
       blockGasLimit: 12000000,
       forking: {
-        url: 'https://endpoints.omniatech.io/v1/eth/mainnet/public',
+        url: 'https://rpc.ankr.com/eth',
       },
     },
     ganache: {
