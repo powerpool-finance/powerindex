@@ -16,6 +16,33 @@ pragma solidity 0.8.11;
 import "@openzeppelin/contracts-0.8/access/Ownable.sol";
 import "hardhat/console.sol";
 
+interface IUniswapV2Router {
+  function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts);
+  function quote(uint256 amountA, uint256 reserveA, uint256 reserveB) external view returns (uint256 amountB);
+}
+
+interface IVestedLpMining {
+  function pools(uint256 index) external view returns (Pool calldata);
+  function users(uint256 poolId, address userAddress) external view returns (miningUserDataStruct calldata);
+  function cvpPerBlock() external view returns (uint96);
+  function totalAllocPoint() external view returns (uint256);
+  function vestableCvp(uint256 pId, address user) external view returns (uint256);
+
+  function poolLength() external view returns(uint);
+  function reservoir() external view returns(address);
+}
+
+interface ILpToken {
+  function getReserves() external view returns (ReservesStruct calldata);
+  function totalSupply() external view returns (uint256);
+  function balanceOf(address wallet) external view returns (uint256);
+}
+
+interface ERC20 {
+  function balanceOf(address wallet) external view returns (uint256);
+  function allowance(address owner, address spender) external view returns(uint256);
+}
+
 struct Pool {
   address lpToken; // address of the LP token contract
   bool votesEnabled; // if the pool is enabled to write votes
@@ -35,33 +62,57 @@ struct LpBasicData {
 
 struct PoolData {
   address lpTokenAddress;
-  uint256 poolWeight;
+  uint256 poolWeightSzabo;
   uint96 cvpPerBlock;
 }
 
 struct FarmingData {
   LpBasicData lpData;
-  uint256 lpTotalSupply;
-  uint256 miningLpBalance;
-  uint256 mainTokenPerPool;
-  uint256 mainTokenPerPoolToken;
+  uint256 lpTotalSupplyWei;
+  uint256 miningLpBalanceWei;
+  uint256 mainTokenPerPoolWei;
+  uint256 mainTokenPerPoolTokenWei;
+  bool isReservoirEnough;
 }
 
-struct PositionData {
-  uint256 lptAmount;
+struct PoolForLiquidityManagers {
+  address tokenAddress;
+  uint256 balanceWei;
+  uint256 allowanceWei;
+  uint256 tokenAmountPerLPToken;
+  uint256 poolBalanceOfThisToken;
+  uint256 tokenPriceSzabo;
+  string symbol;
+}
+
+struct PoolAtMiningForLiquidityManagers {
+  uint256 LpAtMiningAmountWei;
+  uint256 cvpAtMiningMiningWei;
+  uint256 ethAtMiningMiningWei;
+}
+
+struct LiquidityManagers {
+  uint256 tvlUsd;
   uint256 lpTotalSupply;
   TokenPrices tokenPrices;
-  uint256 userCvpAmountWei;
-  uint256 userEthAmountWei;
   uint256 amountCvpInSingleEth;
   uint256 amountEthInSingleCvp;
+  TokenBalances allowanceInfo;
+  PoolForLiquidityManagers[] tokens;
   miningUserDataExtendedStruct userInfo;
+  PoolAtMiningForLiquidityManagers miningData;
 }
 
 struct ReservesStruct {
   uint112 reserve0;
   uint112 reserve1;
   uint32 blockTimestampLast;
+}
+
+struct TokenPrices {
+  uint256 cvpPriceSzabo;
+  uint256 ethPriceSzabo;
+  uint256 lpTokenPriceFinney;
 }
 
 struct miningUserDataStruct {
@@ -72,37 +123,20 @@ struct miningUserDataStruct {
   uint256 lptAmount;
 }
 
-struct TokenPrices {
-  uint256 cvpPriceSzabo;
-  uint256 ethPriceSzabo;
-  uint256 lpTokenPriceFinney;
-}
-
 struct miningUserDataExtendedStruct {
   uint96 pendedCvp;
   uint256 vestableCvp;
   uint256 lockedCvp;
-  uint256 lptAmount;
+  uint256 lpAtMiningAmount;
 }
 
-interface IUniswapV2Router {
-  function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts);
-}
-
-interface IVestedLpMining {
-  function pools(uint256 index) external view returns (Pool calldata);
-  function users(uint256 poolId, address userAddress) external view returns (miningUserDataStruct calldata);
-  function cvpPerBlock() external view returns (uint96);
-  function totalAllocPoint() external view returns (uint256);
-  function vestableCvp(uint256 pId, address user) external view returns (uint256);
-
-  function poolLength() external view returns(uint);
-}
-
-interface ILpToken {
-  function getReserves() external view returns (ReservesStruct calldata);
-  function totalSupply() external view returns (uint256);
-  function balanceOf(address wallet) external view returns (uint256);
+struct TokenBalances {
+  uint256 EthBalance;
+  uint256 CvpBalance;
+  uint256 CvpAllowance;
+  uint256 LpBalance;
+  uint256 LpAllowance;
+  TokenPrices prices;
 }
 
 contract PoolsLens is Ownable {
@@ -169,12 +203,7 @@ contract PoolsLens is Ownable {
     return result[result.length - 1];
   }
 
-  // just getter for checking mapped addresses. Will be removed on release
-  function getMappingPath(address _start, address _end) external view returns (address[] memory) {
-    return exchangePathByTokens[_start][_end];
-  }
-
-  // get basic data for active pool (0 index pool)
+  // get basic data for active pool (0 index pool). apy, tvl, tokens prices, basic pool data and user specific data
   function getBasicPoolData(address user) public view returns (LpBasicData memory) {
     Pool memory pool = mining.pools(0);
     miningUserDataExtendedStruct memory userInfo;
@@ -195,61 +224,158 @@ contract PoolsLens is Ownable {
     // user specific data fetch
     if (user != address(0)) {
       miningUserDataStruct memory data = mining.users(0, user);
-      userInfo.lptAmount = data.lptAmount;
+      userInfo.lpAtMiningAmount = data.lptAmount;
       userInfo.pendedCvp = data.pendedCvp;
       userInfo.vestableCvp = mining.vestableCvp(0, user);
       userInfo.lockedCvp = userInfo.pendedCvp - userInfo.vestableCvp;
     }
 
     return LpBasicData({
-      tvlUsd: tvlInUsd,
-      apyFinney: apy / 10,
+      tvlUsd:      tvlInUsd,
+      apyFinney:   apy / 10,
       tokenPrices: TokenPrices({
-        cvpPriceSzabo: cvpPrice,
-        ethPriceSzabo: ethPrice,
+        cvpPriceSzabo:      cvpPrice,
+        ethPriceSzabo:      ethPrice,
         lpTokenPriceFinney: (tvlInUsd * 10 ** 21) / ILpToken(pool.lpToken).totalSupply()
       }),
       poolData: PoolData({
-        lpTokenAddress: pool.lpToken,
-        poolWeight: poolWeight,
-        cvpPerBlock: mining.cvpPerBlock()
+        lpTokenAddress:  pool.lpToken,
+        poolWeightSzabo: poolWeight,
+        cvpPerBlock:     mining.cvpPerBlock()
       }),
       userInfo: userInfo
     });
   }
 
+  // Aggregate information for farming page
   function getFarmingData(address user) public view returns(FarmingData memory) {
     LpBasicData memory lpData = getBasicPoolData(user);
     uint lpTotalSupply = ILpToken(lpData.poolData.lpTokenAddress).totalSupply();
-    uint256 miningLpBalance = ILpToken(lpData.poolData.lpTokenAddress).balanceOf(user);
+    uint256 miningLpBalance = ILpToken(lpData.poolData.lpTokenAddress).balanceOf(address(mining));
+    uint256 mainTokenPerPool = (lpData.poolData.cvpPerBlock * lpData.poolData.poolWeightSzabo) / 10 ** 6;
+    uint256 mainTokenPerPoolToken = miningLpBalance != 0 ? (mainTokenPerPool * 10 ** 18) / miningLpBalance : 0;
 
-    uint256 mainTokenPerPool = lpData.poolData.cvpPerBlock * lpData.poolData.poolWeight;
-    uint256 mainTokenPerPoolToken = miningLpBalance != 0 ? mainTokenPerPool / miningLpBalance : 0;
+    // Checking if reservoir is capable to return possible claim
+    bool isReservoirEnough = false;
+    uint256 vestableCvp = lpData.userInfo.vestableCvp;
+    if (vestableCvp <= ERC20(cvpAddress).balanceOf(mining.reservoir()) || vestableCvp <= ERC20(cvpAddress).allowance(mining.reservoir(), address(mining))) {
+      isReservoirEnough = true;
+    }
 
     return FarmingData({
-      lpData: lpData,
-      lpTotalSupply: lpTotalSupply,
-      miningLpBalance: miningLpBalance,
-      mainTokenPerPool: mainTokenPerPool,
-      mainTokenPerPoolToken: mainTokenPerPoolToken
+      lpData:                   lpData,
+      lpTotalSupplyWei:         lpTotalSupply,
+      miningLpBalanceWei:       miningLpBalance,
+      mainTokenPerPoolWei:      mainTokenPerPool,
+      mainTokenPerPoolTokenWei: mainTokenPerPoolToken,
+      isReservoirEnough:        isReservoirEnough
     });
   }
 
-  function getUserPosition(address user) external view returns(PositionData memory) {
+  // this function is used for operating liquidity add and liquidity remove interface
+  function getLiquidityManager(address user) external view returns(LiquidityManagers memory) {
     LpBasicData memory lpData = getBasicPoolData(user);
+    TokenBalances memory tokensInfo = getTokensInfo(user);
 
     uint lpTotalSupply = ILpToken(lpData.poolData.lpTokenAddress).totalSupply();
     ReservesStruct memory reserves = ILpToken(lpData.poolData.lpTokenAddress).getReserves();
 
-    return PositionData({
-      lptAmount: lpData.userInfo.lptAmount,
-      lpTotalSupply: lpTotalSupply,
-      tokenPrices: lpData.tokenPrices,
-      userCvpAmountWei: (((lpData.userInfo.lptAmount * 10**18) / lpTotalSupply) * reserves.reserve0) / 10**18,
-      userEthAmountWei: (((lpData.userInfo.lptAmount * 10**18) / lpTotalSupply) * reserves.reserve1) / 10**18,
-      userInfo: lpData.userInfo,
-      amountCvpInSingleEth: getAmountsOut(wethAddress, cvpAddress),
-      amountEthInSingleCvp: getAmountsOut(cvpAddress, wethAddress)
+    // setting tokens array
+    PoolForLiquidityManagers[] memory tokens = new PoolForLiquidityManagers[](2);
+    tokens[0] = PoolForLiquidityManagers({
+      tokenAddress:           cvpAddress,
+      balanceWei:             tokensInfo.CvpBalance,
+      allowanceWei:           tokensInfo.CvpAllowance,
+      tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * reserves.reserve0) / 10**18,
+      poolBalanceOfThisToken: reserves.reserve0,
+      tokenPriceSzabo:        tokensInfo.prices.cvpPriceSzabo,
+      symbol:                 'CVP'
     });
+    tokens[1] = PoolForLiquidityManagers({
+      tokenAddress:           wethAddress,
+      balanceWei:             tokensInfo.EthBalance,
+      allowanceWei:           1000000000000000000000000,
+      tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * reserves.reserve1) / 10**18,
+      poolBalanceOfThisToken: reserves.reserve1,
+      tokenPriceSzabo:        tokensInfo.prices.ethPriceSzabo,
+      symbol:                 'ETH'
+    });
+
+    return LiquidityManagers({
+      tvlUsd: lpData.tvlUsd,
+      lpTotalSupply:        lpTotalSupply,
+      tokenPrices:          lpData.tokenPrices,
+      amountCvpInSingleEth: getAmountsOut(wethAddress, cvpAddress),
+      amountEthInSingleCvp: getAmountsOut(cvpAddress, wethAddress),
+      allowanceInfo:        tokensInfo,
+      tokens:               tokens,
+      userInfo:             lpData.userInfo,
+      miningData: PoolAtMiningForLiquidityManagers({
+        LpAtMiningAmountWei:  lpData.userInfo.lpAtMiningAmount,
+        cvpAtMiningMiningWei: (((lpData.userInfo.lpAtMiningAmount * 10**18) / lpTotalSupply) * reserves.reserve0) / 10**18,
+        ethAtMiningMiningWei: (((lpData.userInfo.lpAtMiningAmount * 10**18) / lpTotalSupply) * reserves.reserve1) / 10**18
+      })
+    });
+  }
+
+  // Accepts amount of token A from pair and returns corresponding amount of token B from pair. (You can switch both tokens)
+  function getTokenBAmount(uint256 tokenAAmountWei, address tokenAAddress, address tokenBAddress) external view returns(uint256) {
+    Pool memory pool = mining.pools(0);
+    ReservesStruct memory reserves = ILpToken(pool.lpToken).getReserves();
+    uint256 reserveA;
+    uint256 reserveB;
+
+    if (tokenAAddress == cvpAddress) {
+      reserveA = reserves.reserve0;
+      reserveB = reserves.reserve1;
+    } else if (tokenAAddress == wethAddress) {
+      reserveB = reserves.reserve0;
+      reserveA = reserves.reserve1;
+    }
+    return uniRouter.quote(tokenAAmountWei, reserveA, reserveB);
+  }
+
+  // get all token prices in usd
+  function getPrices() public view returns(TokenPrices memory) {
+    Pool memory pool = mining.pools(0);
+    uint256 stableDecimals = 10 ** 6;
+
+    // token prices
+    ReservesStruct memory reserves = ILpToken(pool.lpToken).getReserves();
+    uint256 cvpPrice = getAmountsOut(cvpAddress, stableAddress);
+    uint256 ethPrice = getAmountsOut(wethAddress, stableAddress);
+
+    // tvl calc
+    uint256 tvlInUsd = ((reserves.reserve0 * cvpPrice) + (reserves.reserve1 * ethPrice)) / 1 ether / stableDecimals;
+
+    return TokenPrices({
+      cvpPriceSzabo:      cvpPrice,
+      ethPriceSzabo:      ethPrice,
+      lpTokenPriceFinney: (tvlInUsd * 10 ** 21) / ILpToken(pool.lpToken).totalSupply()
+    });
+  }
+
+  // Returns balances and allowances of all 3 tokens (cvp, eth, lp) and prices for them
+  function getTokensInfo(address owner) public view returns(TokenBalances memory) {
+    Pool memory pool = mining.pools(0);
+    if (owner != address(0)) {
+      return TokenBalances({
+        EthBalance:   owner.balance,
+        CvpBalance:   ERC20(cvpAddress).balanceOf(owner),
+        CvpAllowance: ERC20(cvpAddress).allowance(owner, address(uniRouter)),
+        LpBalance:    ERC20(pool.lpToken).balanceOf(owner),
+        LpAllowance:  ERC20(pool.lpToken).allowance(owner, address(mining)),
+        prices:       getPrices()
+      });
+    } else {
+      return TokenBalances({
+        EthBalance:   0,
+        CvpBalance:   0,
+        CvpAllowance: 0,
+        LpBalance:    0,
+        LpAllowance:  0,
+        prices:       getPrices()
+      });
+    }
   }
 }

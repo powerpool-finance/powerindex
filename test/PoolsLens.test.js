@@ -41,8 +41,9 @@ describe.only('PoolsLens', async () => {
       //
       // ----------------- Check zero pool is existing and valid
       // const zeroPool = await this.poolsLens.getPoolData(ethers.constants.AddressZero);
-      const zeroPool = await this.poolsLens.getUserPosition('0x8b19f6F51501dA80FCEFb578427907f223005F7A');
-      console.log('position data is: ', zeroPool);
+      const zeroPool = await this.poolsLens.getLiquidityManager('0x8b19f6F51501dA80FCEFb578427907f223005F7A');
+      // const zeroPool = await this.poolsLens.getFarmingData(ethers.constants.AddressZero);
+      console.log('zeroPool: ', zeroPool);
     });
   } catch (e) {
     console.error(e)
