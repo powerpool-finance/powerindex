@@ -25,8 +25,8 @@ describe.only('PoolsLens', async () => {
         '0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1',
       );
       // const zeroPool = await this.poolsLens.getPoolData(ethers.constants.AddressZero);
-      const zeroPool = await this.poolsLens.getMiningManager('0x8b19f6F51501dA80FCEFb578427907f223005F7A');
-      // const zeroPool = await this.poolsLens.getFarmingData(ethers.constants.AddressZero);
+      // const zeroPool = await this.poolsLens.getMiningManager('0x8b19f6F51501dA80FCEFb578427907f223005F7A');
+      const zeroPool = await this.poolsLens.getMiningManager(ethers.constants.AddressZero);
       console.log('zeroPool: ', zeroPool);
     });
   } catch (e) {

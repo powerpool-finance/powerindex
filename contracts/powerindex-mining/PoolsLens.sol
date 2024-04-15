@@ -404,7 +404,7 @@ contract PoolsLens is Ownable {
         CvpUserBalance:     0,
         CvpRouterAllowance: 0,
         LpUserBalance:      0,
-        LpMiningBalance:    0,
+        LpMiningBalance:    ERC20(pool.lpToken).balanceOf(address(mining)),
         LpMiningAllowance:  0,
         prices:             getPrices()
       });
