@@ -20,7 +20,7 @@ task('deploy-erc20-pipt-swap', 'Deploy Erc20PiptSwap').setAction(async (__, { ne
     cvpAddress,
     poolAddress,
     admin,
-    sendOptions,
+    sendOptions
   );
   console.log('erc20PiptSwap', erc20PiptSwap.address);
 
