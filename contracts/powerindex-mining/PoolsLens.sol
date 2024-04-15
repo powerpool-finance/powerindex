@@ -92,7 +92,6 @@ struct PoolAtMiningForLiquidityManagers {
 }
 
 struct LiquidityManagers {
-  uint256 tvlUsd;
   uint256 lpTotalSupply;
   TokenPrices tokenPrices;
   uint256 amountCvpInSingleEth;
@@ -101,6 +100,15 @@ struct LiquidityManagers {
   PoolForLiquidityManagers[] tokens;
   miningUserDataExtendedStruct userInfo;
   PoolAtMiningForLiquidityManagers miningData;
+}
+
+struct MiningManager {
+  uint256 apyFinney;
+  TokenPrices tokenPrices;
+  TokenBalances allowanceInfo;
+  miningUserDataExtendedStruct userInfo;
+  PoolAtMiningForLiquidityManagers userMiningData;
+  bool isReservoirEnough;
 }
 
 struct ReservesStruct {
@@ -131,11 +139,12 @@ struct miningUserDataExtendedStruct {
 }
 
 struct TokenBalances {
-  uint256 EthBalance;
-  uint256 CvpBalance;
-  uint256 CvpAllowance;
-  uint256 LpBalance;
-  uint256 LpAllowance;
+  uint256 EthUserBalance;
+  uint256 CvpUserBalance;
+  uint256 CvpRouterAllowance;
+  uint256 LpUserBalance;
+  uint256 LpMiningBalance;
+  uint256 LpMiningAllowance;
   TokenPrices prices;
 }
 
@@ -248,7 +257,7 @@ contract PoolsLens is Ownable {
   }
 
   // Aggregate information for farming page
-  function getFarmingData(address user) public view returns(FarmingData memory) {
+  function getFarmingData(address user) external view returns(FarmingData memory) {
     LpBasicData memory lpData = getBasicPoolData(user);
     uint lpTotalSupply = ILpToken(lpData.poolData.lpTokenAddress).totalSupply();
     uint256 miningLpBalance = ILpToken(lpData.poolData.lpTokenAddress).balanceOf(address(mining));
@@ -272,8 +281,8 @@ contract PoolsLens is Ownable {
     });
   }
 
-  // this function is used for operating liquidity add and liquidity remove interface
-  function getLiquidityManager(address user) external view returns(LiquidityManagers memory) {
+  // this function returns data used for liquidity add and remove
+  function getLiquidityManager(address user) public view returns(LiquidityManagers memory) {
     LpBasicData memory lpData = getBasicPoolData(user);
     TokenBalances memory tokensInfo = getTokensInfo(user);
 
@@ -284,8 +293,8 @@ contract PoolsLens is Ownable {
     PoolForLiquidityManagers[] memory tokens = new PoolForLiquidityManagers[](2);
     tokens[0] = PoolForLiquidityManagers({
       tokenAddress:           cvpAddress,
-      balanceWei:             tokensInfo.CvpBalance,
-      allowanceWei:           tokensInfo.CvpAllowance,
+      balanceWei:             tokensInfo.CvpUserBalance,
+      allowanceWei:           tokensInfo.CvpRouterAllowance,
       tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * reserves.reserve0) / 10**18,
       poolBalanceOfThisToken: reserves.reserve0,
       tokenPriceSzabo:        tokensInfo.prices.cvpPriceSzabo,
@@ -293,7 +302,7 @@ contract PoolsLens is Ownable {
     });
     tokens[1] = PoolForLiquidityManagers({
       tokenAddress:           wethAddress,
-      balanceWei:             tokensInfo.EthBalance,
+      balanceWei:             tokensInfo.EthUserBalance,
       allowanceWei:           1000000000000000000000000,
       tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * reserves.reserve1) / 10**18,
       poolBalanceOfThisToken: reserves.reserve1,
@@ -302,7 +311,6 @@ contract PoolsLens is Ownable {
     });
 
     return LiquidityManagers({
-      tvlUsd: lpData.tvlUsd,
       lpTotalSupply:        lpTotalSupply,
       tokenPrices:          lpData.tokenPrices,
       amountCvpInSingleEth: getAmountsOut(wethAddress, cvpAddress),
@@ -315,6 +323,28 @@ contract PoolsLens is Ownable {
         cvpAtMiningMiningWei: (((lpData.userInfo.lpAtMiningAmount * 10**18) / lpTotalSupply) * reserves.reserve0) / 10**18,
         ethAtMiningMiningWei: (((lpData.userInfo.lpAtMiningAmount * 10**18) / lpTotalSupply) * reserves.reserve1) / 10**18
       })
+    });
+  }
+
+  // this function returns data used for mining contract operations (add and remove lpTokens from mining)
+  function getMiningManager(address user) external view returns(MiningManager memory) {
+    LpBasicData memory lpData = getBasicPoolData(user);
+    LiquidityManagers memory liquidityData = getLiquidityManager(user);
+
+    // Checking if reservoir is capable to return possible claim
+    bool isReservoirEnough = false;
+    uint256 vestableCvp = lpData.userInfo.vestableCvp;
+    if (vestableCvp <= ERC20(cvpAddress).balanceOf(mining.reservoir()) || vestableCvp <= ERC20(cvpAddress).allowance(mining.reservoir(), address(mining))) {
+      isReservoirEnough = true;
+    }
+
+    return MiningManager({
+      apyFinney:           lpData.apyFinney,
+      tokenPrices:         liquidityData.tokenPrices,
+      allowanceInfo:       liquidityData.allowanceInfo,
+      userInfo:            liquidityData.userInfo,
+      userMiningData:      liquidityData.miningData,
+      isReservoirEnough:   isReservoirEnough
     });
   }
 
@@ -360,21 +390,23 @@ contract PoolsLens is Ownable {
     Pool memory pool = mining.pools(0);
     if (owner != address(0)) {
       return TokenBalances({
-        EthBalance:   owner.balance,
-        CvpBalance:   ERC20(cvpAddress).balanceOf(owner),
-        CvpAllowance: ERC20(cvpAddress).allowance(owner, address(uniRouter)),
-        LpBalance:    ERC20(pool.lpToken).balanceOf(owner),
-        LpAllowance:  ERC20(pool.lpToken).allowance(owner, address(mining)),
-        prices:       getPrices()
+        EthUserBalance:     owner.balance,
+        CvpUserBalance:     ERC20(cvpAddress).balanceOf(owner),
+        CvpRouterAllowance: ERC20(cvpAddress).allowance(owner, address(uniRouter)),
+        LpUserBalance:      ERC20(pool.lpToken).balanceOf(owner),
+        LpMiningBalance:    ERC20(pool.lpToken).balanceOf(address(mining)),
+        LpMiningAllowance:  ERC20(pool.lpToken).allowance(owner, address(mining)),
+        prices:             getPrices()
       });
     } else {
       return TokenBalances({
-        EthBalance:   0,
-        CvpBalance:   0,
-        CvpAllowance: 0,
-        LpBalance:    0,
-        LpAllowance:  0,
-        prices:       getPrices()
+        EthUserBalance:     0,
+        CvpUserBalance:     0,
+        CvpRouterAllowance: 0,
+        LpUserBalance:      0,
+        LpMiningBalance:    0,
+        LpMiningAllowance:  0,
+        prices:             getPrices()
       });
     }
   }

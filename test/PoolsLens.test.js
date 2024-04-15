@@ -24,24 +24,8 @@ describe.only('PoolsLens', async () => {
         '0xdAC17F958D2ee523a2206206994597C13D831ec7',
         '0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1',
       );
-
-      // ----------------- make sure weth path is exist
-      // const wethPath = await this.poolsLens.getAmountsOut('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', '0xdAC17F958D2ee523a2206206994597C13D831ec7');
-      // console.log('weth path is: ', wethPath);
-      //
-      // ----------------- change stable and check weth path
-      // await this.poolsLens.changeStable('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
-      // const wethPath = await this.poolsLens.getMappingPath('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2');
-      // console.log('weth path is: ', wethPath);
-      //
-      // ----------------- add cvp path and make sure it exists
-      // await this.poolsLens.setTokenPath('0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1');
-      // const wethPath = await this.poolsLens.getMappingPath('0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1');
-      // console.log('cvp path is: ', wethPath);
-      //
-      // ----------------- Check zero pool is existing and valid
       // const zeroPool = await this.poolsLens.getPoolData(ethers.constants.AddressZero);
-      const zeroPool = await this.poolsLens.getLiquidityManager('0x8b19f6F51501dA80FCEFb578427907f223005F7A');
+      const zeroPool = await this.poolsLens.getMiningManager('0x8b19f6F51501dA80FCEFb578427907f223005F7A');
       // const zeroPool = await this.poolsLens.getFarmingData(ethers.constants.AddressZero);
       console.log('zeroPool: ', zeroPool);
     });
