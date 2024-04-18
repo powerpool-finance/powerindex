@@ -8,7 +8,6 @@ require('./tasks/fetchPoolsData');
 require('./tasks/fetchVaultsData');
 require('./tasks/fetchVaultsData3');
 require('./tasks/fetchVaultsData4');
-require('./tasks/deployVestedLpMining');
 require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
 require('./tasks/deployPoolsLens');
@@ -79,8 +78,10 @@ const config = {
       loggingEnabled: true,
       blockGasLimit: 12000000,
       forking: {
-        url: 'https://rpc.ankr.com/eth',
+        url: 'https://mainnet-eth.powerpool.finance',
       },
+      // run the deploy-pools-lens task
+      after: ['deploy-pools-lens']
     },
     ganache: {
       url: 'http://127.0.0.1:8945',
