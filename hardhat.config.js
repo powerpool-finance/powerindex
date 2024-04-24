@@ -80,8 +80,6 @@ const config = {
       forking: {
         url: 'https://mainnet-eth.powerpool.finance',
       },
-      // run the deploy-pools-lens task
-      after: ['deploy-pools-lens']
     },
     ganache: {
       url: 'http://127.0.0.1:8945',
@@ -91,7 +89,14 @@ const config = {
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
       accounts: getAccounts('mainnet'),
-      gasPrice: 36 * 10 ** 9,
+      gasPrice: 8 * 10 ** 9,
+      gasMultiplier: 1.2,
+      timeout: 2000000,
+    },
+    sepolia: {
+      url: 'https://rpc.sepolia.org',
+      accounts: getAccounts('sepolia'),
+      gasPrice: 1 * 10 ** 9,
       gasMultiplier: 1.2,
       timeout: 2000000,
     },

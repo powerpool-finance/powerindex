@@ -14,7 +14,6 @@ https://powerpool.finance/
 pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts-0.8/access/Ownable.sol";
-import "hardhat/console.sol";
 
 interface IUniswapV2Router {
   function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts);
@@ -139,6 +138,7 @@ struct TokenBalances {
   uint256 LpUserBalance;
   uint256 LpMiningBalance;
   uint256 LpMiningAllowance;
+  uint256 LpRouterAllowance;
   TokenPrices prices;
 }
 
@@ -343,7 +343,7 @@ contract PoolsLens is Ownable {
   }
 
   // Accepts amount of token A from pair and returns corresponding amount of token B from pair. (You can switch both tokens)
-  function getTokenBAmount(uint256 tokenAAmountWei, address tokenAAddress, address tokenBAddress) external view returns(uint256) {
+  function getTokenBAmount(uint256 tokenAAmountWei, address tokenAAddress, address) external view returns(uint256) {
     Pool memory pool = mining.pools(0);
     (uint112 reserve0, uint112 reserve1,) = ILpToken(pool.lpToken).getReserves();
     uint256 reserveA;
@@ -390,6 +390,7 @@ contract PoolsLens is Ownable {
         LpUserBalance:      ERC20(pool.lpToken).balanceOf(_owner),
         LpMiningBalance:    ERC20(pool.lpToken).balanceOf(address(mining)),
         LpMiningAllowance:  ERC20(pool.lpToken).allowance(_owner, address(mining)),
+        LpRouterAllowance:  ERC20(pool.lpToken).allowance(_owner, address(uniRouter)),
         prices:             getPrices()
       });
     } else {
@@ -400,6 +401,7 @@ contract PoolsLens is Ownable {
         LpUserBalance:      0,
         LpMiningBalance:    ERC20(pool.lpToken).balanceOf(address(mining)),
         LpMiningAllowance:  0,
+        LpRouterAllowance:  0,
         prices:             getPrices()
       });
     }
