@@ -87,9 +87,9 @@ const config = {
       hardfork: 'muirGlacier',
     },
     mainnet: {
-      url: 'https://mainnet-eth.compound.finance',
+      url: 'https://rough-compatible-hill.quiknode.pro/b7052dc47d31d455c2a770377f7db70735924fba/',
       accounts: getAccounts('mainnet'),
-      gasPrice: 8 * 10 ** 9,
+      gasPrice: 9 * 10 ** 9,
       gasMultiplier: 1.2,
       timeout: 2000000,
     },
