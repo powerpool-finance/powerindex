@@ -8,9 +8,9 @@ require('./tasks/fetchPoolsData');
 require('./tasks/fetchVaultsData');
 require('./tasks/fetchVaultsData3');
 require('./tasks/fetchVaultsData4');
-require('./tasks/deployVestedLpMining');
 require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
+require('./tasks/deployPoolsLens');
 require('./tasks/testMainnetErc20PiptSwap');
 require('./tasks/deployPoolRestrictions');
 require('./tasks/deployMainnetYeti');
@@ -64,18 +64,22 @@ const config = {
   gasReporter: {
     currency: 'USD',
     enabled: !!process.env.REPORT_GAS,
+    gasPrice: 56
   },
   mocha: {
     timeout: 70000,
   },
   networks: {
     hardhat: {
-      chainId: 31337,
+      chainId: 1,
       accounts: testAccounts,
       allowUnlimitedContractSize: true,
       gas: 12000000,
-      loggingEnabled: false,
+      loggingEnabled: true,
       blockGasLimit: 12000000,
+      forking: {
+        url: 'https://mainnet-eth.powerpool.finance',
+      },
     },
     ganache: {
       url: 'http://127.0.0.1:8945',
@@ -83,9 +87,16 @@ const config = {
       hardfork: 'muirGlacier',
     },
     mainnet: {
-      url: 'https://mainnet-eth.compound.finance',
+      url: 'https://rough-compatible-hill.quiknode.pro/b7052dc47d31d455c2a770377f7db70735924fba/',
       accounts: getAccounts('mainnet'),
-      gasPrice: 36 * 10 ** 9,
+      gasPrice: 9 * 10 ** 9,
+      gasMultiplier: 1.2,
+      timeout: 2000000,
+    },
+    sepolia: {
+      url: 'https://rpc.sepolia.org',
+      accounts: getAccounts('sepolia'),
+      gasPrice: 1 * 10 ** 9,
       gasMultiplier: 1.2,
       timeout: 2000000,
     },
@@ -97,6 +108,7 @@ const config = {
       timeout: 2000000,
       blockGasLimit: 20000000,
       allowUnlimitedContractSize: true,
+      loggingEnabled: true,
     },
     local: {
       url: 'http://127.0.0.1:8545',
@@ -121,13 +133,26 @@ const config = {
     tests: './test',
   },
   solidity: {
-    settings: {
-      optimizer: {
-        enabled: !!process.env.ETHERSCAN_KEY || process.env.COMPILE_TARGET === 'release',
-        runs: 200,
+    compilers: [
+      {
+        settings: {
+          optimizer: {
+            enabled: !!process.env.ETHERSCAN_KEY || process.env.COMPILE_TARGET === 'release',
+            runs: 200,
+          },
+        },
+        version: '0.6.12',
       },
-    },
-    version: '0.6.12',
+      {
+        settings: {
+          optimizer: {
+            enabled: !!process.env.ETHERSCAN_KEY || process.env.COMPILE_TARGET === 'release',
+            runs: 200,
+          },
+        },
+        version: '0.8.11',
+      }
+    ]
   },
   typechain: {
     outDir: 'typechain',
