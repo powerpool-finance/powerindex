@@ -41,6 +41,8 @@ interface ILpToken {
   function balanceOf(address wallet) external view returns (uint256);
   function symbol() external view returns (string memory);
   function factory() external view returns (address);
+  function getFinalTokens() external view returns (address[] memory);
+  function getNormalizedWeight(address) external view returns (uint256);
 }
 
 interface ERC20 {
@@ -65,6 +67,20 @@ struct FarmingListItem {
   uint256 lpAtMiningAmount;
   uint256 vestableCvp;
   bool isBoosted;
+}
+
+struct EarnListItem {
+  address lpToken;
+  uint8 poolType;
+  uint256 pid;
+  uint256 totalSupply;
+  uint256 userTotalBalance; // user wallet balance + user mining balance
+  PartOfThePool[] tokensDistribution;
+}
+
+struct PartOfThePool {
+  address tokenAddress;
+  uint256 percent;
 }
 
 struct FarmingDetail {
@@ -115,6 +131,7 @@ contract DeprecatedPoolsLens {
   address public stableAddress;
   address immutable public wethAddress;
   address immutable public cvpAddress;
+  mapping(uint8 => uint8) public earnPidMap;
 
   constructor(
     IVestedLpMining _mining,
@@ -127,6 +144,11 @@ contract DeprecatedPoolsLens {
     uniRouter = _router;
     wethAddress = _wethAddress;
     cvpAddress = _cvpAddress;
+
+    earnPidMap[0] = 13;
+    earnPidMap[1] = 6;
+    earnPidMap[2] = 10;
+    earnPidMap[3] = 9;
   }
 
   function getFarmingList(address _user) external view returns (FarmingListItem[] memory) {
@@ -139,7 +161,6 @@ contract DeprecatedPoolsLens {
     pools[5] = mining.pools(11);
     pools[6] = mining.pools(12);
     pools[7] = mining.pools(13);
-//    lpBoostRate
 
     FarmingListItem[] memory farmingPools = new FarmingListItem[](8);
 
@@ -209,8 +230,7 @@ contract DeprecatedPoolsLens {
     });
   }
 
-
-  function getSushiSecondaryLiquidityRemoveInfo(address _user, uint _pid) external view returns (tokenRemove memory) {
+  function getSecondaryLiquidityRemoveInfo(address _user, uint _pid) external view returns (tokenRemove memory) {
     Pool memory pool = mining.pools(_pid);
     bool isSushi = pool.poolType == 4;
 
@@ -249,6 +269,46 @@ contract DeprecatedPoolsLens {
         tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * (reserve1 * 10**(18 - token2Decimals))) / 10**18
       })
     });
+  }
+
+  function getEarnList(address _user) external view returns (EarnListItem[] memory) {
+    Pool[] memory pools = new Pool[](4);
+    pools[0] = mining.pools(13);
+    pools[1] = mining.pools(6);
+    pools[2] = mining.pools(10);
+    pools[3] = mining.pools(9);
+
+    EarnListItem[] memory earnPools = new EarnListItem[](4);
+    for (uint8 i = 0; i < 4; i++) {
+      Pool memory pool = pools[i];
+
+      earnPools[i] = EarnListItem({
+        lpToken:            pool.lpToken,
+        poolType:           pool.poolType,
+        pid:                earnPidMap[i],
+        totalSupply:        ILpToken(pool.lpToken).totalSupply(),
+        tokensDistribution: new PartOfThePool[](ILpToken(pool.lpToken).getFinalTokens().length),
+        userTotalBalance:   0
+      });
+
+      EarnListItem memory earnPool = earnPools[i];
+
+      // User balance
+      if (_user != address(0)) {
+        earnPool.userTotalBalance = ILpToken(pool.lpToken).balanceOf(_user) + mining.users(earnPool.pid, _user).lptAmount;
+      }
+
+      // get tokens percents
+      address[] memory finalTokens = ILpToken(pool.lpToken).getFinalTokens();
+      for (uint8 j = 0; j < finalTokens.length; j++) {
+        earnPool.tokensDistribution[j] = PartOfThePool({
+          tokenAddress: finalTokens[j],
+          percent: ILpToken(pool.lpToken).getNormalizedWeight(finalTokens[j])
+        });
+      }
+    }
+
+    return earnPools;
   }
 
   // TODO: Remove automatic 0 pool fetch and use TokenBAddress
