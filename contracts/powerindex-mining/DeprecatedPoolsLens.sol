@@ -27,6 +27,7 @@ interface IVestedLpMining {
   function totalAllocPoint() external view returns (uint256);
   function vestableCvp(uint256 pId, address user) external view returns (uint256);
   function poolBoostByLp(uint256 pId) external view returns (uint256, uint256, uint32, uint256, uint256);
+  function usersPoolBoost(uint256 pId, address user) external view returns(uint256 balance, uint32 lastUpdateBlock);
 
   function poolLength() external view returns(uint);
   function reservoir() external view returns(address);
@@ -34,14 +35,18 @@ interface IVestedLpMining {
 
 interface ILpToken {
   function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32);
+  function token0() external view returns (address);
+  function token1() external view returns (address);
   function totalSupply() external view returns (uint256);
   function balanceOf(address wallet) external view returns (uint256);
   function symbol() external view returns (string memory);
+  function factory() external view returns (address);
 }
 
 interface ERC20 {
   function balanceOf(address wallet) external view returns (uint256);
   function allowance(address owner, address spender) external view returns(uint256);
+  function decimals() external view returns (uint8);
 }
 
 struct Pool {
@@ -55,11 +60,25 @@ struct Pool {
 
 struct FarmingListItem {
   address lpToken;
+  uint8 poolType;
+  uint256 pid;
   uint256 lpAtMiningAmount;
-  uint256 pendedCvp;
   uint256 vestableCvp;
-  uint256 lockedCvp;
   bool isBoosted;
+}
+
+struct FarmingDetail {
+  address lpToken;
+  uint8 poolType;
+  uint256 pid;
+  uint256 lpMiningBalance;
+  uint256 lpTotalSupply;
+  uint256 vestableCvp;
+  uint256 lpTokenUserStakedAtMining;
+  uint256 boostedAmount;
+  bool isReservoirEnough;
+  bool isSushi;
+  bool isBalancer;
 }
 
 struct miningUserDataStruct {
@@ -68,6 +87,25 @@ struct miningUserDataStruct {
   uint96 pendedCvp;
   uint96 cvpAdjust;
   uint256 lptAmount;
+}
+
+struct tokenInfo {
+  address tokenAddress;
+  string tokenSymbol;
+  uint256 reserves;
+  uint8 decimals;
+  uint256 tokenAmountPerLPToken;
+}
+
+struct tokenRemove {
+  address lpToken;
+  uint8 poolType;
+  uint256 pid;
+  uint256 lpTotalSupply;
+  uint256 balance;
+  uint256 allowance;
+  tokenInfo token1;
+  tokenInfo token2;
 }
 
 contract DeprecatedPoolsLens {
@@ -91,8 +129,7 @@ contract DeprecatedPoolsLens {
     cvpAddress = _cvpAddress;
   }
 
-  //
-  function getFarmingList(address _user) public view returns (FarmingListItem[] memory) {
+  function getFarmingList(address _user) external view returns (FarmingListItem[] memory) {
     Pool[] memory pools = new Pool[](8);
     pools[0] = mining.pools(6);
     pools[1] = mining.pools(7);
@@ -111,10 +148,10 @@ contract DeprecatedPoolsLens {
 
       farmingPools[i] = FarmingListItem({
         lpToken:          pool.lpToken,
+        poolType:         pool.poolType,
+        pid:              i + 6,
         lpAtMiningAmount: 0,
-        pendedCvp:        0,
         vestableCvp:      0,
-        lockedCvp:        0,
         isBoosted:        false
       });
 
@@ -122,21 +159,96 @@ contract DeprecatedPoolsLens {
 
       // User total lp and balance
       if (_user != address(0)) {
-        miningUserDataStruct memory data = mining.users(i + 6, _user);
-        farmingPool.lpAtMiningAmount = data.lptAmount;
-        farmingPool.pendedCvp = data.pendedCvp;
-        farmingPool.vestableCvp = mining.vestableCvp(i + 6, _user);
-        farmingPool.lockedCvp = farmingPool.pendedCvp - farmingPool.vestableCvp;
+        uint256 vestableCvp = mining.vestableCvp(farmingPool.pid, _user);
+        farmingPool.lpAtMiningAmount = mining.users(farmingPool.pid, _user).lptAmount;
+        farmingPool.vestableCvp = vestableCvp;
       }
 
       // Check if pool is boostable
-      (uint256 lpBoostRate,,,,) = mining.poolBoostByLp(i + 6);
+      (uint256 lpBoostRate,,,,) = mining.poolBoostByLp(farmingPool.pid);
       if (lpBoostRate > 0) {
         farmingPool.isBoosted = true;
       }
     }
 
     return farmingPools;
+  }
+
+  function getFarmingDetail(address _user, uint256 _pid) external view returns (FarmingDetail memory) {
+    Pool memory pool = mining.pools(_pid);
+
+    // User total lp and balance
+    uint256 lpTokenUserStaked;
+    uint256 vestableCvp;
+    uint boostAmount;
+    if (_user != address(0)) {
+      lpTokenUserStaked = mining.users(_pid, _user).lptAmount;
+      vestableCvp = mining.vestableCvp(_pid, _user);
+      (boostAmount,) = mining.usersPoolBoost(_pid, _user);
+    }
+
+    // Check if can claim cvp
+    bool isReservoirEnough = vestableCvp <= ERC20(cvpAddress).balanceOf(mining.reservoir()) || vestableCvp <= ERC20(cvpAddress).allowance(mining.reservoir(), address(mining));
+
+    // check if 3rd party pool involved (so later it can be unwrapped to one of PowerPool pool)
+    bool isSushi = _pid == 11 || _pid == 12;
+    bool isBalancer = _pid == 7 || _pid == 8;
+
+    return FarmingDetail({
+      lpToken:                   pool.lpToken,
+      poolType:                  pool.poolType,
+      pid:                       _pid,
+      lpMiningBalance:           ILpToken(pool.lpToken).balanceOf(address(mining)),
+      lpTotalSupply:             ILpToken(pool.lpToken).totalSupply(),
+      vestableCvp:               vestableCvp,
+      lpTokenUserStakedAtMining: lpTokenUserStaked,
+      boostedAmount:             boostAmount,
+      isReservoirEnough:         isReservoirEnough,
+      isSushi:                   isSushi,
+      isBalancer:                isBalancer
+    });
+  }
+
+
+  function getSushiSecondaryLiquidityRemoveInfo(address _user, uint _pid) external view returns (tokenRemove memory) {
+    Pool memory pool = mining.pools(_pid);
+    bool isSushi = pool.poolType == 4;
+
+    address routerContract;
+    if (isSushi) { // sushi
+      routerContract = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
+    } else {       // balancer
+      routerContract = pool.lpToken;
+    }
+
+    (uint112 reserve0, uint112 reserve1,) = ILpToken(pool.lpToken).getReserves();
+
+    uint8 token1Decimals = ERC20(ILpToken(pool.lpToken).token0()).decimals();
+    uint8 token2Decimals = ERC20(ILpToken(pool.lpToken).token1()).decimals();
+    uint256 lpTotalSupply = ILpToken(pool.lpToken).totalSupply();
+
+    return tokenRemove({
+      lpToken:                   pool.lpToken,
+      poolType:                  pool.poolType,
+      pid:                       _pid,
+      lpTotalSupply:             lpTotalSupply,
+      balance:                   ERC20(pool.lpToken).balanceOf(_user),
+      allowance:                 ERC20(pool.lpToken).allowance(_user, routerContract),
+      token1: tokenInfo({
+        tokenAddress: ILpToken(pool.lpToken).token0(),
+        tokenSymbol: ILpToken(ILpToken(pool.lpToken).token0()).symbol(),
+        decimals: token1Decimals,
+        reserves: reserve0,
+        tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * (reserve0 * 10**(18 - token1Decimals))) / 10**18
+      }),
+      token2: tokenInfo({
+        tokenAddress: ILpToken(pool.lpToken).token1(),
+        tokenSymbol: ILpToken(ILpToken(pool.lpToken).token1()).symbol(),
+        decimals: token2Decimals,
+        reserves: reserve1,
+        tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * (reserve1 * 10**(18 - token2Decimals))) / 10**18
+      })
+    });
   }
 
   // TODO: Remove automatic 0 pool fetch and use TokenBAddress

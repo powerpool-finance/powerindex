@@ -11,6 +11,7 @@ require('./tasks/fetchVaultsData4');
 require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
 require('./tasks/deployPoolsLens');
+require('./tasks/deployDeprecatedPoolsLens');
 require('./tasks/testMainnetErc20PiptSwap');
 require('./tasks/deployPoolRestrictions');
 require('./tasks/deployMainnetYeti');
