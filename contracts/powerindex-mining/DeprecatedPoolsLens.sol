@@ -35,6 +35,7 @@ interface IVestedLpMining {
 
 interface ILpToken {
   function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32);
+  function getBalance(address tokenAddress) external view returns (uint256);
   function token0() external view returns (address);
   function token1() external view returns (address);
   function totalSupply() external view returns (uint256);
@@ -80,6 +81,7 @@ struct EarnListItem {
 
 struct PartOfThePool {
   address tokenAddress;
+  string symbol;
   uint256 percent;
 }
 
@@ -88,6 +90,7 @@ struct FarmingDetail {
   uint8 poolType;
   uint256 pid;
   uint256 lpMiningBalance;
+  uint256 lpUserBalance;
   uint256 lpTotalSupply;
   uint256 vestableCvp;
   uint256 lpTokenUserStakedAtMining;
@@ -115,6 +118,7 @@ struct tokenInfo {
 
 struct tokenRemove {
   address lpToken;
+  address routerAddress;
   uint8 poolType;
   uint256 pid;
   uint256 lpTotalSupply;
@@ -220,6 +224,7 @@ contract DeprecatedPoolsLens {
       poolType:                  pool.poolType,
       pid:                       _pid,
       lpMiningBalance:           ILpToken(pool.lpToken).balanceOf(address(mining)),
+      lpUserBalance:           ILpToken(pool.lpToken).balanceOf(_user),
       lpTotalSupply:             ILpToken(pool.lpToken).totalSupply(),
       vestableCvp:               vestableCvp,
       lpTokenUserStakedAtMining: lpTokenUserStaked,
@@ -237,37 +242,79 @@ contract DeprecatedPoolsLens {
     address routerContract;
     if (isSushi) { // sushi
       routerContract = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
+      return getSushiInfo(_user, _pid, routerContract, pool);
     } else {       // balancer
       routerContract = pool.lpToken;
+      return getBalancerInfo(_user, _pid, routerContract, pool);
     }
+  }
 
-    (uint112 reserve0, uint112 reserve1,) = ILpToken(pool.lpToken).getReserves();
+  // Returns specific for balancer data. Used when building interface for balancer redeem
+  function getBalancerInfo(address _user, uint _pid, address _router, Pool memory _pool) internal view returns (tokenRemove memory) {
+    // getBalance
+    // getFinalTokens
+    uint256 reserve0 = ILpToken(_pool.lpToken).getBalance(ILpToken(_pool.lpToken).getFinalTokens()[0]);
+    uint256 reserve1 = ILpToken(_pool.lpToken).getBalance(ILpToken(_pool.lpToken).getFinalTokens()[1]);
 
-    uint8 token1Decimals = ERC20(ILpToken(pool.lpToken).token0()).decimals();
-    uint8 token2Decimals = ERC20(ILpToken(pool.lpToken).token1()).decimals();
-    uint256 lpTotalSupply = ILpToken(pool.lpToken).totalSupply();
+    uint8 token1Decimals = ERC20(ILpToken(_pool.lpToken).getFinalTokens()[0]).decimals();
+    uint8 token2Decimals = ERC20(ILpToken(_pool.lpToken).getFinalTokens()[1]).decimals();
+    uint256 lpTotalSupply = ILpToken(_pool.lpToken).totalSupply();
 
     return tokenRemove({
-      lpToken:                   pool.lpToken,
-      poolType:                  pool.poolType,
+      lpToken:                   _pool.lpToken,
+      routerAddress:             _router,
+      poolType:                  _pool.poolType,
       pid:                       _pid,
       lpTotalSupply:             lpTotalSupply,
-      balance:                   ERC20(pool.lpToken).balanceOf(_user),
-      allowance:                 ERC20(pool.lpToken).allowance(_user, routerContract),
+      balance:                   ERC20(_pool.lpToken).balanceOf(_user),
+      allowance:                 ERC20(_pool.lpToken).allowance(_user, _router),
       token1: tokenInfo({
-        tokenAddress: ILpToken(pool.lpToken).token0(),
-        tokenSymbol: ILpToken(ILpToken(pool.lpToken).token0()).symbol(),
-        decimals: token1Decimals,
-        reserves: reserve0,
-        tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * (reserve0 * 10**(18 - token1Decimals))) / 10**18
-      }),
+      tokenAddress: ILpToken(_pool.lpToken).getFinalTokens()[0],
+      tokenSymbol: ILpToken(ILpToken(_pool.lpToken).getFinalTokens()[0]).symbol(),
+      decimals: token1Decimals,
+      reserves: reserve0,
+      tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * (reserve0 * 10**(18 - token1Decimals))) / 10**18
+    }),
       token2: tokenInfo({
-        tokenAddress: ILpToken(pool.lpToken).token1(),
-        tokenSymbol: ILpToken(ILpToken(pool.lpToken).token1()).symbol(),
-        decimals: token2Decimals,
-        reserves: reserve1,
-        tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * (reserve1 * 10**(18 - token2Decimals))) / 10**18
-      })
+      tokenAddress: ILpToken(_pool.lpToken).getFinalTokens()[1],
+      tokenSymbol: ILpToken(ILpToken(_pool.lpToken).getFinalTokens()[1]).symbol(),
+      decimals: token2Decimals,
+      reserves: reserve1,
+      tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * (reserve1 * 10**(18 - token2Decimals))) / 10**18
+    })
+    });
+  }
+
+  // Returns specific for sushi data. Used when building interface for sushi redeem
+  function getSushiInfo(address _user, uint _pid, address _router, Pool memory _pool) internal view returns (tokenRemove memory) {
+    (uint112 reserve0, uint112 reserve1,) = ILpToken(_pool.lpToken).getReserves();
+
+    uint8 token1Decimals = ERC20(ILpToken(_pool.lpToken).token0()).decimals();
+    uint8 token2Decimals = ERC20(ILpToken(_pool.lpToken).token1()).decimals();
+    uint256 lpTotalSupply = ILpToken(_pool.lpToken).totalSupply();
+
+    return tokenRemove({
+      lpToken:                   _pool.lpToken,
+      routerAddress:             _router,
+      poolType:                  _pool.poolType,
+      pid:                       _pid,
+      lpTotalSupply:             lpTotalSupply,
+      balance:                   ERC20(_pool.lpToken).balanceOf(_user),
+      allowance:                 ERC20(_pool.lpToken).allowance(_user, _router),
+      token1: tokenInfo({
+      tokenAddress: ILpToken(_pool.lpToken).token0(),
+      tokenSymbol: ILpToken(ILpToken(_pool.lpToken).token0()).symbol(),
+      decimals: token1Decimals,
+      reserves: reserve0,
+      tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * (reserve0 * 10**(18 - token1Decimals))) / 10**18
+    }),
+      token2: tokenInfo({
+      tokenAddress: ILpToken(_pool.lpToken).token1(),
+      tokenSymbol: ILpToken(ILpToken(_pool.lpToken).token1()).symbol(),
+      decimals: token2Decimals,
+      reserves: reserve1,
+      tokenAmountPerLPToken:  (((1 ether * 10**18) / lpTotalSupply) * (reserve1 * 10**(18 - token2Decimals))) / 10**18
+    })
     });
   }
 
@@ -301,9 +348,11 @@ contract DeprecatedPoolsLens {
       // get tokens percents
       address[] memory finalTokens = ILpToken(pool.lpToken).getFinalTokens();
       for (uint8 j = 0; j < finalTokens.length; j++) {
+        if (finalTokens[j] == 0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2) continue; // fcked up token symbol (bytes32), pass that
         earnPool.tokensDistribution[j] = PartOfThePool({
           tokenAddress: finalTokens[j],
-          percent: ILpToken(pool.lpToken).getNormalizedWeight(finalTokens[j])
+          symbol:       ILpToken(finalTokens[j]).symbol(),
+          percent:      ILpToken(pool.lpToken).getNormalizedWeight(finalTokens[j])
         });
       }
     }
