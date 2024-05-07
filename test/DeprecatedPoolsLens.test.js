@@ -16,7 +16,7 @@ describe.only('DeprecatedPoolsLens', async () => {
       // const result = await this.poolsLens.getPoolData(ethers.constants.AddressZero);
       // const result = await this.poolsLens.getEarnList('0x8b19f6F51501dA80FCEFb578427907f223005F7A');
 
-      const result = await this.poolsLens.RemoveLiquidityInfo('0x8b19f6F51501dA80FCEFb578427907f223005F7A', 10); // balancer
+      const result = await this.poolsLens.RemoveLiquidityInfo('0x8b19f6F51501dA80FCEFb578427907f223005F7A', 6); // balancer
 
       // const result = await this.poolsLens.getSecondaryLiquidityRemoveInfo('0x8b19f6F51501dA80FCEFb578427907f223005F7A', 7); // balancer
       // const result = await this.poolsLens.getSecondaryLiquidityRemoveInfo('0x8b19f6F51501dA80FCEFb578427907f223005F7A', 11); // sushi

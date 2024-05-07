@@ -153,10 +153,7 @@ struct RemoveLiquidityData {
   uint8 poolType;
   uint256 pid;
   uint256 balance;
-  address defaultWrapper;
-  address multiWrapper;
-  uint256 defaultAllowance;
-  uint256 multiAllowance;
+  uint256 allowance;
   Fees fees;
   LiquidityTokens[] tokens;
 }
@@ -393,16 +390,6 @@ contract DeprecatedPoolsLens {
 
   function RemoveLiquidityInfo(address _user, uint256 _pid) external view returns (RemoveLiquidityData memory) {
     Pool memory pool = mining.pools(_pid);
-    address defaultWrapper = pool.lpToken;
-    address multiWrapper = pool.lpToken;
-    uint256 exitFee = 0.001 ether;
-
-    if (pool.lpToken == 0xFA2562da1Bba7B954f26C74725dF51fb62646313) { // ASSY token has it's wrapper hardcoded in configs
-      defaultWrapper = 0x43Fa8eF8E334720b80367Cf94e438Cf90c562aBE;
-      multiWrapper = 0x43Fa8eF8E334720b80367Cf94e438Cf90c562aBE;
-    } else if (pool.lpToken == 0x9ba60bA98413A60dB4C651D4afE5C937bbD8044B) {
-      defaultWrapper = 0x3D256E2468c36F15997E3bFc295eD5Ab3D6c0576;    // YLA default wrapper is contract that handle USDC
-    }
 
     LiquidityTokens[] memory tokens = new LiquidityTokens[](ILpToken(pool.lpToken).getFinalTokens().length);
 
@@ -412,21 +399,18 @@ contract DeprecatedPoolsLens {
       token.tokenAddress = ILpToken(pool.lpToken).getFinalTokens()[i];
       token.balance = ERC20(ILpToken(pool.lpToken).getFinalTokens()[i]).balanceOf(_user);
       token.decimals = ERC20(ILpToken(pool.lpToken).getFinalTokens()[i]).decimals();
-      token.tokenAmountForOneLpSingle = getSingleTokenOut(_pid, ILpToken(pool.lpToken).getFinalTokens()[i]);
-      token.tokenAmountForOneLpMulti = 0;
+      token.tokenAmountForOneLpSingle = getSingleTokenOut(_pid, token.tokenAddress);
+      token.tokenAmountForOneLpMulti = getMultiTokensOut(_pid, token.tokenAddress, token.decimals);
     }
 
     return RemoveLiquidityData({
-      lpToken:                   pool.lpToken,
-      poolType:                  pool.poolType,
-      pid:                       _pid,
-      balance:                   ILpToken(pool.lpToken).balanceOf(_user),
-      defaultWrapper:            defaultWrapper,
-      multiWrapper:              multiWrapper,
-      defaultAllowance:          ERC20(pool.lpToken).allowance(_user, defaultWrapper),
-      multiAllowance:            ERC20(pool.lpToken).allowance(_user, multiWrapper),
-      fees:                      ILpToken(pool.lpToken).getCommunityFee(),
-      tokens: tokens
+      lpToken:    pool.lpToken,
+      poolType:   pool.poolType,
+      pid:        _pid,
+      balance:    ILpToken(pool.lpToken).balanceOf(_user),
+      allowance:  ERC20(pool.lpToken).allowance(_user, pool.lpToken),
+      fees:       ILpToken(pool.lpToken).getCommunityFee(),
+      tokens:     tokens
     });
   }
 
@@ -447,5 +431,13 @@ contract DeprecatedPoolsLens {
         ILpToken(pool.lpToken).getSwapFee()
       );
     }
+  }
+
+  function getMultiTokensOut(uint256 _pid, address _tokenAddress, uint8 _decimals) internal view returns (uint256) {
+    Pool memory pool = mining.pools(_pid);
+    uint256 totalSupply = ILpToken(pool.lpToken).totalSupply();
+    uint256 reserve = ILpToken(pool.lpToken).getBalance(_tokenAddress);
+
+    return (((1 ether * 10**18) / totalSupply) * (reserve * 10**(18 - _decimals))) / 10**18;
   }
 }
