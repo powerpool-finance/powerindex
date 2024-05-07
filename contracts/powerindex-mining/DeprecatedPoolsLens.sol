@@ -152,6 +152,7 @@ struct RemoveLiquidityData {
   address lpToken;
   uint8 poolType;
   uint256 pid;
+  string symbol;
   uint256 balance;
   uint256 allowance;
   Fees fees;
@@ -388,7 +389,7 @@ contract DeprecatedPoolsLens {
     return earnPools;
   }
 
-  function RemoveLiquidityInfo(address _user, uint256 _pid) external view returns (RemoveLiquidityData memory) {
+  function removeLiquidityInfo(address _user, uint256 _pid) external view returns (RemoveLiquidityData memory) {
     Pool memory pool = mining.pools(_pid);
 
     LiquidityTokens[] memory tokens = new LiquidityTokens[](ILpToken(pool.lpToken).getFinalTokens().length);
@@ -407,6 +408,7 @@ contract DeprecatedPoolsLens {
       lpToken:    pool.lpToken,
       poolType:   pool.poolType,
       pid:        _pid,
+      symbol:     ILpToken(pool.lpToken).symbol(),
       balance:    ILpToken(pool.lpToken).balanceOf(_user),
       allowance:  ERC20(pool.lpToken).allowance(_user, pool.lpToken),
       fees:       ILpToken(pool.lpToken).getCommunityFee(),
