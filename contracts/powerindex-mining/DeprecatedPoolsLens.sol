@@ -13,13 +13,6 @@ https://powerpool.finance/
 
 pragma solidity 0.8.11;
 
-import "hardhat/console.sol";
-
-interface IUniswapV2Router {
-  function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts);
-  function quote(uint256 amountA, uint256 reserveA, uint256 reserveB) external view returns (uint256 amountB);
-}
-
 interface IVestedLpMining {
   function pools(uint256 index) external view returns (Pool calldata);
   function users(uint256 poolId, address userAddress) external view returns (miningUserDataStruct calldata);
@@ -137,6 +130,7 @@ struct LiquidityTokens {
   address tokenAddress;
   uint256 balance;
   uint8 decimals;
+  string symbol;
   uint256 tokenAmountForOneLpSingle;
   uint256 tokenAmountForOneLpMulti;
 }
@@ -161,23 +155,15 @@ struct RemoveLiquidityData {
 
 contract DeprecatedPoolsLens {
   IVestedLpMining public mining;
-  IUniswapV2Router public uniRouter;
 
-  address public stableAddress;
-  address immutable public wethAddress;
   address immutable public cvpAddress;
   mapping(uint8 => uint8) public earnPidMap;
 
   constructor(
     IVestedLpMining _mining,
-    IUniswapV2Router _router,
-    address _wethAddress,
-    address _stableAddress,
     address _cvpAddress
   ) {
     mining = _mining;
-    uniRouter = _router;
-    wethAddress = _wethAddress;
     cvpAddress = _cvpAddress;
 
     earnPidMap[0] = 13;
@@ -400,6 +386,11 @@ contract DeprecatedPoolsLens {
       token.tokenAddress = ILpToken(pool.lpToken).getFinalTokens()[i];
       token.balance = ERC20(ILpToken(pool.lpToken).getFinalTokens()[i]).balanceOf(_user);
       token.decimals = ERC20(ILpToken(pool.lpToken).getFinalTokens()[i]).decimals();
+      if (ILpToken(pool.lpToken).getFinalTokens()[i] == 0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2) {
+        token.symbol = 'MKR';
+      } else {
+        token.symbol = ILpToken(ILpToken(pool.lpToken).getFinalTokens()[i]).symbol();
+      }
       token.tokenAmountForOneLpSingle = getSingleTokenOut(_pid, token.tokenAddress);
       token.tokenAmountForOneLpMulti = getMultiTokensOut(_pid, token.tokenAddress, token.decimals);
     }
