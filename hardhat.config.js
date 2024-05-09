@@ -11,6 +11,8 @@ require('./tasks/fetchVaultsData4');
 require('./tasks/deployMainnetPowerIndexPool');
 require('./tasks/deployErc20PiptSwap');
 require('./tasks/deployPoolsLens');
+require('./tasks/deployDeprecatedPoolsLens');
+require('./tasks/deployBscDeprecatedPoolsLens');
 require('./tasks/testMainnetErc20PiptSwap');
 require('./tasks/deployPoolRestrictions');
 require('./tasks/deployMainnetYeti');
@@ -71,14 +73,14 @@ const config = {
   },
   networks: {
     hardhat: {
-      chainId: 1,
+      chainId: 56,
       accounts: testAccounts,
       allowUnlimitedContractSize: true,
       gas: 12000000,
       loggingEnabled: true,
       blockGasLimit: 12000000,
       forking: {
-        url: 'https://mainnet-eth.powerpool.finance',
+        url: 'https://divine-icy-yard.bsc.quiknode.pro/1ec99ee8099d558029e893df069f138441e17e80/',
       },
     },
     ganache: {
@@ -89,7 +91,14 @@ const config = {
     mainnet: {
       url: 'https://rough-compatible-hill.quiknode.pro/b7052dc47d31d455c2a770377f7db70735924fba/',
       accounts: getAccounts('mainnet'),
-      gasPrice: 9 * 10 ** 9,
+      gasPrice: 5 * 10 ** 9,
+      gasMultiplier: 1.2,
+      timeout: 2000000,
+    },
+    binance: {
+      url: 'https://divine-icy-yard.bsc.quiknode.pro/1ec99ee8099d558029e893df069f138441e17e80/',
+      accounts: getAccounts('binance'),
+      gasPrice: 10 ** 9,
       gasMultiplier: 1.2,
       timeout: 2000000,
     },
