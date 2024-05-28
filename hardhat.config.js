@@ -80,7 +80,7 @@ const config = {
       loggingEnabled: true,
       blockGasLimit: 12000000,
       forking: {
-        url: 'https://divine-icy-yard.bsc.quiknode.pro/1ec99ee8099d558029e893df069f138441e17e80/',
+        url: 'https://rough-compatible-hill.quiknode.pro/b7052dc47d31d455c2a770377f7db70735924fba/',
       },
     },
     ganache: {
@@ -91,7 +91,7 @@ const config = {
     mainnet: {
       url: 'https://rough-compatible-hill.quiknode.pro/b7052dc47d31d455c2a770377f7db70735924fba/',
       accounts: getAccounts('mainnet'),
-      gasPrice: 5 * 10 ** 9,
+      gasPrice: 10 * 10 ** 9,
       gasMultiplier: 1.2,
       timeout: 2000000,
     },

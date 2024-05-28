@@ -3,7 +3,7 @@ const { ethers} = require('hardhat');
 const PoolsLens = artifacts.require('DeprecatedBscPoolsLens');
 const zeroAddress = '0x0000000000000000000000000000000000000000';
 
-describe.only('DeprecatedBscPoolsLens', async () => {
+describe('DeprecatedBscPoolsLens', async () => {
   try {
     it('chore test pass', async () => {
       this.poolsLens = await PoolsLens.new(

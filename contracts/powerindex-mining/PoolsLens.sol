@@ -26,6 +26,7 @@ interface IVestedLpMining {
   function cvpPerBlock() external view returns (uint96);
   function totalAllocPoint() external view returns (uint256);
   function vestableCvp(uint256 pId, address user) external view returns (uint256);
+  function pendingCvp(uint256 pId, address user) external view returns (uint256);
 
   function poolLength() external view returns(uint);
   function reservoir() external view returns(address);
@@ -125,7 +126,7 @@ struct miningUserDataStruct {
 }
 
 struct miningUserDataExtendedStruct {
-  uint96 pendedCvp;
+  uint256 pendedCvp;
   uint256 vestableCvp;
   uint256 lockedCvp;
   uint256 lpAtMiningAmount;
@@ -228,7 +229,7 @@ contract PoolsLens is Ownable {
     if (_user != address(0)) {
       miningUserDataStruct memory data = mining.users(0, _user);
       userInfo.lpAtMiningAmount = data.lptAmount;
-      userInfo.pendedCvp = data.pendedCvp;
+      userInfo.pendedCvp = mining.pendingCvp(0, _user);
       userInfo.vestableCvp = mining.vestableCvp(0, _user);
       userInfo.lockedCvp = userInfo.pendedCvp - userInfo.vestableCvp;
     }

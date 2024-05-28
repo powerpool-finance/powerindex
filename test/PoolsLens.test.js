@@ -4,7 +4,7 @@ const { ethers} = require('hardhat');
 const PoolsLens = artifacts.require('PoolsLens');
 const zeroAddress = '0x0000000000000000000000000000000000000000';
 
-describe('PoolsLens', async () => {
+describe.only('PoolsLens', async () => {
   try {
     it('Zero pool is doing fine', async () => {
       this.poolsLens = await PoolsLens.new(
@@ -15,7 +15,7 @@ describe('PoolsLens', async () => {
         '0x38e4adB44ef08F22F5B5b76A8f0c2d0dCbE7DcA1',
       );
       // const zeroPool = await this.poolsLens.getPoolData(ethers.constants.AddressZero);
-      const zeroPool = await this.poolsLens.getBasicPoolData('0x8b19f6F51501dA80FCEFb578427907f223005F7A');
+      const zeroPool = await this.poolsLens.getBasicPoolData('0xCce0bca1365a02e5770390165E64d1F59238D92e');
       // const zeroPool = await this.poolsLens.getMiningManager(ethers.constants.AddressZero);
       console.log('zeroPool: ', zeroPool);
     });

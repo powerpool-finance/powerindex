@@ -241,7 +241,7 @@ contract DeprecatedPoolsLens {
       poolType:                  pool.poolType,
       pid:                       _pid,
       lpMiningBalance:           ILpToken(pool.lpToken).balanceOf(address(mining)),
-      lpUserBalance:           ILpToken(pool.lpToken).balanceOf(_user),
+      lpUserBalance:             ILpToken(pool.lpToken).balanceOf(_user),
       lpTotalSupply:             ILpToken(pool.lpToken).totalSupply(),
       vestableCvp:               vestableCvp,
       lpTokenUserStakedAtMining: lpTokenUserStaked,
