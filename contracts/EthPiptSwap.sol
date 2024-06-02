@@ -131,8 +131,12 @@ contract EthPiptSwap is ProgressiveFee {
     return _swapWethToPiptByPoolOut(msg.value, _poolAmountOut, tokens, getWrapFee(tokens));
   }
 
-  function swapPiptToEth(uint256 _poolAmountIn) external payable returns (uint256 ethOutAmount) {
-    ethOutAmount = _swapPiptToWeth(_poolAmountIn);
+  function swapPiptToEth(uint256 _poolAmountIn, uint256 _minEthAmountOut)
+    external
+    payable
+    returns (uint256 ethOutAmount)
+  {
+    ethOutAmount = _swapPiptToWeth(_poolAmountIn, _minEthAmountOut);
 
     weth.withdraw(ethOutAmount);
     Address.sendValue(msg.sender, ethOutAmount);
@@ -206,12 +210,7 @@ contract EthPiptSwap is ProgressiveFee {
 
     uint256 totalEthRequired = 0;
     {
-      uint256 piptTotalSupply = pipt.totalSupply();
-      // get pool out for 1 ether as 100% for calculate shares
-      // poolOut by 1 ether first token join = piptTotalSupply.mul(1 ether).div(getPiptTokenBalance(_tokens[0]))
-      // poolRatio = poolOut/totalSupply
-      uint256 poolRatio =
-        piptTotalSupply.mul(1 ether).div(getPiptTokenBalance(_tokens[0])).mul(1 ether).div(piptTotalSupply);
+      uint256 poolRatio = uint256(1e36).div(getPiptTokenBalance(_tokens[0]));
 
       for (uint256 i = 0; i < _tokens.length; i++) {
         // token share relatively 1 ether of first token
@@ -269,7 +268,7 @@ contract EthPiptSwap is ProgressiveFee {
   }
 
   function calcNeedEthToPoolOut(uint256 _poolAmountOut, uint256 _slippage) public view returns (uint256) {
-    uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(100);
+    uint256 ratio = calcRatioToJoin(_poolAmountOut, pipt.totalSupply());
 
     address[] memory tokens = getPiptTokens();
     uint256 len = tokens.length;
@@ -283,6 +282,12 @@ contract EthPiptSwap is ProgressiveFee {
       totalEthSwap = getAmountInForUniswapValue(_uniswapPairFor(tokens[i]), tokensInPipt[i], true).add(totalEthSwap);
     }
     return totalEthSwap.add(totalEthSwap.mul(_slippage).div(1 ether));
+  }
+
+  function calcRatioToJoin(uint256 _poolAmountOut, uint256 _totalSupply) public view returns (uint256) {
+    // add 100 wei to ratio to make tokensInPipt values bigger as well as totalEthSwap
+    // to avoid LIMIT_IN errors on joinPool
+    return _poolAmountOut.mul(1 ether).div(_totalSupply).add(100);
   }
 
   function calcEthFee(uint256 ethAmount, uint256 wrapperFee) public view returns (uint256 ethFee, uint256 ethAfterFee) {
@@ -378,7 +383,7 @@ contract EthPiptSwap is ProgressiveFee {
       }
     }
 
-    (uint256 feeAmount, uint256 swapAmount) = calcEthFee(_wethAmount, wrapperFee);
+    (uint256 ethFeeAmount, uint256 swapAmount) = calcEthFee(_wethAmount, wrapperFee);
     (uint256[] memory tokensInPipt, uint256 totalEthSwap) = _prepareTokensForJoin(tokens, _poolAmountOut);
 
     {
@@ -390,7 +395,7 @@ contract EthPiptSwap is ProgressiveFee {
         address(this)
       );
 
-      emit EthToPiptSwap(msg.sender, swapAmount, feeAmount, _poolAmountOut, poolAmountOutFee);
+      emit EthToPiptSwap(msg.sender, swapAmount, ethFeeAmount, _poolAmountOut, poolAmountOutFee);
     }
 
     _joinPool(_poolAmountOut, tokensInPipt, wrapperFee);
@@ -411,7 +416,7 @@ contract EthPiptSwap is ProgressiveFee {
   {
     uint256 len = _tokens.length;
     tokensInPipt = new uint256[](len);
-    uint256 ratio = _poolAmountOut.mul(1 ether).div(pipt.totalSupply()).add(100);
+    uint256 ratio = calcRatioToJoin(_poolAmountOut, pipt.totalSupply());
     for (uint256 i = 0; i < len; i++) {
       tokensInPipt[i] = ratio.mul(getPiptTokenBalance(_tokens[i])).div(1 ether);
       totalEthSwap = totalEthSwap.add(_swapWethForTokenIn(_tokens[i], tokensInPipt[i]));
@@ -424,7 +429,7 @@ contract EthPiptSwap is ProgressiveFee {
     }
   }
 
-  function _swapPiptToWeth(uint256 _poolAmountIn) internal returns (uint256) {
+  function _swapPiptToWeth(uint256 _poolAmountIn, uint256 _minEthAmountOut) internal returns (uint256) {
     address[] memory tokens = getPiptTokens();
     uint256 len = tokens.length;
 
@@ -436,6 +441,7 @@ contract EthPiptSwap is ProgressiveFee {
     uint256 wrapperFee = getWrapFee(tokens);
 
     (uint256 ethFeeAmount, uint256 ethOutAmount) = calcEthFee(totalEthOut, wrapperFee);
+    require(ethOutAmount >= _minEthAmountOut, "MIN_ETH_AMOUNT_OUT");
 
     _exitPool(_poolAmountIn, tokensOutPipt, wrapperFee);
 
@@ -459,7 +465,7 @@ contract EthPiptSwap is ProgressiveFee {
       pipt.joinPool(_poolAmountOut, _maxAmountsIn);
     } else {
       if (address(this).balance < _wrapperFee) {
-        weth.withdraw(_wrapperFee);
+        weth.withdraw(_wrapperFee.sub(address(this).balance));
       }
       piptWrapper.joinPool{ value: _wrapperFee }(_poolAmountOut, _maxAmountsIn);
     }

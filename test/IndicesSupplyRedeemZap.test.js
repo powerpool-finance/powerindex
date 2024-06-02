@@ -383,16 +383,24 @@ describe('IndicesSupplyRedeemZap', () => {
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [alice, bob], '0x', {from: reporter}), 'NULL_TO');
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan, carol], '0x', {from: reporter}), 'NULL_TO');
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [], '0x', {from: reporter}), 'L');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [], [], '0x', {from: reporter}), 'L');
 
       assert.equal(await this.indiciesZap.isRoundReadyToExecute(firstRoundEthKey), true);
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], '0x', {from: dan}), 'NOT_HDH');
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], '0x', {from: slasher}), 'NOT_HDH');
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('2', [firstRoundEthKey], '0x', {from: reporter}), 'NOT_HDH');
+      const { ethAfterFee: ethInAfterFee } = await erc20PiptSwap.calcEthFee(totalEthToSwap);
+      const {poolOut: poolOutForEth} = await erc20PiptSwap.calcSwapEthToPiptInputs(
+        ethInAfterFee,
+        balancerTokens.map(t => t.address),
+        await erc20PiptSwap.defaultSlippage(),
+      );
 
-      res = await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], '0x', {from: reporter});
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], '0x', {from: reporter}), 'TO_NOT_NULL');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], [poolOutForEth], '0x', {from: dan}), 'NOT_HDH');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], [poolOutForEth], '0x', {from: slasher}), 'NOT_HDH');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('2', [firstRoundEthKey], [poolOutForEth], '0x', {from: reporter}), 'NOT_HDH');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], [addBN(poolOutForEth, ether('1'))], '0x', {from: reporter}), 'MIN_POOL_AMOUNT_OUT');
+
+      res = await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], [poolOutForEth], '0x', {from: reporter});
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundEthKey], [poolOutForEth], '0x', {from: reporter}), 'TO_NOT_NULL');
       const secondRoundEthKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, ETH, pool.address);
       endTime = await web3.eth.getBlock(res.receipt.blockNumber).then(b => (b.timestamp + roundPeriod).toString());
       await expectEvent.inTransaction(res.tx, IndicesSupplyRedeemZap, 'InitRound', {
@@ -410,13 +418,6 @@ describe('IndicesSupplyRedeemZap', () => {
         inputCap: '0',
         finishEndTime: await web3.eth.getBlock(res.receipt.blockNumber).then(b => b.timestamp.toString())
       });
-
-      const { ethAfterFee: ethInAfterFee } = await erc20PiptSwap.calcEthFee(totalEthToSwap);
-      const {poolOut: poolOutForEth} = await erc20PiptSwap.calcSwapEthToPiptInputs(
-        ethInAfterFee,
-        balancerTokens.map(t => t.address),
-        await erc20PiptSwap.defaultSlippage(),
-      );
 
       round = await this.indiciesZap.rounds(firstRoundEthKey);
       assertEqualWithAccuracy(round.totalOutputAmount, poolOutForEth, ether('0.05'));
@@ -482,11 +483,12 @@ describe('IndicesSupplyRedeemZap', () => {
         true
       );
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundEthKey], '0x', {from: dan}), 'INVALID_POKER_KEY');
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundEthKey], '0x', {from: reporter}), 'INVALID_POKER_KEY');
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('1', [firstRoundEthKey], '0x', {from: slasher}), 'INVALID_POKER_KEY');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundEthKey], [], '0x', {from: dan}), 'INVALID_POKER_KEY');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundEthKey], [], '0x', {from: reporter}), 'INVALID_POKER_KEY');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('1', [firstRoundEthKey], [], '0x', {from: slasher}), 'INVALID_POKER_KEY');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundUsdcKey], [addBN(poolOutForUsdc, ether('1'))], '0x', {from: slasher}), 'MIN_POOL_AMOUNT_OUT');
 
-      res = await this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundUsdcKey], '0x', {from: slasher});
+      res = await this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundUsdcKey], [poolOutForUsdc], '0x', {from: slasher});
 
       const thirdRoundUsdcKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, usdc.address, pool.address);
       endTime = await web3.eth.getBlock(res.receipt.blockNumber).then(b => (b.timestamp + roundPeriod).toString());
@@ -592,13 +594,21 @@ describe('IndicesSupplyRedeemZap', () => {
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundPoolUsdcKey, alice), alicePoolBalance);
       assert.equal(await this.indiciesZap.getRoundUserInput(firstRoundPoolUsdcKey, bob), bobPoolBalance);
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundPoolUsdcKey], '0x', {from: reporter}), 'CUR_ROUND');
+      const {totalErc20Out} = await erc20PiptSwap.calcSwapPiptToErc20Inputs(
+        usdc.address,
+        totalPoolUsdcRoundInput,
+        await erc20PiptSwap.getPiptTokens(),
+        true,
+      );
+
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundPoolUsdcKey], [totalErc20Out], '0x', {from: reporter}), 'CUR_ROUND');
 
       await time.increase(roundPeriod);
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundPoolUsdcKey], '0x', {from: slasher}), 'MAX_I');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromSlasher('2', [firstRoundPoolUsdcKey], [totalErc20Out], '0x', {from: slasher}), 'MAX_I');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundPoolUsdcKey], [addBN(totalErc20Out, ether('1'))], '0x', {from: reporter}), 'MIN_ERC20_AMOUNT_OUT');
 
-      res = await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundPoolUsdcKey], '0x', {from: reporter});
+      res = await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundPoolUsdcKey], [totalErc20Out], '0x', {from: reporter});
       const secondRoundPoolUsdcKey = await this.indiciesZap.getRoundKey(res.receipt.blockNumber, pool.address, pool.address, usdc.address);
       endTime = await web3.eth.getBlock(res.receipt.blockNumber).then(b => (b.timestamp + roundPeriod).toString());
       await expectEvent.inTransaction(res.tx, IndicesSupplyRedeemZap, 'InitRound', {
@@ -615,13 +625,6 @@ describe('IndicesSupplyRedeemZap', () => {
         totalInputAmount: totalPoolUsdcRoundInput,
         inputCap: '0'
       });
-
-      const {totalErc20Out} = await erc20PiptSwap.calcSwapPiptToErc20Inputs(
-        usdc.address,
-        totalPoolUsdcRoundInput,
-        await erc20PiptSwap.getPiptTokens(),
-        true,
-      );
 
       round = await this.indiciesZap.rounds(firstRoundPoolUsdcKey);
       assertEqualWithAccuracy(round.totalOutputAmount, totalErc20Out, ether('0.05'));
@@ -689,12 +692,14 @@ describe('IndicesSupplyRedeemZap', () => {
       });
       await vaultPoolSwap.setVaultConfigs(
         vaults.map(v => v.vault.address),
-        vaults.map(v => v.depositor.address),
-        vaults.map(v => v.config.depositorType || 1),
-        vaults.map(v => v.config.amountsLength),
-        vaults.map(v => v.config.usdcIndex),
-        vaults.map(v => v.lpToken.address),
-        vaults.map(() => vaultRegistry.address),
+        vaults.map(v => ({
+          depositorLength: v.config.amountsLength,
+          depositorIndex: v.config.usdcIndex,
+          depositorType: v.config.depositorType || 1,
+          depositor: v.depositor.address,
+          lpToken: v.lpToken.address,
+          curvePoolRegistry: vaultRegistry.address,
+        })),
       );
       await vaultPoolSwap.updatePools([pool.address]);
 
@@ -726,8 +731,9 @@ describe('IndicesSupplyRedeemZap', () => {
 
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [alice, bob], '0x', {from: reporter}), 'NULL_TO');
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [dan, carol], '0x', {from: reporter}), 'NULL_TO');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundUsdcKey], [ether('0.162800516149818229')], '0x', {from: reporter}), 'POOL_AMOUNT_OUT_MIN');
 
-      await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundUsdcKey], '0x', {from: reporter});
+      await this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundUsdcKey], [ether('0.152800516149818229')], '0x', {from: reporter});
       assert.equal(await pool.balanceOf(alice), '0');
       assert.equal(await pool.balanceOf(bob), '0');
 
@@ -753,7 +759,7 @@ describe('IndicesSupplyRedeemZap', () => {
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundUsdcKey, [alice, bob], '0x', {from: reporter}), 'INPUT_NULL');
       await expectRevert(this.indiciesZap.claimPokeFromReporter('1', firstRoundEthKey, [alice, bob], '0x', {from: reporter}), 'NULL_TO');
 
-      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundUsdcKey], '0x', {from: reporter}), 'TO_NOT_NULL');
+      await expectRevert(this.indiciesZap.supplyAndRedeemPokeFromReporter('1', [firstRoundUsdcKey], [], '0x', {from: reporter}), 'TO_NOT_NULL');
     });
   });
 });

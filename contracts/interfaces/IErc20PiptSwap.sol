@@ -21,7 +21,14 @@ interface IErc20PiptSwap {
 
   function defaultDiffPercent() external view returns (uint256);
 
-  function swapPiptToEth(uint256 _poolAmountIn) external payable returns (uint256 ethOutAmount);
+  function swapPiptToEth(uint256 _poolAmountIn, uint256 _minEthAmountOut)
+    external
+    payable
+    returns (uint256 ethOutAmount);
 
-  function swapPiptToErc20(address _swapToken, uint256 _poolAmountIn) external payable returns (uint256 erc20Out);
+  function swapPiptToErc20(
+    address _swapToken,
+    uint256 _poolAmountIn,
+    uint256 _minErc20Out
+  ) external payable returns (uint256 erc20Out);
 }
