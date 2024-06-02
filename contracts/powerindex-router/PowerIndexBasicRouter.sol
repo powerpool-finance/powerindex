@@ -17,7 +17,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   uint256 public constant HUNDRED_PCT = 1 ether;
 
   event SetVotingAndStaking(address indexed voting, address indexed staking);
-  event SetReserveConfig(uint256 ratio, uint256 claimRewardsInterval);
+  event SetReserveConfig(uint256 ratio, uint256 ratioLowerBound, uint256 ratioUpperBound, uint256 claimRewardsInterval);
   event SetRebalancingInterval(uint256 rebalancingInterval);
   event IgnoreRebalancing(uint256 blockTimestamp, uint256 lastRebalancedAt, uint256 rebalancingInterval);
   event RewardPool(address indexed pool, uint256 amount);
@@ -32,7 +32,8 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     address voting;
     address staking;
     uint256 reserveRatio;
-    uint256 reserveRatioToForceRebalance;
+    uint256 reserveRatioLowerBound;
+    uint256 reserveRatioUpperBound;
     uint256 claimRewardsInterval;
     address pvp;
     uint256 pvpFee;
@@ -50,7 +51,8 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   uint256 public claimRewardsInterval;
   uint256 public lastClaimRewardsAt;
   uint256 public lastRebalancedAt;
-  uint256 public reserveRatioToForceRebalance;
+  uint256 public reserveRatioLowerBound;
+  uint256 public reserveRatioUpperBound;
   // 1 ether == 100%
   uint256 public pvpFee;
 
@@ -84,7 +86,9 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
 
   constructor(address _piToken, BasicConfig memory _basicConfig) public PowerIndexNaiveRouter() Ownable() {
     require(_piToken != address(0), "INVALID_PI_TOKEN");
-    require(_basicConfig.reserveRatio <= HUNDRED_PCT, "RR_GT_HUNDRED_PCT");
+    require(_basicConfig.reserveRatioUpperBound <= HUNDRED_PCT, "UPPER_RR_GREATER_THAN_100_PCT");
+    require(_basicConfig.reserveRatio >= _basicConfig.reserveRatioLowerBound, "RR_LTE_LOWER_RR");
+    require(_basicConfig.reserveRatio <= _basicConfig.reserveRatioUpperBound, "RR_GTE_UPPER_RR");
     require(_basicConfig.pvpFee < HUNDRED_PCT, "PVP_FEE_GTE_HUNDRED_PCT");
     require(_basicConfig.pvp != address(0), "INVALID_PVP_ADDR");
     require(_basicConfig.poolRestrictions != address(0), "INVALID_POOL_RESTRICTIONS_ADDR");
@@ -95,7 +99,8 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     voting = _basicConfig.voting;
     staking = _basicConfig.staking;
     reserveRatio = _basicConfig.reserveRatio;
-    reserveRatioToForceRebalance = _basicConfig.reserveRatioToForceRebalance;
+    reserveRatioLowerBound = _basicConfig.reserveRatioLowerBound;
+    reserveRatioUpperBound = _basicConfig.reserveRatioUpperBound;
     claimRewardsInterval = _basicConfig.claimRewardsInterval;
     pvp = _basicConfig.pvp;
     pvpFee = _basicConfig.pvpFee;
@@ -116,11 +121,21 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     emit SetVotingAndStaking(_voting, _staking);
   }
 
-  function setReserveConfig(uint256 _reserveRatio, uint256 _claimRewardsInterval) public virtual override onlyOwner {
-    require(_reserveRatio <= HUNDRED_PCT, "RR_GREATER_THAN_100_PCT");
+  function setReserveConfig(
+    uint256 _reserveRatio,
+    uint256 _reserveRatioLowerBound,
+    uint256 _reserveRatioUpperBound,
+    uint256 _claimRewardsInterval
+  ) external virtual override onlyOwner {
+    require(_reserveRatioUpperBound <= HUNDRED_PCT, "UPPER_RR_GREATER_THAN_100_PCT");
+    require(_reserveRatio >= _reserveRatioLowerBound, "RR_LT_LOWER_RR");
+    require(_reserveRatio <= _reserveRatioUpperBound, "RR_GT_UPPER_RR");
+
     reserveRatio = _reserveRatio;
+    reserveRatioLowerBound = _reserveRatioLowerBound;
+    reserveRatioUpperBound = _reserveRatioUpperBound;
     claimRewardsInterval = _claimRewardsInterval;
-    emit SetReserveConfig(_reserveRatio, _claimRewardsInterval);
+    emit SetReserveConfig(_reserveRatio, _reserveRatioLowerBound, _reserveRatioUpperBound, _claimRewardsInterval);
   }
 
   function setRewardPools(address[] calldata _rewardPools) external onlyOwner {
@@ -138,6 +153,10 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
   function setPiTokenEthFee(uint256 _ethFee) external onlyOwner {
     require(_ethFee <= 0.1 ether, "ETH_FEE_OVER_THE_LIMIT");
     piToken.setEthFee(_ethFee);
+  }
+
+  function setPiTokenNoFee(address _for, bool _noFee) external onlyOwner {
+    piToken.setNoFee(_for, _noFee);
   }
 
   function withdrawEthFee(address payable _receiver) external onlyOwner {
@@ -165,12 +184,14 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     bool _claimAndDistributeRewards,
     bytes calldata _rewardOpts
   ) external onlyReporter(_reporterId, _rewardOpts) onlyEOA {
+    _beforePoke();
     (uint256 minInterval, ) = _getMinMaxReportInterval();
     (ReserveStatus status, uint256 diff, bool forceRebalance) = getReserveStatus(_getUnderlyingStaked(), 0);
     require(forceRebalance || lastRebalancedAt + minInterval < block.timestamp, "MIN_INTERVAL_NOT_REACHED");
-    require(status != ReserveStatus.EQUILIBRIUM, "RESERVE_STATUS_EQUILIBRIUM");
-    _rebalancePoke(status, diff);
-    _postPoke(_claimAndDistributeRewards);
+    if (status != ReserveStatus.EQUILIBRIUM) {
+      _rebalancePoke(status, diff);
+    }
+    _afterPoke(status, _claimAndDistributeRewards);
   }
 
   function pokeFromSlasher(
@@ -178,25 +199,25 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     bool _claimAndDistributeRewards,
     bytes calldata _rewardOpts
   ) external onlyNonReporter(_reporterId, _rewardOpts) onlyEOA {
+    _beforePoke();
     (, uint256 maxInterval) = _getMinMaxReportInterval();
     (ReserveStatus status, uint256 diff, bool forceRebalance) = getReserveStatus(_getUnderlyingStaked(), 0);
     require(forceRebalance || lastRebalancedAt + maxInterval < block.timestamp, "MAX_INTERVAL_NOT_REACHED");
-    require(status != ReserveStatus.EQUILIBRIUM, "RESERVE_STATUS_EQUILIBRIUM");
-    _rebalancePoke(status, diff);
-    _postPoke(_claimAndDistributeRewards);
+    if (status != ReserveStatus.EQUILIBRIUM) {
+      _rebalancePoke(status, diff);
+    }
+    _afterPoke(status, _claimAndDistributeRewards);
   }
 
-  function poke(bool _claimAndDistributeRewards) external onlyEOA {
-    (ReserveStatus status, uint256 diff, ) = getReserveStatus(_getUnderlyingStaked(), 0);
-    _rebalancePoke(status, diff);
-    _postPoke(_claimAndDistributeRewards);
+  function _beforePoke() internal virtual {
+    require(staking != address(0), "STAKING_IS_NULL");
   }
 
-  function _postPoke(bool _claimAndDistributeRewards) internal {
+  function _afterPoke(ReserveStatus reserveStatus, bool _claimAndDistributeRewards) internal virtual {
     lastRebalancedAt = block.timestamp;
 
     if (_claimAndDistributeRewards && lastClaimRewardsAt + claimRewardsInterval < block.timestamp) {
-      _claimRewards();
+      _claimRewards(reserveStatus);
       _distributeRewards();
       lastClaimRewardsAt = block.timestamp;
     }
@@ -206,7 +227,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     // need to redefine in implementation
   }
 
-  function _claimRewards() internal virtual {
+  function _claimRewards(ReserveStatus reserveStatus) internal virtual {
     // need to redefine in implementation
   }
 
@@ -214,12 +235,12 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     // need to redefine in implementation
   }
 
-  function _callVoting(bytes4 _sig, bytes memory _data) internal {
-    piToken.callExternal(voting, _sig, _data, 0);
+  function _callVoting(bytes4 _sig, bytes memory _data) internal returns (bytes memory) {
+    return piToken.callExternal(voting, _sig, _data, 0);
   }
 
-  function _callStaking(bytes4 _sig, bytes memory _data) internal {
-    piToken.callExternal(staking, _sig, _data, 0);
+  function _callStaking(bytes4 _sig, bytes memory _data) internal returns (bytes memory) {
+    return piToken.callExternal(staking, _sig, _data, 0);
   }
 
   function _checkVotingSenderAllowed() internal view {
@@ -279,7 +300,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
    * @dev Getting status and diff of actual staked balance and target reserve balance.
    */
   function getReserveStatusForStakedBalance()
-    public
+    external
     view
     returns (
       ReserveStatus status,
@@ -303,16 +324,28 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     )
   {
     uint256 expectedReserveAmount;
+    uint256 underlyingBalance = piToken.getUnderlyingBalance();
     (status, diff, expectedReserveAmount) = getReserveStatusPure(
       reserveRatio,
-      piToken.getUnderlyingBalance(),
+      underlyingBalance,
       _stakedBalance,
       _withdrawAmount
     );
 
+    if (status == ReserveStatus.EQUILIBRIUM) {
+      return (status, diff, forceRebalance);
+    }
+
+    uint256 denominator = underlyingBalance.add(_stakedBalance).sub(_withdrawAmount);
+
     if (status == ReserveStatus.SHORTAGE) {
-      uint256 currentRatio = expectedReserveAmount.sub(diff).mul(HUNDRED_PCT).div(expectedReserveAmount);
-      forceRebalance = reserveRatioToForceRebalance >= currentRatio;
+      uint256 numerator = expectedReserveAmount.sub(diff).mul(HUNDRED_PCT);
+      uint256 currentRatio = numerator.div(denominator);
+      forceRebalance = reserveRatioLowerBound >= currentRatio;
+    } else if (status == ReserveStatus.EXCESS) {
+      uint256 numerator = expectedReserveAmount.add(diff).mul(HUNDRED_PCT);
+      uint256 currentRatio = numerator.div(denominator);
+      forceRebalance = reserveRatioUpperBound <= currentRatio;
     }
   }
 
@@ -336,7 +369,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 _underlyingAmount,
     IERC20 _underlyingToken,
     uint256 _piTotalSupply
-  ) public view virtual override returns (uint256) {
+  ) external view virtual override returns (uint256) {
     uint256 underlyingOnPiToken = _underlyingToken.balanceOf(address(piToken));
     return
       getPiEquivalentForUnderlyingPure(
@@ -363,7 +396,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
     uint256 _piAmount,
     IERC20 _underlyingToken,
     uint256 _piTotalSupply
-  ) public view virtual override returns (uint256) {
+  ) external view virtual override returns (uint256) {
     uint256 underlyingOnPiToken = _underlyingToken.balanceOf(address(piToken));
     return
       getUnderlyingEquivalentForPiPure(
@@ -391,8 +424,7 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
    * @param _reserveRatioPct The reserve ratio in %, 1 ether == 100 ether
    * @param _leftOnPiToken The amount of origin tokens left on the piToken (WrappedPiErc20) contract
    * @param _stakedBalance The amount of original tokens staked on the staking contract
-   * @param _withdrawAmount The amount to be withdrawn within the current transaction
-   *                        (could be negative in a case of deposit)
+   * @param _withdrawAmount The amount to be withdrawn within the current transaction. Deprecated, pass in 0.
    * @return status The reserve status:
    * * SHORTAGE - There is not enough underlying funds on the wrapper contract to satisfy the reserve ratio,
    *           the diff amount should be redeemed from the staking contract
@@ -437,8 +469,9 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
    * @param _reserveRatioPct % of a reserve ratio, 1 ether == 100%
    * @param _leftOnPiToken The amount of origin tokens left on the piToken (WrappedPiErc20) contract
    * @param _stakedBalance The amount of original tokens staked on the staking contract
-   * @param _withdrawAmount The amount to be withdrawn within the current transaction
-   *                        (could be negative in a case of deposit)
+   * @param _withdrawAmount The amount to be withdrawn within the current transaction. Deprecated, now it is always 0.
+   *        Introduced when the rebalancing logic was triggered by deposit/withdraw actions of piToken. Now this logic
+   *        is triggered by the poke*() methods only.
    * @return expectedReserveAmount The expected reserve amount
    *
    *                           / %reserveRatio * (staked + _leftOnPiToken - withdrawAmount) \
@@ -455,6 +488,19 @@ contract PowerIndexBasicRouter is PowerIndexBasicRouterInterface, PowerIndexNaiv
       _reserveRatioPct.mul(_stakedBalance.add(_leftOnPiToken).sub(_withdrawAmount)).div(HUNDRED_PCT).add(
         _withdrawAmount
       );
+  }
+
+  function _safeTransfer(
+    IERC20 _token,
+    address _to,
+    uint256 _value
+  ) internal {
+    bytes memory response = piToken.callExternal(address(_token), IERC20.transfer.selector, abi.encode(_to, _value), 0);
+
+    if (response.length > 0) {
+      // Return data is optional
+      require(abi.decode(response, (bool)), "ERC20 operation did not succeed");
+    }
   }
 
   function _reward(

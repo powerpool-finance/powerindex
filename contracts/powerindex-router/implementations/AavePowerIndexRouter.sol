@@ -48,15 +48,15 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
 
   function callCreate(bytes calldata _args) external {
     _checkVotingSenderAllowed();
-    _callVoting(IAaveGovernanceV2(0).create.selector, _args);
+    _callVoting(IAaveGovernanceV2.create.selector, _args);
   }
 
   function callSubmitVote(uint256 _proposalId, bool _support) external {
     _checkVotingSenderAllowed();
-    _callVoting(IAaveGovernanceV2(0).submitVote.selector, abi.encode(_proposalId, _support));
+    _callVoting(IAaveGovernanceV2.submitVote.selector, abi.encode(_proposalId, _support));
   }
 
-  function _claimRewards() internal override {
+  function _claimRewards(ReserveStatus) internal override {
     uint256 rewardsPending = IStakedAave(staking).getTotalRewardsBalance(address(piToken));
     require(rewardsPending > 0, "NOTHING_TO_CLAIM");
 
@@ -153,7 +153,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   }
 
   function _triggerCoolDown() internal {
-    _callStaking(IStakedAave(0).cooldown.selector, "");
+    _callStaking(IStakedAave.cooldown.selector, "");
     emit TriggerCooldown();
   }
 
@@ -161,7 +161,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
     require(_amount > 0, "CANT_STAKE_0");
 
     piToken.approveUnderlying(staking, _amount);
-    _callStaking(IStakedAave(0).stake.selector, abi.encode(piToken, _amount));
+    _callStaking(IStakedAave.stake.selector, abi.encode(piToken, _amount));
 
     emit Stake(msg.sender, _amount);
   }
@@ -169,7 +169,7 @@ contract AavePowerIndexRouter is PowerIndexBasicRouter {
   function _redeem(uint256 _amount) internal {
     require(_amount > 0, "CANT_REDEEM_0");
 
-    _callStaking(IStakedAave(0).redeem.selector, abi.encode(address(piToken), _amount));
+    _callStaking(IStakedAave.redeem.selector, abi.encode(address(piToken), _amount));
 
     emit Redeem(msg.sender, _amount);
   }

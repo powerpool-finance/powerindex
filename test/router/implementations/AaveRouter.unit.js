@@ -59,6 +59,8 @@ const COOLDOWN_STATUS = {
   UNSTAKE_WINDOW: 2,
 };
 
+const REPORTER_ID = 42;
+
 describe('AaveRouter Tests', () => {
   let deployer,
     aaveDistributor,
@@ -66,6 +68,7 @@ describe('AaveRouter Tests', () => {
     alice,
     rewardsVault,
     emissionManager,
+    reporter,
     stub,
     guardian,
     piGov,
@@ -79,6 +82,7 @@ describe('AaveRouter Tests', () => {
       alice,
       rewardsVault,
       emissionManager,
+      reporter,
       stub,
       guardian,
       piGov,
@@ -131,7 +135,6 @@ describe('AaveRouter Tests', () => {
         // governance
         constants.ZERO_ADDRESS,
       );
-
       poolRestrictions = await PoolRestrictions.new();
       piAave = await WrappedPiErc20.new(aave.address, stub, 'wrapped.aave', 'piAAVE');
       poke = await MockPoke.new(true);
@@ -144,6 +147,7 @@ describe('AaveRouter Tests', () => {
           stakedAave.address,
           ether('0.2'),
           ether('0.02'),
+          ether('0.3'),
           '0',
           pvp,
           ether('0.2'),
@@ -175,6 +179,7 @@ describe('AaveRouter Tests', () => {
           stakedAave.address,
           ether('0.2'),
           ether('0.02'),
+          ether('0.3'),
           '172801',
           pvp,
           ether('0.2'),
@@ -189,9 +194,11 @@ describe('AaveRouter Tests', () => {
     describe('owner methods', async () => {
       describe('setReserveConfig()', () => {
         it('should allow the owner setting a reserve config', async () => {
-          const res = await aaveRouter.setReserveConfig(ether('0.2'), 3600, { from: piGov });
+          const res = await aaveRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.5'), 3600, { from: piGov });
           expectEvent(res, 'SetReserveConfig', {
             ratio: ether('0.2'),
+            ratioLowerBound: ether('0.1'),
+            ratioUpperBound: ether('0.5'),
             claimRewardsInterval: '3600'
           });
           assert.equal(await aaveRouter.reserveRatio(), ether('0.2'))
@@ -199,11 +206,11 @@ describe('AaveRouter Tests', () => {
         });
 
         it('should deny setting a reserve ratio greater or equal 100%', async () => {
-          await expectRevert(aaveRouter.setReserveConfig(ether('1.01'), 0, { from: piGov }), 'RR_GREATER_THAN_100_PCT');
+          await expectRevert(aaveRouter.setReserveConfig(ether('1.01'), ether('0.3'), ether('1.01'), 0, { from: piGov }), 'UPPER_RR_GREATER_THAN_100_PCT');
         });
 
         it('should deny non-owner setting reserve config', async () => {
-          await expectRevert(aaveRouter.setReserveConfig(ether('0.2'), 3600, { from: alice }), 'Ownable: caller is not the owner');
+          await expectRevert(aaveRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.3'), 3600, { from: alice }), 'Ownable: caller is not the owner');
         });
       });
 
@@ -212,7 +219,7 @@ describe('AaveRouter Tests', () => {
           await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
           await aave.approve(piAave.address, ether('10000'), { from: alice });
           await piAave.deposit(ether('10000'), { from: alice });
-          await aaveRouter.poke(false);
+          await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x', { from: reporter });
 
           assert.equal(await aave.balanceOf(piAave.address), ether(2000));
           assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
@@ -298,7 +305,7 @@ describe('AaveRouter Tests', () => {
       it('it should initially stake the excess of funds to the staking contract immediately', async () => {
         await aave.approve(piAave.address, ether(10000), { from: alice });
         await piAave.deposit(ether('10000'), { from: alice });
-        await aaveRouter.poke(false);
+        await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await piAave.totalSupply(), ether(10000));
         assert.equal(await piAave.balanceOf(alice), ether(10000));
@@ -316,14 +323,14 @@ describe('AaveRouter Tests', () => {
         beforeEach(async () => {
           await aave.approve(piAave.address, ether(10000), { from: alice });
           await piAave.deposit(ether(10000), { from: alice });
-          await aaveRouter.poke(false);
+          await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
         });
 
         it('it should stake the excess of funds to the staking contract immediately', async () => {
           // 2nd
           await aave.approve(piAave.address, ether(10000), { from: bob });
           await piAave.deposit(ether(10000), { from: bob });
-          await aaveRouter.poke(false);
+          await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
           assert.equal(await piAave.totalSupply(), ether(20000));
           assert.equal(await piAave.balanceOf(alice), ether(10000));
@@ -343,13 +350,13 @@ describe('AaveRouter Tests', () => {
           await piAave.withdraw(ether(500), { from: alice });
           await piAave.withdraw(ether(500), { from: alice });
           await piAave.withdraw(ether(500), { from: alice });
-          await aaveRouter.poke(false);
+          await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
           assert.equal((await aaveRouter.getCoolDownStatus()).status, COOLDOWN_STATUS.COOLDOWN);
 
           await aave.approve(piAave.address, ether(10000), { from: bob });
           await piAave.deposit(ether(10000), { from: bob });
-          await aaveRouter.poke(false);
+          await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
         });
       });
     });
@@ -359,14 +366,14 @@ describe('AaveRouter Tests', () => {
         await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
         await aave.approve(piAave.address, ether(1000), { from: alice });
         await piAave.deposit(ether(1000), { from: alice });
-        await aaveRouter.poke(false);
+        await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
         await aave.transfer(piAave.address, ether(50), { from: alice });
         assert.equal(await aave.balanceOf(piAave.address), ether(250));
         assert.equal(await aave.balanceOf(stakedAave.address), ether(42800));
 
         // 2nd
         await piAave.withdraw(ether(50), { from: alice });
-        await aaveRouter.poke(false);
+        await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         // The router has partially staked the deposit with regard to the reserve ration value (20/80)
         assert.equal(await aave.balanceOf(piAave.address), ether(200));
@@ -378,7 +385,7 @@ describe('AaveRouter Tests', () => {
       await aave.transfer(alice, ether(100000), { from: aaveDistributor });
       await aave.approve(piAave.address, ether(10000), { from: alice });
       await piAave.deposit(ether(10000), { from: alice });
-      await aaveRouter.poke(false);
+      await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
       await aaveRouter.triggerCooldown({ from: piGov });
       await time.increase(cooldownPeriod + 1);
@@ -391,7 +398,7 @@ describe('AaveRouter Tests', () => {
       assert.equal(await piAave.balanceOf(alice), ether(10000));
       assert.equal(await piAave.totalSupply(), ether(10000));
 
-      await expectRevert(aaveRouter.poke(false), 'call to a non-contract account');
+      await expectRevert(aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x'), 'STAKING_IS_NULL');
     });
 
     describe('when interval enabled', () => {
@@ -400,12 +407,12 @@ describe('AaveRouter Tests', () => {
         await aave.transfer(alice, ether(100000), { from: aaveDistributor });
         await aave.approve(piAave.address, ether(10000), { from: alice });
         await piAave.deposit(ether(10000), { from: alice });
-        await aaveRouter.poke(false);
+        await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await aave.balanceOf(stakedAave.address), ether(50000));
         assert.equal(await aave.balanceOf(piAave.address), ether(2000));
 
-        await aaveRouter.setReserveConfig(ether('0.2'), time.duration.hours(1), { from: piGov });
+        await aaveRouter.setReserveConfig(ether('0.2'), ether('0.1'), ether('0.5'), time.duration.hours(1), { from: piGov });
       });
 
       it('should DO rebalance on deposit if the rebalancing interval has passed', async () => {
@@ -413,7 +420,7 @@ describe('AaveRouter Tests', () => {
 
         await aave.approve(piAave.address, ether(1000), { from: alice });
         await piAave.deposit(ether(1000), { from: alice });
-        await aaveRouter.poke(false);
+        await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await aave.balanceOf(stakedAave.address), ether(50800));
         assert.equal(await stakedAave.balanceOf(piAave.address), ether(8800));
@@ -424,7 +431,7 @@ describe('AaveRouter Tests', () => {
         await time.increase(time.duration.minutes(61));
 
         await piAave.withdraw(ether(1000), { from: alice });
-        const res = await aaveRouter.poke(false);
+        const res = await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
         await expectEvent.inTransaction(res.tx, stakedAave, 'Cooldown', {
           user: piAave.address
         });
@@ -439,7 +446,7 @@ describe('AaveRouter Tests', () => {
         await time.increase(cooldownPeriod + 1);
 
         await piAave.withdraw(ether(1000), { from: alice });
-        await aaveRouter.poke(false);
+        await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await aave.balanceOf(stakedAave.address), ether(49200));
         assert.equal(await stakedAave.balanceOf(piAave.address), ether(7200));
@@ -450,7 +457,7 @@ describe('AaveRouter Tests', () => {
         await time.increase(time.duration.minutes(59));
         await poke.setMinMaxReportIntervals(time.duration.minutes(59), time.duration.minutes(118))
 
-        await aaveRouter.poke(false);
+        await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
         await aave.approve(piAave.address, ether(1000), { from: alice });
         await piAave.deposit(ether(1000), { from: alice });
         await expectRevert(aaveRouter.pokeFromReporter('0', false, '0x'), 'MIN_INTERVAL_NOT_REACHED');
@@ -479,11 +486,11 @@ describe('AaveRouter Tests', () => {
 
         beforeEach(async () => {
           await piAave.deposit(ether(1000), { from: alice });
-          await aaveRouter.poke(false);
+          await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
           await time.increase(1);
 
           await piAave.withdraw(ether(200), { from: alice });
-          let res = await aaveRouter.poke(false);
+          let res = await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
           cooldownActivatedAt = parseInt(await getResTimestamp(res));
         });
 
@@ -536,7 +543,7 @@ describe('AaveRouter Tests', () => {
 
         await aave.approve(piAave.address, ether(10000), { from: alice });
         await piAave.deposit(ether('10000'), { from: alice });
-        await aaveRouter.poke(false);
+        await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         await piAave.transfer(poolA.address, 10, { from: alice });
         await piAave.transfer(poolB.address, 20, { from: alice });
@@ -557,7 +564,7 @@ describe('AaveRouter Tests', () => {
           await increaseTimeTo(increaseTo);
         }
 
-        const claimRes = await aaveRouter.poke(true, { from: bob });
+        const claimRes = await aaveRouter.pokeFromReporter(REPORTER_ID, true, '0x', { from: bob });
 
         // The following assertions will fail when running coverage
         expectEvent(claimRes, 'ClaimRewards', {
@@ -604,7 +611,7 @@ describe('AaveRouter Tests', () => {
           [buildAaveAssetConfigInput(0, '0', stakedAave.address)],
           { from: emissionManager },
         );
-        await expectRevert(aaveRouter.poke(true, { from: alice }), 'NOTHING_TO_CLAIM');
+        await expectRevert(aaveRouter.pokeFromReporter(REPORTER_ID, true, '0x', { from: alice }), 'NOTHING_TO_CLAIM');
       });
 
       it('should revert distributing rewards when missing reward pools config', async () => {
@@ -618,6 +625,7 @@ describe('AaveRouter Tests', () => {
             stakedAave.address,
             ether('0.2'),
             ether('0.02'),
+            ether('0.3'),
             '0',
             pvp,
             ether('0.2'),
@@ -629,7 +637,7 @@ describe('AaveRouter Tests', () => {
         );
         await aaveRouter.migrateToNewRouter(piAave.address, router.address, [], { from: piGov });
         await time.increase(1);
-        await expectRevert(router.poke(true, { from: bob }), 'MISSING_REWARD_POOLS');
+        await expectRevert(router.pokeFromReporter(REPORTER_ID, true, '0x', { from: reporter }), 'MISSING_REWARD_POOLS');
       });
 
       it('should correctly distribute pvpFee', async () => {
@@ -645,6 +653,7 @@ describe('AaveRouter Tests', () => {
             stakedAave.address,
             ether('0.2'),
             ether('0.02'),
+            ether('0.3'),
             '0',
             pvp,
             0,
@@ -660,8 +669,8 @@ describe('AaveRouter Tests', () => {
 
         await aaveRouter.migrateToNewRouter(piAave.address, router.address, [], { from: piGov });
         await time.increase(1);
-        await router.poke(true, { from: bob });
-        const res = await router.poke(true, { from: bob });
+        await router.pokeFromReporter(REPORTER_ID, true, '0x', { from: reporter });
+        const res = await router.pokeFromReporter(REPORTER_ID, true, '0x', { from: bob });
 
         expectEvent(res, 'DistributeRewards', {
           sender: bob,
@@ -729,9 +738,9 @@ describe('AaveRouter Tests', () => {
         await aave.transfer(alice, ether('10000'), { from: aaveDistributor });
         await aave.approve(piAave.address, ether('10000'), { from: alice });
         await piAave.deposit(ether('10000'), { from: alice });
-        await aaveRouter.poke(false);
+        await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
-        await aaveRouter.poke(false);
+        await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
 
         assert.equal(await piAave.totalSupply(), ether('10000'));
         assert.equal(await piAave.balanceOf(alice), ether('10000'));
@@ -747,7 +756,7 @@ describe('AaveRouter Tests', () => {
         await aave.transfer(alice, ether(12300000), { from: aaveDistributor });
         await aave.approve(piAave.address, ether(12300000), { from: alice });
         await piAave.deposit(ether(12300000), { from: alice });
-        await aaveRouter.poke(false);
+        await aaveRouter.pokeFromReporter(REPORTER_ID, false, '0x');
         assert.equal(await stakedAave.balanceOf(piAave.address), ether(9848000));
         assert.equal(await aave.balanceOf(piAave.address), ether(2462000));
 

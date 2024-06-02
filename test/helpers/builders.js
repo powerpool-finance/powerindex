@@ -1,11 +1,12 @@
-function buildBasicRouterConfig(poolRestrictions, powerPoke, voting, staking, reserveRatio, reserveRatioToForceRebalance, claimRewardsInterval, pvp, pvpFee, rewardPools) {
+function buildBasicRouterConfig(poolRestrictions, powerPoke, voting, staking, reserveRatio, reserveRatioLowerBound, reserveRatioUpperBound, claimRewardsInterval, pvp, pvpFee, rewardPools) {
   return {
     poolRestrictions,
     powerPoke,
     voting,
     staking,
     reserveRatio,
-    reserveRatioToForceRebalance,
+    reserveRatioLowerBound,
+    reserveRatioUpperBound,
     claimRewardsInterval,
     pvp,
     pvpFee,
@@ -40,6 +41,35 @@ function buildSushiRouterConfig(SUSHI) {
   return { SUSHI };
 }
 
+// PANCAKE MASTER CHEF
+function buildPancakeMasterChefRouterConfig(cake) {
+  return { cake };
+}
+
+// BAKERY
+function buildBakeryChefRouterConfig(token) {
+  return { token };
+}
+
+// MASTER CHEF
+function buildMasterChefRouterConfig(token, masterChefPid) {
+  return { token, masterChefPid };
+}
+
+// AUTO
+function buildAutoRouterConfig(AUTO) {
+  return { AUTO };
+}
+
+// ALPACA
+function buildAlpacaRouterConfig(ALPACA, ibALPACA, masterChefPid) {
+  return { ALPACA, ibALPACA, masterChefPid };
+}
+
+// VENUS
+function buildVenusRouterConfig(troller, xvs) {
+  return { troller, xvs };
+}
 
 const BasicConfig = {
   poolRestrictions: 'address',
@@ -47,7 +77,8 @@ const BasicConfig = {
   voting: 'address',
   staking: 'address',
   reserveRatio: 'uint256',
-  reserveRatioToForceRebalance: 'uint256',
+  reserveRatioLowerBound: 'uint256',
+  reserveRatioUpperBound: 'uint256',
   claimRewardsInterval: 'uint256',
   pvp: 'address',
   pvpFee: 'uint256',
@@ -121,6 +152,12 @@ module.exports = {
   buildBasicRouterConfig,
   buildAaveRouterConfig,
   buildSushiRouterConfig,
+  buildPancakeMasterChefRouterConfig,
+  buildBakeryChefRouterConfig,
+  buildMasterChefRouterConfig,
+  buildAutoRouterConfig,
+  buildAlpacaRouterConfig,
+  buildVenusRouterConfig,
   buildAaveAssetConfigInput,
   buildBasicRouterArgs,
   buildYearnRouterArgs,

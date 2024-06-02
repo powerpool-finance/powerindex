@@ -103,6 +103,7 @@ describe('PowerIndexPoolController', () => {
       '0',
       '0',
       '0',
+      '0',
       stub,
       ether(0),
       []
@@ -114,7 +115,8 @@ describe('PowerIndexPoolController', () => {
         voting: 'address',
         staking: 'address',
         reserveRatio: 'uint256',
-        reserveRatioToForceRebalance: 'uint256',
+        reserveRatioUpperBound: 'uint256',
+        reserveRatioLowerBound: 'uint256',
         claimRewardsInterval: 'uint256',
         pvp: 'address',
         pvpFee: 'uint256',
